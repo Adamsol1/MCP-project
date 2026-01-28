@@ -1,0 +1,45 @@
+# ============================================
+# MCP Threat Intelligence MVP - Git Attributes
+# ============================================
+# This file ensures consistent line endings across platforms
+
+# Auto-detect text files and normalize line endings to LF on commit
+* text=auto
+
+# Shell scripts must always use LF (Unix line endings)
+*.sh text eol=lf
+
+# Batch scripts must always use CRLF (Windows line endings)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Python files use LF
+*.py text eol=lf
+
+# JavaScript/TypeScript files use LF
+*.js text eol=lf
+*.jsx text eol=lf
+*.ts text eol=lf
+*.tsx text eol=lf
+*.json text eol=lf
+
+# Configuration files use LF
+*.yml text eol=lf
+*.yaml text eol=lf
+*.toml text eol=lf
+*.ini text eol=lf
+*.cfg text eol=lf
+
+# Markdown and documentation use LF
+*.md text eol=lf
+*.txt text eol=lf
+
+# Binary files (don't modify)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.zip binary
+*.tar.gz binary
+*.whl binary
