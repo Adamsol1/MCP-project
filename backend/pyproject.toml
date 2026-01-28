@@ -1,0 +1,36 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "MCP Threat Intelligence MVP Backend"
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+license = {text = "MIT"}
+requires-python = ">=3.11,<4"
+dependencies = [
+    "fastapi (>=0.128.0,<0.129.0)",
+    "uvicorn (>=0.40.0,<0.41.0)",
+    "pydantic (>=2.12.5,<3.0.0)",
+    "httpx (>=0.28.1,<0.29.0)",
+    "fastmcp (>=2.14.4,<3.0.0)",
+    "pymisp (>=2.5.32,<3.0.0)",
+    "otxv2 (>=1.5.12,<2.0.0)",
+    "reportlab (>=4.4.9,<5.0.0)"
+]
+
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[dependency-groups]
+dev = [
+    "pytest (>=9.0.2,<10.0.0)",
+    "pytest-asyncio (>=1.3.0,<2.0.0)",
+    "pytest-cov (>=7.0.0,<8.0.0)",
+    "respx (>=0.22.0,<0.23.0)",
+    "ruff (>=0.14.14,<0.15.0)",
+    "mypy (>=1.19.1,<2.0.0)"
+]
