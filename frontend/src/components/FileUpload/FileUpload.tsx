@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 interface FileUploadProps {
   onFileSelect?: (file: File) => void;
@@ -10,6 +10,7 @@ export default function FileUpload({
   onSubmit,
 }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   /**
    * Handles file input change event
@@ -38,11 +39,30 @@ export default function FileUpload({
   };
 
   /**
+   * Handles drag enter event
+   * @param event
+   */
+  const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingOver(true);
+  };
+
+  /**
+   * Handles drag leave event
+   * @param event
+   */
+  const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDraggingOver(false);
+  };
+
+  /**
    * Handle file drop event with multiple files support
    * @param event
    */
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault(); // Prevent default browser behavior
+    setIsDraggingOver(false);
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
       const newFiles = Array.from(files);
@@ -90,8 +110,14 @@ export default function FileUpload({
       <div
         data-testid="file-dropzone"
         onDragOver={handleDragOver}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className="relative border-2 border-dashed p-42 border-gray-300 rounded-lg min-h-64 text-center hover:border-blue-400 transition-colors cursor-pointer"
+        className={`relative border-2 border-dashed p-42 rounded-lg min-h-64 text-center transition-colors cursor-pointer ${
+          isDraggingOver
+            ? "border-blue-500 bg-blue-50"
+            : "border-gray-300 hover:border-blue-400"
+        }`}
       >
         <label
           htmlFor="file-upload"
@@ -156,7 +182,12 @@ export default function FileUpload({
         <button
           type="button"
           onClick={handleSubmit}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium"
+          disabled={selectedFiles.length === 0}
+          className={`px-4 py-2 rounded-lg font-medium ${
+            selectedFiles.length === 0
+              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+              : "bg-blue-500 text-white hover:bg-blue-600"
+          }`}
         >
           Submit
         </button>

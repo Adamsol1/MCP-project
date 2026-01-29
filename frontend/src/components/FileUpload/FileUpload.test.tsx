@@ -177,4 +177,47 @@ describe("FileUpload", () => {
     expect(handleSubmit).toHaveBeenCalledTimes(1);
     expect(handleSubmit).toHaveBeenCalledWith([testFile1, testFile2]);
   });
+
+  it("highlights drop zone when dragging over", () => {
+    render(<FileUpload />);
+
+    const dropZone = screen.getByTestId("file-dropzone");
+
+    // Initially, no highlight
+    expect(dropZone).not.toHaveClass("border-blue-500");
+
+    // Drag enter
+    fireEvent.dragEnter(dropZone, {
+      dataTransfer: { files: [] },
+    });
+
+    // Should now be highlighted
+    expect(dropZone).toHaveClass("border-blue-500");
+
+    // Drag leave
+    fireEvent.dragLeave(dropZone);
+
+    // Highlight should be gone
+    expect(dropZone).not.toHaveClass("border-blue-500");
+  });
+
+  it("enables Submit button when files are selected", async () => {
+    const user = userEvent.setup();
+    render(<FileUpload />);
+
+    const submitButton = screen.getByRole("button", { name: /submit/i });
+    const fileInput = screen.getByLabelText(/upload file/i);
+
+    // Initially disabled
+    expect(submitButton).toBeDisabled();
+
+    // Add a file
+    const testFile = new File(["content"], "test.json", {
+      type: "application/json",
+    });
+    await user.upload(fileInput, testFile);
+
+    // Should now be enabled
+    expect(submitButton).toBeEnabled();
+  });
 });
