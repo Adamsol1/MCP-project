@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 interface FileUploadProps {
   onFileSelect?: (file: File) => void;
@@ -49,11 +49,14 @@ export default function FileUpload({
 
   /**
    * Handles drag leave event
+   * Only removes highlight if truly leaving the drop zone (not moving to a child element)
    * @param event
    */
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    setIsDraggingOver(false);
+    if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+      setIsDraggingOver(false);
+    }
   };
 
   /**
