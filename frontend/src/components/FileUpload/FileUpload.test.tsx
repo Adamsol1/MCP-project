@@ -19,7 +19,7 @@ describe("FileUpload", () => {
     expect(fileInput).toHaveAttribute("accept", ".json, .csv, .pdf, .txt");
   });
 
-  it("calles onFileSelect when a file is selected", async () => {
+  it("calls onFileSelect when a file is selected", async () => {
     const user = userEvent.setup();
     const handleFileSelect = vi.fn();
     render(<FileUpload onFileSelect={handleFileSelect} />);

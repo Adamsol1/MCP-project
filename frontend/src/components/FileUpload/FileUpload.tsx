@@ -7,6 +7,10 @@ interface FileUploadProps {
 export default function FileUpload({ onFileSelect }: FileUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
+  /**
+   * Handles file input change event
+   * @param event
+   */
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files && files.length > 0) {
@@ -20,12 +24,21 @@ export default function FileUpload({ onFileSelect }: FileUploadProps) {
     }
   };
 
+  /**
+   * Function that formats file size into human-readable string
+   * @param bytes - Bytes size of the file in numbers
+   * @returns {string} size - String of file size in bytes, KB, or MB
+   */
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} bytes`;
     else if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
     else return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
+  /**
+   * Handles remove of file listed
+   * @param fileToRemove
+   */
   const handleRemove = (fileToRemove: File) => {
     setSelectedFiles((prev) => prev.filter((file) => file !== fileToRemove));
   };
