@@ -34,3 +34,44 @@ class TLPLevel(str, Enum):
     GREEN = "green"  # Community - share within community
     AMBER = "amber"  # Limited - share on need-to-know
     RED = "red"  # Restricted - named recipients only
+
+
+class IndicatorRole(str, Enum):
+    """What the indicator is used for in an attack."""
+
+    C2 = "c2"  # Command and Control server
+    MALWARE = "malware"  # Malware hash or delivery
+    PHISHING = "phishing"  # Phishing domain/URL
+    SCANNER = "scanner"  # Scanning/reconnaissance
+    EXFILTRATION = "exfiltration"  # Data exfiltration endpoint
+    UNKNOWN = "unknown"  # Not yet classified
+
+
+class DataSource(str, Enum):
+    """Where threat intelligence data originated."""
+
+    OTX = "otx"  # AlienVault OTX
+    MISP = "misp"  # MISP platform
+    CSV_UPLOAD = "csv_upload"
+    PDF_UPLOAD = "pdf_upload"
+    TXT_UPLOAD = "txt_upload"
+    JSON_UPLOAD = "json_upload"
+    MANUAL = "manual"  # Manual entry
+
+
+class ExtractionMethod(str, Enum):
+    """How IOCs were extracted from source data."""
+
+    DIRECT_PARSE = "direct_parse"  # Structured data (JSON, CSV)
+    REGEX = "regex"  # Pattern matching
+    AI_EXTRACTION = "ai_extraction"  # LLM-based extraction
+    MANUAL = "manual"  # Human entry
+
+
+class ProcessingStatus(str, Enum):
+    """State machine for file processing."""
+
+    PENDING = "pending"  # Waiting to be processed
+    PROCESSING = "processing"  # Currently being processed
+    COMPLETED = "completed"  # Successfully processed
+    FAILED = "failed"  # Processing failed
