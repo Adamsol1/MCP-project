@@ -1,0 +1,602 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prototype 3 - Intel Command Board</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f2f4f8;
+        --panel: #ffffff;
+        --panel-2: #eef1f6;
+        --panel-3: #e3e8f1;
+        --border: #d1d7e3;
+        --text: #1b2230;
+        --muted: #6b7383;
+        --accent: #ff6b2c;
+        --accent-2: #ff8b5c;
+        --ok: #1ea672;
+        --warn: #e6a700;
+        --bad: #e04f4f;
+        --shadow: 0 10px 26px rgba(16, 19, 27, 0.08);
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0d1118;
+        --panel: #161b25;
+        --panel-2: #1d2431;
+        --panel-3: #222b3a;
+        --border: #2d3647;
+        --text: #e7ecf5;
+        --muted: #9aa3b2;
+        --accent: #ff925c;
+        --accent-2: #ffb38a;
+        --ok: #39c088;
+        --warn: #f4c251;
+        --bad: #ff6b6b;
+        --shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .app {
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        height: 100vh;
+      }
+
+      .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-weight: 700;
+      }
+
+      .brand-badge {
+        background: var(--accent);
+        color: white;
+        border-radius: 999px;
+        padding: 6px 10px;
+        font-size: 0.75rem;
+      }
+
+      .status-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .status-pill {
+        padding: 4px 8px;
+        border-radius: 999px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 260px 1fr 320px;
+        gap: 14px;
+        padding: 14px 16px;
+        overflow: hidden;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .panel header {
+        padding: 12px 14px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .panel header h3 {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+
+      .panel header button {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        color: var(--text);
+      }
+
+      .case-list {
+        padding: 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+      }
+
+      .case-item {
+        border: 1px solid transparent;
+        border-radius: 12px;
+        padding: 8px 10px;
+        background: var(--panel-2);
+        cursor: pointer;
+      }
+
+      .case-item.active {
+        border-color: var(--accent);
+        background: rgba(255, 107, 44, 0.15);
+      }
+
+      .case-title {
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .case-meta {
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .timeline {
+        padding: 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+        overflow-y: auto;
+      }
+
+      .event {
+        border-left: 3px solid var(--accent);
+        padding: 10px 12px;
+        background: var(--panel-2);
+        border-radius: 12px;
+      }
+
+      .event h4 {
+        margin: 0 0 6px 0;
+        font-size: 0.9rem;
+      }
+
+      .event p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 0.85rem;
+      }
+
+      .event small {
+        color: var(--muted);
+      }
+
+      .intel-grid {
+        padding: 12px;
+        display: grid;
+        grid-template-rows: auto auto 1fr;
+        gap: 10px;
+        overflow: hidden;
+      }
+
+      .metric {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+
+      .metric h4 {
+        margin: 0;
+        font-size: 0.85rem;
+      }
+
+      .metric .value {
+        font-size: 1.4rem;
+        font-weight: 700;
+      }
+
+      .risk-bar {
+        height: 10px;
+        background: var(--panel-3);
+        border-radius: 999px;
+        overflow: hidden;
+        margin-top: 6px;
+      }
+
+      .risk-fill {
+        height: 100%;
+        background: var(--bad);
+      }
+
+      .ioc-list {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 12px;
+        padding: 10px;
+        overflow-y: auto;
+      }
+
+      .ioc-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 6px 0;
+        border-bottom: 1px dashed var(--border);
+        font-size: 0.82rem;
+      }
+
+      .ioc-item:last-child {
+        border-bottom: none;
+      }
+
+      .ioc-tag {
+        padding: 2px 6px;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        background: var(--panel-3);
+      }
+
+      .composer {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 14px 18px;
+        border-top: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .composer input,
+      .composer textarea {
+        width: 100%;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px 12px;
+        background: var(--panel-2);
+        color: var(--text);
+        font-family: inherit;
+      }
+
+      .composer button {
+        border: none;
+        border-radius: 10px;
+        padding: 10px 14px;
+        background: var(--accent);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .logbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 10px 18px;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .logbar button {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 8px;
+        padding: 6px 8px;
+        cursor: pointer;
+        color: var(--text);
+      }
+
+      @media (max-width: 1100px) {
+        .layout {
+          grid-template-columns: 220px 1fr;
+        }
+
+        .layout .panel:nth-child(3) {
+          grid-column: 1 / -1;
+        }
+      }
+
+      @media (max-width: 800px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #d6dbe6;background:#ffffff;">
+      <a href="/index.html">Home</a>
+      <a href="/prototype-1.html">Prototype 1</a>
+      <a href="/prototype-2.html">Prototype 2</a>
+      <a href="/prototype-3.html">Prototype 3</a>
+    </nav>
+
+        <div class="app" id="app"></div>
+
+    <script>
+      const state = {
+        theme: "light",
+        cases: [],
+        activeCaseId: "",
+      };
+
+      const STORAGE_KEY = "prototype-3-state";
+
+      const saveState = () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      };
+
+      const loadState = () => {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (!stored) return;
+        try {
+          const parsed = JSON.parse(stored);
+          state.theme = parsed.theme || "light";
+          state.cases = Array.isArray(parsed.cases) ? parsed.cases : [];
+          state.activeCaseId = parsed.activeCaseId || "";
+        } catch (err) {
+          console.warn("Failed to load state", err);
+        }
+      };
+
+      const createCase = () => {
+        const id = "case_" + Date.now().toString(36);
+        const now = Date.now();
+        const item = {
+          id,
+          title: "New intel case",
+          updatedAt: now,
+          timeline: [
+            {
+              id: "event_" + Math.random().toString(36),
+              title: "Case opened",
+              body: "Initial triage created. Awaiting signals.",
+              createdAt: now,
+            },
+          ],
+          iocs: [
+            { value: "1.2.3.4", type: "ip", severity: "high" },
+            { value: "evil-domain.com", type: "domain", severity: "medium" },
+            { value: "e3b0c442", type: "hash", severity: "low" },
+          ],
+          risk: 62,
+        };
+        state.cases.unshift(item);
+        state.activeCaseId = id;
+        saveState();
+      };
+
+      const getActiveCase = () => state.cases.find((c) => c.id === state.activeCaseId);
+
+      const addEvent = (text) => {
+        const active = getActiveCase();
+        if (!active) return;
+        active.timeline.unshift({
+          id: "event_" + Math.random().toString(36),
+          title: "Analyst note",
+          body: text,
+          createdAt: Date.now(),
+        });
+        active.updatedAt = Date.now();
+        active.risk = Math.min(95, active.risk + Math.floor(Math.random() * 10));
+        saveState();
+      };
+
+      const addIoc = () => {
+        const active = getActiveCase();
+        if (!active) return;
+        const samples = [
+          { value: "suspicious-login.net", type: "domain", severity: "high" },
+          { value: "5.6.7.8", type: "ip", severity: "medium" },
+          { value: "aa12bb34", type: "hash", severity: "low" },
+        ];
+        active.iocs.unshift(samples[Math.floor(Math.random() * samples.length)]);
+        active.updatedAt = Date.now();
+        saveState();
+      };
+
+      const render = () => {
+        document.documentElement.setAttribute("data-theme", state.theme);
+        if (!state.cases.length) {
+          createCase();
+        }
+        if (!state.activeCaseId) {
+          state.activeCaseId = state.cases[0].id;
+        }
+        const active = getActiveCase();
+
+        const app = document.getElementById("app");
+        app.innerHTML = `
+          <div class="top">
+            <div class="brand">
+              Intel Command Board
+              <span class="brand-badge">Prototype 3</span>
+            </div>
+            <div class="status-row">
+              <span class="status-pill">${active?.timeline.length || 0} events</span>
+              <span class="status-pill">Risk ${active?.risk || 0}%</span>
+              <button data-action="toggle-theme">${state.theme === "light" ? "??" : "?"}</button>
+            </div>
+          </div>
+
+          <div class="layout">
+            <section class="panel">
+              <header>
+                <h3>Cases</h3>
+                <button data-action="new-case">+ New</button>
+              </header>
+              <div class="case-list">
+                ${state.cases
+                  .map(
+                    (item) => `
+                    <div class="case-item ${item.id === state.activeCaseId ? "active" : ""}" data-action="open-case" data-id="${item.id}">
+                      <div class="case-title">${item.title}</div>
+                      <div class="case-meta">Updated ${new Date(item.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</div>
+                    </div>
+                  `
+                  )
+                  .join("")}
+              </div>
+            </section>
+
+            <section class="panel">
+              <header>
+                <h3>${active?.title || "Case"}</h3>
+                <button data-action="add-ioc">+ IOC</button>
+              </header>
+              <div class="timeline">
+                ${active?.timeline
+                  .map(
+                    (event) => `
+                    <div class="event">
+                      <h4>${event.title}</h4>
+                      <p>${event.body}</p>
+                      <small>${new Date(event.createdAt).toLocaleString()}</small>
+                    </div>
+                  `
+                  )
+                  .join("")}
+              </div>
+            </section>
+
+            <section class="panel">
+              <header>
+                <h3>Intel Snapshot</h3>
+                <button data-action="refresh">?</button>
+              </header>
+              <div class="intel-grid">
+                <div class="metric">
+                  <h4>Threat posture</h4>
+                  <div class="value">${active?.risk || 0}%</div>
+                  <div class="risk-bar"><div class="risk-fill" style="width: ${active?.risk || 0}%"></div></div>
+                </div>
+                <div class="metric">
+                  <h4>Indicators</h4>
+                  <div class="value">${active?.iocs.length || 0}</div>
+                </div>
+                <div class="ioc-list">
+                  ${active?.iocs
+                    .map(
+                      (ioc) => `
+                      <div class="ioc-item">
+                        <span>${ioc.value}</span>
+                        <span class="ioc-tag">${ioc.type} · ${ioc.severity}</span>
+                      </div>
+                    `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div class="composer">
+            <textarea id="note" rows="2" placeholder="Add a timeline note..."></textarea>
+            <button data-action="add-note">Add note</button>
+          </div>
+
+          <div class="logbar">
+            <span>Console: Monitoring streams • mock only</span>
+            <button data-action="rename">Rename case</button>
+          </div>
+        `;
+      };
+
+      const handleClick = (event) => {
+        const actionEl = event.target.closest("[data-action]");
+        if (!actionEl) return;
+        const action = actionEl.dataset.action;
+        const id = actionEl.dataset.id;
+
+        if (action === "toggle-theme") {
+          state.theme = state.theme === "light" ? "dark" : "light";
+          saveState();
+          render();
+          return;
+        }
+
+        if (action === "new-case") {
+          createCase();
+          render();
+          return;
+        }
+
+        if (action === "open-case" && id) {
+          state.activeCaseId = id;
+          saveState();
+          render();
+          return;
+        }
+
+        if (action === "add-note") {
+          const input = document.getElementById("note");
+          if (input.value.trim()) {
+            addEvent(input.value.trim());
+            input.value = "";
+            render();
+          }
+          return;
+        }
+
+        if (action === "add-ioc") {
+          addIoc();
+          render();
+          return;
+        }
+
+        if (action === "refresh") {
+          const active = getActiveCase();
+          if (active) {
+            active.risk = Math.min(98, Math.max(10, active.risk + (Math.random() > 0.5 ? 5 : -5)));
+            active.updatedAt = Date.now();
+            saveState();
+            render();
+          }
+          return;
+        }
+
+        if (action === "rename") {
+          const active = getActiveCase();
+          if (!active) return;
+          const next = prompt("Rename case", active.title);
+          if (!next) return;
+          active.title = next.trim().slice(0, 60);
+          active.updatedAt = Date.now();
+          saveState();
+          render();
+        }
+      };
+
+      loadState();
+      document.addEventListener("click", handleClick);
+      render();
+    </script>
+  </body>
+</html>
