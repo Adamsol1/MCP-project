@@ -4,35 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Prototype 1 - Chat UI</title>
-    <style>
+            <style>
       :root {
         color-scheme: light;
-        --bg: #f6f7fb;
+        --bg: #f3efe6;
+        --bg-accent: #f8f4ec;
         --panel: #ffffff;
-        --panel-2: #f2f4f8;
-        --border: #d6dbe6;
-        --text: #1f2430;
-        --muted: #6b7383;
-        --shadow: 0 6px 18px rgba(20, 24, 35, 0.08);
-        --accent: #2b6cf6;
-        --accent-2: #1a56d6;
-        --success: #1f9d5c;
-        --danger: #d64545;
+        --panel-2: #f5f0e6;
+        --line: #ded6c8;
+        --text: #1d1a16;
+        --muted: #6b6358;
+        --shadow: 0 10px 24px rgba(26, 23, 18, 0.12);
+        --accent: #b24a2b;
+        --accent-2: #2b3f8c;
+        --success: #2b8f5f;
+        --danger: #b33b3b;
       }
 
       [data-theme="dark"] {
         color-scheme: dark;
-        --bg: #0f1117;
-        --panel: #151923;
-        --panel-2: #1b2230;
-        --border: #2a3242;
-        --text: #e6e9f2;
-        --muted: #9aa3b2;
-        --shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
-        --accent: #6ea3ff;
-        --accent-2: #3d7bff;
-        --success: #4cc38a;
-        --danger: #ff6b6b;
+        --bg: #14130f;
+        --bg-accent: #1a1915;
+        --panel: #1c1b18;
+        --panel-2: #23211d;
+        --line: #34312a;
+        --text: #f1ede6;
+        --muted: #b8b0a4;
+        --shadow: 0 16px 30px rgba(0, 0, 0, 0.5);
+        --accent: #e07b5d;
+        --accent-2: #8fa5ff;
+        --success: #5bd39b;
+        --danger: #ff7a7a;
       }
 
       * {
@@ -41,71 +43,102 @@
 
       body {
         margin: 0;
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: var(--bg);
+        font-family: "Georgia", "Times New Roman", serif;
+        background: radial-gradient(circle at top left, var(--bg-accent), var(--bg));
         color: var(--text);
         height: 100vh;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #app {
+        flex: 1;
+        min-height: 0;
       }
 
       .app {
-        display: flex;
-        height: 100vh;
-        width: 100vw;
+        height: 100%;
+        width: 100%;
+      }
+
+      .app-shell {
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        gap: 18px;
+        padding: 16px 18px;
+        height: 100%;
+      }
+
+      .app-shell.rail-collapsed {
+        grid-template-columns: 84px minmax(0, 1fr) 300px;
       }
 
       .sidebar {
-        width: 280px;
-        min-width: 280px;
         background: var(--panel);
-        border-right: 1px solid var(--border);
+        border: 1px solid var(--line);
+        border-radius: 18px;
         display: flex;
         flex-direction: column;
+        min-height: 0;
+        box-shadow: var(--shadow);
         transition: width 0.2s ease;
       }
 
       .sidebar.collapsed {
-        width: 72px;
-        min-width: 72px;
+        width: 84px;
       }
 
-      .sidebar-header {
+      .rail-header {
         display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 16px;
-        border-bottom: 1px solid var(--border);
+        flex-direction: column;
+        gap: 12px;
+        padding: 18px 16px 12px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-weight: 700;
+        font-size: 1.05rem;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+      }
+
+      .rail-actions {
+        display: flex;
         gap: 8px;
       }
 
+      .sidebar-header,
       .sidebar-header button,
       .sidebar-header .icon-btn {
+        display: none;
+      }
+
+      .icon-btn {
         background: var(--panel-2);
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         padding: 8px 10px;
         border-radius: 10px;
         cursor: pointer;
         color: var(--text);
         box-shadow: var(--shadow);
-      }
-
-      .sidebar-header .icon-btn {
-        width: 36px;
-        height: 36px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.85rem;
       }
 
       .sidebar-body {
-        padding: 12px 14px;
+        padding: 14px 16px 18px;
         display: flex;
         flex-direction: column;
         gap: 12px;
         height: 100%;
+        min-height: 0;
       }
 
-      .sidebar.collapsed .sidebar-body > * {
+      .sidebar.collapsed .sidebar-body > *,
+      .sidebar.collapsed .rail-header {
         opacity: 0;
         pointer-events: none;
         height: 0;
@@ -119,22 +152,27 @@
         gap: 8px;
         padding: 10px 12px;
         border-radius: 12px;
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         background: var(--accent);
-        color: white;
-        font-weight: 600;
+        color: #fff7f1;
+        font-weight: 700;
         cursor: pointer;
-        box-shadow: var(--shadow);
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       }
 
       .search {
         display: flex;
-        align-items: center;
+        flex-direction: column;
         gap: 6px;
         background: var(--panel-2);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 8px 10px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--muted);
       }
 
       .search input {
@@ -143,19 +181,21 @@
         outline: none;
         color: var(--text);
         width: 100%;
+        font-family: "Georgia", "Times New Roman", serif;
+        font-size: 0.95rem;
       }
 
       .conversation-list {
         display: flex;
         flex-direction: column;
-        gap: 8px;
+        gap: 10px;
         overflow-y: auto;
         padding-right: 4px;
       }
 
       .conversation-item {
-        padding: 10px 12px;
-        border-radius: 12px;
+        padding: 12px 12px;
+        border-radius: 14px;
         border: 1px solid transparent;
         background: var(--panel-2);
         cursor: pointer;
@@ -167,137 +207,194 @@
 
       .conversation-item.active {
         border-color: var(--accent);
-        background: rgba(43, 108, 246, 0.15);
+        background: #fcefe9;
+      }
+
+      [data-theme="dark"] .conversation-item.active {
+        background: #2a1e1b;
       }
 
       .conversation-title {
-        font-weight: 600;
-        font-size: 0.92rem;
+        font-weight: 700;
+        font-size: 0.95rem;
       }
 
       .conversation-meta {
-        font-size: 0.72rem;
+        font-size: 0.75rem;
         color: var(--muted);
       }
 
       .conversation-actions {
         display: flex;
         gap: 6px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       }
 
       .icon-only {
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         background: transparent;
         color: var(--muted);
-        border-radius: 8px;
-        width: 26px;
-        height: 26px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
+        border-radius: 10px;
+        padding: 4px 8px;
         cursor: pointer;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
       }
 
       .main {
-        flex: 1;
         display: flex;
         flex-direction: column;
-        height: 100%;
-        position: relative;
+        min-height: 0;
       }
 
-      .topbar {
+      .studio-header {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border);
+        padding: 18px 20px;
+        border: 1px solid var(--line);
+        border-radius: 18px;
         background: var(--panel);
+        box-shadow: var(--shadow);
       }
 
-      .topbar .title {
-        font-weight: 700;
-        font-size: 1.1rem;
-      }
-
-      .topbar-actions {
+      .header-left {
         display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .title-block {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+      }
+
+      .eyebrow {
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.7rem;
+        letter-spacing: 1.2px;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .studio-header .title {
+        font-weight: 700;
+        font-size: 1.2rem;
+      }
+
+      .header-actions {
+        display: flex;
+        align-items: center;
         gap: 10px;
       }
 
-      .topbar button {
-        border: 1px solid var(--border);
+      .status-tag {
+        padding: 6px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
         background: var(--panel-2);
-        padding: 8px 10px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .ghost {
+        border: 1px solid var(--line);
+        background: transparent;
         border-radius: 10px;
+        padding: 8px 12px;
         cursor: pointer;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
         color: var(--text);
+      }
+
+      .storyboard {
+        margin-top: 16px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px 18px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-height: 0;
+      }
+
+      .story-meta {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--muted);
       }
 
       .chat-log {
         flex: 1;
         overflow-y: auto;
-        padding: 24px 20px 120px;
         display: flex;
         flex-direction: column;
-        gap: 18px;
+        gap: 12px;
+        padding-right: 6px;
+        min-height: 0;
       }
 
       .message {
         display: flex;
         flex-direction: column;
-        gap: 6px;
+        gap: 8px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid var(--line);
+        background: var(--panel-2);
       }
 
       .message.user {
-        align-items: flex-end;
+        border-left: 4px solid var(--accent);
+        background: #fff5ee;
+        align-self: flex-end;
       }
 
       .message.assistant {
-        align-items: flex-start;
+        border-left: 4px solid var(--accent-2);
+        background: #f2f4ff;
+        align-self: flex-start;
       }
 
-      .message.tool {
-        align-items: stretch;
+      [data-theme="dark"] .message.user {
+        background: #2a1d18;
+      }
+
+      [data-theme="dark"] .message.assistant {
+        background: #1e2334;
       }
 
       .bubble {
-        max-width: 75%;
-        padding: 14px 16px;
-        border-radius: 16px;
-        box-shadow: var(--shadow);
-      }
-
-      .user .bubble {
-        background: var(--accent);
-        color: white;
-        border-bottom-right-radius: 6px;
-      }
-
-      .assistant .bubble {
-        background: var(--panel);
-        border: 1px solid var(--border);
-        border-bottom-left-radius: 6px;
-      }
-
-      .tool .bubble {
-        background: var(--panel-2);
-        border: 1px dashed var(--border);
-        color: var(--muted);
+        line-height: 1.5;
       }
 
       .message-actions {
         display: flex;
-        gap: 8px;
         align-items: center;
-        font-size: 0.75rem;
+        gap: 10px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
         color: var(--muted);
       }
 
       .copy-btn {
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         background: transparent;
-        border-radius: 8px;
+        border-radius: 10px;
         padding: 4px 8px;
         cursor: pointer;
         color: var(--muted);
@@ -305,8 +402,8 @@
 
       .run-trace {
         margin-top: 8px;
-        border: 1px solid var(--border);
-        background: var(--panel-2);
+        border: 1px solid var(--line);
+        background: var(--panel);
         border-radius: 12px;
         padding: 10px 12px;
       }
@@ -314,12 +411,13 @@
       .run-trace summary {
         cursor: pointer;
         font-weight: 600;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       }
 
       .run-step {
         font-size: 0.85rem;
         padding: 6px 0;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--line);
       }
 
       .run-step:last-child {
@@ -329,25 +427,27 @@
       .composer {
         position: sticky;
         bottom: 0;
+        margin-top: 14px;
         background: var(--panel);
-        border-top: 1px solid var(--border);
-        padding: 16px 20px;
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 14px 16px;
         display: flex;
         gap: 12px;
         align-items: flex-end;
+        box-shadow: var(--shadow);
       }
 
       .composer textarea {
         flex: 1;
         resize: none;
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: 14px;
         padding: 12px 14px;
         font-family: inherit;
         font-size: 0.95rem;
         background: var(--panel-2);
         color: var(--text);
-        box-shadow: var(--shadow);
         min-height: 44px;
         max-height: 160px;
         overflow-y: auto;
@@ -357,12 +457,12 @@
         border: none;
         border-radius: 12px;
         padding: 12px 16px;
-        font-weight: 600;
+        font-weight: 700;
         cursor: pointer;
         background: var(--accent);
-        color: white;
-        box-shadow: var(--shadow);
+        color: #fff7f1;
         min-width: 90px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       }
 
       .composer button[disabled] {
@@ -371,15 +471,72 @@
       }
 
       .jump-latest {
-        position: absolute;
-        bottom: 92px;
-        right: 24px;
+        align-self: flex-end;
+        margin-top: 12px;
         background: var(--panel);
-        border: 1px solid var(--border);
+        border: 1px solid var(--line);
         border-radius: 999px;
         padding: 8px 14px;
         box-shadow: var(--shadow);
         cursor: pointer;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      }
+
+      .insights {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        box-shadow: var(--shadow);
+        min-height: 0;
+      }
+
+      .insight-card {
+        border: 1px solid var(--line);
+        background: var(--panel-2);
+        border-radius: 14px;
+        padding: 12px 14px;
+      }
+
+      .insight-card h4 {
+        margin: 0 0 8px;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.8px;
+        color: var(--muted);
+      }
+
+      .insight-card p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .signal-list {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 0.9rem;
+      }
+
+      .chip-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        padding: 6px 10px;
+        background: transparent;
+        cursor: pointer;
+        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text);
       }
 
       .sidebar-toggle-mobile {
@@ -390,14 +547,33 @@
         display: none;
       }
 
+      @media (max-width: 1200px) {
+        .app-shell {
+          grid-template-columns: 240px minmax(0, 1fr);
+        }
+
+        .app-shell.rail-collapsed {
+          grid-template-columns: 84px minmax(0, 1fr);
+        }
+
+        .insights {
+          display: none;
+        }
+      }
+
       @media (max-width: 900px) {
+        .app-shell {
+          grid-template-columns: minmax(0, 1fr);
+        }
+
         .sidebar {
           position: fixed;
           left: 0;
           top: 0;
           bottom: 0;
           z-index: 20;
-          transform: translateX(-100%);
+          transform: translateX(-110%);
+          max-width: 280px;
         }
 
         .sidebar.open {
@@ -632,7 +808,7 @@
 
         const copyButton =
           message.role === "assistant"
-            ? `<button class="copy-btn" data-action="copy" data-id="${message.id}">? Copy</button>`
+            ? `<button class="copy-btn" data-action="copy" data-id="${message.id}">Copy</button>`
             : "";
 
         const runTrace =
@@ -664,25 +840,36 @@
         document.documentElement.setAttribute("data-theme", state.theme);
 
         const activeConversation = getActiveConversation();
+        const updatedLabel = activeConversation
+          ? new Date(activeConversation.updatedAt).toLocaleString()
+          : "-";
+        const lastRole = activeConversation?.messages.length
+          ? activeConversation.messages[activeConversation.messages.length - 1].role
+          : "-";
         const query = state.searchQuery || "";
         const filtered = state.conversations.filter((c) =>
           c.title.toLowerCase().includes(query.toLowerCase())
         );
 
         const app = document.getElementById("app");
-        app.innerHTML = `
+                app.innerHTML = `
           <div class="drawer-backdrop ${state.sidebarOpenMobile ? "active" : ""}" data-action="close-drawer"></div>
-          <div class="app-shell app">
+          <div class="app-shell app notebook ${state.sidebarCollapsed ? "rail-collapsed" : ""}">
             <aside class="sidebar ${state.sidebarCollapsed ? "collapsed" : ""} ${state.sidebarOpenMobile ? "open" : ""}">
-              <div class="sidebar-header">
-                <button class="icon-btn" data-action="toggle-collapse">?</button>
-                <button class="icon-btn" data-action="toggle-theme">${state.theme === "light" ? "??" : "?"}</button>
+              <div class="rail-header">
+                <div class="brand">Signal Notebook</div>
+                <div class="rail-actions">
+                  <button class="icon-btn" data-action="toggle-collapse">Collapse</button>
+                  <button class="icon-btn" data-action="toggle-theme">${
+                    state.theme === "light" ? "Dark" : "Light"
+                  }</button>
+                </div>
               </div>
               <div class="sidebar-body">
-                <button class="new-chat" data-action="new-chat">+ New Chat</button>
+                <button class="new-chat" data-action="new-chat">New session</button>
                 <label class="search">
-                  ??
-                  <input type="text" placeholder="Search" value="${query}" data-action="search" />
+                  Filter
+                  <input type="text" placeholder="Find notes" value="${query}" data-action="search" />
                 </label>
                 <div class="conversation-list">
                   ${filtered
@@ -698,8 +885,8 @@
                           ).toLocaleDateString()}</div>
                         </div>
                         <div class="conversation-actions">
-                          <button class="icon-only" title="Rename" data-action="rename" data-id="${convo.id}">?</button>
-                          <button class="icon-only" title="Delete" data-action="delete" data-id="${convo.id}">??</button>
+                          <button class="icon-only" title="Rename" data-action="rename" data-id="${convo.id}">Rename</button>
+                          <button class="icon-only" title="Delete" data-action="delete" data-id="${convo.id}">Delete</button>
                         </div>
                       </div>
                     `
@@ -709,20 +896,31 @@
               </div>
             </aside>
 
-            <main class="main">
-              <div class="topbar">
-                <div class="topbar-actions">
-                  <button class="sidebar-toggle-mobile" data-action="open-drawer">?</button>
-                  <div class="title">${activeConversation?.title || "Conversation"}</div>
+            <main class="main canvas">
+              <header class="studio-header">
+                <div class="header-left">
+                  <button class="sidebar-toggle-mobile" data-action="open-drawer">Menu</button>
+                  <div class="title-block">
+                    <div class="eyebrow">Live transcript</div>
+                    <div class="title">${activeConversation?.title || "Conversation"}</div>
+                  </div>
                 </div>
-                <div class="topbar-actions">
-                  <button data-action="clear-chat">? Clear</button>
+                <div class="header-actions">
+                  <span class="status-tag">${state.streaming.active ? "Recording" : "Ready"}</span>
+                  <button class="ghost" data-action="clear-chat">Clear</button>
                 </div>
-              </div>
+              </header>
 
-              <div class="chat-log" id="chat-log">
-                ${activeConversation?.messages.map(renderMessage).join("") || ""}
-              </div>
+              <section class="storyboard">
+                <div class="story-meta">
+                  <div class="meta-item">Entries: ${activeConversation?.messages.length || 0}</div>
+                  <div class="meta-item">Updated: ${updatedLabel}</div>
+                  <div class="meta-item">Last speaker: ${lastRole}</div>
+                </div>
+                <div class="chat-log" id="chat-log">
+                  ${activeConversation?.messages.map(renderMessage).join("") || ""}
+                </div>
+              </section>
 
               <button class="jump-latest" style="display: none" data-action="jump">Jump to latest</button>
 
@@ -730,13 +928,33 @@
                 <textarea
                   id="composer"
                   rows="1"
-                  placeholder="Message Prototype 1..."
+                  placeholder="Add a note to this session..."
                 ></textarea>
                 <button id="send-btn" ${state.streaming.active ? "" : "disabled"} data-action="send">${
                   state.streaming.active ? "Stop" : "Send"
                 }</button>
               </div>
             </main>
+
+            <aside class="insights">
+              <div class="insight-card">
+                <h4>Briefing</h4>
+                <p>Capture decisions, attach indicators, and keep the narrative focused on actionable outcomes.</p>
+              </div>
+              <div class="insight-card">
+                <h4>Signals</h4>
+                <div class="signal-list">
+                  <div>Priority: ${activeConversation?.messages.length ? "Normal" : "Idle"}</div>
+                  <div>Last speaker: ${lastRole}</div>
+                  <div>Status: ${state.streaming.active ? "Streaming" : "Paused"}</div>
+                </div>
+              </div>
+              <div class="insight-card">
+                <h4>Quick actions</h4>
+                <button class="chip-btn" data-action="clear-chat">Clear log</button>
+                <button class="chip-btn" data-action="new-chat">New session</button>
+              </div>
+            </aside>
           </div>
         `;
 

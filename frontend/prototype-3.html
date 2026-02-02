@@ -442,7 +442,7 @@
             <div class="status-row">
               <span class="status-pill">${active?.timeline.length || 0} events</span>
               <span class="status-pill">Risk ${active?.risk || 0}%</span>
-              <button data-action="toggle-theme">${state.theme === "light" ? "??" : "?"}</button>
+              <button data-action="toggle-theme">${state.theme === "light" ? "Dark" : "Light"}</button>
             </div>
           </div>
 
@@ -489,7 +489,7 @@
             <section class="panel">
               <header>
                 <h3>Intel Snapshot</h3>
-                <button data-action="refresh">?</button>
+                <button data-action="refresh">Refresh</button>
               </header>
               <div class="intel-grid">
                 <div class="metric">

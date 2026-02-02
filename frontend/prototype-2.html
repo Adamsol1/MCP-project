@@ -781,7 +781,7 @@
         const baseText = {
           English: `Assessment summary (${control.modelPreset}, ${control.modelCount} models).\n${fileMention}`,
           "Norwegian (Bokmål)": `Oppsummering (${control.modelPreset}, ${control.modelCount} modeller).\n${fileMention}`,
-          "Chinese (??)": `????(${control.modelPreset},${control.modelCount} ???)?\n${fileMention}`,
+          "Chinese (Simplified)": `Summary (${control.modelPreset}, ${control.modelCount} models).\n${fileMention}`,
         };
 
         const iocs = [
@@ -859,7 +859,7 @@
 
         const copyButton =
           message.role === "assistant"
-            ? `<button class="copy-btn" data-action="copy" data-id="${message.id}">? Copy</button>`
+            ? `<button class="copy-btn" data-action="copy" data-id="${message.id}">Copy</button>`
             : "";
 
         const runTrace =
@@ -910,15 +910,15 @@
           <div class="app">
             <aside class="sidebar ${state.sidebarCollapsed ? "collapsed" : ""} ${state.sidebarOpenMobile ? "open" : ""}">
               <div class="sidebar-header">
-                <button class="focusable" data-action="toggle-collapse" aria-label="Collapse sidebar">?</button>
+                <button class="focusable" data-action="toggle-collapse" aria-label="Collapse sidebar">Collapse</button>
                 <button class="focusable" data-action="toggle-theme" aria-label="Toggle theme">${
-                  state.theme === "light" ? "??" : "?"
+                  state.theme === "light" ? "Dark" : "Light"
                 }</button>
               </div>
               <div class="sidebar-body">
                 <button class="new-chat focusable" data-action="new-chat">+ New Chat</button>
                 <label class="search">
-                  ??
+                  Search
                   <input type="text" placeholder="Search" value="${query}" data-action="search" aria-label="Search conversations" />
                 </label>
                 <div class="conversation-list">
@@ -935,8 +935,8 @@
                           ).toLocaleDateString()}</div>
                         </div>
                         <div class="conversation-actions">
-                          <button class="icon-only" title="Rename" data-action="rename" data-id="${convo.id}">?</button>
-                          <button class="icon-only" title="Delete" data-action="delete" data-id="${convo.id}">??</button>
+                          <button class="icon-only" title="Rename" data-action="rename" data-id="${convo.id}">Rename</button>
+                          <button class="icon-only" title="Delete" data-action="delete" data-id="${convo.id}">Delete</button>
                         </div>
                       </div>
                     `
@@ -949,16 +949,16 @@
             <main class="main">
               <div class="topbar">
                 <div class="topbar-actions">
-                  <button class="sidebar-toggle-mobile" data-action="open-drawer">?</button>
+                  <button class="sidebar-toggle-mobile" data-action="open-drawer">Menu</button>
                   <div>
                     <div class="title">${activeConversation?.title || "Conversation"}</div>
                     <div class="status">Demo status: mock-only</div>
                   </div>
                 </div>
                 <div class="topbar-actions">
-                  <button data-action="clear-chat">? Clear</button>
+                  <button data-action="clear-chat">Clear</button>
                   <button data-action="toggle-theme">${
-                    state.theme === "light" ? "??" : "?"
+                    state.theme === "light" ? "Dark" : "Light"
                   }</button>
                 </div>
               </div>
@@ -1000,8 +1000,8 @@
                       placeholder="API Key"
                       aria-label="API Key"
                     />
-                    <button class="focusable" data-action="toggle-api-key" aria-label="Show or hide API key">??</button>
-                    <button class="focusable" data-action="save-api" aria-label="Save API settings">??</button>
+                    <button class="focusable" data-action="toggle-api-key" aria-label="Show or hide API key">Show</button>
+                    <button class="focusable" data-action="save-api" aria-label="Save API settings">Save</button>
                   </div>
                   <div class="helper-text">Demo only — no requests will be sent.</div>
                 </div>
@@ -1045,7 +1045,7 @@
                 <div class="control-section">
                   <h4>Language</h4>
                   <select data-action="language" aria-label="Language">
-                    ${["English", "Norwegian (Bokmål)", "Chinese (??)"]
+                    ${["English", "Norwegian (Bokmål)", "Chinese (Simplified)"]
                       .map(
                         (opt) =>
                           `<option ${
