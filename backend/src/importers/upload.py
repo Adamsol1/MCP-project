@@ -1,3 +1,4 @@
+from datetime import datetime
 from pathlib import Path
 
 from fastapi import UploadFile
@@ -6,34 +7,33 @@ allowed_filetypes = [".txt", ".pdf", ".json", ".csv"]
 
 ##Function for checking if filetype is legal.
 ##Returns True if legal, and false if illegal.
-
 def legal_file_upload(filetype : str) -> bool:
         ##Checks if filetype contains a dot.
         if "." not in filetype:
             return False
 
         ##Finds filetype by splitting the string by . and taking the last element.
-        formattetFiletype = filetype.split(".")[-1].lower()
+        formattetFiletype = "." + filetype.split(".")[-1].lower()
         return formattetFiletype in allowed_filetypes
 
 
-##Destination is optional because of the mock tests
-def save_uploaded_file(file: UploadFile, destination=None):
-  ##Checks if a destination is given. if not use the default destination.
-  if destination is None:
-      destination = Path("data/imports")
-
-  save_destination = destination / file.filename
-  filename = file.filename
-  ##Check if filetype is legal. If not raise error
+##Function for saving and uploading files
+def save_uploaded_file(file, filename: str, save_directory) -> Path:
   if not legal_file_upload(filename):
-    ##If not legal return error and no save
-    raise ValueError("Illegal filetype")
+      raise ValueError("Illegal filetype")
 
-  ##If legal save to directory
-  with open(save_destination, "wb") as f:
-      f.write(file.file.read())
+  path = save_directory / filename
 
+  #Add timestamp to filename only if file already exists. This is for preventing overwriting files.
+  if path.exists():
+      name_parts = filename.rsplit(".", 1)
+      base_name = name_parts[0]
+      extension = "." + name_parts[1]
+      date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+      unique_filename = f"{base_name}_{date_time}{extension}"
+      path = save_directory / unique_filename
 
-      ##Return success
-      return save_destination
+  #Save the file to disk
+  with open(path, "wb") as f:
+      f.write(file.read())
+  return path

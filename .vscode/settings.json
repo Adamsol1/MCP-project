@@ -142,5 +142,6 @@
   // ============================================
   // Testing
   // ============================================
-  "testing.automaticallyOpenPeekView": "never"
+  "testing.automaticallyOpenPeekView": "never",
+  "python.analysis.extraPaths": ["./backend/src/importers"]
 }
