@@ -1,6 +1,5 @@
 """Tests for OTX (AlienVault Open Threat Exchange) models."""
 
-import pytest
 from datetime import datetime
 
 
@@ -61,7 +60,7 @@ class TestOTXPulse:
 
     def test_otx_pulse_with_indicators(self):
         """OTXPulse with nested indicators."""
-        from src.models.sources.otx import OTXPulse, OTXIndicator
+        from src.models.sources.otx import OTXIndicator, OTXPulse
 
         indicator1 = OTXIndicator(indicator="10.0.0.1", type="IPv4")
         indicator2 = OTXIndicator(indicator="evil.com", type="domain")

@@ -8,9 +8,8 @@ class TestThreatReport:
 
     def test_valid_threat_report_creation(self):
         """Valid ThreatReport should be created successfully."""
-        from src.models.reports import ThreatReport
-
         from src.models.enums import DataSource, ThreatLevel, TLPLevel
+        from src.models.reports import ThreatReport
 
         report = ThreatReport(
             id="report-001",
@@ -27,9 +26,9 @@ class TestThreatReport:
     def test_title_max_length_200(self):
         """Title should reject strings over 200 chars."""
         from pydantic import ValidationError
-        from src.models.reports import ThreatReport
 
         from src.models.enums import DataSource, ThreatLevel, TLPLevel
+        from src.models.reports import ThreatReport
 
         with pytest.raises(ValidationError):
             ThreatReport(
@@ -42,9 +41,8 @@ class TestThreatReport:
 
     def test_tags_are_deduplicated_and_lowercase(self):
         """Tags should be deduplicated and normalized to lowercase."""
-        from src.models.reports import ThreatReport
-
         from src.models.enums import DataSource, ThreatLevel, TLPLevel
+        from src.models.reports import ThreatReport
 
         report = ThreatReport(
             id="report-003",

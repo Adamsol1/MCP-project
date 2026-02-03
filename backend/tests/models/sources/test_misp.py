@@ -1,7 +1,8 @@
 """Tests for MISP (Malware Information Sharing Platform) models."""
 
-import pytest
 from datetime import datetime
+
+import pytest
 
 
 class TestMISPAttribute:
@@ -47,8 +48,9 @@ class TestMISPAttribute:
 
     def test_misp_attribute_distribution_validation(self):
         """Distribution must be 0-5."""
-        from src.models.sources.misp import MISPAttribute
         from pydantic import ValidationError
+
+        from src.models.sources.misp import MISPAttribute
 
         with pytest.raises(ValidationError):
             MISPAttribute(
@@ -75,7 +77,7 @@ class TestMISPEvent:
 
     def test_misp_event_with_attributes(self):
         """MISPEvent with nested attributes."""
-        from src.models.sources.misp import MISPEvent, MISPAttribute
+        from src.models.sources.misp import MISPAttribute, MISPEvent
 
         attr1 = MISPAttribute(type="ip-dst", value="10.0.0.1")
         attr2 = MISPAttribute(type="domain", value="phishing.example.com")
@@ -122,8 +124,9 @@ class TestMISPEvent:
 
     def test_misp_event_threat_level_validation(self):
         """Threat level must be 1-4."""
-        from src.models.sources.misp import MISPEvent
         from pydantic import ValidationError
+
+        from src.models.sources.misp import MISPEvent
 
         with pytest.raises(ValidationError):
             MISPEvent(
@@ -133,8 +136,9 @@ class TestMISPEvent:
 
     def test_misp_event_analysis_validation(self):
         """Analysis must be 0-2."""
-        from src.models.sources.misp import MISPEvent
         from pydantic import ValidationError
+
+        from src.models.sources.misp import MISPEvent
 
         with pytest.raises(ValidationError):
             MISPEvent(
