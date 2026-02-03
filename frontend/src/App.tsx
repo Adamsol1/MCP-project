@@ -1,15 +1,15 @@
 import FileUpload from "./components/FileUpload/FileUpload";
+import { uploadFile } from "./services/upload";
 function App() {
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
   };
 
-  const handleSubmit = (files: File[]) => {
-    console.log(
-      "Submitted files:",
-      files.map((file) => file.name),
-    );
-  };
+  const handleSubmit = async (files: File[]) => {
+    for (const file of files){
+      await uploadFile(file)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">

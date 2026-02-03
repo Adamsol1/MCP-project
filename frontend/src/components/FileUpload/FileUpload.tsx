@@ -85,6 +85,8 @@ export default function FileUpload({
   const handleSubmit = () => {
     if (onSubmit) {
       onSubmit(selectedFiles);
+      // Clear selected files when submitted
+      setSelectedFiles([]);
     }
   };
 

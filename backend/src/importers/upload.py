@@ -25,15 +25,18 @@ def save_uploaded_file(file, filename: str, save_directory) -> Path:
   path = save_directory / filename
 
   #Add timestamp to filename only if file already exists. This is for preventing overwriting files.
-  if path.exists():
+  while path.exists():
       name_parts = filename.rsplit(".", 1)
       base_name = name_parts[0]
       extension = "." + name_parts[1]
-      date_time = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+      date_time = datetime.now().strftime("%d-%m-%y_%H-%M-%S-%f")
       unique_filename = f"{base_name}_{date_time}{extension}"
+      print("Unique : " + unique_filename)
       path = save_directory / unique_filename
 
   #Save the file to disk
   with open(path, "wb") as f:
       f.write(file.read())
+  print(f"File saved to {path.as_posix()}")
+
   return path
