@@ -64,14 +64,14 @@
 
       .app-shell {
         display: grid;
-        grid-template-columns: 260px minmax(0, 1fr) 300px;
+        grid-template-columns: 260px minmax(0, 1fr);
         gap: 18px;
         padding: 16px 18px;
         height: 100%;
       }
 
       .app-shell.rail-collapsed {
-        grid-template-columns: 84px minmax(0, 1fr) 300px;
+        grid-template-columns: 84px minmax(0, 1fr);
       }
 
       .sidebar {
@@ -83,10 +83,6 @@
         min-height: 0;
         box-shadow: var(--shadow);
         transition: width 0.2s ease;
-      }
-
-      .sidebar.collapsed {
-        width: 84px;
       }
 
       .rail-header {
@@ -137,8 +133,7 @@
         min-height: 0;
       }
 
-      .sidebar.collapsed .sidebar-body > *,
-      .sidebar.collapsed .rail-header {
+      .sidebar.collapsed .sidebar-body > * {
         opacity: 0;
         pointer-events: none;
         height: 0;
@@ -312,18 +307,7 @@
         color: var(--text);
       }
 
-      .storyboard {
-        margin-top: 16px;
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 16px 18px;
-        box-shadow: var(--shadow);
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        min-height: 0;
-      }
+      .storyboard {        margin-top: 16px;        background: var(--panel);        border: 1px solid var(--line);        border-radius: 18px;        padding: 16px 18px;        box-shadow: var(--shadow);        display: flex;        flex-direction: column;        gap: 12px;        min-height: 0;        flex: 1;      }
 
       .story-meta {
         display: flex;
@@ -342,7 +326,7 @@
         display: flex;
         flex-direction: column;
         gap: 12px;
-        padding-right: 6px;
+        padding: 18px 6px 220px;
         min-height: 0;
       }
 
@@ -425,9 +409,10 @@
       }
 
       .composer {
-        position: sticky;
-        bottom: 0;
-        margin-top: 14px;
+        position: fixed;
+        left: calc(16px + 260px);
+        right: 16px;
+        bottom: 16px;
         background: var(--panel);
         border: 1px solid var(--line);
         border-radius: 16px;
@@ -435,21 +420,22 @@
         display: flex;
         gap: 12px;
         align-items: flex-end;
-        box-shadow: var(--shadow);
+        box-shadow: 0 -6px 18px rgba(26, 23, 18, 0.08);
+        z-index: 5;
       }
 
       .composer textarea {
         flex: 1;
         resize: none;
         border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 12px 14px;
+        border-radius: 16px;
+        padding: 14px 16px;
         font-family: inherit;
-        font-size: 0.95rem;
+        font-size: 1rem;
         background: var(--panel-2);
         color: var(--text);
-        min-height: 44px;
-        max-height: 160px;
+        min-height: 72px;
+        max-height: 180px;
         overflow-y: auto;
       }
 
@@ -482,63 +468,6 @@
         font-family: "Trebuchet MS", "Segoe UI", sans-serif;
       }
 
-      .insights {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 18px;
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        box-shadow: var(--shadow);
-        min-height: 0;
-      }
-
-      .insight-card {
-        border: 1px solid var(--line);
-        background: var(--panel-2);
-        border-radius: 14px;
-        padding: 12px 14px;
-      }
-
-      .insight-card h4 {
-        margin: 0 0 8px;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-        font-size: 0.85rem;
-        text-transform: uppercase;
-        letter-spacing: 0.8px;
-        color: var(--muted);
-      }
-
-      .insight-card p {
-        margin: 0;
-        font-size: 0.95rem;
-        line-height: 1.5;
-      }
-
-      .signal-list {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
-        font-size: 0.9rem;
-      }
-
-      .chip-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border: 1px solid var(--line);
-        border-radius: 999px;
-        padding: 6px 10px;
-        background: transparent;
-        cursor: pointer;
-        font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        color: var(--text);
-      }
-
       .sidebar-toggle-mobile {
         display: none;
       }
@@ -554,10 +483,6 @@
 
         .app-shell.rail-collapsed {
           grid-template-columns: 84px minmax(0, 1fr);
-        }
-
-        .insights {
-          display: none;
         }
       }
 
@@ -599,7 +524,13 @@
         .sidebar-toggle-mobile {
           display: inline-flex;
         }
+
+        .composer {
+          left: 16px;
+          right: 16px;
+        }
       }
+
     </style>
   </head>
   <body>
@@ -622,36 +553,6 @@
         streaming: { active: false, cancelToken: null },
       };
 
-      const STORAGE_KEY = "prototype-1-chat-state";
-
-      const saveStateToLocalStorage = () => {
-        const payload = {
-          theme: state.theme,
-          sidebarCollapsed: state.sidebarCollapsed,
-          sidebarOpenMobile: state.sidebarOpenMobile,
-          conversations: state.conversations,
-          activeConversationId: state.activeConversationId,
-        };
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
-      };
-
-      const loadStateFromLocalStorage = () => {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (!stored) return;
-        try {
-          const parsed = JSON.parse(stored);
-          state.theme = parsed.theme || "light";
-          state.sidebarCollapsed = Boolean(parsed.sidebarCollapsed);
-          state.sidebarOpenMobile = Boolean(parsed.sidebarOpenMobile);
-          state.conversations = Array.isArray(parsed.conversations)
-            ? parsed.conversations
-            : [];
-          state.activeConversationId = parsed.activeConversationId || "";
-        } catch (err) {
-          console.warn("Failed to load state", err);
-        }
-      };
-
       const createConversation = () => {
         const id = "convo_" + Date.now().toString(36);
         const convo = {
@@ -662,7 +563,7 @@
         };
         state.conversations.unshift(convo);
         state.activeConversationId = id;
-        saveStateToLocalStorage();
+        
         return convo;
       };
 
@@ -673,7 +574,7 @@
         if (!nextTitle) return;
         convo.title = nextTitle.trim().slice(0, 60);
         convo.updatedAt = Date.now();
-        saveStateToLocalStorage();
+        
       };
 
       const deleteConversation = (id) => {
@@ -685,7 +586,7 @@
         if (state.activeConversationId === id) {
           state.activeConversationId = state.conversations[0]?.id || "";
         }
-        saveStateToLocalStorage();
+        
       };
 
       const addMessage = (convoId, role, content, meta) => {
@@ -699,7 +600,7 @@
           meta: meta || null,
         });
         convo.updatedAt = Date.now();
-        saveStateToLocalStorage();
+        
       };
 
       const mockGenerateResponse = (userText) => {
@@ -813,7 +714,7 @@
 
         const runTrace =
           message.meta && message.meta.runTrace
-            ? `<details class="run-trace"><summary>Run details</summary>${message.meta.runTrace.steps
+            ? `<details class="run-trace"><summary>View details</summary>${message.meta.runTrace.steps
                 .map(
                   (step) =>
                     `<div class="run-step"><strong>${step.name}</strong> · ${step.duration}<br/>${step.logs
@@ -857,7 +758,7 @@
           <div class="app-shell app notebook ${state.sidebarCollapsed ? "rail-collapsed" : ""}">
             <aside class="sidebar ${state.sidebarCollapsed ? "collapsed" : ""} ${state.sidebarOpenMobile ? "open" : ""}">
               <div class="rail-header">
-                <div class="brand">Signal Notebook</div>
+                
                 <div class="rail-actions">
                   <button class="icon-btn" data-action="toggle-collapse">Collapse</button>
                   <button class="icon-btn" data-action="toggle-theme">${
@@ -867,11 +768,7 @@
               </div>
               <div class="sidebar-body">
                 <button class="new-chat" data-action="new-chat">New session</button>
-                <label class="search">
-                  Filter
-                  <input type="text" placeholder="Find notes" value="${query}" data-action="search" />
-                </label>
-                <div class="conversation-list">
+<div class="conversation-list">
                   ${filtered
                     .map(
                       (convo) => `
@@ -897,21 +794,7 @@
             </aside>
 
             <main class="main canvas">
-              <header class="studio-header">
-                <div class="header-left">
-                  <button class="sidebar-toggle-mobile" data-action="open-drawer">Menu</button>
-                  <div class="title-block">
-                    <div class="eyebrow">Live transcript</div>
-                    <div class="title">${activeConversation?.title || "Conversation"}</div>
-                  </div>
-                </div>
-                <div class="header-actions">
-                  <span class="status-tag">${state.streaming.active ? "Recording" : "Ready"}</span>
-                  <button class="ghost" data-action="clear-chat">Clear</button>
-                </div>
-              </header>
-
-              <section class="storyboard">
+<section class="storyboard">
                 <div class="story-meta">
                   <div class="meta-item">Entries: ${activeConversation?.messages.length || 0}</div>
                   <div class="meta-item">Updated: ${updatedLabel}</div>
@@ -935,26 +818,6 @@
                 }</button>
               </div>
             </main>
-
-            <aside class="insights">
-              <div class="insight-card">
-                <h4>Briefing</h4>
-                <p>Capture decisions, attach indicators, and keep the narrative focused on actionable outcomes.</p>
-              </div>
-              <div class="insight-card">
-                <h4>Signals</h4>
-                <div class="signal-list">
-                  <div>Priority: ${activeConversation?.messages.length ? "Normal" : "Idle"}</div>
-                  <div>Last speaker: ${lastRole}</div>
-                  <div>Status: ${state.streaming.active ? "Streaming" : "Paused"}</div>
-                </div>
-              </div>
-              <div class="insight-card">
-                <h4>Quick actions</h4>
-                <button class="chip-btn" data-action="clear-chat">Clear log</button>
-                <button class="chip-btn" data-action="new-chat">New session</button>
-              </div>
-            </aside>
           </div>
         `;
 
@@ -1025,7 +888,7 @@
 
         state.streaming.active = true;
         state.streaming.cancelToken = { cancelled: false };
-        saveStateToLocalStorage();
+        
         render();
 
         streamAssistantMessage(
@@ -1043,7 +906,7 @@
             if (cancelled) {
               assistantMessage.content += "\n\n[Response cancelled]";
             }
-            saveStateToLocalStorage();
+            
             render();
           },
           state.streaming.cancelToken
@@ -1057,7 +920,7 @@
         if (!ok) return;
         convo.messages = [];
         convo.updatedAt = Date.now();
-        saveStateToLocalStorage();
+        
         render();
       };
 
@@ -1069,14 +932,14 @@
 
         if (action === "toggle-collapse") {
           state.sidebarCollapsed = !state.sidebarCollapsed;
-          saveStateToLocalStorage();
+          
           render();
           return;
         }
 
         if (action === "toggle-theme") {
           state.theme = state.theme === "light" ? "dark" : "light";
-          saveStateToLocalStorage();
+          
           render();
           return;
         }
@@ -1090,7 +953,7 @@
         if (action === "open" && id) {
           state.activeConversationId = id;
           state.sidebarOpenMobile = false;
-          saveStateToLocalStorage();
+          
           render();
           return;
         }
@@ -1167,7 +1030,6 @@
         }
       };
 
-      loadStateFromLocalStorage();
       ensureActiveConversation();
       if (!state.conversations.length) {
         const convo = createConversation();
