@@ -8,9 +8,9 @@ class TestNormalizedIndicator:
 
     def test_valid_ipv4_indicator(self):
         """Valid IPv4 indicator should be created."""
-        from src.models.indicators import NormalizedIndicator
 
         from src.models.enums import DataSource, IOCType, ThreatLevel
+        from src.models.indicators import NormalizedIndicator
 
         indicator = NormalizedIndicator(
             id="ind-001",
@@ -27,9 +27,9 @@ class TestNormalizedIndicator:
     def test_invalid_ipv4_rejected(self):
         """Invalid IPv4 should raise ValidationError."""
         from pydantic import ValidationError
-        from src.models.indicators import NormalizedIndicator
 
         from src.models.enums import DataSource, IOCType, ThreatLevel
+        from src.models.indicators import NormalizedIndicator
 
         with pytest.raises(ValidationError):
             NormalizedIndicator(
