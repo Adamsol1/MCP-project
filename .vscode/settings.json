@@ -144,5 +144,6 @@
   // ============================================
   "testing.automaticallyOpenPeekView": "never",
   "python-envs.defaultEnvManager": "ms-python.python:system",
-  "python-envs.pythonProjects": []
+  "python-envs.pythonProjects": [],
+  "python.analysis.extraPaths": ["./backend/src/importers"],
 }
