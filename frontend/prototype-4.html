@@ -1,0 +1,1532 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prototype 4</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fb;
+        --panel: #ffffff;
+        --panel-2: #f0f3f8;
+        --border: #d6dbe6;
+        --text: #1e2430;
+        --muted: #6c7485;
+        --shadow: 0 8px 20px rgba(18, 23, 36, 0.08);
+        --accent: #2a6df4;
+        --accent-2: #1e56c7;
+        --success: #1f9d5c;
+        --danger: #d64545;
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0f1117;
+        --panel: #151923;
+        --panel-2: #1b2230;
+        --border: #2a3242;
+        --text: #e6e9f2;
+        --muted: #9aa3b2;
+        --shadow: 0 10px 26px rgba(0, 0, 0, 0.4);
+        --accent: #6ea3ff;
+        --accent-2: #3d7bff;
+        --success: #4cc38a;
+        --danger: #ff6b6b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      .app {
+        display: flex;
+        height: 100vh;
+        width: 100vw;
+      }
+
+      .sidebar {
+        width: 280px;
+        min-width: 280px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        transition: width 0.2s ease;
+      }
+
+      .sidebar.collapsed {
+        width: 72px;
+        min-width: 72px;
+      }
+
+      .sidebar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 16px;
+        border-bottom: 1px solid var(--border);
+        gap: 8px;
+      }
+
+      .sidebar-header button {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        padding: 8px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: var(--text);
+        box-shadow: var(--shadow);
+      }
+
+      .sidebar-body {
+        padding: 12px 14px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        height: 100%;
+      }
+
+      .sidebar.collapsed .sidebar-body > * {
+        opacity: 0;
+        pointer-events: none;
+        height: 0;
+        margin: 0;
+      }
+
+      .new-chat {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: var(--accent);
+        color: white;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: var(--shadow);
+      }
+
+      .search {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+      }
+
+      .search input {
+        background: transparent;
+        border: none;
+        outline: none;
+        color: var(--text);
+        width: 100%;
+      }
+
+      .conversation-list {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+
+      .conversation-item {
+        padding: 10px 12px;
+        border-radius: 12px;
+        border: 1px solid transparent;
+        background: var(--panel-2);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .conversation-item.active {
+        border-color: var(--accent);
+        background: rgba(43, 108, 246, 0.15);
+      }
+
+      .conversation-title {
+        font-weight: 600;
+        font-size: 0.92rem;
+      }
+
+      .conversation-meta {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .conversation-actions {
+        display: flex;
+        gap: 6px;
+      }
+
+      .icon-only {
+        border: 1px solid var(--border);
+        background: transparent;
+        color: var(--muted);
+        border-radius: 8px;
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .main {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        position: relative;
+      }
+      .topbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 14px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+      }
+
+      .topbar .title {
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+
+      .topbar .status {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .topbar-actions {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .topbar-language {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .topbar-language label {
+        font-size: 0.7rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .topbar-language select {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 8px 10px;
+        background: var(--panel-2);
+        color: var(--text);
+        height: 34px;
+      }
+
+      .topbar button {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 8px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: var(--text);
+      }
+
+      .control-bar {
+        display: flex;
+        gap: 10px;
+        padding: 10px 20px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+        align-items: stretch;
+      }
+
+      .control-section {
+        background: var(--panel-2);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 8px 10px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 0;
+        flex: 1;
+      }
+
+      .control-section h4 {
+        margin: 0;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+      }
+
+      .control-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .control-row button {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 8px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        color: var(--text);
+      }
+
+      .ai-counsel-inline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .control-section input,
+      .control-section select {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 6px 8px;
+        background: var(--panel);
+        color: var(--text);
+        width: 100%;
+      }
+
+      .helper-text {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+
+      .chip-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+
+      .chip {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 8px;
+        font-size: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .chip button {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        color: var(--muted);
+      }
+
+      .stepper {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+      }
+
+      .stepper button {
+        width: 28px;
+        height: 28px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        cursor: pointer;
+      }
+
+      .download-group {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        justify-content: center;
+        flex-shrink: 0;
+      }
+
+      .download-group button {
+        border: none;
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--accent);
+        color: white;
+        white-space: nowrap;
+        font-size: 0.82rem;
+      }
+
+      .download-group button.secondary {
+        background: var(--panel-2);
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+
+      .progress-bar {
+        display: none;
+        align-items: center;
+        gap: 12px;
+        padding: 10px 20px;
+        background: var(--panel);
+        border-bottom: 1px solid var(--border);
+      }
+
+      .progress-bar.active {
+        display: flex;
+      }
+
+      .progress-track {
+        flex: 1;
+        height: 8px;
+        background: var(--panel-2);
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        width: 0;
+        background: var(--accent);
+        transition: width 0.2s ease;
+      }
+
+      .progress-meta {
+        font-size: 0.85rem;
+        color: var(--muted);
+        min-width: 160px;
+      }
+
+      .progress-bar button {
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        padding: 6px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      .chat-log {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px 20px 120px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+
+      .message {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+
+      .message.user {
+        align-items: flex-end;
+      }
+
+      .message.assistant {
+        align-items: flex-start;
+      }
+
+      .message.tool {
+        align-items: stretch;
+      }
+
+      .bubble {
+        max-width: 75%;
+        padding: 14px 16px;
+        border-radius: 16px;
+        box-shadow: var(--shadow);
+      }
+
+      .user .bubble {
+        background: var(--accent);
+        color: white;
+        border-bottom-right-radius: 6px;
+      }
+
+      .assistant .bubble {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-bottom-left-radius: 6px;
+      }
+
+      .tool .bubble {
+        background: var(--panel-2);
+        border: 1px dashed var(--border);
+        color: var(--muted);
+      }
+
+      .message-actions {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        font-size: 0.75rem;
+        color: var(--muted);
+      }
+
+      .copy-btn {
+        border: 1px solid var(--border);
+        background: transparent;
+        border-radius: 8px;
+        padding: 4px 8px;
+        cursor: pointer;
+        color: var(--muted);
+      }
+
+      .artifacts {
+        margin-top: 8px;
+        display: inline-flex;
+        gap: 10px;
+        align-items: center;
+        background: var(--panel-2);
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        font-size: 0.8rem;
+      }
+
+      .artifacts button {
+        border: none;
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 4px 8px;
+        cursor: pointer;
+      }
+
+      .run-trace {
+        margin-top: 8px;
+        border: 1px solid var(--border);
+        background: var(--panel-2);
+        border-radius: 12px;
+        padding: 10px 12px;
+      }
+
+      .run-trace summary {
+        cursor: pointer;
+        font-weight: 600;
+      }
+
+      .run-step {
+        font-size: 0.85rem;
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border);
+      }
+
+      .run-step:last-child {
+        border-bottom: none;
+      }
+
+      .composer {
+        position: sticky;
+        bottom: 0;
+        background: var(--panel);
+        border-top: 1px solid var(--border);
+        padding: 18px 20px;
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+      }
+
+      .composer textarea {
+        flex: 1;
+        resize: none;
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 16px 18px;
+        font-family: inherit;
+        font-size: 1rem;
+        background: var(--panel-2);
+        color: var(--text);
+        box-shadow: var(--shadow);
+        min-height: 140px;
+        max-height: 260px;
+        overflow-y: auto;
+      }
+
+      .composer button {
+        border: none;
+        border-radius: 12px;
+        padding: 12px 16px;
+        font-weight: 600;
+        cursor: pointer;
+        background: var(--accent);
+        color: white;
+        box-shadow: var(--shadow);
+        min-width: 90px;
+      }
+
+      .composer button[disabled] {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .jump-latest {
+        position: absolute;
+        bottom: 92px;
+        right: 24px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 8px 14px;
+        box-shadow: var(--shadow);
+        cursor: pointer;
+        display: none;
+      }
+
+      .sidebar-toggle-mobile {
+        display: none;
+      }
+
+      .drawer-backdrop {
+        display: none;
+      }
+
+      @media (max-width: 1100px) {
+        .control-bar {
+          flex-wrap: wrap;
+        }
+
+        .control-section {
+          flex: 1 1 calc(50% - 10px);
+        }
+
+        .download-group {
+          flex-direction: row;
+          justify-content: flex-start;
+          flex: 1 1 100%;
+        }
+      }
+
+      @media (max-width: 900px) {
+        .sidebar {
+          position: fixed;
+          left: 0;
+          top: 0;
+          bottom: 0;
+          z-index: 20;
+          transform: translateX(-100%);
+        }
+
+        .sidebar.open {
+          transform: translateX(0);
+        }
+
+        .drawer-backdrop {
+          display: block;
+          position: fixed;
+          inset: 0;
+          background: rgba(0, 0, 0, 0.4);
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.2s ease;
+          z-index: 10;
+        }
+
+        .drawer-backdrop.active {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        .sidebar-toggle-mobile {
+          display: inline-flex;
+        }
+
+      }
+
+      .focusable:focus,
+      input:focus,
+      select:focus,
+      textarea:focus,
+      button:focus {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <nav style="display:flex;gap:12px;padding:12px 16px;border-bottom:1px solid #d6dbe6;background:#ffffff;">
+      <a href="/index.html">Home</a>
+      <a href="/prototype-1.html">Prototype 1</a>
+      <a href="/prototype-2.html">Prototype 2</a>
+      <a href="/prototype-3.html">Prototype 3</a>
+      <a href="/prototype-4.html">Prototype 4</a>
+      <a href="/prototype-5.html">Prototype 5</a>
+    </nav>
+
+        <div id="app"></div>
+
+    <script>
+      const state = {
+        theme: "light",
+        sidebarCollapsed: false,
+        sidebarOpenMobile: false,
+        control: {
+          aiRounds: 3,
+          aiCountries: ["US", "UK"],
+          modelPreset: "Balanced",
+          modelCount: 2,
+          language: "English",
+          uploadedFiles: [],
+        },
+        conversations: [],
+        activeConversationId: "",
+        uploadPrompted: false,
+        run: {
+          active: false,
+          cancelled: false,
+          progress: 0,
+          stage: "",
+          cancelToken: null,
+        },
+      };
+
+      const createConversation = () => {
+        const id = "convo_" + Date.now().toString(36);
+        const convo = {
+          id,
+          title: "New chat",
+          updatedAt: Date.now(),
+          messages: [],
+        };
+        state.conversations.unshift(convo);
+        state.activeConversationId = id;
+        state.uploadPrompted = false;
+        return convo;
+      };
+      const renameConversation = (id) => {
+        const convo = state.conversations.find((c) => c.id === id);
+        if (!convo) return;
+        const nextTitle = prompt("Rename conversation", convo.title);
+        if (!nextTitle) return;
+        convo.title = nextTitle.trim().slice(0, 60);
+        convo.updatedAt = Date.now();
+      };
+
+      const deleteConversation = (id) => {
+        const index = state.conversations.findIndex((c) => c.id === id);
+        if (index === -1) return;
+        const ok = confirm("Delete this conversation?");
+        if (!ok) return;
+        state.conversations.splice(index, 1);
+        if (state.activeConversationId === id) {
+          state.activeConversationId = state.conversations[0]?.id || "";
+        }
+      };
+
+      const addMessage = (convoId, role, content, meta) => {
+        const convo = state.conversations.find((c) => c.id === convoId);
+        if (!convo) return;
+        convo.messages.push({
+          id: "msg_" + Date.now().toString(36) + Math.random().toString(36),
+          role,
+          content,
+          createdAt: Date.now(),
+          meta: meta || null,
+        });
+        convo.updatedAt = Date.now();
+      };
+
+      const mockGenerateResponse = (userText, control) => {
+        const lang = control.language;
+        const presets = {
+          "Fast (small)": { verbosity: 1, baseDelay: 400 },
+          Balanced: { verbosity: 2, baseDelay: 700 },
+          "Deep (large)": { verbosity: 3, baseDelay: 1100 },
+          Custom: { verbosity: 3, baseDelay: 900 },
+        };
+
+        const flavor = presets[control.modelPreset] || presets.Balanced;
+        const fileMention = control.uploadedFiles.length
+          ? `I parsed ${control.uploadedFiles.length} file(s): ${control.uploadedFiles
+              .map((f) => f.name)
+              .join(", ")}.`
+          : "No files were attached, so I focused on the text.";
+
+        const baseText = {
+          English: `Assessment summary (${control.modelPreset}, ${control.modelCount} models).\n${fileMention}`,
+          "Norwegian (Bokm?l)": `Oppsummering (${control.modelPreset}, ${control.modelCount} modeller).\n${fileMention}`,
+          "Chinese (Simplified)": `Summary (${control.modelPreset}, ${control.modelCount} models).\n${fileMention}`,
+        };
+
+        const iocs = [
+          { type: "ip", value: "1.2.3.4", severity: "medium" },
+          { type: "domain", value: "evil-domain.com", severity: "high" },
+          { type: "hash", value: "e3b0c442...", severity: "low" },
+        ];
+
+        const citations = [
+          { label: "Case note", source: "Internal telemetry" },
+          { label: "Threat feed", source: "Mock OSINT" },
+        ];
+
+        const steps = [
+          { name: "Collection", duration: `${(flavor.baseDelay / 1000).toFixed(1)}s` },
+          { name: "Normalize", duration: `${(flavor.baseDelay / 1200).toFixed(1)}s` },
+          { name: "Analyze", duration: `${(flavor.baseDelay / 800).toFixed(1)}s` },
+          { name: "Review", duration: `${(flavor.baseDelay / 900).toFixed(1)}s` },
+        ];
+
+        const responseText =
+          baseText[lang] +
+          "\n\nExtracted IOCs:\n" +
+          iocs.map((ioc) => `- ${ioc.type}: ${ioc.value} (${ioc.severity})`).join("\n") +
+          "\n\nRecommended next steps:\n- Enrich indicators\n- Correlate endpoint logs\n- Escalate to IR team";
+
+        return {
+          assistantTextMarkdown: responseText,
+          extractedIocs: iocs,
+          citations,
+          runTrace: { steps },
+        };
+      };
+
+      const streamAssistantMessage = (fullText, onChunk, onDone, cancelToken) => {
+        let index = 0;
+        const interval = setInterval(() => {
+          if (cancelToken.cancelled) {
+            clearInterval(interval);
+            onDone(true);
+            return;
+          }
+          index += Math.floor(Math.random() * 5) + 2;
+          const chunk = fullText.slice(0, index);
+          onChunk(chunk);
+          if (index >= fullText.length) {
+            clearInterval(interval);
+            onDone(false);
+          }
+        }, 45);
+      };
+
+      const formatTime = (timestamp) => {
+        const date = new Date(timestamp);
+        return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      };
+
+      const getActiveConversation = () =>
+        state.conversations.find((c) => c.id === state.activeConversationId);
+
+      const ensureActiveConversation = () => {
+        if (!state.conversations.length) {
+          createConversation();
+        }
+        if (!state.activeConversationId) {
+          state.activeConversationId = state.conversations[0].id;
+        }
+      };
+
+      const renderMessage = (message) => {
+        const safeContent = message.content
+          .split("\n")
+          .map((line) => `<div>${line}</div>`)
+          .join("");
+
+        const copyButton =
+          message.role === "assistant"
+            ? `<button class="copy-btn" data-action="copy" data-id="${message.id}">Copy</button>`
+            : "";
+
+        const runTrace =
+          message.meta && message.meta.runTrace
+            ? `<details class="run-trace"><summary>View details</summary>${message.meta.runTrace.steps
+                .map(
+                  (step) =>
+                    `<div class="run-step"><strong>${step.name}</strong> ? ${step.duration}</div>`
+                )
+                .join("")}</details>`
+            : "";
+
+        const artifacts =
+          message.role === "assistant" && message.meta?.showArtifacts
+            ? `<div class="artifacts">
+                <span>Report ready</span>
+                <button data-action="download-report">Download report</button>
+                <button data-action="download-json">Download JSON</button>
+              </div>`
+            : "";
+
+        return `
+          <div class="message ${message.role}">
+            <div class="bubble">${safeContent}</div>
+            <div class="message-actions">
+              <span>${formatTime(message.createdAt)}</span>
+              ${copyButton}
+            </div>
+            ${artifacts}
+            ${runTrace}
+          </div>
+        `;
+      };
+
+      const render = () => {
+        ensureActiveConversation();
+        document.documentElement.setAttribute("data-theme", state.theme);
+
+        const activeConversation = getActiveConversation();
+        const query = state.searchQuery || "";
+        const filtered = state.conversations.filter((c) =>
+          c.title.toLowerCase().includes(query.toLowerCase())
+        );
+
+        const app = document.getElementById("app");
+        app.innerHTML = `
+          <div class="drawer-backdrop ${state.sidebarOpenMobile ? "active" : ""}" data-action="close-drawer"></div>
+          <div class="app">
+            <aside class="sidebar ${state.sidebarCollapsed ? "collapsed" : ""} ${state.sidebarOpenMobile ? "open" : ""}">
+              <div class="sidebar-header">
+                <button class="focusable" data-action="toggle-collapse" aria-label="Collapse sidebar">Collapse</button>
+                <button class="focusable" data-action="toggle-theme" aria-label="Toggle theme">${
+                  state.theme === "light" ? "Dark" : "Light"
+                }</button>
+              </div>
+              <div class="sidebar-body">
+                <button class="new-chat focusable" data-action="new-chat">+ New Chat</button>
+                <label class="search">
+                  Search
+                  <input type="text" placeholder="Search" value="${query}" data-action="search" aria-label="Search conversations" />
+                </label>
+                <div class="conversation-list">
+                  ${filtered
+                    .map(
+                      (convo) => `
+                      <div class="conversation-item ${
+                        convo.id === state.activeConversationId ? "active" : ""
+                      }" data-action="open" data-id="${convo.id}">
+                        <div>
+                          <div class="conversation-title">${convo.title}</div>
+                          <div class="conversation-meta">${new Date(
+                            convo.updatedAt
+                          ).toLocaleDateString()}</div>
+                        </div>
+                        <div class="conversation-actions">
+                          <button class="icon-only" title="Rename" data-action="rename" data-id="${convo.id}">Rename</button>
+                          <button class="icon-only" title="Delete" data-action="delete" data-id="${convo.id}">Delete</button>
+                        </div>
+                      </div>
+                    `
+                    )
+                    .join("")}
+                </div>
+              </div>
+            </aside>
+
+            <main class="main">
+              <div class="topbar">
+                <div class="topbar-actions">
+                  <button class="sidebar-toggle-mobile" data-action="open-drawer">Menu</button>
+                  <div>
+                    <div class="title">${activeConversation?.title || "Conversation"}</div>
+                    <div class="status">Demo status: mock-only</div>
+                  </div>
+                </div>
+                <div class="topbar-actions">
+                  <div class="topbar-language">
+                    <label for="top-language-select">Language</label>
+                    <select id="top-language-select" data-action="language" aria-label="Language">
+                      ${["English", "Norwegian (Bokmal)", "Chinese (Simplified)"]
+                        .map(
+                          (opt) =>
+                            `<option ${
+                              state.control.language === opt ? "selected" : ""
+                            }>${opt}</option>`
+                        )
+                        .join("")}
+                    </select>
+                  </div>
+                  <button data-action="clear-chat">Clear</button>
+                  <button data-action="toggle-theme">${
+                    state.theme === "light" ? "Dark" : "Light"
+                  }</button>
+                </div>
+              </div>
+                            <div class="control-bar">
+                  <div class="control-section">
+                    <h4>Models</h4>
+                    <select data-action="model-preset" aria-label="Model preset">
+                      ${["Fast (small)", "Balanced", "Deep (large)", "Custom"]
+                        .map(
+                          (opt) =>
+                            `<option ${
+                              state.control.modelPreset === opt ? "selected" : ""
+                            }>${opt}</option>`
+                        )
+                        .join("")}
+                    </select>
+                    <div class="control-row">
+                      <span># Models</span>
+                      <div class="stepper">
+                        <button data-action="model-dec" aria-label="Decrease model count">-</button>
+                        <span>${state.control.modelCount}</span>
+                        <button data-action="model-inc" aria-label="Increase model count">+</button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="control-section">
+                    <h4>AI Counsel</h4>
+                    <div class="ai-counsel-inline">
+                      <div>
+                        <label for="ai-rounds" class="helper-text">Rounds</label>
+                        <select id="ai-rounds" data-action="ai-rounds" aria-label="AI counsel rounds">
+                          ${[1, 2, 3, 4, 5]
+                            .map(
+                              (opt) =>
+                                `<option ${
+                                  state.control.aiRounds === opt ? "selected" : ""
+                                }>${opt}</option>`
+                            )
+                            .join("")}
+                        </select>
+                      </div>
+                      <div>
+                        <label for="ai-countries" class="helper-text">Countries</label>
+                        <input
+                          id="ai-countries"
+                          type="text"
+                          data-action="ai-countries"
+                          value="${state.control.aiCountries.join(", ") }"
+                          placeholder="US, UK, Norway"
+                          aria-label="AI counsel countries"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="control-section">
+                    <h4>Files</h4>
+                    <div class="helper-text">Upload files to enrich the run.</div>
+                    <div class="control-row">
+                      <button class="focusable" data-action="upload-files">Upload files</button>
+                      <button class="focusable" data-action="run-analysis">Run analysis</button>
+                      <input type="file" id="file-input" multiple style="display:none" />
+                    </div>
+                    <div class="chip-list">
+                      ${state.control.uploadedFiles
+                        .map(
+                          (file) => `
+                        <span class="chip">${file.name} (${Math.round(file.size / 1024)} KB)
+                          <button data-action="remove-file" data-id="${file.id}" aria-label="Remove file">x</button>
+                        </span>
+                      `
+                        )
+                        .join("")}
+                    </div>
+                  </div>
+
+                  <div class="download-group">
+                    <button data-action="download-report">Download report</button>
+                    <button class="secondary" data-action="download-json">Download JSON</button>
+                  </div>
+              </div>
+
+              <div class="progress-bar ${state.run.active ? "active" : ""}">
+                <div class="progress-track">
+                  <div class="progress-fill" style="width: ${state.run.progress}%"></div>
+                </div>
+                <div class="progress-meta">${state.run.stage || ""} ${
+                  state.run.progress
+                }%</div>
+                <button data-action="cancel-run">Cancel</button>
+              </div>
+
+              <div class="chat-log" id="chat-log">
+                ${activeConversation?.messages.map(renderMessage).join("") || ""}
+              </div>
+
+              <button class="jump-latest" data-action="jump">Jump to latest</button>
+
+              <div class="composer">
+                <textarea
+                  id="composer"
+                  rows="1"
+                  placeholder="Message Prototype 4..."
+                  aria-label="Message input"
+                ></textarea>
+                <button id="send-btn" ${state.run.active ? "" : "disabled"} data-action="send">${
+                  state.run.active ? "Stop" : "Send"
+                }</button>
+              </div>
+            </main>
+          </div>
+        `;
+
+        const textarea = document.getElementById("composer");
+        const sendBtn = document.getElementById("send-btn");
+        const chatLog = document.getElementById("chat-log");
+        const jumpBtn = document.querySelector(".jump-latest");
+
+        const updateSendState = () => {
+          if (!state.run.active) {
+            sendBtn.disabled = textarea.value.trim().length === 0;
+          }
+        };
+
+        const autoGrow = () => {
+          textarea.style.height = "auto";
+          textarea.style.height = Math.min(textarea.scrollHeight, 160) + "px";
+          updateSendState();
+        };
+
+        textarea.addEventListener("input", autoGrow);
+        autoGrow();
+
+        const handleScroll = () => {
+          const nearBottom =
+            chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 120;
+          jumpBtn.style.display = nearBottom ? "none" : "inline-flex";
+        };
+
+        chatLog.addEventListener("scroll", handleScroll);
+        handleScroll();
+
+        if (!state.preventAutoScroll) {
+          chatLog.scrollTop = chatLog.scrollHeight;
+        }
+      };
+
+      const generateReportText = () => {
+        const convo = getActiveConversation();
+        const lines = [
+          `Conversation: ${convo?.title || ""}`,
+          `Language: ${state.control.language}`,
+          `Model preset: ${state.control.modelPreset}`,
+          `Model count: ${state.control.modelCount}`,
+          `Files: ${state.control.uploadedFiles.map((f) => f.name).join(", ")}`,
+          "",
+          "Messages:",
+        ];
+        (convo?.messages || []).forEach((m) => {
+          lines.push(`[${m.role}] ${m.content}`);
+        });
+        return lines.join("\n");
+      };
+
+      const downloadBlob = (content, filename, type) => {
+        const blob = new Blob([content], { type });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      };
+
+      const downloadReport = () => {
+        downloadBlob(generateReportText(), "report.txt", "text/plain");
+      };
+
+      const downloadJson = () => {
+        const convo = getActiveConversation();
+        const payload = {
+          meta: {
+            generatedAt: new Date().toISOString(),
+            conversationId: convo?.id || "",
+          },
+          settings: {
+            modelPreset: state.control.modelPreset,
+            modelCount: state.control.modelCount,
+            language: state.control.language,
+          },
+          files: state.control.uploadedFiles,
+          messages: convo?.messages || [],
+        };
+        downloadBlob(JSON.stringify(payload, null, 2), "conversation.json", "application/json");
+      };
+
+      const startRun = () => {
+        if (state.run.active) return;
+        state.run.active = true;
+        state.run.cancelled = false;
+        state.run.progress = 0;
+        state.run.stage = "Collecting...";
+        state.run.cancelToken = { cancelled: false };
+        render();
+
+        const stages = [
+          { label: "Collecting...", until: 25 },
+          { label: "Normalizing...", until: 50 },
+          { label: "Analyzing...", until: 80 },
+          { label: "Reviewing...", until: 100 },
+        ];
+
+        let stageIndex = 0;
+        const interval = setInterval(() => {
+          if (state.run.cancelToken?.cancelled) {
+            clearInterval(interval);
+            state.run.active = false;
+            state.run.stage = "Cancelled";
+            state.run.progress = 0;
+            render();
+            return;
+          }
+          state.run.progress += Math.floor(Math.random() * 6) + 3;
+          if (state.run.progress >= stages[stageIndex].until) {
+            stageIndex = Math.min(stageIndex + 1, stages.length - 1);
+            state.run.stage = stages[stageIndex].label;
+          }
+          if (state.run.progress >= 100) {
+            state.run.progress = 100;
+            state.run.active = false;
+            state.run.stage = "Completed";
+            clearInterval(interval);
+          }
+          render();
+        }, 220);
+      };
+
+      const finishRun = () => {
+        state.run.active = false;
+        state.run.stage = "Completed";
+        state.run.progress = 100;
+      };
+
+      const sendMessage = () => {
+        const textarea = document.getElementById("composer");
+        const text = textarea.value.trim();
+        if (!text || state.run.active) return;
+
+        const activeId = state.activeConversationId;
+        addMessage(activeId, "user", text);
+        textarea.value = "";
+        state.preventAutoScroll = false;
+
+        if (!state.uploadPrompted && state.control.uploadedFiles.length === 0) {
+          state.uploadPrompted = true;
+          const wantsUpload = confirm("Upload a file for this run?");
+          if (wantsUpload) {
+            const input = document.getElementById("file-input");
+            if (input) {
+              input.click();
+            }
+          }
+        }
+
+        startRun();
+
+        if (state.control.uploadedFiles.length) {
+          addMessage(
+            activeId,
+            "tool",
+            `Parsing ${state.control.uploadedFiles.length} file(s)... extracted ${
+              state.control.uploadedFiles.length * 3
+            } IOCs.`
+          );
+        }
+
+        const response = mockGenerateResponse(text, state.control);
+        const assistantMessage = {
+          id: "msg_" + Date.now().toString(36),
+          role: "assistant",
+          content: "",
+          createdAt: Date.now(),
+          meta: { runTrace: response.runTrace, showArtifacts: true },
+        };
+
+        const convo = getActiveConversation();
+        convo.messages.push(assistantMessage);
+
+        state.run.cancelToken = { cancelled: false };
+        render();
+
+        streamAssistantMessage(
+          response.assistantTextMarkdown,
+          (chunk) => {
+            assistantMessage.content = chunk;
+            const chatLog = document.getElementById("chat-log");
+            const nearBottom =
+              chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 140;
+            state.preventAutoScroll = !nearBottom;
+            render();
+          },
+          (cancelled) => {
+            if (cancelled) {
+              assistantMessage.content += "\n\n[Response cancelled]";
+            }
+            finishRun();
+            render();
+          },
+          state.run.cancelToken
+        );
+      };
+
+      const runAnalysis = () => {
+        if (state.run.active) return;
+        startRun();
+        const response = mockGenerateResponse("(analysis)", state.control);
+        const activeId = state.activeConversationId;
+        const assistantMessage = {
+          id: "msg_" + Date.now().toString(36),
+          role: "assistant",
+          content: "",
+          createdAt: Date.now(),
+          meta: { runTrace: response.runTrace, showArtifacts: true },
+        };
+        const convo = getActiveConversation();
+        convo.messages.push(assistantMessage);
+
+        streamAssistantMessage(
+          response.assistantTextMarkdown,
+          (chunk) => {
+            assistantMessage.content = chunk;
+            render();
+          },
+          () => {
+            finishRun();
+            render();
+          },
+          state.run.cancelToken || { cancelled: false }
+        );
+      };
+
+      const clearChat = () => {
+        const convo = getActiveConversation();
+        if (!convo) return;
+        const ok = confirm("Clear this chat?");
+        if (!ok) return;
+        convo.messages = [];
+        convo.updatedAt = Date.now();
+        state.uploadPrompted = false;
+        render();
+      };
+
+      const handleClick = (event) => {
+        const actionEl = event.target.closest("[data-action]");
+        if (!actionEl) return;
+        const action = actionEl.dataset.action;
+        const id = actionEl.dataset.id;
+
+        if (action === "toggle-collapse") {
+          state.sidebarCollapsed = !state.sidebarCollapsed;
+          render();
+          return;
+        }
+
+        if (action === "toggle-theme") {
+          state.theme = state.theme === "light" ? "dark" : "light";
+          render();
+          return;
+        }
+
+        if (action === "new-chat") {
+          createConversation();
+          render();
+          return;
+        }
+
+        if (action === "open" && id) {
+          state.activeConversationId = id;
+          state.sidebarOpenMobile = false;
+          render();
+          return;
+        }
+
+        if (action === "rename" && id) {
+          renameConversation(id);
+          render();
+          return;
+        }
+
+        if (action === "delete" && id) {
+          deleteConversation(id);
+          render();
+          return;
+        }
+
+        if (action === "send") {
+          if (state.run.active) {
+            if (state.run.cancelToken) {
+              state.run.cancelToken.cancelled = true;
+            }
+          } else {
+            sendMessage();
+          }
+          return;
+        }
+
+        if (action === "copy" && id) {
+          const convo = getActiveConversation();
+          const msg = convo?.messages.find((m) => m.id === id);
+          if (msg) {
+            navigator.clipboard.writeText(msg.content || "");
+          }
+          return;
+        }
+
+        if (action === "clear-chat") {
+          clearChat();
+          return;
+        }
+
+        if (action === "open-drawer") {
+          state.sidebarOpenMobile = true;
+          render();
+          return;
+        }
+
+        if (action === "close-drawer") {
+          state.sidebarOpenMobile = false;
+          render();
+          return;
+        }
+
+        if (action === "jump") {
+          const chatLog = document.getElementById("chat-log");
+          chatLog.scrollTop = chatLog.scrollHeight;
+          return;
+        }
+
+        if (action === "upload-files") {
+          document.getElementById("file-input").click();
+          return;
+        }
+
+        if (action === "remove-file" && id) {
+          state.control.uploadedFiles = state.control.uploadedFiles.filter(
+            (f) => f.id !== id
+          );
+          render();
+          return;
+        }
+
+        if (action === "model-dec") {
+          state.control.modelCount = Math.max(1, state.control.modelCount - 1);
+          render();
+          return;
+        }
+
+        if (action === "model-inc") {
+          state.control.modelCount = Math.min(5, state.control.modelCount + 1);
+          render();
+          return;
+        }
+
+        if (action === "download-report") {
+          downloadReport();
+          return;
+        }
+
+        if (action === "download-json") {
+          downloadJson();
+          return;
+        }
+
+        if (action === "run-analysis") {
+          runAnalysis();
+          return;
+        }
+
+        if (action === "cancel-run") {
+          if (state.run.cancelToken) {
+            state.run.cancelToken.cancelled = true;
+          }
+          return;
+        }
+      };
+
+      const handleInput = (event) => {
+        if (event.target.matches("[data-action='ai-rounds']")) {
+          state.control.aiRounds = Number(event.target.value);
+          render();
+          return;
+        }
+
+        if (event.target.matches("[data-action='ai-countries']")) {
+          state.control.aiCountries = event.target.value
+            .split(",")
+            .map((c) => c.trim())
+            .filter((c) => c.length);
+          return;
+        }
+
+
+        if (event.target.matches("[data-action='search']")) {
+          state.searchQuery = event.target.value;
+          render();
+          return;
+        }
+
+
+        if (event.target.matches("[data-action='model-preset']")) {
+          state.control.modelPreset = event.target.value;
+          render();
+          return;
+        }
+
+        if (event.target.matches("[data-action='language']")) {
+          state.control.language = event.target.value;
+          render();
+          return;
+        }
+      };
+
+      const handleKeydown = (event) => {
+        const textarea = event.target.closest("#composer");
+        if (!textarea) return;
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      };
+
+      const handleFileChange = (event) => {
+        const files = Array.from(event.target.files || []);
+        const mapped = files.map((file) => ({
+          id: "file_" + Date.now().toString(36) + Math.random().toString(36),
+          name: file.name,
+          size: file.size,
+          lastModified: file.lastModified,
+        }));
+        state.control.uploadedFiles = state.control.uploadedFiles.concat(mapped);
+        event.target.value = "";
+        render();
+      };
+      ensureActiveConversation();
+      if (!state.conversations.length) {
+        const convo = createConversation();
+        addMessage(
+          convo.id,
+          "assistant",
+          "Welcome to Prototype 2. Use the control bar to configure your mock threat-intel run."
+        );
+      }
+
+      document.addEventListener("click", handleClick);
+      document.addEventListener("input", handleInput);
+      document.addEventListener("keydown", handleKeydown);
+      document.addEventListener("change", (event) => {
+        if (event.target.id === "file-input") {
+          handleFileChange(event);
+        }
+      });
+
+      render();
+    </script>
+  </body>
+</html>
+
+
+

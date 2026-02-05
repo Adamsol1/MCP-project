@@ -1,0 +1,1195 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Prototype 5 - Analyst Workspace</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f0f4fa;
+        --panel: #ffffff;
+        --panel-2: #e8eef7;
+        --panel-3: #dce4f2;
+        --border: #c5d0e6;
+        --text: #1a2340;
+        --muted: #6b7a96;
+        --shadow: 0 8px 24px rgba(20, 35, 75, 0.08);
+        --shadow-lg: 0 16px 40px rgba(20, 35, 75, 0.12);
+        --accent: #2563eb;
+        --accent-light: #dbeafe;
+        --accent-hover: #1d4ed8;
+        --accent-subtle: #eff6ff;
+        --success: #059669;
+        --success-light: #d1fae5;
+        --warn: #d97706;
+        --warn-light: #fef3c7;
+        --danger: #dc2626;
+        --danger-light: #fee2e2;
+        --radius: 14px;
+        --radius-sm: 10px;
+        --radius-xs: 8px;
+      }
+
+      [data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #0b1120;
+        --panel: #111b2e;
+        --panel-2: #172340;
+        --panel-3: #1e2d50;
+        --border: #263a5e;
+        --text: #e1e8f5;
+        --muted: #8899b8;
+        --shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.4);
+        --accent: #60a5fa;
+        --accent-light: #1e3a5f;
+        --accent-hover: #93c5fd;
+        --accent-subtle: #0f2340;
+        --success: #34d399;
+        --success-light: #0d3024;
+        --warn: #fbbf24;
+        --warn-light: #3d2d05;
+        --danger: #f87171;
+        --danger-light: #3b1515;
+      }
+
+      * { box-sizing: border-box; margin: 0; }
+
+      body {
+        font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+      }
+
+      /* ---- Top Nav (prototype navigation) ---- */
+      .proto-nav {
+        display: flex;
+        gap: 12px;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        font-size: 0.85rem;
+        flex-shrink: 0;
+      }
+      .proto-nav a {
+        color: var(--muted);
+        text-decoration: none;
+        padding: 4px 8px;
+        border-radius: var(--radius-xs);
+        transition: all 0.15s;
+      }
+      .proto-nav a:hover { color: var(--accent); background: var(--accent-subtle); }
+      .proto-nav a.active { color: var(--accent); font-weight: 600; background: var(--accent-light); }
+
+      /* ---- App Shell ---- */
+      .app-shell {
+        display: flex;
+        flex: 1;
+        min-height: 0;
+      }
+
+      /* ---- Sidebar ---- */
+      .sidebar {
+        width: 270px;
+        min-width: 270px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        transition: all 0.25s ease;
+        flex-shrink: 0;
+      }
+      .sidebar.collapsed { width: 0; min-width: 0; overflow: hidden; border-right: none; }
+
+      .sidebar-head {
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .sidebar-brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+      .sidebar-brand .logo {
+        width: 36px; height: 36px;
+        background: linear-gradient(135deg, var(--accent), #7c3aed);
+        border-radius: var(--radius-sm);
+        display: flex; align-items: center; justify-content: center;
+        color: white; font-weight: 800; font-size: 0.85rem;
+      }
+      .sidebar-brand .brand-text {
+        font-weight: 700; font-size: 1rem; letter-spacing: -0.3px;
+      }
+      .sidebar-brand .brand-sub {
+        font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px;
+      }
+
+      .btn-new-session {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        padding: 10px; border-radius: var(--radius-sm);
+        border: none; background: var(--accent); color: white;
+        font-weight: 600; font-size: 0.88rem; cursor: pointer;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        transition: all 0.15s;
+      }
+      .btn-new-session:hover { background: var(--accent-hover); }
+
+      .sidebar-search {
+        display: flex; align-items: center; gap: 6px;
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 8px 10px;
+      }
+      .sidebar-search svg { color: var(--muted); flex-shrink: 0; }
+      .sidebar-search input {
+        background: transparent; border: none; outline: none;
+        color: var(--text); width: 100%; font-size: 0.88rem;
+      }
+
+      .conversation-list {
+        flex: 1; overflow-y: auto; padding: 10px 12px;
+        display: flex; flex-direction: column; gap: 6px;
+      }
+
+      .convo-item {
+        padding: 10px 12px; border-radius: var(--radius-sm);
+        border: 1px solid transparent; background: var(--panel-2);
+        cursor: pointer; display: flex; align-items: center;
+        justify-content: space-between; gap: 8px;
+        transition: all 0.15s;
+      }
+      .convo-item:hover { background: var(--accent-subtle); }
+      .convo-item.active {
+        border-color: var(--accent); background: var(--accent-light);
+      }
+      .convo-title { font-weight: 600; font-size: 0.9rem; }
+      .convo-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; }
+      .convo-actions { display: flex; gap: 4px; }
+      .convo-actions button {
+        border: 1px solid var(--border); background: var(--panel);
+        color: var(--muted); border-radius: 6px; width: 26px; height: 26px;
+        display: inline-flex; align-items: center; justify-content: center;
+        cursor: pointer; font-size: 0.72rem; transition: all 0.15s;
+      }
+      .convo-actions button:hover { color: var(--accent); border-color: var(--accent); }
+
+      /* ---- Main Content ---- */
+      .main-content {
+        flex: 1; display: flex; flex-direction: column;
+        min-width: 0; position: relative;
+      }
+
+      /* ---- Top Bar ---- */
+      .topbar {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 12px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--panel);
+        flex-shrink: 0;
+      }
+      .topbar-left { display: flex; align-items: center; gap: 12px; }
+      .topbar-title { font-weight: 700; font-size: 1.05rem; }
+      .topbar-status {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: 0.75rem; color: var(--muted);
+        padding: 4px 10px; border-radius: 999px;
+        background: var(--panel-2); border: 1px solid var(--border);
+      }
+      .topbar-status .dot {
+        width: 6px; height: 6px; border-radius: 50%;
+        background: var(--success); animation: pulse 2s infinite;
+      }
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.4; }
+      }
+      .topbar-right { display: flex; align-items: center; gap: 8px; }
+
+      .btn-icon {
+        border: 1px solid var(--border); background: var(--panel-2);
+        padding: 8px 10px; border-radius: var(--radius-xs);
+        cursor: pointer; color: var(--text); font-size: 0.82rem;
+        transition: all 0.15s;
+      }
+      .btn-icon:hover { border-color: var(--accent); color: var(--accent); }
+
+      /* ---- Middle Area (Chat + Intel Panel) ---- */
+      .workspace {
+        display: flex; flex: 1; min-height: 0;
+      }
+
+      /* ---- Chat Area ---- */
+      .chat-area {
+        flex: 1; display: flex; flex-direction: column; min-width: 0;
+        position: relative;
+      }
+
+      /* ---- Control Strip ---- */
+      .control-strip {
+        display: flex; align-items: center; gap: 10px;
+        padding: 10px 20px;
+        border-bottom: 1px solid var(--border);
+        background: var(--accent-subtle);
+        flex-wrap: wrap;
+        flex-shrink: 0;
+      }
+      .cs-group {
+        display: flex; align-items: center; gap: 6px;
+        font-size: 0.8rem;
+      }
+      .cs-label {
+        font-size: 0.7rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--muted); font-weight: 600;
+      }
+      .cs-select, .cs-input {
+        border: 1px solid var(--border); border-radius: var(--radius-xs);
+        padding: 5px 8px; background: var(--panel); color: var(--text);
+        font-size: 0.82rem;
+      }
+      .cs-stepper {
+        display: inline-flex; align-items: center; gap: 4px;
+      }
+      .cs-stepper button {
+        width: 24px; height: 24px; border-radius: 6px;
+        border: 1px solid var(--border); background: var(--panel);
+        cursor: pointer; color: var(--text); font-weight: 600;
+      }
+      .cs-stepper span { min-width: 18px; text-align: center; font-weight: 600; }
+      .cs-divider {
+        width: 1px; height: 24px; background: var(--border); margin: 0 4px;
+      }
+      .btn-upload, .btn-run {
+        border: none; border-radius: var(--radius-xs);
+        padding: 6px 12px; font-weight: 600; font-size: 0.8rem;
+        cursor: pointer; transition: all 0.15s;
+      }
+      .btn-upload {
+        background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      }
+      .btn-upload:hover { border-color: var(--accent); color: var(--accent); }
+      .btn-run {
+        background: var(--accent); color: white;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      }
+      .btn-run:hover { background: var(--accent-hover); }
+
+      /* ---- Progress ---- */
+      .progress-bar {
+        display: none; align-items: center; gap: 12px;
+        padding: 8px 20px; background: var(--accent-subtle);
+        border-bottom: 1px solid var(--border); flex-shrink: 0;
+      }
+      .progress-bar.active { display: flex; }
+      .progress-track {
+        flex: 1; height: 6px; background: var(--panel-3);
+        border-radius: 999px; overflow: hidden;
+      }
+      .progress-fill {
+        height: 100%; width: 0;
+        background: linear-gradient(90deg, var(--accent), #7c3aed);
+        border-radius: 999px; transition: width 0.25s ease;
+      }
+      .progress-label {
+        font-size: 0.78rem; color: var(--muted); min-width: 120px;
+      }
+      .progress-bar .btn-cancel {
+        border: 1px solid var(--border); background: var(--panel);
+        border-radius: var(--radius-xs); padding: 4px 10px;
+        cursor: pointer; font-size: 0.78rem; color: var(--muted);
+      }
+
+      /* ---- File chips ---- */
+      .file-chips {
+        display: flex; flex-wrap: wrap; gap: 6px;
+        padding: 6px 20px; border-bottom: 1px solid var(--border);
+        background: var(--panel); flex-shrink: 0;
+      }
+      .file-chips:empty { display: none; }
+      .chip {
+        background: var(--accent-light); border: 1px solid var(--accent);
+        border-radius: 999px; padding: 3px 10px 3px 10px;
+        font-size: 0.75rem; display: inline-flex; align-items: center; gap: 6px;
+        color: var(--accent);
+      }
+      .chip button {
+        border: none; background: transparent; cursor: pointer;
+        color: var(--accent); font-size: 0.8rem; padding: 0; line-height: 1;
+      }
+
+      /* ---- Chat Log ---- */
+      .chat-log {
+        flex: 1; overflow-y: auto; padding: 24px 20px 20px;
+        display: flex; flex-direction: column; gap: 16px;
+      }
+
+      .message { display: flex; flex-direction: column; gap: 6px; }
+      .message.user { align-items: flex-end; }
+      .message.assistant { align-items: flex-start; }
+      .message.tool { align-items: stretch; }
+
+      .bubble {
+        max-width: 72%; padding: 14px 18px; border-radius: 18px;
+        line-height: 1.55; box-shadow: var(--shadow);
+      }
+      .user .bubble {
+        background: linear-gradient(135deg, var(--accent), #4f46e5);
+        color: white; border-bottom-right-radius: 6px;
+      }
+      .assistant .bubble {
+        background: var(--panel); border: 1px solid var(--border);
+        border-bottom-left-radius: 6px;
+      }
+      .tool .bubble {
+        background: var(--panel-2); border: 1px dashed var(--border);
+        color: var(--muted); font-size: 0.88rem;
+        max-width: 100%; border-radius: var(--radius);
+      }
+
+      .msg-actions {
+        display: flex; gap: 8px; align-items: center;
+        font-size: 0.72rem; color: var(--muted);
+      }
+      .msg-actions button {
+        border: 1px solid var(--border); background: transparent;
+        border-radius: 6px; padding: 3px 8px; cursor: pointer;
+        color: var(--muted); font-size: 0.72rem; transition: all 0.15s;
+      }
+      .msg-actions button:hover { color: var(--accent); border-color: var(--accent); }
+
+      .run-trace {
+        margin-top: 6px; border: 1px solid var(--border);
+        background: var(--panel-2); border-radius: var(--radius-sm);
+        padding: 8px 12px; max-width: 72%;
+      }
+      .run-trace summary { cursor: pointer; font-weight: 600; font-size: 0.85rem; }
+      .run-step {
+        font-size: 0.82rem; padding: 5px 0;
+        border-bottom: 1px solid var(--border);
+      }
+      .run-step:last-child { border-bottom: none; }
+
+      .artifacts {
+        margin-top: 6px; display: inline-flex; gap: 8px; align-items: center;
+        background: var(--accent-subtle); padding: 6px 10px;
+        border-radius: var(--radius-xs); border: 1px solid var(--accent);
+        font-size: 0.78rem; color: var(--accent);
+      }
+      .artifacts button {
+        border: none; background: var(--accent); color: white;
+        border-radius: 6px; padding: 4px 10px; cursor: pointer;
+        font-size: 0.75rem; font-weight: 600;
+      }
+
+      /* ---- Composer ---- */
+      .composer {
+        position: sticky; bottom: 0; left: 0; right: 0;
+        background: var(--panel); border-top: 1px solid var(--border);
+        padding: 14px 20px; display: flex; gap: 12px;
+        align-items: flex-end; z-index: 5;
+        box-shadow: 0 -4px 16px rgba(20, 35, 75, 0.06);
+        flex-shrink: 0;
+      }
+      .composer textarea {
+        flex: 1; resize: none; border: 1px solid var(--border);
+        border-radius: 16px; padding: 12px 16px;
+        font-family: inherit; font-size: 0.95rem;
+        background: var(--panel-2); color: var(--text);
+        min-height: 48px; max-height: 160px; overflow-y: auto;
+        transition: border-color 0.15s;
+      }
+      .composer textarea:focus { outline: none; border-color: var(--accent); }
+      .composer button {
+        border: none; border-radius: 12px; padding: 12px 18px;
+        font-weight: 600; cursor: pointer; background: var(--accent);
+        color: white; min-width: 80px; font-size: 0.9rem;
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+        transition: all 0.15s;
+      }
+      .composer button:hover { background: var(--accent-hover); }
+      .composer button[disabled] { opacity: 0.45; cursor: not-allowed; }
+
+      .jump-latest {
+        position: absolute; bottom: 90px; right: 24px;
+        background: var(--panel); border: 1px solid var(--border);
+        border-radius: 999px; padding: 8px 14px;
+        box-shadow: var(--shadow); cursor: pointer;
+        font-size: 0.8rem; color: var(--muted);
+        display: none; z-index: 6;
+      }
+
+      /* ---- Intel Panel (Right) ---- */
+      .intel-panel {
+        width: 320px; min-width: 320px;
+        background: var(--panel); border-left: 1px solid var(--border);
+        display: flex; flex-direction: column;
+        transition: all 0.25s ease; flex-shrink: 0;
+      }
+      .intel-panel.collapsed { width: 0; min-width: 0; overflow: hidden; border-left: none; }
+
+      .intel-tabs {
+        display: flex; border-bottom: 1px solid var(--border);
+        flex-shrink: 0;
+      }
+      .intel-tab {
+        flex: 1; padding: 10px 8px; text-align: center;
+        font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+        letter-spacing: 0.04em; color: var(--muted);
+        border: none; background: transparent; cursor: pointer;
+        border-bottom: 2px solid transparent; transition: all 0.15s;
+      }
+      .intel-tab:hover { color: var(--text); }
+      .intel-tab.active {
+        color: var(--accent); border-bottom-color: var(--accent);
+        background: var(--accent-subtle);
+      }
+
+      .intel-body {
+        flex: 1; overflow-y: auto; padding: 14px;
+        display: flex; flex-direction: column; gap: 12px;
+      }
+
+      /* Risk Gauge */
+      .risk-gauge {
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 16px; text-align: center;
+      }
+      .risk-gauge .gauge-label {
+        font-size: 0.72rem; text-transform: uppercase;
+        letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px;
+      }
+      .risk-gauge .gauge-value {
+        font-size: 2.2rem; font-weight: 800;
+        background: linear-gradient(135deg, var(--accent), #7c3aed);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .risk-gauge .gauge-bar {
+        height: 8px; background: var(--panel-3); border-radius: 999px;
+        overflow: hidden; margin-top: 8px;
+      }
+      .risk-gauge .gauge-fill {
+        height: 100%; border-radius: 999px;
+        transition: width 0.4s ease;
+      }
+
+      /* Metric Cards */
+      .metric-row {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+      }
+      .metric-card {
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 12px;
+      }
+      .metric-card .mc-label {
+        font-size: 0.7rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--muted); margin-bottom: 4px;
+      }
+      .metric-card .mc-value { font-size: 1.3rem; font-weight: 700; }
+
+      /* IOC List */
+      .ioc-section-header {
+        display: flex; align-items: center; justify-content: space-between;
+      }
+      .ioc-section-header h4 {
+        font-size: 0.78rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--muted);
+      }
+      .ioc-section-header button {
+        border: 1px solid var(--border); background: var(--panel-2);
+        border-radius: 6px; padding: 4px 8px; cursor: pointer;
+        font-size: 0.72rem; color: var(--muted);
+      }
+
+      .ioc-list { display: flex; flex-direction: column; gap: 6px; }
+      .ioc-item {
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 8px 10px; background: var(--panel-2);
+        border: 1px solid var(--border); border-radius: var(--radius-xs);
+        font-size: 0.82rem;
+      }
+      .ioc-value { font-family: "Consolas", "Monaco", monospace; font-size: 0.8rem; }
+      .ioc-badge {
+        padding: 2px 8px; border-radius: 999px; font-size: 0.68rem;
+        font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      .ioc-badge.high { background: var(--danger-light); color: var(--danger); }
+      .ioc-badge.medium { background: var(--warn-light); color: var(--warn); }
+      .ioc-badge.low { background: var(--success-light); color: var(--success); }
+
+      /* Settings Tab */
+      .settings-group {
+        background: var(--panel-2); border: 1px solid var(--border);
+        border-radius: var(--radius-sm); padding: 12px;
+        display: flex; flex-direction: column; gap: 8px;
+      }
+      .settings-group h4 {
+        font-size: 0.72rem; text-transform: uppercase;
+        letter-spacing: 0.06em; color: var(--muted); margin: 0;
+      }
+      .settings-row {
+        display: flex; align-items: center; justify-content: space-between;
+        gap: 8px;
+      }
+      .settings-row label { font-size: 0.82rem; color: var(--text); }
+      .settings-row select, .settings-row input {
+        border: 1px solid var(--border); border-radius: var(--radius-xs);
+        padding: 5px 8px; background: var(--panel); color: var(--text);
+        font-size: 0.82rem; max-width: 140px;
+      }
+
+      /* Download buttons in intel panel */
+      .download-section {
+        display: flex; flex-direction: column; gap: 6px; margin-top: auto;
+        padding-top: 12px; border-top: 1px solid var(--border);
+      }
+      .btn-download {
+        border: none; border-radius: var(--radius-xs);
+        padding: 10px; font-weight: 600; cursor: pointer;
+        font-size: 0.82rem; text-align: center;
+        transition: all 0.15s;
+      }
+      .btn-download.primary {
+        background: var(--accent); color: white;
+        box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+      }
+      .btn-download.primary:hover { background: var(--accent-hover); }
+      .btn-download.secondary {
+        background: var(--panel-2); color: var(--text);
+        border: 1px solid var(--border);
+      }
+      .btn-download.secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+      /* ---- Empty State ---- */
+      .empty-state {
+        display: flex; flex-direction: column; align-items: center;
+        justify-content: center; flex: 1; gap: 12px; color: var(--muted);
+        padding: 40px;
+      }
+      .empty-state .es-icon {
+        width: 64px; height: 64px; border-radius: 50%;
+        background: var(--accent-light); display: flex;
+        align-items: center; justify-content: center;
+        font-size: 1.5rem; color: var(--accent);
+      }
+      .empty-state h3 { font-size: 1.1rem; color: var(--text); }
+      .empty-state p { font-size: 0.88rem; text-align: center; max-width: 300px; }
+
+      /* ---- Mobile Drawer ---- */
+      .drawer-backdrop {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0, 0, 0, 0.4);
+        opacity: 0; pointer-events: none;
+        transition: opacity 0.2s ease; z-index: 10;
+      }
+      .drawer-backdrop.active { opacity: 1; pointer-events: auto; }
+
+      .sidebar-toggle-mobile { display: none; }
+
+      /* ---- Responsive ---- */
+      @media (max-width: 1200px) {
+        .intel-panel { width: 280px; min-width: 280px; }
+      }
+
+      @media (max-width: 1000px) {
+        .intel-panel { width: 0; min-width: 0; overflow: hidden; border-left: none; }
+      }
+
+      @media (max-width: 800px) {
+        .sidebar {
+          position: fixed; left: 0; top: 0; bottom: 0;
+          z-index: 20; transform: translateX(-100%);
+          max-width: 300px; width: 300px;
+        }
+        .sidebar.open { transform: translateX(0); }
+        .drawer-backdrop { display: block; }
+        .sidebar-toggle-mobile { display: inline-flex; }
+        .control-strip { padding: 8px 12px; }
+      }
+
+      /* ---- Scrollbar ---- */
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+      ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+      /* ---- Focus ---- */
+      *:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <nav class="proto-nav">
+      <a href="/index.html">Home</a>
+      <a href="/prototype-1.html">Prototype 1</a>
+      <a href="/prototype-2.html">Prototype 2</a>
+      <a href="/prototype-3.html">Prototype 3</a>
+      <a href="/prototype-4.html">Prototype 4</a>
+      <a href="/prototype-5.html" class="active">Prototype 5</a>
+    </nav>
+
+    <div id="app"></div>
+
+    <script>
+      /* ===== State ===== */
+      const state = {
+        theme: "light",
+        sidebarCollapsed: false,
+        sidebarOpenMobile: false,
+        intelPanelCollapsed: false,
+        intelTab: "iocs",
+        control: {
+          aiRounds: 3,
+          aiCountries: ["US", "UK"],
+          modelPreset: "Balanced",
+          modelCount: 2,
+          language: "English",
+          uploadedFiles: [],
+        },
+        conversations: [],
+        activeConversationId: "",
+        uploadPrompted: false,
+        run: { active: false, cancelled: false, progress: 0, stage: "", cancelToken: null },
+        intel: {
+          risk: 42,
+          iocs: [
+            { value: "1.2.3.4", type: "ip", severity: "high" },
+            { value: "evil-domain.com", type: "domain", severity: "medium" },
+            { value: "e3b0c442...", type: "hash", severity: "low" },
+          ],
+        },
+      };
+
+      /* ===== Conversation CRUD ===== */
+      const createConversation = () => {
+        const id = "convo_" + Date.now().toString(36);
+        const convo = { id, title: "New chat", updatedAt: Date.now(), messages: [] };
+        state.conversations.unshift(convo);
+        state.activeConversationId = id;
+        state.uploadPrompted = false;
+        return convo;
+      };
+
+      const renameConversation = (id) => {
+        const convo = state.conversations.find((c) => c.id === id);
+        if (!convo) return;
+        const next = prompt("Rename conversation", convo.title);
+        if (!next) return;
+        convo.title = next.trim().slice(0, 60);
+        convo.updatedAt = Date.now();
+      };
+
+      const deleteConversation = (id) => {
+        const idx = state.conversations.findIndex((c) => c.id === id);
+        if (idx === -1) return;
+        if (!confirm("Delete this conversation?")) return;
+        state.conversations.splice(idx, 1);
+        if (state.activeConversationId === id) {
+          state.activeConversationId = state.conversations[0]?.id || "";
+        }
+      };
+
+      const addMessage = (convoId, role, content, meta) => {
+        const convo = state.conversations.find((c) => c.id === convoId);
+        if (!convo) return;
+        convo.messages.push({
+          id: "msg_" + Date.now().toString(36) + Math.random().toString(36),
+          role, content, createdAt: Date.now(), meta: meta || null,
+        });
+        convo.updatedAt = Date.now();
+      };
+
+      const getActive = () => state.conversations.find((c) => c.id === state.activeConversationId);
+
+      const ensureActive = () => {
+        if (!state.conversations.length) createConversation();
+        if (!state.activeConversationId) state.activeConversationId = state.conversations[0].id;
+      };
+
+      /* ===== Mock Response Generator ===== */
+      const mockResponse = (text, ctrl) => {
+        const fileMention = ctrl.uploadedFiles.length
+          ? `Parsed ${ctrl.uploadedFiles.length} file(s): ${ctrl.uploadedFiles.map((f) => f.name).join(", ")}.`
+          : "No files attached. Analysis based on text input.";
+
+        const iocs = [
+          { type: "ip", value: "1.2.3.4", severity: "medium" },
+          { type: "domain", value: "evil-domain.com", severity: "high" },
+          { type: "hash", value: "e3b0c442...", severity: "low" },
+        ];
+
+        const steps = [
+          { name: "Collection", duration: "0.6s" },
+          { name: "Normalize", duration: "0.4s" },
+          { name: "Analyze", duration: "1.1s" },
+          { name: "Review", duration: "0.5s" },
+        ];
+
+        const body =
+          `Assessment (${ctrl.modelPreset}, ${ctrl.modelCount} model(s)).\n${fileMention}` +
+          "\n\nExtracted IOCs:\n" +
+          iocs.map((i) => `- ${i.type}: ${i.value} (${i.severity})`).join("\n") +
+          "\n\nRecommended next steps:\n- Enrich indicators with passive DNS\n- Correlate endpoint telemetry\n- Escalate to IR team";
+
+        return { text: body, runTrace: { steps }, iocs };
+      };
+
+      /* ===== Streaming ===== */
+      const streamText = (fullText, onChunk, onDone, cancelToken) => {
+        let idx = 0;
+        const iv = setInterval(() => {
+          if (cancelToken.cancelled) { clearInterval(iv); onDone(true); return; }
+          idx += Math.floor(Math.random() * 5) + 2;
+          onChunk(fullText.slice(0, idx));
+          if (idx >= fullText.length) { clearInterval(iv); onDone(false); }
+        }, 40);
+      };
+
+      /* ===== Run ===== */
+      const startRun = () => {
+        if (state.run.active) return;
+        state.run = { active: true, cancelled: false, progress: 0, stage: "Collecting...", cancelToken: { cancelled: false } };
+        render();
+        const stages = [
+          { label: "Collecting...", until: 25 },
+          { label: "Normalizing...", until: 50 },
+          { label: "Analyzing...", until: 80 },
+          { label: "Reviewing...", until: 100 },
+        ];
+        let si = 0;
+        const iv = setInterval(() => {
+          if (state.run.cancelToken?.cancelled) {
+            clearInterval(iv);
+            state.run = { active: false, cancelled: true, progress: 0, stage: "Cancelled", cancelToken: null };
+            render(); return;
+          }
+          state.run.progress += Math.floor(Math.random() * 6) + 3;
+          if (state.run.progress >= stages[si].until) si = Math.min(si + 1, stages.length - 1);
+          state.run.stage = stages[si].label;
+          if (state.run.progress >= 100) {
+            state.run.progress = 100; state.run.active = false;
+            state.run.stage = "Completed"; clearInterval(iv);
+          }
+          render();
+        }, 220);
+      };
+
+      /* ===== Helpers ===== */
+      const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+      const riskColor = (r) => r >= 70 ? "var(--danger)" : r >= 40 ? "var(--warn)" : "var(--success)";
+
+      /* ===== Downloads ===== */
+      const dlBlob = (content, name, type) => {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([content], { type }));
+        a.download = name; document.body.appendChild(a); a.click();
+        a.remove(); URL.revokeObjectURL(a.href);
+      };
+      const dlReport = () => {
+        const c = getActive();
+        const lines = [`Conversation: ${c?.title}`, `Model: ${state.control.modelPreset}`, `Models: ${state.control.modelCount}`, "", "Messages:"];
+        (c?.messages || []).forEach((m) => lines.push(`[${m.role}] ${m.content}`));
+        dlBlob(lines.join("\n"), "report.txt", "text/plain");
+      };
+      const dlJson = () => {
+        const c = getActive();
+        dlBlob(JSON.stringify({ settings: state.control, messages: c?.messages || [], intel: state.intel }, null, 2), "analysis.json", "application/json");
+      };
+
+      /* ===== Send Message ===== */
+      const sendMessage = () => {
+        const ta = document.getElementById("composer-input");
+        const text = ta.value.trim();
+        if (!text || state.run.active) return;
+        const aid = state.activeConversationId;
+        addMessage(aid, "user", text);
+        ta.value = "";
+        state.preventAutoScroll = false;
+
+        if (!state.uploadPrompted && !state.control.uploadedFiles.length) {
+          state.uploadPrompted = true;
+          if (confirm("Upload a file for this run?")) {
+            document.getElementById("file-input")?.click();
+          }
+        }
+
+        startRun();
+
+        if (state.control.uploadedFiles.length) {
+          addMessage(aid, "tool", `Parsing ${state.control.uploadedFiles.length} file(s)... extracted ${state.control.uploadedFiles.length * 3} IOCs.`);
+        }
+
+        const resp = mockResponse(text, state.control);
+
+        // Update intel panel
+        state.intel.risk = Math.min(95, state.intel.risk + Math.floor(Math.random() * 15) + 5);
+        resp.iocs.forEach((ioc) => {
+          if (!state.intel.iocs.find((i) => i.value === ioc.value)) {
+            state.intel.iocs.unshift(ioc);
+          }
+        });
+
+        const msg = {
+          id: "msg_" + Date.now().toString(36), role: "assistant",
+          content: "", createdAt: Date.now(),
+          meta: { runTrace: resp.runTrace, showArtifacts: true },
+        };
+        getActive().messages.push(msg);
+        render();
+
+        streamText(resp.text, (chunk) => {
+          msg.content = chunk;
+          const cl = document.getElementById("chat-log");
+          if (cl) state.preventAutoScroll = cl.scrollHeight - cl.scrollTop - cl.clientHeight >= 140;
+          render();
+        }, (cancelled) => {
+          if (cancelled) msg.content += "\n\n[Cancelled]";
+          state.run.active = false; state.run.stage = "Completed"; state.run.progress = 100;
+          render();
+        }, state.run.cancelToken);
+      };
+
+      const runAnalysis = () => {
+        if (state.run.active) return;
+        startRun();
+        const resp = mockResponse("(analysis)", state.control);
+        state.intel.risk = Math.min(95, state.intel.risk + Math.floor(Math.random() * 10));
+        const msg = {
+          id: "msg_" + Date.now().toString(36), role: "assistant",
+          content: "", createdAt: Date.now(),
+          meta: { runTrace: resp.runTrace, showArtifacts: true },
+        };
+        getActive().messages.push(msg);
+        streamText(resp.text, (chunk) => { msg.content = chunk; render(); },
+          () => { state.run.active = false; state.run.stage = "Completed"; state.run.progress = 100; render(); },
+          state.run.cancelToken || { cancelled: false });
+      };
+
+      /* ===== Render ===== */
+      const renderMsg = (m) => {
+        const safe = m.content.split("\n").map((l) => `<div>${l}</div>`).join("");
+        const copy = m.role === "assistant" ? `<button data-action="copy" data-id="${m.id}">Copy</button>` : "";
+        const trace = m.meta?.runTrace
+          ? `<details class="run-trace"><summary>Run details</summary>${m.meta.runTrace.steps.map((s) => `<div class="run-step"><strong>${s.name}</strong> - ${s.duration}</div>`).join("")}</details>` : "";
+        const arts = m.role === "assistant" && m.meta?.showArtifacts
+          ? `<div class="artifacts"><span>Report ready</span><button data-action="download-report">Report</button><button data-action="download-json">JSON</button></div>` : "";
+        return `<div class="message ${m.role}"><div class="bubble">${safe}</div><div class="msg-actions"><span>${fmtTime(m.createdAt)}</span>${copy}</div>${arts}${trace}</div>`;
+      };
+
+      const renderIntelTab = () => {
+        if (state.intelTab === "iocs") {
+          return `
+            <div class="risk-gauge">
+              <div class="gauge-label">Threat Risk Score</div>
+              <div class="gauge-value">${state.intel.risk}%</div>
+              <div class="gauge-bar"><div class="gauge-fill" style="width:${state.intel.risk}%;background:${riskColor(state.intel.risk)}"></div></div>
+            </div>
+            <div class="metric-row">
+              <div class="metric-card"><div class="mc-label">Indicators</div><div class="mc-value">${state.intel.iocs.length}</div></div>
+              <div class="metric-card"><div class="mc-label">High Sev</div><div class="mc-value" style="color:var(--danger)">${state.intel.iocs.filter((i) => i.severity === "high").length}</div></div>
+            </div>
+            <div class="ioc-section-header"><h4>IOC Feed</h4><button data-action="add-ioc">+ Add</button></div>
+            <div class="ioc-list">
+              ${state.intel.iocs.map((ioc) => `
+                <div class="ioc-item">
+                  <div><span class="ioc-value">${ioc.value}</span><br/><span style="font-size:0.7rem;color:var(--muted)">${ioc.type}</span></div>
+                  <span class="ioc-badge ${ioc.severity}">${ioc.severity}</span>
+                </div>`).join("")}
+            </div>`;
+        }
+        if (state.intelTab === "settings") {
+          return `
+            <div class="settings-group">
+              <h4>Model Configuration</h4>
+              <div class="settings-row"><label>Preset</label>
+                <select data-action="model-preset">${["Fast (small)", "Balanced", "Deep (large)", "Custom"].map((o) => `<option ${state.control.modelPreset === o ? "selected" : ""}>${o}</option>`).join("")}</select>
+              </div>
+              <div class="settings-row"><label>Model count</label>
+                <div class="cs-stepper"><button data-action="model-dec">-</button><span>${state.control.modelCount}</span><button data-action="model-inc">+</button></div>
+              </div>
+            </div>
+            <div class="settings-group">
+              <h4>AI Counsel</h4>
+              <div class="settings-row"><label>Rounds</label>
+                <select data-action="ai-rounds">${[1, 2, 3, 4, 5].map((o) => `<option ${state.control.aiRounds === o ? "selected" : ""}>${o}</option>`).join("")}</select>
+              </div>
+              <div class="settings-row"><label>Countries</label>
+                <input type="text" data-action="ai-countries" value="${state.control.aiCountries.join(", ")}" placeholder="US, UK" />
+              </div>
+            </div>
+            <div class="settings-group">
+              <h4>Language</h4>
+              <div class="settings-row"><label>Output language</label>
+                <select data-action="language">${["English", "Norwegian (Bokmal)", "Chinese (Simplified)"].map((o) => `<option ${state.control.language === o ? "selected" : ""}>${o}</option>`).join("")}</select>
+              </div>
+            </div>`;
+        }
+        if (state.intelTab === "timeline") {
+          const convo = getActive();
+          const msgs = convo?.messages || [];
+          if (!msgs.length) return `<div class="empty-state"><div class="es-icon">T</div><h3>No events yet</h3><p>Send a message to start building the timeline.</p></div>`;
+          return `<div style="display:flex;flex-direction:column;gap:8px">
+            ${msgs.map((m) => `
+              <div style="border-left:3px solid ${m.role === "user" ? "var(--accent)" : m.role === "assistant" ? "var(--success)" : "var(--muted)"};padding:8px 12px;background:var(--panel-2);border-radius:var(--radius-xs);">
+                <div style="font-size:0.72rem;text-transform:uppercase;color:var(--muted);margin-bottom:2px">${m.role} - ${fmtTime(m.createdAt)}</div>
+                <div style="font-size:0.82rem">${m.content.slice(0, 120)}${m.content.length > 120 ? "..." : ""}</div>
+              </div>`).join("")}
+          </div>`;
+        }
+        return "";
+      };
+
+      const render = () => {
+        ensureActive();
+        document.documentElement.setAttribute("data-theme", state.theme);
+        const convo = getActive();
+        const query = state.searchQuery || "";
+        const filtered = state.conversations.filter((c) => c.title.toLowerCase().includes(query.toLowerCase()));
+
+        document.getElementById("app").innerHTML = `
+          <div class="drawer-backdrop ${state.sidebarOpenMobile ? "active" : ""}" data-action="close-drawer"></div>
+          <div class="app-shell">
+            <!-- Sidebar -->
+            <aside class="sidebar ${state.sidebarCollapsed ? "collapsed" : ""} ${state.sidebarOpenMobile ? "open" : ""}">
+              <div class="sidebar-head">
+                <div class="sidebar-brand">
+                  <div class="logo">M</div>
+                  <div><div class="brand-text">MCP Intel</div><div class="brand-sub">Prototype 5</div></div>
+                </div>
+                <button class="btn-new-session" data-action="new-chat">+ New Session</button>
+                <div class="sidebar-search">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input type="text" placeholder="Search conversations..." value="${query}" data-action="search" />
+                </div>
+              </div>
+              <div class="conversation-list">
+                ${filtered.map((c) => `
+                  <div class="convo-item ${c.id === state.activeConversationId ? "active" : ""}" data-action="open" data-id="${c.id}">
+                    <div><div class="convo-title">${c.title}</div><div class="convo-meta">${new Date(c.updatedAt).toLocaleDateString()} - ${c.messages.length} msgs</div></div>
+                    <div class="convo-actions">
+                      <button title="Rename" data-action="rename" data-id="${c.id}">R</button>
+                      <button title="Delete" data-action="delete" data-id="${c.id}">X</button>
+                    </div>
+                  </div>`).join("")}
+              </div>
+            </aside>
+
+            <!-- Main Content -->
+            <div class="main-content">
+              <div class="topbar">
+                <div class="topbar-left">
+                  <button class="btn-icon sidebar-toggle-mobile" data-action="open-drawer">Menu</button>
+                  <button class="btn-icon" data-action="toggle-sidebar">${state.sidebarCollapsed ? "Show" : "Hide"} sidebar</button>
+                  <div class="topbar-title">${convo?.title || "Conversation"}</div>
+                  <div class="topbar-status"><div class="dot"></div>Ready</div>
+                </div>
+                <div class="topbar-right">
+                  <button class="btn-icon" data-action="toggle-intel">${state.intelPanelCollapsed ? "Show" : "Hide"} Intel</button>
+                  <button class="btn-icon" data-action="clear-chat">Clear</button>
+                  <button class="btn-icon" data-action="toggle-theme">${state.theme === "light" ? "Dark" : "Light"}</button>
+                </div>
+              </div>
+
+              <div class="workspace">
+                <!-- Chat -->
+                <div class="chat-area">
+                  <div class="control-strip">
+                    <div class="cs-group">
+                      <span class="cs-label">Model</span>
+                      <select class="cs-select" data-action="model-preset">
+                        ${["Fast (small)", "Balanced", "Deep (large)", "Custom"].map((o) => `<option ${state.control.modelPreset === o ? "selected" : ""}>${o}</option>`).join("")}
+                      </select>
+                    </div>
+                    <div class="cs-group">
+                      <span class="cs-label">#</span>
+                      <div class="cs-stepper"><button data-action="model-dec">-</button><span>${state.control.modelCount}</span><button data-action="model-inc">+</button></div>
+                    </div>
+                    <div class="cs-divider"></div>
+                    <div class="cs-group">
+                      <span class="cs-label">Counsel</span>
+                      <select class="cs-select" data-action="ai-rounds">${[1, 2, 3, 4, 5].map((o) => `<option ${state.control.aiRounds === o ? "selected" : ""}>${o}</option>`).join("")}</select>
+                      <span class="cs-label">rounds</span>
+                    </div>
+                    <div class="cs-divider"></div>
+                    <button class="btn-upload" data-action="upload-files">Upload files</button>
+                    <button class="btn-run" data-action="run-analysis">Run analysis</button>
+                    <input type="file" id="file-input" multiple style="display:none" />
+                  </div>
+
+                  <div class="progress-bar ${state.run.active ? "active" : ""}">
+                    <div class="progress-track"><div class="progress-fill" style="width:${state.run.progress}%"></div></div>
+                    <div class="progress-label">${state.run.stage || ""} ${state.run.progress}%</div>
+                    <button class="btn-cancel" data-action="cancel-run">Cancel</button>
+                  </div>
+
+                  <div class="file-chips">
+                    ${state.control.uploadedFiles.map((f) => `
+                      <span class="chip">${f.name} (${Math.round(f.size / 1024)} KB)
+                        <button data-action="remove-file" data-id="${f.id}">x</button>
+                      </span>`).join("")}
+                  </div>
+
+                  <div class="chat-log" id="chat-log">
+                    ${convo?.messages.length
+                      ? convo.messages.map(renderMsg).join("")
+                      : `<div class="empty-state">
+                          <div class="es-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                          </div>
+                          <h3>Ready to analyze</h3>
+                          <p>Type a message or upload files to begin your threat intelligence analysis.</p>
+                        </div>`}
+                  </div>
+
+                  <button class="jump-latest" data-action="jump">Jump to latest</button>
+
+                  <div class="composer">
+                    <textarea id="composer-input" rows="1" placeholder="Describe your threat intel query..."></textarea>
+                    <button id="send-btn" ${state.run.active ? "" : "disabled"} data-action="send">${state.run.active ? "Stop" : "Send"}</button>
+                  </div>
+                </div>
+
+                <!-- Intel Panel -->
+                <aside class="intel-panel ${state.intelPanelCollapsed ? "collapsed" : ""}">
+                  <div class="intel-tabs">
+                    <button class="intel-tab ${state.intelTab === "iocs" ? "active" : ""}" data-action="intel-tab" data-id="iocs">IOCs</button>
+                    <button class="intel-tab ${state.intelTab === "settings" ? "active" : ""}" data-action="intel-tab" data-id="settings">Settings</button>
+                    <button class="intel-tab ${state.intelTab === "timeline" ? "active" : ""}" data-action="intel-tab" data-id="timeline">Timeline</button>
+                  </div>
+                  <div class="intel-body">
+                    ${renderIntelTab()}
+                  </div>
+                  <div class="download-section" style="padding:12px 14px">
+                    <button class="btn-download primary" data-action="download-report">Download Report</button>
+                    <button class="btn-download secondary" data-action="download-json">Export JSON</button>
+                  </div>
+                </aside>
+              </div>
+            </div>
+          </div>`;
+
+        // Post-render bindings
+        const ta = document.getElementById("composer-input");
+        const sendBtn = document.getElementById("send-btn");
+        const chatLog = document.getElementById("chat-log");
+        const jumpBtn = document.querySelector(".jump-latest");
+
+        if (ta && sendBtn) {
+          const updateSend = () => { if (!state.run.active) sendBtn.disabled = ta.value.trim().length === 0; };
+          const autoGrow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; updateSend(); };
+          ta.addEventListener("input", autoGrow);
+          autoGrow();
+        }
+
+        if (chatLog && jumpBtn) {
+          const onScroll = () => {
+            const near = chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 120;
+            jumpBtn.style.display = near ? "none" : "inline-flex";
+          };
+          chatLog.addEventListener("scroll", onScroll);
+          onScroll();
+          if (!state.preventAutoScroll) chatLog.scrollTop = chatLog.scrollHeight;
+        }
+      };
+
+      /* ===== Event Handling ===== */
+      const handleClick = (e) => {
+        const el = e.target.closest("[data-action]");
+        if (!el) return;
+        const a = el.dataset.action;
+        const id = el.dataset.id;
+
+        if (a === "toggle-theme") { state.theme = state.theme === "light" ? "dark" : "light"; render(); return; }
+        if (a === "toggle-sidebar") { state.sidebarCollapsed = !state.sidebarCollapsed; render(); return; }
+        if (a === "toggle-intel") { state.intelPanelCollapsed = !state.intelPanelCollapsed; render(); return; }
+        if (a === "new-chat") { createConversation(); render(); return; }
+        if (a === "open" && id) { state.activeConversationId = id; state.sidebarOpenMobile = false; render(); return; }
+        if (a === "rename" && id) { renameConversation(id); render(); return; }
+        if (a === "delete" && id) { deleteConversation(id); render(); return; }
+        if (a === "open-drawer") { state.sidebarOpenMobile = true; render(); return; }
+        if (a === "close-drawer") { state.sidebarOpenMobile = false; render(); return; }
+        if (a === "intel-tab" && id) { state.intelTab = id; render(); return; }
+        if (a === "send") {
+          if (state.run.active) { if (state.run.cancelToken) state.run.cancelToken.cancelled = true; }
+          else sendMessage();
+          return;
+        }
+        if (a === "copy" && id) {
+          const msg = getActive()?.messages.find((m) => m.id === id);
+          if (msg) navigator.clipboard.writeText(msg.content || "");
+          return;
+        }
+        if (a === "clear-chat") {
+          const c = getActive();
+          if (c && confirm("Clear this chat?")) { c.messages = []; c.updatedAt = Date.now(); state.uploadPrompted = false; render(); }
+          return;
+        }
+        if (a === "jump") { document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight; return; }
+        if (a === "upload-files") { document.getElementById("file-input").click(); return; }
+        if (a === "remove-file" && id) { state.control.uploadedFiles = state.control.uploadedFiles.filter((f) => f.id !== id); render(); return; }
+        if (a === "model-dec") { state.control.modelCount = Math.max(1, state.control.modelCount - 1); render(); return; }
+        if (a === "model-inc") { state.control.modelCount = Math.min(5, state.control.modelCount + 1); render(); return; }
+        if (a === "download-report") { dlReport(); return; }
+        if (a === "download-json") { dlJson(); return; }
+        if (a === "run-analysis") { runAnalysis(); return; }
+        if (a === "cancel-run") { if (state.run.cancelToken) state.run.cancelToken.cancelled = true; return; }
+        if (a === "add-ioc") {
+          const samples = [
+            { value: "suspicious-login.net", type: "domain", severity: "high" },
+            { value: "5.6.7.8", type: "ip", severity: "medium" },
+            { value: "aa12bb34cc", type: "hash", severity: "low" },
+          ];
+          state.intel.iocs.unshift(samples[Math.floor(Math.random() * samples.length)]);
+          state.intel.risk = Math.min(95, state.intel.risk + Math.floor(Math.random() * 5) + 2);
+          render();
+          return;
+        }
+      };
+
+      const handleInput = (e) => {
+        if (e.target.matches("[data-action='search']")) { state.searchQuery = e.target.value; render(); return; }
+        if (e.target.matches("[data-action='model-preset']")) { state.control.modelPreset = e.target.value; render(); return; }
+        if (e.target.matches("[data-action='ai-rounds']")) { state.control.aiRounds = Number(e.target.value); render(); return; }
+        if (e.target.matches("[data-action='ai-countries']")) {
+          state.control.aiCountries = e.target.value.split(",").map((c) => c.trim()).filter((c) => c);
+          return;
+        }
+        if (e.target.matches("[data-action='language']")) { state.control.language = e.target.value; render(); return; }
+      };
+
+      const handleKeydown = (e) => {
+        if (!e.target.closest("#composer-input")) return;
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+      };
+
+      const handleFileChange = (e) => {
+        const files = Array.from(e.target.files || []);
+        state.control.uploadedFiles = state.control.uploadedFiles.concat(
+          files.map((f) => ({ id: "f_" + Date.now().toString(36) + Math.random().toString(36), name: f.name, size: f.size }))
+        );
+        e.target.value = "";
+        render();
+      };
+
+      /* ===== Init ===== */
+      ensureActive();
+      if (state.conversations.length === 1 && !state.conversations[0].messages.length) {
+        addMessage(state.conversations[0].id, "assistant",
+          "Welcome to the Analyst Workspace. Upload files or type a query to begin your threat intelligence analysis.");
+      }
+
+      document.addEventListener("click", handleClick);
+      document.addEventListener("input", handleInput);
+      document.addEventListener("keydown", handleKeydown);
+      document.addEventListener("change", (e) => { if (e.target.id === "file-input") handleFileChange(e); });
+
+      render();
+    </script>
+  </body>
+</html>
