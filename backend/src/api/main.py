@@ -12,10 +12,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"], #Port used by vite
-    allow_credentials=True,
-    allow_methods=["*"], #Allow all methods
-    allow_headers=["*"], #Allow all headers
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 #Path for saving uploaded files. This is fixed.

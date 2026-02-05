@@ -21,10 +21,13 @@ dependencies = [
 [tool.poetry]
 package-mode = true
 
-
 packages = [
     { include = "src" }
 ]
+
+[tool.poetry.scripts]
+dev = "src.runner:dev"
+start = "src.runner:start"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
