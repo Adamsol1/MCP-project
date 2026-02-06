@@ -5,6 +5,7 @@ import pytest
 
 from src.importers.upload import legal_file_upload, save_uploaded_file
 
+
 class TestFileTypeValidation:
     """Test suite for validating allowed and disallowed file types."""
 

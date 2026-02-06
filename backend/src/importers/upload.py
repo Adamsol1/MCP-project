@@ -1,8 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import UploadFile
-
 allowed_filetypes = [".txt", ".pdf", ".json", ".csv"]
 
 ##Function for checking if filetype is legal.

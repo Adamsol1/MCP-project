@@ -1,6 +1,6 @@
-import pytest
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
@@ -16,10 +16,10 @@ class TestFileUploads:
     ("test.csv", "test data")
   ])
   ##Test for uploading json file
-  def test_upload_legal_filetype(self, file_name, content, mock_upload_path):
+  def test_upload_legal_filetype(self, file_name, content, mock_upload_path):  # noqa: ARG002 //Disable mock_upload_path warning because pytest uses it for test setup
 
 
-    ##Attempt to upload file'
+    ##Attempt to upload file
     http_response = client.post(
       "/api/import/upload",
       files={"file": (file_name, content, "application/json")}
@@ -46,7 +46,7 @@ class TestFileUploads:
     assert http_response.status_code == 400
 
 
-  def test_if_uploaded_file_is_saved_to_file(self, mock_upload_path):
+  def test_if_uploaded_file_is_saved_to_file(self, mock_upload_path):  # noqa: ARG002
     file_content = b"test data"
     filename = "test.txt"
 

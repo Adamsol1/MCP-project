@@ -1,7 +1,6 @@
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
-
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.importers.upload import legal_file_upload, save_uploaded_file
@@ -37,5 +36,5 @@ async def upload_file(file: UploadFile = File(...)):
     try:
         saved_path = save_uploaded_file(file.file, file.filename or "", UPLOAD_PATH)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
     return {"status": "success", "filename": file.filename, "path": saved_path.as_posix()}
