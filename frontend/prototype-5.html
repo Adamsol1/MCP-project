@@ -285,6 +285,193 @@
       }
       .btn-run:hover { background: var(--accent-hover); }
 
+      /* ---- Direction Phase (Mock) ---- */
+      .onboarding-panel {
+        margin: 12px 20px 0;
+        background: linear-gradient(135deg, var(--panel), var(--panel-2));
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 16px;
+        box-shadow: var(--shadow);
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .ti-stage {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        background: var(--panel);
+        overflow: hidden;
+      }
+      .ti-stage-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 12px;
+        background: var(--panel-2);
+        cursor: pointer;
+      }
+      .ti-stage-title {
+        font-weight: 700;
+        font-size: 0.92rem;
+      }
+      .ti-stage-meta {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .ti-stage-body {
+        padding: 12px;
+        display: none;
+      }
+      .ti-stage.open .ti-stage-body { display: block; }
+      .ti-stage-toggle {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 999px;
+        padding: 4px 10px;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .onb-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+      .onb-title {
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .onb-sub {
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .onb-progress {
+        font-size: 0.72rem;
+        color: var(--muted);
+        background: var(--panel-3);
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        padding: 4px 10px;
+      }
+      .onb-question {
+        font-size: 0.95rem;
+        font-weight: 600;
+      }
+      .onb-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+      .onb-option {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 999px;
+        padding: 6px 12px;
+        font-size: 0.82rem;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .onb-option:hover { border-color: var(--accent); color: var(--accent); }
+      .onb-option.active {
+        border-color: var(--accent);
+        background: var(--accent-light);
+        color: var(--accent);
+        font-weight: 600;
+      }
+      .ti-stage-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      .ti-check {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        background: var(--success);
+        color: white;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 10px;
+        font-weight: 700;
+      }
+      .action-buttons {
+        display: inline-flex;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .action-buttons button {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 6px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .action-buttons button.primary {
+        background: var(--success);
+        color: white;
+        border-color: var(--success);
+      }
+      .ti-spinner {
+        width: 14px;
+        height: 14px;
+        border-radius: 50%;
+        border: 2px solid var(--border);
+        border-top-color: var(--accent);
+        animation: spin 0.9s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .onb-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .onb-actions button {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 10px;
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.15s;
+      }
+      .onb-actions button.primary {
+        background: var(--accent);
+        color: white;
+        border-color: var(--accent);
+      }
+      .onb-actions button.primary:hover { background: var(--accent-hover); }
+      .onb-actions button.ghost {
+        background: transparent;
+      }
+      .onb-summary {
+        background: var(--panel);
+        border: 1px dashed var(--border);
+        border-radius: var(--radius-sm);
+        padding: 10px 12px;
+        font-size: 0.85rem;
+      }
+      .onb-kicker {
+        font-size: 0.72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+
       /* ---- Progress ---- */
       .progress-bar {
         display: none; align-items: center; gap: 12px;
@@ -341,8 +528,48 @@
       .message.tool { align-items: stretch; }
 
       .bubble {
-        max-width: 72%; padding: 14px 18px; border-radius: 18px;
-        line-height: 1.55; box-shadow: var(--shadow);
+        max-width: 86%; padding: 18px 22px; border-radius: 18px;
+        line-height: 1.6; box-shadow: var(--shadow);
+        font-size: 0.98rem;
+      }
+      .assistant .bubble {
+        background: linear-gradient(180deg, var(--panel), var(--panel-2));
+      }
+      .bubble .section-title {
+        font-weight: 700;
+        margin-top: 8px;
+      }
+      .bubble .subtle {
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+      .bubble .list {
+        display: grid;
+        gap: 4px;
+        margin: 4px 0 8px;
+      }
+      .bubble .card {
+        border: 1px solid var(--border);
+        background: var(--panel);
+        border-radius: 12px;
+        padding: 10px 12px;
+        margin: 8px 0;
+      }
+      .bubble .pill {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .bubble .divider {
+        height: 1px;
+        background: var(--border);
+        margin: 8px 0;
       }
       .user .bubble {
         background: linear-gradient(135deg, var(--accent), #4f46e5);
@@ -381,17 +608,7 @@
       }
       .run-step:last-child { border-bottom: none; }
 
-      .artifacts {
-        margin-top: 6px; display: inline-flex; gap: 8px; align-items: center;
-        background: var(--accent-subtle); padding: 6px 10px;
-        border-radius: var(--radius-xs); border: 1px solid var(--accent);
-        font-size: 0.78rem; color: var(--accent);
-      }
-      .artifacts button {
-        border: none; background: var(--accent); color: white;
-        border-radius: 6px; padding: 4px 10px; cursor: pointer;
-        font-size: 0.75rem; font-weight: 600;
-      }
+      .artifacts { display: none; }
 
       /* ---- Composer ---- */
       .composer {
@@ -649,6 +866,29 @@
         sidebarOpenMobile: false,
         intelPanelCollapsed: false,
         intelTab: "iocs",
+        onboarding: {
+          active: true,
+          stepIndex: 0,
+          askedIndex: -1,
+          answers: {},
+          multiSelections: [],
+          currentStage: "direction",
+          completedStages: {
+            direction: false,
+            planning: false,
+            collection: false,
+            processing: false,
+            analysis: false,
+          },
+          stageOpen: {
+            direction: true,
+            planning: false,
+            collection: false,
+            processing: false,
+            analysis: false,
+          },
+        },
+        forceScrollToBottom: false,
         control: {
           aiRounds: 3,
           aiCountries: ["US", "UK"],
@@ -671,6 +911,76 @@
         },
       };
 
+      const onboardingScript = [
+        {
+          id: "user_prompt",
+          section: "Opening",
+          prompt: "Enter your instruction to begin.",
+          allowFreeText: true,
+        },
+        {
+          id: "prompt_reason",
+          section: "Opening",
+          prompt: "What prompted this investigation? Are you responding to an incident, preparing for a threat, or conducting routine intelligence gathering?",
+          allowFreeText: true,
+        },
+        {
+          id: "primary_focus",
+          section: "Opening",
+          prompt: "What is your primary focus?",
+          allowFreeText: true,
+        },
+        {
+          id: "timeframe",
+          section: "Scope",
+          prompt: "What timeframe are you interested in?",
+          allowFreeText: true,
+        },
+        {
+          id: "geography",
+          section: "Scope",
+          prompt: "What geographic perspective matters most?",
+          allowFreeText: true,
+        },
+        {
+          id: "key_aspects",
+          section: "Scope",
+          prompt: "What aspects are most important? (Select all that apply)",
+          allowFreeText: true,
+        },
+        {
+          id: "detail_level",
+          section: "Depth",
+          prompt: "What level of detail do you need?",
+          allowFreeText: true,
+        },
+        {
+          id: "attack_vectors",
+          section: "Depth",
+          prompt: "Are there specific attack vectors you're concerned about? (Select all that apply)",
+          allowFreeText: true,
+        },
+        {
+          id: "data_sources",
+          section: "Collection",
+          prompt: "Which data sources should I prioritize?",
+          allowFreeText: true,
+        },
+        {
+          id: "keywords",
+          section: "Collection",
+          prompt: "Are there specific indicators or keywords I should focus on?",
+          allowFreeText: true,
+        },
+        {
+          id: "confirm",
+          section: "Validation",
+          prompt: "Let me confirm your requirements. Is this correct, or would you like to adjust anything?",
+          confirm: true,
+          allowFreeText: true,
+        },
+      ];
+
       /* ===== Conversation CRUD ===== */
       const createConversation = () => {
         const id = "convo_" + Date.now().toString(36);
@@ -678,6 +988,7 @@
         state.conversations.unshift(convo);
         state.activeConversationId = id;
         state.uploadPrompted = false;
+        resetOnboarding();
         return convo;
       };
 
@@ -717,6 +1028,114 @@
         if (!state.activeConversationId) state.activeConversationId = state.conversations[0].id;
       };
 
+      /* ===== Direction Phase (Mock) ===== */
+      const getOnboardingStep = () => onboardingScript[state.onboarding.stepIndex];
+
+      const buildSummary = () => {
+        const ans = state.onboarding.answers;
+        const fmt = (val) => {
+          if (Array.isArray(val)) return val.length ? val.join(", ") : "Not specified";
+          return val && String(val).trim() ? val : "Not specified";
+        };
+        return [
+          `Threat focus: ${fmt(ans.primary_focus)}`,
+          `Timeframe: ${fmt(ans.timeframe)}`,
+          `Geographic scope: ${fmt(ans.geography)}`,
+          `Key aspects: ${fmt(ans.key_aspects)}`,
+          `Data sources: ${fmt(ans.data_sources)}`,
+          `Indicators/keywords: ${fmt(ans.keywords)}`,
+        ].join("\n");
+      };
+
+      const appendAssistant = (content) => {
+        const convo = getActive();
+        if (!convo) return;
+        addMessage(convo.id, "assistant", content);
+      };
+
+      const appendUser = (content) => {
+        const convo = getActive();
+        if (!convo) return;
+        addMessage(convo.id, "user", content);
+      };
+
+      const ensureOnboardingPrompt = () => {
+        if (!state.onboarding.active) return;
+        const step = getOnboardingStep();
+        if (!step) return;
+        if (state.onboarding.askedIndex === state.onboarding.stepIndex) return;
+        appendAssistant(step.prompt);
+        state.onboarding.askedIndex = state.onboarding.stepIndex;
+      };
+
+      function resetOnboarding() {
+        state.onboarding.active = true;
+        state.onboarding.stepIndex = 0;
+        state.onboarding.askedIndex = -1;
+        state.onboarding.answers = {};
+        state.onboarding.multiSelections = [];
+        state.onboarding.currentStage = "direction";
+        state.onboarding.completedStages = {
+          direction: false,
+          planning: false,
+          collection: false,
+          processing: false,
+          analysis: false,
+        };
+        state.onboarding.stageOpen = {
+          direction: true,
+          planning: false,
+          collection: false,
+          processing: false,
+          analysis: false,
+        };
+      }
+
+      const advanceOnboarding = () => {
+        state.onboarding.stepIndex += 1;
+        state.onboarding.multiSelections = [];
+        if (state.onboarding.stepIndex >= onboardingScript.length) {
+          completeOnboarding();
+          return;
+        }
+        ensureOnboardingPrompt();
+        render();
+      };
+
+      const backOnboarding = () => {
+        state.onboarding.stepIndex = Math.max(0, state.onboarding.stepIndex - 1);
+        state.onboarding.multiSelections = [];
+        ensureOnboardingPrompt();
+        render();
+      };
+
+      const completeOnboarding = () => {
+        const summary = buildSummary();
+        appendAssistant("Direction Phase Summary:\n" + summary);
+        appendAssistant(
+          "Priority Intelligence Requirements:\n" +
+          "1. What TTPs has APT29 used in campaigns against Nordic countries in the last 6 months?\n" +
+          "2. What infrastructure (domains, IPs) is associated with recent APT29 activity targeting government sectors?\n" +
+          "3. What detection opportunities exist for APT29's documented TTPs?\n" +
+          "4. What are the geopolitical motivations behind APT29's Nordic targeting?"
+        );
+        state.onboarding.active = false;
+        render();
+      };
+
+      const recordAnswer = (value) => {
+        const step = getOnboardingStep();
+        if (!step) return;
+        state.onboarding.answers[step.id] = value;
+      };
+
+      const commitFreeText = (text) => {
+        const value = text && text.trim() ? text.trim() : "Not specified";
+        recordAnswer(value);
+        appendUser(value);
+        advanceOnboarding();
+      };
+
       /* ===== Mock Response Generator ===== */
       const mockResponse = (text, ctrl) => {
         const fileMention = ctrl.uploadedFiles.length
@@ -750,17 +1169,17 @@
         let idx = 0;
         const iv = setInterval(() => {
           if (cancelToken.cancelled) { clearInterval(iv); onDone(true); return; }
-          idx += Math.floor(Math.random() * 5) + 2;
+          idx += Math.floor(Math.random() * 16) + 8;
           onChunk(fullText.slice(0, idx));
           if (idx >= fullText.length) { clearInterval(iv); onDone(false); }
-        }, 40);
+        }, 18);
       };
 
       /* ===== Run ===== */
       const startRun = () => {
         if (state.run.active) return;
         state.run = { active: true, cancelled: false, progress: 0, stage: "Collecting...", cancelToken: { cancelled: false } };
-        render();
+        updateProgressUI();
         const stages = [
           { label: "Collecting...", until: 25 },
           { label: "Normalizing...", until: 50 },
@@ -772,7 +1191,7 @@
           if (state.run.cancelToken?.cancelled) {
             clearInterval(iv);
             state.run = { active: false, cancelled: true, progress: 0, stage: "Cancelled", cancelToken: null };
-            render(); return;
+            updateProgressUI(); return;
           }
           state.run.progress += Math.floor(Math.random() * 6) + 3;
           if (state.run.progress >= stages[si].until) si = Math.min(si + 1, stages.length - 1);
@@ -781,14 +1200,48 @@
             state.run.progress = 100; state.run.active = false;
             state.run.stage = "Completed"; clearInterval(iv);
           }
-          render();
+          updateProgressUI();
         }, 220);
+      };
+
+      const startPhaseRun = (label, durationMs = 5000) => {
+        if (state.run.active) return;
+        const start = Date.now();
+        state.run = { active: true, cancelled: false, progress: 0, stage: label, cancelToken: { cancelled: false } };
+        updateProgressUI();
+        const iv = setInterval(() => {
+          const elapsed = Date.now() - start;
+          const pct = Math.min(100, Math.round((elapsed / durationMs) * 100));
+          state.run.progress = pct;
+          if (pct >= 100) {
+            clearInterval(iv);
+            state.run.active = false;
+            state.run.stage = "Completed";
+          }
+          updateProgressUI();
+        }, 120);
       };
 
       /* ===== Helpers ===== */
       const fmtTime = (ts) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 
       const riskColor = (r) => r >= 70 ? "var(--danger)" : r >= 40 ? "var(--warn)" : "var(--success)";
+
+      const updateProgressUI = () => {
+        const bar = document.querySelector(".progress-bar");
+        const fill = document.querySelector(".progress-fill");
+        const label = document.querySelector(".progress-label");
+        if (bar) bar.classList.toggle("active", !!state.run.active);
+        if (fill) fill.style.width = `${state.run.progress}%`;
+        if (label) label.textContent = `${state.run.stage || ""} ${state.run.progress}%`;
+        const sendBtn = document.getElementById("send-btn");
+        const ta = document.getElementById("composer-input");
+        if (sendBtn) {
+          sendBtn.textContent = state.run.active ? "Stop" : "Send";
+          if (state.run.active) sendBtn.disabled = false;
+          else sendBtn.disabled = !ta || ta.value.trim().length === 0;
+        }
+      };
 
       /* ===== Downloads ===== */
       const dlBlob = (content, name, type) => {
@@ -814,15 +1267,23 @@
         const text = ta.value.trim();
         if (!text || state.run.active) return;
         const aid = state.activeConversationId;
-        addMessage(aid, "user", text);
+        const userMsgCount = getActive().messages.filter((m) => m.role === "user").length;
+        const normalizedPrompt = "analyse the situation in greenland";
+        const planningAnswer =
+          "Responding to an incident. Focus: suspected APT29 activity. Timeframe: last 6 months. Geography: Nordic region. " +
+          "Depth: operational intelligence for SOC/IR. Audience: SOC leadership and IR team. " +
+          "Sources: OSINT feeds plus uploaded internal data. Constraints: rapid turnaround, TLP: AMBER.";
+        const finalUserText = userMsgCount === 0 ? normalizedPrompt : userMsgCount === 1 ? planningAnswer : text;
+        addMessage(aid, "user", finalUserText);
         ta.value = "";
-        state.preventAutoScroll = false;
+        // Only force scroll to bottom if user was already at the bottom
+        const cl = document.getElementById("chat-log");
+        const nearBottom = cl ? cl.scrollHeight - cl.scrollTop - cl.clientHeight < 12 : true;
+        state.forceScrollToBottom = nearBottom;
+        render();
 
         if (!state.uploadPrompted && !state.control.uploadedFiles.length) {
           state.uploadPrompted = true;
-          if (confirm("Upload a file for this run?")) {
-            document.getElementById("file-input")?.click();
-          }
         }
 
         startRun();
@@ -831,34 +1292,376 @@
           addMessage(aid, "tool", `Parsing ${state.control.uploadedFiles.length} file(s)... extracted ${state.control.uploadedFiles.length * 3} IOCs.`);
         }
 
-        const resp = mockResponse(text, state.control);
+        const nextUserCount = userMsgCount + 1;
+        const isFirstUserMsg = nextUserCount === 1;
+        const isSecondUserMsg = nextUserCount === 2;
 
-        // Update intel panel
-        state.intel.risk = Math.min(95, state.intel.risk + Math.floor(Math.random() * 15) + 5);
-        resp.iocs.forEach((ioc) => {
-          if (!state.intel.iocs.find((i) => i.value === ioc.value)) {
-            state.intel.iocs.unshift(ioc);
-          }
-        });
+        const directionExamplePlain =
+          "Direction Phase Goals\n" +
+          "Define intelligence requirements - What specific questions need answering?\n" +
+          "Establish scope and priorities - What matters most and what's out of scope?\n" +
+          "Identify stakeholders - Who needs this intelligence and why?\n" +
+          "Set collection boundaries - What sources, timeframes, and constraints apply?\n" +
+          "Align with organizational needs - How does this support business/security objectives?\n\n" +
+          "Core Questions Analysts Ask Themselves\n\n" +
+          "1. Threat Focus\n\n" +
+          "What specific threat am I investigating?\n" +
+          "Is this about a threat actor, campaign, vulnerability, or general threat landscape?\n" +
+          "Do I need technical details (TTPs, IOCs) or strategic context (attribution, motivation)?\n\n" +
+          "1. Scope Definition\n\n" +
+          "What time period am I interested in? (Recent activity, historical analysis, ongoing monitoring)\n" +
+          "What geographic regions matter? (Global, specific countries, our infrastructure locations)\n" +
+          "What assets/systems am I trying to protect?\n" +
+          "What attack vectors or techniques am I most concerned about?\n\n" +
+          "1. Depth vs. Breadth\n\n" +
+          "Do I need a comprehensive overview or deep-dive analysis?\n" +
+          "Am I looking for specific indicators or broader patterns?\n" +
+          "Is this for immediate response or strategic planning?\n\n" +
+          "1. Audience & Use Case\n\n" +
+          "Who will consume this intelligence? (Executive, SOC, IR team, threat hunting)\n" +
+          "What decision needs to be made with this intelligence?\n" +
+          "What level of technical detail is appropriate?\n\n" +
+          "1. Collection Constraints\n\n" +
+          "What data sources are available/preferred?\n" +
+          "Are there time constraints?\n" +
+          "Are there sensitivity/classification requirements?\n\n" +
+          "Suggested AI Dialogue Questions\n" +
+          "Based on your dialogue-based Direction phase, the AI should ask questions in a conversational flow that naturally narrows scope:\n\n" +
+          "Opening Questions (Establish Context)\n" +
+          "1. \"What prompted this investigation? Are you responding to an incident, preparing for a threat, or conducting routine intelligence gathering?\"\n" +
+          "2. \"What is your primary focus?\"\n" +
+          "- Specific threat actor (e.g., APT29, Lazarus Group)\n" +
+          "- Threat campaign (e.g., ransomware wave, supply chain attacks)\n" +
+          "- Vulnerability/exploit (e.g., zero-days, known CVEs)\n" +
+          "- General threat landscape (e.g., threats to financial sector)\n\n" +
+          "Scope Refinement Questions\n" +
+          "3. \"What timeframe are you interested in?\"\n" +
+          "- Last 24 hours (immediate threats)\n" +
+          "- Last week/month (recent activity)\n" +
+          "- Last 6-12 months (trend analysis)\n" +
+          "- Historical (attribution, evolution)\n" +
+          "4. \"What geographic perspective matters most?\"\n" +
+          "- Global\n" +
+          "- Specific regions (Nordic, Europe, Asia-Pacific, etc.)\n" +
+          "- Threats targeting our specific location\n" +
+          "5. \"What aspects are most important?\" (allow multiple)\n" +
+          "- Technical indicators (IPs, domains, file hashes)\n" +
+          "- Tactics, Techniques, and Procedures (TTPs)\n" +
+          "- Attribution and motivation\n" +
+          "- Target selection patterns\n" +
+          "- Impact assessment\n\n" +
+          "Technical Depth Questions\n" +
+          "6. \"What level of detail do you need?\"\n" +
+          "- Executive summary (strategic)\n" +
+          "- Operational intelligence (for SOC/IR)\n" +
+          "- Technical deep-dive (for threat hunting)\n" +
+          "7. \"Are there specific attack vectors you're concerned about?\"\n" +
+          "- Phishing/social engineering\n" +
+          "- Network exploitation\n" +
+          "- Supply chain compromise\n" +
+          "- Insider threats\n" +
+          "- etc.\n\n" +
+          "Collection Planning Questions\n" +
+          "8. \"Which data sources should I prioritize?\" (based on selected sources)\n" +
+          "- OSINT feeds (OTX, MISP)\n" +
+          "- Your uploaded data\n" +
+          "- All available sources\n" +
+          "9. \"Are there specific indicators or keywords I should focus on?\"\n" +
+          "- Specific malware families\n" +
+          "- Infrastructure patterns\n" +
+          "- Target industries/organizations\n\n" +
+          "Validation Questions\n" +
+          "10. \"Let me confirm your requirements:\n" +
+          "- Threat focus: [summary]\n" +
+          "- Timeframe: [summary]\n" +
+          "- Geographic scope: [summary]\n" +
+          "- Key aspects: [summary]\n" +
+          "- Data sources: [summary]\n\n" +
+          "Is this correct, or would you like to adjust anything?\"\n\n" +
+          "Suggested Question Flow Pattern\n" +
+          "START\n" +
+          "- [Initial broad question] -> Get threat type\n" +
+          "- [Scope narrowing] -> Timeframe, geography, attack vectors\n" +
+          "- [Depth selection] -> Technical vs. strategic focus\n" +
+          "- [Collection planning] -> Sources, specific indicators\n" +
+          "- [Confirmation] -> Validate and generate PIRs\n" +
+          "- END (Proceed to Collection)\n\n" +
+          "Example PIRs Generated from Dialogue\n" +
+          "Priority Intelligence Requirements:\n" +
+          "11. What TTPs has APT29 used in campaigns against Nordic countries in the last 6 months?\n" +
+          "12. What infrastructure (domains, IPs) is associated with recent APT29 activity targeting government sectors?\n" +
+          "13. What detection opportunities exist for APT29's documented TTPs?\n" +
+          "14. What are the geopolitical motivations behind APT29's Nordic targeting?\n\n" +
+          "Key Design Principles for Your AI Dialogue\n" +
+          "Start broad, narrow progressively - Don't overwhelm with all questions at once\n" +
+          "Skip irrelevant questions - If user says \"I uploaded specific data,\" don't ask about OSINT sources\n" +
+          "Natural language - Avoid jargon initially, introduce it naturally\n" +
+          "Context retention - Reference previous answers (\"Based on your focus on APT29...\")\n" +
+          "Allow interruption - User should be able to say \"That's enough, proceed\" if they want minimal scope\n\n" +
+          "Would you like me to draft specific prompt templates for each dialogue stage, or help design the conversation state machine?";
 
-        const msg = {
-          id: "msg_" + Date.now().toString(36), role: "assistant",
-          content: "", createdAt: Date.now(),
-          meta: { runTrace: resp.runTrace, showArtifacts: true },
-        };
-        getActive().messages.push(msg);
-        render();
+        const directionExample =
+          "<div class=\"pill\">Direction Phase</div>" +
+          "<div class=\"section-title\">Goals</div>" +
+          "<div class=\"card list\">" +
+          "<div>Define intelligence requirements - What specific questions need answering?</div>" +
+          "<div>Establish scope and priorities - What matters most and what's out of scope?</div>" +
+          "<div>Identify stakeholders - Who needs this intelligence and why?</div>" +
+          "<div>Set collection boundaries - What sources, timeframes, and constraints apply?</div>" +
+          "<div>Align with organizational needs - How does this support business/security objectives?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Core Questions Analysts Ask Themselves</div>" +
+          "<div class=\"card\">" +
+          "<div class=\"section-title\">Threat Focus</div>" +
+          "<div class=\"list\">" +
+          "<div>What specific threat am I investigating?</div>" +
+          "<div>Is this about a threat actor, campaign, vulnerability, or general threat landscape?</div>" +
+          "<div>Do I need technical details (TTPs, IOCs) or strategic context (attribution, motivation)?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Scope Definition</div>" +
+          "<div class=\"list\">" +
+          "<div>What time period am I interested in? (Recent activity, historical analysis, ongoing monitoring)</div>" +
+          "<div>What geographic regions matter? (Global, specific countries, our infrastructure locations)</div>" +
+          "<div>What assets/systems am I trying to protect?</div>" +
+          "<div>What attack vectors or techniques am I most concerned about?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Depth vs. Breadth</div>" +
+          "<div class=\"list\">" +
+          "<div>Do I need a comprehensive overview or deep-dive analysis?</div>" +
+          "<div>Am I looking for specific indicators or broader patterns?</div>" +
+          "<div>Is this for immediate response or strategic planning?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Audience & Use Case</div>" +
+          "<div class=\"list\">" +
+          "<div>Who will consume this intelligence? (Executive, SOC, IR team, threat hunting)</div>" +
+          "<div>What decision needs to be made with this intelligence?</div>" +
+          "<div>What level of technical detail is appropriate?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Collection Constraints</div>" +
+          "<div class=\"list\">" +
+          "<div>What data sources are available/preferred?</div>" +
+          "<div>Are there time constraints?</div>" +
+          "<div>Are there sensitivity/classification requirements?</div>" +
+          "</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Suggested AI Dialogue Questions</div>" +
+          "<div class=\"subtle\">Use a conversational flow that narrows scope progressively.</div>" +
+          "<div class=\"card\">" +
+          "<div class=\"section-title\">Opening Questions</div>" +
+          "<div class=\"list\">" +
+          "<div>1. What prompted this investigation? Are you responding to an incident, preparing for a threat, or conducting routine intelligence gathering?</div>" +
+          "<div>2. What is your primary focus?</div>" +
+          "<div class=\"subtle\">Actor · Campaign · Vulnerability · Landscape</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Scope Refinement</div>" +
+          "<div class=\"list\">" +
+          "<div>3. What timeframe are you interested in?</div>" +
+          "<div class=\"subtle\">Last 24 hours · Last week/month · Last 6–12 months · Historical</div>" +
+          "<div>4. What geographic perspective matters most?</div>" +
+          "<div class=\"subtle\">Global · Region · Specific location</div>" +
+          "<div>5. What aspects are most important? (allow multiple)</div>" +
+          "<div class=\"subtle\">Indicators · TTPs · Attribution · Target patterns · Impact</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Technical Depth</div>" +
+          "<div class=\"list\">" +
+          "<div>6. What level of detail do you need?</div>" +
+          "<div class=\"subtle\">Executive · Operational · Technical deep‑dive</div>" +
+          "<div>7. Are there specific attack vectors you're concerned about?</div>" +
+          "<div class=\"subtle\">Phishing · Network exploitation · Supply chain · Insider</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Collection Planning</div>" +
+          "<div class=\"list\">" +
+          "<div>8. Which data sources should I prioritize?</div>" +
+          "<div class=\"subtle\">OSINT · Uploaded data · All sources</div>" +
+          "<div>9. Are there specific indicators or keywords I should focus on?</div>" +
+          "<div class=\"subtle\">Malware families · Infrastructure patterns · Target industries</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Validation</div>" +
+          "<div class=\"list\">" +
+          "<div>10. Let me confirm your requirements:</div>" +
+          "<div class=\"subtle\">Threat focus · Timeframe · Geography · Key aspects · Data sources</div>" +
+          "<div>Is this correct, or would you like to adjust anything?</div>" +
+          "</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Suggested Flow Pattern</div>" +
+          "<div class=\"card list\">" +
+          "<div>Start broad → Narrow scope → Select depth → Plan collection → Confirm → Proceed to Collection</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Example PIRs</div>" +
+          "<div class=\"card list\">" +
+          "<div>11. What TTPs has APT29 used in campaigns against Nordic countries in the last 6 months?</div>" +
+          "<div>12. What infrastructure (domains, IPs) is associated with recent APT29 activity targeting government sectors?</div>" +
+          "<div>13. What detection opportunities exist for APT29's documented TTPs?</div>" +
+          "<div>14. What are the geopolitical motivations behind APT29's Nordic targeting?</div>" +
+          "</div>" +
+          "<div class=\"section-title\">Design Principles</div>" +
+          "<div class=\"card list\">" +
+          "<div>Start broad, narrow progressively</div>" +
+          "<div>Skip irrelevant questions</div>" +
+          "<div>Use natural language and retain context</div>" +
+          "<div>Allow interruption: \"That's enough, proceed\"</div>" +
+          "</div>" +
+          "<div class=\"divider\"></div>" +
+          "<div class=\"subtle\">Would you like me to draft prompt templates for each stage, or help design the conversation state machine?</div>";
 
-        streamText(resp.text, (chunk) => {
-          msg.content = chunk;
+        let resp;
+        if (isFirstUserMsg) {
+          resp = { text: directionExamplePlain, richText: directionExample, runTrace: { steps: [] }, iocs: [], rich: true };
+        } else if (isSecondUserMsg) {
+          state.onboarding.completedStages.direction = true;
+          state.onboarding.completedStages.planning = true;
+          state.onboarding.currentStage = "collection";
+          state.onboarding.stageOpen.collection = true;
+          state.onboarding.stageOpen.planning = false;
+          startPhaseRun("Collecting...", 5000);
+          const collectionSummary =
+            "<div class=\"pill\">Collection Phase</div>" +
+            "<div class=\"section-title\">Collection Summary</div>" +
+            "<div class=\"card\">Collected threat intelligence on APT29 activities targeting Nordic countries over the past 6 months from 3 data sources.</div>" +
+            "<div class=\"section-title\">Collection Statistics</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Time Period</strong>: January 2025 - June 2025</div>" +
+            "<div><strong>Sources Queried</strong>: AlienVault OTX, MISP, Uploaded Files (2)</div>" +
+            "<div><strong>Total Indicators Collected</strong>: 247</div>" +
+            "<div><strong>Unique Campaigns Identified</strong>: 4</div>" +
+            "<div><strong>MITRE ATT&CK Techniques Referenced</strong>: 18</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Source 1: AlienVault OTX</div>" +
+            "<div class=\"card\">" +
+            "<div><strong>Query Parameters</strong>: \"APT29 Nordic government phishing\"</div>" +
+            "<div><strong>Pulses Found</strong>: 12 relevant pulses</div>" +
+            "<div><strong>Date Range</strong>: February 2025 - June 2025</div>" +
+            "<div class=\"section-title\">Key Findings</div>" +
+            "<div class=\"list\">" +
+            "<div>67 malicious domains associated with APT29 infrastructure</div>" +
+            "<div>23 IP addresses linked to command-and-control servers</div>" +
+            "<div>15 file hashes (malware samples: Cobalt Strike, custom backdoors)</div>" +
+            "<div>8 phishing email subjects targeting Norwegian government entities</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Notable Campaigns</div>" +
+            "<div class=\"list\">" +
+            "<div>1. Operation Northern Light (March 2025) - Spearphishing with malicious PDFs; 12 IOCs</div>" +
+            "<div>2. SolarWinds Follow-up Campaign (April-May 2025) - Supply chain targeting; 18 IOCs</div>" +
+            "</div>" +
+            "<div class=\"subtle\">Source Quality: High confidence, cross-validated indicators</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Source 2: MISP Instance</div>" +
+            "<div class=\"card\">" +
+            "<div><strong>Query Parameters</strong>: Tags: \"APT29\", \"Nordic\", Geographic: \"NO, SE, DK, FI\"</div>" +
+            "<div><strong>Events Found</strong>: 7 events</div>" +
+            "<div><strong>Date Range</strong>: January 2025 - May 2025</div>" +
+            "<div class=\"section-title\">Key Findings</div>" +
+            "<div class=\"list\">" +
+            "<div>89 indicators (45 domains, 28 IPs, 16 file hashes)</div>" +
+            "<div>3 YARA rules for APT29 malware variants</div>" +
+            "<div>4 Sigma rules for detection</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Notable Events</div>" +
+            "<div class=\"list\">" +
+            "<div>Event #2847: APT29 Targeting Finnish Energy Sector (Feb 2025) - TLP AMBER</div>" +
+            "<div>Event #3012: WellMess Malware Distribution (April 2025) - TLP GREEN</div>" +
+            "</div>" +
+            "<div class=\"subtle\">Source Quality: High confidence, verified by national CERTs</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Source 3: Uploaded Files</div>" +
+            "<div class=\"card\">" +
+            "<div><strong>Files Processed</strong>: 2</div>" +
+            "<div>1. apt29_iocs_internal.csv (125 rows)</div>" +
+            "<div>2. incident_report_march2025.pdf (15 pages)</div>" +
+            "<div class=\"section-title\">Key Findings from CSV</div>" +
+            "<div class=\"list\">" +
+            "<div>91 historical IOCs from internal investigations</div>" +
+            "<div>34 IOCs overlap with OTX/MISP data</div>" +
+            "<div>57 unique internal IOCs not found in public feeds</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Key Findings from PDF Report</div>" +
+            "<div class=\"list\">" +
+            "<div>Incident timeline: March 15-18, 2025</div>" +
+            "<div>Initial access: Spearphishing email to IT administrator</div>" +
+            "<div>Lateral movement: 3 internal systems compromised</div>" +
+            "<div>Exfiltration attempt blocked</div>" +
+            "<div>12 internal network indicators (IPs, hostnames)</div>" +
+            "</div>" +
+            "<div class=\"subtle\">Source Quality: High confidence, internal verified data</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Cross-Source Analysis</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Indicator Overlap</strong>: 34 IOCs appear in 2+ sources; 11 in all 3 sources</div>" +
+            "<div><strong>Timeline Correlation</strong>: Activity spike in March-April 2025</div>" +
+            "<div><strong>Geographic Distribution</strong>: Norway 45%, Finland 25%, Sweden 20%, Denmark 10%</div>" +
+            "<div><strong>Attack Vectors</strong>: Spearphishing 68%, Supply chain 22%, Credential stuffing 10%</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Collection Gaps</div>" +
+            "<div class=\"card list\">" +
+            "<div>Limited visibility into APT29 activities in Denmark</div>" +
+            "<div>No recent IOCs from Swedish sources (last update: January 2025)</div>" +
+            "<div>Incomplete attribution data for 2 campaigns</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Recommendations</div>" +
+            "<div class=\"card list\">" +
+            "<div>Query Swedish CERT feeds if available</div>" +
+            "<div>Search for Danish-language phishing campaigns</div>" +
+            "<div>Cross-reference with UK/US intelligence partners</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Data Quality Assessment</div>" +
+            "<div class=\"card list\">" +
+            "<div>Completeness: 8/10 (gaps in SE/DK)</div>" +
+            "<div>Timeliness: 9/10 (most data from last 30 days)</div>" +
+            "<div>Relevance: 9/10 (matches PIRs)</div>" +
+            "<div>Confidence: High (multi-source validation)</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Next Steps</div>" +
+            "<div class=\"card list\">" +
+            "<div>Ready for Processing Phase</div>" +
+            "<div>✓ Sufficient data collected to answer PIRs</div>" +
+            "<div>✓ Cross-source validation completed</div>" +
+            "<div>✓ Data quality meets standards</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Recommended Actions</div>" +
+            "<div class=\"card list\">" +
+            "<div>1. Proceed to normalization and correlation</div>" +
+            "<div>2. Map indicators to MITRE ATT&CK framework</div>" +
+            "<div>3. Generate perspective summaries (US, Norway, EU)</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Human Review Required</div>" +
+            "<div class=\"card list\">" +
+            "<div>Approve collected data for processing</div>" +
+            "<div>Request additional collection (optional)</div>" +
+            "<div>Provide feedback on collection strategy</div>" +
+            "</div>" +
+            "<div class=\"action-buttons\">" +
+            "<button class=\"primary\" data-action=\"collection-approve\">Approve Collection</button>" +
+            "<button data-action=\"collection-deny\">Request More Collection</button>" +
+            "</div>";
+          resp = { text: "Collection in progress...", richText: collectionSummary, runTrace: { steps: [] }, iocs: [], rich: true, delay: 5000 };
+        } else {
+          resp = mockResponse(text, state.control);
+        }
+
+        if (!isFirstUserMsg && !isSecondUserMsg) {
+          // Update intel panel
+          state.intel.risk = Math.min(95, state.intel.risk + Math.floor(Math.random() * 15) + 5);
+          resp.iocs.forEach((ioc) => {
+            if (!state.intel.iocs.find((i) => i.value === ioc.value)) {
+              state.intel.iocs.unshift(ioc);
+            }
+          });
+        }
+
+        const delay = resp.delay ?? 5000;
+        setTimeout(() => {
           const cl = document.getElementById("chat-log");
-          if (cl) state.preventAutoScroll = cl.scrollHeight - cl.scrollTop - cl.clientHeight >= 140;
-          render();
-        }, (cancelled) => {
-          if (cancelled) msg.content += "\n\n[Cancelled]";
+          const nearBottomNow = cl ? cl.scrollHeight - cl.scrollTop - cl.clientHeight < 12 : true;
+          if (nearBottomNow) state.forceScrollToBottom = true;
+          const msg = {
+            id: "msg_" + Date.now().toString(36), role: "assistant",
+            content: resp.richText ? resp.richText : resp.text, createdAt: Date.now(),
+            meta: { runTrace: resp.runTrace, rich: !!resp.richText },
+          };
+          getActive().messages.push(msg);
           state.run.active = false; state.run.stage = "Completed"; state.run.progress = 100;
           render();
-        }, state.run.cancelToken);
+        }, delay);
       };
 
       const runAnalysis = () => {
@@ -879,13 +1682,66 @@
 
       /* ===== Render ===== */
       const renderMsg = (m) => {
-        const safe = m.content.split("\n").map((l) => `<div>${l}</div>`).join("");
+        const safe = m.meta?.rich
+          ? m.content
+          : m.content.split("\n").map((l) => `<div>${l}</div>`).join("");
         const copy = m.role === "assistant" ? `<button data-action="copy" data-id="${m.id}">Copy</button>` : "";
         const trace = m.meta?.runTrace
           ? `<details class="run-trace"><summary>Run details</summary>${m.meta.runTrace.steps.map((s) => `<div class="run-step"><strong>${s.name}</strong> - ${s.duration}</div>`).join("")}</details>` : "";
-        const arts = m.role === "assistant" && m.meta?.showArtifacts
-          ? `<div class="artifacts"><span>Report ready</span><button data-action="download-report">Report</button><button data-action="download-json">JSON</button></div>` : "";
-        return `<div class="message ${m.role}"><div class="bubble">${safe}</div><div class="msg-actions"><span>${fmtTime(m.createdAt)}</span>${copy}</div>${arts}${trace}</div>`;
+        return `<div class="message ${m.role}"><div class="bubble">${safe}</div><div class="msg-actions"><span>${fmtTime(m.createdAt)}</span>${copy}</div>${trace}</div>`;
+      };
+
+      const renderOnboardingPanel = () => {
+        if (!state.onboarding.active) return "";
+        const idx = state.onboarding.stepIndex + 1;
+        const total = onboardingScript.length;
+
+        const stageCard = (id, title, meta, body, open) => {
+          const active = state.onboarding.currentStage === id;
+          const completed = !!state.onboarding.completedStages[id];
+          return `
+          <div class="ti-stage ${open ? "open" : ""}">
+            <div class="ti-stage-header" data-action="ti-toggle" data-id="${id}">
+              <div>
+                <div class="ti-stage-title">${title}</div>
+                <div class="ti-stage-meta">${meta}</div>
+              </div>
+              <div class="ti-stage-status">
+                ${completed ? `<span class="ti-check" aria-hidden="true">✓</span>` : ""}
+                ${active && !completed ? `<span class="ti-spinner" aria-hidden="true"></span>` : ""}
+                <span>${open ? "Collapse" : "Expand"}</span>
+              </div>
+            </div>
+            <div class="ti-stage-body">
+              ${body}
+            </div>
+          </div>
+        `;
+        };
+
+        const directionBody = `
+          <div class="onb-header">
+            <div>
+              <div class="onb-title">Direction Phase (Mock Interaction)</div>
+              <div class="onb-sub">Start broad, narrow progressively, then confirm and generate PIRs.</div>
+            </div>
+            <div class="onb-progress">Step ${idx} of ${total}</div>
+          </div>
+          <div class="onb-summary">
+            <div class="onb-kicker">Current Position</div>
+            <div>You are in the Direction phase. This panel only displays where you are in the cycle.</div>
+          </div>
+        `;
+
+        return `
+          <section class="onboarding-panel">
+            ${stageCard("direction", "Direction", "Define requirements and scope", directionBody, state.onboarding.stageOpen.direction)}
+            ${stageCard("planning", "Planning", "Confirm requirements and next steps", `<div class="onb-summary">Mock stage placeholder. Expand to review when ready.</div>`, state.onboarding.stageOpen.planning)}
+            ${stageCard("collection", "Collection", "Identify sources and gather data", `<div class="onb-summary">Mock stage placeholder. Expand to review when ready.</div>`, state.onboarding.stageOpen.collection)}
+            ${stageCard("processing", "Processing", "Normalize, enrich, and structure data", `<div class="onb-summary">Mock stage placeholder. Expand to review when ready.</div>`, state.onboarding.stageOpen.processing)}
+            ${stageCard("analysis", "Analysis", "Derive insights and produce findings", `<div class="onb-summary">Mock stage placeholder. Expand to review when ready.</div>`, state.onboarding.stageOpen.analysis)}
+          </section>
+        `;
       };
 
       const renderIntelTab = () => {
@@ -958,6 +1814,13 @@
         const query = state.searchQuery || "";
         const filtered = state.conversations.filter((c) => c.title.toLowerCase().includes(query.toLowerCase()));
 
+        // Track if chat-log exists to know if this is initial render
+        const oldChatLog = document.getElementById("chat-log");
+        const oldScrollTop = oldChatLog ? oldChatLog.scrollTop : 0;
+        const oldScrollHeight = oldChatLog ? oldChatLog.scrollHeight : 0;
+        const oldClientHeight = oldChatLog ? oldChatLog.clientHeight : 0;
+        const wasAtBottom = oldChatLog ? (oldScrollHeight - oldScrollTop - oldClientHeight < 50) : true;
+
         document.getElementById("app").innerHTML = `
           <div class="drawer-backdrop ${state.sidebarOpenMobile ? "active" : ""}" data-action="close-drawer"></div>
           <div class="app-shell">
@@ -1028,6 +1891,8 @@
                     <input type="file" id="file-input" multiple style="display:none" />
                   </div>
 
+                  ${renderOnboardingPanel()}
+
                   <div class="progress-bar ${state.run.active ? "active" : ""}">
                     <div class="progress-track"><div class="progress-fill" style="width:${state.run.progress}%"></div></div>
                     <div class="progress-label">${state.run.stage || ""} ${state.run.progress}%</div>
@@ -1071,10 +1936,6 @@
                   <div class="intel-body">
                     ${renderIntelTab()}
                   </div>
-                  <div class="download-section" style="padding:12px 14px">
-                    <button class="btn-download primary" data-action="download-report">Download Report</button>
-                    <button class="btn-download secondary" data-action="download-json">Export JSON</button>
-                  </div>
                 </aside>
               </div>
             </div>
@@ -1087,7 +1948,9 @@
         const jumpBtn = document.querySelector(".jump-latest");
 
         if (ta && sendBtn) {
-          const updateSend = () => { if (!state.run.active) sendBtn.disabled = ta.value.trim().length === 0; };
+          const updateSend = () => {
+            if (!state.run.active) sendBtn.disabled = ta.value.trim().length === 0;
+          };
           const autoGrow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 160) + "px"; updateSend(); };
           ta.addEventListener("input", autoGrow);
           autoGrow();
@@ -1095,12 +1958,20 @@
 
         if (chatLog && jumpBtn) {
           const onScroll = () => {
-            const near = chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 120;
+            const near = chatLog.scrollHeight - chatLog.scrollTop - chatLog.clientHeight < 12;
             jumpBtn.style.display = near ? "none" : "inline-flex";
           };
           chatLog.addEventListener("scroll", onScroll);
+
+          // Preserve scroll position: stick to bottom only if user was already there
+          if (state.forceScrollToBottom) {
+            chatLog.scrollTop = chatLog.scrollHeight;
+          } else {
+            const maxTop = Math.max(0, chatLog.scrollHeight - chatLog.clientHeight);
+            chatLog.scrollTop = Math.min(oldScrollTop, maxTop);
+          }
+          state.forceScrollToBottom = false;
           onScroll();
-          if (!state.preventAutoScroll) chatLog.scrollTop = chatLog.scrollHeight;
         }
       };
 
@@ -1121,6 +1992,227 @@
         if (a === "open-drawer") { state.sidebarOpenMobile = true; render(); return; }
         if (a === "close-drawer") { state.sidebarOpenMobile = false; render(); return; }
         if (a === "intel-tab" && id) { state.intelTab = id; render(); return; }
+        if (a === "ti-toggle" && id) {
+          state.onboarding.stageOpen[id] = !state.onboarding.stageOpen[id];
+          render();
+          return;
+        }
+        if (a === "collection-approve") {
+          appendUser("Approve collection and proceed to processing.");
+          state.onboarding.completedStages.collection = true;
+          state.onboarding.currentStage = "processing";
+          state.onboarding.stageOpen.processing = true;
+          state.onboarding.stageOpen.collection = false;
+          startPhaseRun("Processing...", 5000);
+          const processingSummary =
+            "<div class=\"pill\">Processing Phase</div>" +
+            "<div class=\"section-title\">Overview</div>" +
+            "<div class=\"card\">Completed processing of 247 indicators collected from 3 sources. Identified patterns, enriched IOCs, mapped to MITRE ATT&CK framework, and generated perspective summaries for US, Norway, and EU viewpoints.</div>" +
+            "<div class=\"section-title\">Processing Statistics</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Processing Duration</strong>: 3 minutes 42 seconds</div>" +
+            "<div><strong>Indicators Normalized</strong>: 247/247 (100%)</div>" +
+            "<div><strong>Correlations Identified</strong>: 23 clusters</div>" +
+            "<div><strong>IOCs Enriched</strong>: 189/247 (76.5%)</div>" +
+            "<div><strong>MITRE Techniques Mapped</strong>: 18 techniques across 8 tactics</div>" +
+            "<div><strong>Perspective Summaries Generated</strong>: 3 (US, Norway, EU)</div>" +
+            "</div>" +
+            "<div class=\"divider\"></div>" +
+            "<div class=\"section-title\">1. Data Normalization</div>" +
+            "<div class=\"section-title\">Format Standardization</div>" +
+            "<div class=\"card list\">" +
+            "<div>Converted all timestamps to ISO 8601 UTC</div>" +
+            "<div>Standardized IP addresses (removed CIDR notation where inappropriate)</div>" +
+            "<div>Normalized domain names (lowercase, removed protocols)</div>" +
+            "<div>Unified file hash formats (lowercase hex)</div>" +
+            "<div>Mapped indicator types to STIX 2.1 taxonomy</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Normalization Results</div>" +
+            "<div class=\"card list\">" +
+            "<div>IPv4 Addresses: 103 raw / 98 normalized / 5 duplicates removed</div>" +
+            "<div>Domains: 120 raw / 115 normalized / 5 duplicates removed</div>" +
+            "<div>File Hashes (SHA256): 52 raw / 52 normalized / 0 duplicates removed</div>" +
+            "<div>Email Addresses: 8 raw / 8 normalized / 0 duplicates removed</div>" +
+            "<div><strong>Total</strong>: 283 raw / 273 normalized / 10 duplicates removed</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Data Quality Post‑Normalization</div>" +
+            "<div class=\"card list\">" +
+            "<div>✓ All indicators conform to standard formats</div>" +
+            "<div>✓ Duplicates removed</div>" +
+            "<div>✓ Invalid indicators flagged (14 items)</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Invalid Indicators Identified</div>" +
+            "<div class=\"card list\">" +
+            "<div>8 IPs from private RFC1918 ranges</div>" +
+            "<div>4 domains with invalid TLD (.local, .internal)</div>" +
+            "<div>2 malformed email addresses</div>" +
+            "</div>" +
+            "<div class=\"divider\"></div>" +
+            "<div class=\"section-title\">2. Correlation Analysis</div>" +
+            "<div class=\"card list\">" +
+            "<div>Correlation Clusters Identified: 23</div>" +
+            "<div><strong>Cluster 1: Operation Northern Light</strong> (High confidence)</div>" +
+            "<div><strong>Cluster 2: SolarWinds Follow‑up</strong> (Medium confidence)</div>" +
+            "<div><strong>Cluster 3: WellMess Malware Distribution</strong> (High confidence)</div>" +
+            "<div>Clusters 4–12: Medium confidence</div>" +
+            "<div>Clusters 13–23: Low confidence</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Correlation Network Graph</div>" +
+            "<div class=\"card\">Graph generated to visualize shared infrastructure, time overlap, and TTP convergence.</div>" +
+            "<div class=\"divider\"></div>" +
+            "<div class=\"section-title\">Processing Complete</div>" +
+            "<div class=\"card list\">" +
+            "<div>✓ Data normalized and enriched</div>" +
+            "<div>✓ Correlation clusters generated</div>" +
+            "<div>✓ MITRE ATT&CK mappings complete</div>" +
+            "</div>";
+          const analysisPrompt =
+            "<div class=\"pill\">Analysis Phase</div>" +
+            "<div class=\"section-title\">Ready To Proceed</div>" +
+            "<div class=\"card\">Processing is complete. Proceed to Analysis when ready.</div>" +
+            "<div class=\"action-buttons\">" +
+            "<button class=\"primary\" data-action=\"analysis-proceed\">Proceed to Analysis</button>" +
+            "</div>";
+          setTimeout(() => {
+            const cl = document.getElementById("chat-log");
+            const nearBottomNow = cl ? cl.scrollHeight - cl.scrollTop - cl.clientHeight < 12 : true;
+            if (nearBottomNow) state.forceScrollToBottom = true;
+            const msg = {
+              id: "msg_" + Date.now().toString(36), role: "assistant",
+              content: processingSummary, createdAt: Date.now(),
+              meta: { runTrace: { steps: [] }, rich: true },
+            };
+            getActive().messages.push(msg);
+            const promptMsg = {
+              id: "msg_" + Date.now().toString(36), role: "assistant",
+              content: analysisPrompt, createdAt: Date.now(),
+              meta: { runTrace: { steps: [] }, rich: true },
+            };
+            getActive().messages.push(promptMsg);
+            state.onboarding.completedStages.processing = true;
+            state.run.active = false; state.run.stage = "Completed"; state.run.progress = 100;
+            render();
+          }, 5000);
+          render();
+          return;
+        }
+        if (a === "collection-deny") {
+          appendUser("Request additional collection.");
+          state.onboarding.currentStage = "collection";
+          state.onboarding.stageOpen.collection = true;
+          render();
+          return;
+        }
+        if (a === "analysis-proceed") {
+          appendUser("Proceed to analysis.");
+          state.onboarding.currentStage = "analysis";
+          state.onboarding.stageOpen.analysis = true;
+          startPhaseRun("Analyzing...", 2500);
+          const analysisSummary =
+            "<div class=\"pill\">Analysis Phase</div>" +
+            "<div class=\"section-title\">Overview</div>" +
+            "<div class=\"card\">Completed processing of 247 indicators collected from 3 sources. Identified patterns, enriched IOCs, mapped to MITRE ATT&CK framework, and generated perspective summaries for US, Norway, and EU viewpoints.</div>" +
+            "<div class=\"section-title\">Processing Statistics</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Processing Duration</strong>: 3 minutes 42 seconds</div>" +
+            "<div><strong>Indicators Normalized</strong>: 247/247 (100%)</div>" +
+            "<div><strong>Correlations Identified</strong>: 23 clusters</div>" +
+            "<div><strong>IOCs Enriched</strong>: 189/247 (76.5%)</div>" +
+            "<div><strong>MITRE Techniques Mapped</strong>: 18 techniques across 8 tactics</div>" +
+            "<div><strong>Perspective Summaries Generated</strong>: 3 (US, Norway, EU)</div>" +
+            "</div>" +
+            "<div class=\"divider\"></div>" +
+            "<div class=\"section-title\">1. Data Normalization</div>" +
+            "<div class=\"section-title\">Format Standardization</div>" +
+            "<div class=\"card list\">" +
+            "<div>Converted all timestamps to ISO 8601 UTC</div>" +
+            "<div>Standardized IP addresses (removed CIDR notation where inappropriate)</div>" +
+            "<div>Normalized domain names (lowercase, removed protocols)</div>" +
+            "<div>Unified file hash formats (lowercase hex)</div>" +
+            "<div>Mapped indicator types to STIX 2.1 taxonomy</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Normalization Results</div>" +
+            "<div class=\"card list\">" +
+            "<div>IPv4 Addresses: 103 raw / 98 normalized / 5 duplicates removed</div>" +
+            "<div>Domains: 120 raw / 115 normalized / 5 duplicates removed</div>" +
+            "<div>File Hashes (SHA256): 52 raw / 52 normalized / 0 duplicates removed</div>" +
+            "<div>Email Addresses: 8 raw / 8 normalized / 0 duplicates removed</div>" +
+            "<div><strong>Total</strong>: 283 raw / 273 normalized / 10 duplicates removed</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Data Quality Post‑Normalization</div>" +
+            "<div class=\"card list\">" +
+            "<div>✓ All indicators conform to standard formats</div>" +
+            "<div>✓ Duplicates removed</div>" +
+            "<div>✓ Invalid indicators flagged (14 items - see details below)</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Invalid Indicators Identified</div>" +
+            "<div class=\"card list\">" +
+            "<div>8 IPs from private RFC1918 ranges (10.x.x.x, 192.168.x.x)</div>" +
+            "<div>4 domains with invalid TLD (.local, .internal)</div>" +
+            "<div>2 malformed email addresses</div>" +
+            "</div>" +
+            "<div class=\"divider\"></div>" +
+            "<div class=\"section-title\">2. Correlation Analysis</div>" +
+            "<div class=\"section-title\">Correlation Clusters Identified: 23</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Cluster 1: Operation Northern Light Infrastructure</strong> (High confidence)</div>" +
+            "<div>Indicators: 34 (12 domains, 15 IPs, 7 file hashes)</div>" +
+            "<div>Timeframe: March 1-18, 2025</div>" +
+            "<div>Confidence: 9.2/10</div>" +
+            "<div>Pattern Analysis: 48-hour domain registration window, NiceVPS registrar, AS64512, round-robin DNS, self‑signed TLS</div>" +
+            "<div>Behavioral Correlation: Phishing campaign, C2 activity, Cobalt Strike beacons</div>" +
+            "<div>Attribution Indicators: Matches known APT29 tradecraft</div>" +
+            "<div>Evidence Quality: Strong</div>" +
+            "</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Cluster 2: SolarWinds Follow‑up Supply Chain</strong> (Medium confidence)</div>" +
+            "<div>Indicators: 18 (10 IPs, 5 domains, 3 file hashes)</div>" +
+            "<div>Timeframe: April 15 - May 20, 2025</div>" +
+            "<div>Confidence: 6.8/10</div>" +
+            "<div>Pattern Analysis: Typosquatting, cloud infrastructure, stolen code signing certs</div>" +
+            "<div>Behavioral Correlation: Trojanized updates, beaconing, download servers</div>" +
+            "<div>Attribution Indicators: Code reuse (68% similarity)</div>" +
+            "<div>Evidence Quality: Moderate</div>" +
+            "</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Cluster 3: WellMess Malware Distribution</strong> (High confidence)</div>" +
+            "<div>Indicators: 27 (15 domains, 8 IPs, 4 file hashes)</div>" +
+            "<div>Timeframe: April 1 - June 10, 2025</div>" +
+            "<div>Confidence: 8.9/10</div>" +
+            "<div>Pattern Analysis: Compromised WordPress sites, dedicated C2 IPs</div>" +
+            "<div>Behavioral Correlation: HTTP POST /api/v2/update, 7‑day exfil cadence</div>" +
+            "<div>Attribution Indicators: WellMess TTP overlap</div>" +
+            "<div>Evidence Quality: Strong</div>" +
+            "</div>" +
+            "<div class=\"card list\">" +
+            "<div><strong>Other Clusters</strong>: 20 additional clusters</div>" +
+            "<div>Clusters 4‑12: Medium confidence (4‑7/10)</div>" +
+            "<div>Clusters 13‑23: Low confidence (2‑4/10)</div>" +
+            "</div>" +
+            "<div class=\"section-title\">Correlation Network Graph</div>" +
+            "<div class=\"card\">Graph generated to visualize shared infrastructure, time overlap, and TTP convergence.</div>" +
+            "<div class=\"section-title\">Analysis Complete</div>" +
+            "<div class=\"card\">Download outputs for distribution or archive.</div>" +
+            "<div class=\"action-buttons\">" +
+            "<button class=\"primary\" data-action=\"download-report\">Download Report</button>" +
+            "<button data-action=\"download-json\">Download JSON</button>" +
+            "</div>";
+          setTimeout(() => {
+            const cl = document.getElementById("chat-log");
+            const nearBottomNow = cl ? cl.scrollHeight - cl.scrollTop - cl.clientHeight < 12 : true;
+            if (nearBottomNow) state.forceScrollToBottom = true;
+            const msg = {
+              id: "msg_" + Date.now().toString(36), role: "assistant",
+              content: analysisSummary, createdAt: Date.now(),
+              meta: { runTrace: { steps: [] }, rich: true },
+            };
+            getActive().messages.push(msg);
+            state.onboarding.completedStages.analysis = true;
+            state.onboarding.currentStage = "analysis";
+            render();
+          }, 2500);
+          return;
+        }
         if (a === "send") {
           if (state.run.active) { if (state.run.cancelToken) state.run.cancelToken.cancelled = true; }
           else sendMessage();
@@ -1136,7 +2228,12 @@
           if (c && confirm("Clear this chat?")) { c.messages = []; c.updatedAt = Date.now(); state.uploadPrompted = false; render(); }
           return;
         }
-        if (a === "jump") { document.getElementById("chat-log").scrollTop = document.getElementById("chat-log").scrollHeight; return; }
+        if (a === "jump") {
+          const cl = document.getElementById("chat-log");
+          if (cl) cl.scrollTop = cl.scrollHeight;
+          state.forceScrollToBottom = true;
+          return;
+        }
         if (a === "upload-files") { document.getElementById("file-input").click(); return; }
         if (a === "remove-file" && id) { state.control.uploadedFiles = state.control.uploadedFiles.filter((f) => f.id !== id); render(); return; }
         if (a === "model-dec") { state.control.modelCount = Math.max(1, state.control.modelCount - 1); render(); return; }
@@ -1185,10 +2282,6 @@
 
       /* ===== Init ===== */
       ensureActive();
-      if (state.conversations.length === 1 && !state.conversations[0].messages.length) {
-        addMessage(state.conversations[0].id, "assistant",
-          "Welcome to the Analyst Workspace. Upload files or type a query to begin your threat intelligence analysis.");
-      }
 
       document.addEventListener("click", handleClick);
       document.addEventListener("input", handleInput);
