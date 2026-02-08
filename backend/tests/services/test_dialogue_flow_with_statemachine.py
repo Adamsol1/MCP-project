@@ -33,6 +33,10 @@ async def test_state_transition_from_initial_to_gathering():
 
   #Check if state is correct
   assert dialogue_flow.state == DialogueState.GATHERING
+  #Check if initial query is saved
+  assert dialogue_flow.context.initial_query == "Investigate x"
+  #Check if UI is updated with correct action
+  assert result.action == "ask_question"
 
 
 #Test for checking if the machine states follow the inteded path of gathering -> confirming
@@ -106,6 +110,28 @@ async def test_state_transition_from_human_validation_to_gathering_with_modifica
   result = await dialogue_flow.process_user_input("modify", mock_service)
 
   assert dialogue_flow.state == DialogueState.GATHERING
+
+
+#Test for checking that the machine state is force changed from GATHERING -> CONFIRMING when question count reaches 5
+@pytest.mark.asyncio
+async def test_state_transition_when_question_count_is_5():
+  #Start new workflow for test enviorment and put in relevant state
+  dialogue_flow = DialogueFlow()
+  mock_service = MockDialogueService()
+  dialogue_flow.state = DialogueState.GATHERING
+
+
+  #Maually set question count to max and process user input
+  dialogue_flow.question_count = 5
+
+  await dialogue_flow.process_user_input("modify", mock_service)
+
+
+  #Check if machine state is forced to CONFIRMING
+
+  assert dialogue_flow.state == DialogueState.CONFIRMING
+
+
 
 
 
