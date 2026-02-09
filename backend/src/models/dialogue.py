@@ -1,12 +1,39 @@
-class DialogueContext:
-  def __init__(self):
-    self.initial_query = "" #The initial query given by the user. This will withhold inteded goal
-    self.scope = "" #Scope of the current investigation
-    self.timeframe = "" #Set the timefra for current investigation
-    self.target_entities = [] #List of target entities for current investigation. E.g [Norway, Russsia]
+from enum import Enum
 
-#The response object returned by the dialogue flow to frontend. Witholds actions and content to be shown to the user.
-class DialogueResponse:
-  def __init__(self):
-    self.action ="" #The action returned to the frontend. Informs about what the frontend shall do
-    self.content="" #The reponse content. Can be question/information connected to the action
+from pydantic import BaseModel
+
+
+class QuestionType(str, Enum):
+    SCOPE = "scope"
+    TIMEFRAME = "timeframe"
+    TARGETS = "target_entities"
+    ACTORS = "actors"
+    FOCUS = "focus"
+    CONFIRMATION = "confirmation"
+
+
+class DialogueContext(BaseModel):
+    """Accumulates information gathered through dialogue"""
+
+    initial_query: str = ""
+    scope: str = ""
+    timeframe: str = ""
+    target_entities: list[str] = []
+    threat_actors: list[str] | None = None
+    priority_focus: str | None = None
+
+
+class DialogueResponse(BaseModel):
+    """Response object returned by dialogue flow to frontend"""
+
+    action: str = ""
+    content: str = ""
+
+
+class ClarifyingQuestion(BaseModel):
+    """Question returned by DialogueService"""
+
+    question_text: str
+    question_type: str
+    is_final: bool = False
+    suggested_answers: list[str] | None = None
