@@ -29,7 +29,7 @@ async def test_state_transition_from_initial_to_gathering():
   mock_service = MockDialogueService()
 
   #Attempt to move to next state
-  result = await dialogue_flow.process_user_input("Investigate x", mock_service)
+  result = await dialogue_flow.process_user_message("Investigate x", mock_service)
 
   #Check if state is correct
   assert dialogue_flow.state == DialogueState.GATHERING
@@ -55,7 +55,7 @@ async def test_state_transition_from_gathering_to_confirming():
   dialogue_flow.context.target_entities = ["Norway"] #List of target entities
 
   #Attempt to move to the next state
-  result = await dialogue_flow.process_user_input("Investigate x", mock_service)
+  result = await dialogue_flow.process_user_message("Investigate x", mock_service)
 
   assert dialogue_flow.state == DialogueState.CONFIRMING
 
@@ -72,7 +72,7 @@ async def test_state_transition_from_confirming_to_complete():
   dialogue_flow.state = DialogueState.CONFIRMING
 
   #The user acccepts the information
-  result = await dialogue_flow.process_user_input(True, mock_service)
+  result = await dialogue_flow.process_user_message(True, mock_service)
 
   assert dialogue_flow.state == DialogueState.COMPLETE
 
@@ -89,7 +89,7 @@ async def test_state_transition_from_confirming_to_gathering_with_modifications(
   dialogue_flow.state = DialogueState.CONFIRMING
 
   ##The user denies the information and gives modifications
-  result = await dialogue_flow.process_user_input(False, mock_service)
+  result = await dialogue_flow.process_user_message(False, mock_service)
 
   assert dialogue_flow.state == DialogueState.GATHERING
 
@@ -106,7 +106,7 @@ async def test_state_transition_when_question_count_is_max():
   #Maually set question count to max and process user input
   dialogue_flow.question_count = dialogue_flow.max_questions
 
-  await dialogue_flow.process_user_input("modify", mock_service)
+  await dialogue_flow.process_user_message("modify", mock_service)
 
 
   #Check if machine state is forced to CONFIRMING
@@ -123,7 +123,7 @@ async def test_state_stays_gathering_when_context_is_insufficient():
 
   #No context set
 
-  result = await dialogue_flow.process_user_input("some input", mock_service)
+  result = await dialogue_flow.process_user_message("some input", mock_service)
 
   #State should remain GATHERING
   assert dialogue_flow.state == DialogueState.GATHERING

@@ -17,30 +17,30 @@ class DialogueFlow:
 
 
 
-  async def process_user_input(self, user_input, dialogue_service):
+  async def process_user_message(self, user_message, dialogue_service):
     #INITIAL PHASE
     if self.state == DialogueState.INITIAL:
-      return await self.handle_initial_input(user_input, dialogue_service)
+      return await self.handle_initial_input(user_message, dialogue_service)
 
     #GATHERIGN PHASE
     elif self.state == DialogueState.GATHERING:
-      return await self.handle_gathering_input(user_input, dialogue_service)
+      return await self.handle_gathering_input(user_message, dialogue_service)
 
     #CONFIRMING PHASE
     elif self.state == DialogueState.CONFIRMING:
-      return await self.handle_confirming_input(user_input, dialogue_service)
+      return await self.handle_confirming_input(user_message, dialogue_service)
 
 
   #State handler for initial phase. Here we will save initial query, generate questions and change state
-  async def handle_initial_input(self, user_input, dialogue_service):
-      self.context.initial_query = user_input #First user input is saved as initial query. This is the intended goal of the investigation
+  async def handle_initial_input(self, user_message, dialogue_service):
+      self.context.initial_query = user_message #First user input is saved as initial query. This is the intended goal of the investigation
       #Create response that is sent to frontend
       dialogue_response = DialogueResponse()
       dialogue_response.action = "ask_question"
 
-      #Generate questions for user based on user_input
+      #Generate questions for user based on user_message
       question = await dialogue_service.generate_clarifying_question(
-          user_input=user_input,
+          user_message=user_message,
           context = self.context
          )
       dialogue_response.content = question.question_text
@@ -53,7 +53,7 @@ class DialogueFlow:
       return dialogue_response
 
   #State handler for gathering phase.  Here we will update context with information from user input, change state if possible or generate more questions if needed
-  async def handle_gathering_input(self, user_input, dialogue_service):
+  async def handle_gathering_input(self, user_message, dialogue_service):
       dialogue_response = DialogueResponse()
       if(self.question_count >= self.max_questions):
          self.state = DialogueState.CONFIRMING
@@ -72,8 +72,8 @@ class DialogueFlow:
         self.question_count += 1
         return dialogue_response
       else:
-        question = await dialogue_service.generate_clarifying_questions(
-          user_input=user_input,
+        question = await dialogue_service.generate_clarifying_question(
+          user_message=user_message,
           context = self.context
          )
         dialogue_response.action = "ask_question"
@@ -89,12 +89,12 @@ class DialogueFlow:
 # - User updates the summary -> Change state CONFIRMING -> GATHERING
 # - User rejects the summary -> Change state CONFIRMING -> GATHERING
 
-  async def handle_confirming_input(self, user_input, dialogue_service):
+  async def handle_confirming_input(self, user_message, dialogue_service):
 
       #Set ut frontend response
       dialogue_respons = DialogueResponse()
       #Check if user confirms summary
-      if user_input:
+      if user_message:
          self.state = DialogueState.COMPLETE
          dialogue_respons.action = "complete"
 
