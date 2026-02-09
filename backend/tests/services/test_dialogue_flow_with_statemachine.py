@@ -1,8 +1,10 @@
 import pytest
+
 from src.services.dialogue_flow import DialogueFlow, DialogueState
 
-class MockDialogueService():
-  async def generate_clarifying_question(self, user_message, context):
+
+class MockDialogueService:
+  async def generate_clarifying_question(self, user_message, context):  # noqa: ARG002
     return MockQuestion()
 
 class MockQuestion:
@@ -57,6 +59,8 @@ async def test_state_transition_from_gathering_to_confirming():
   #Attempt to move to the next state
   result = await dialogue_flow.process_user_message("Investigate x", mock_service)
 
+  assert result.action == "show_summary"
+
   assert dialogue_flow.state == DialogueState.CONFIRMING
 
 #Test for checking if the machine states follow the intended path of CONFIRMING -> COMPLETE.
@@ -73,6 +77,8 @@ async def test_state_transition_from_confirming_to_complete():
 
   #The user acccepts the information
   result = await dialogue_flow.process_user_message(True, mock_service)
+
+  assert result.action == "complete"
 
   assert dialogue_flow.state == DialogueState.COMPLETE
 
@@ -91,6 +97,8 @@ async def test_state_transition_from_confirming_to_gathering_with_modifications(
   ##The user denies the information and gives modifications
   result = await dialogue_flow.process_user_message(False, mock_service)
 
+  assert result.action == "ask_modification"
+
   assert dialogue_flow.state == DialogueState.GATHERING
 
 
@@ -106,8 +114,10 @@ async def test_state_transition_when_question_count_is_max():
   #Maually set question count to max and process user input
   dialogue_flow.question_count = dialogue_flow.max_questions
 
-  await dialogue_flow.process_user_message("modify", mock_service)
+  result = await dialogue_flow.process_user_message("modify", mock_service)
 
+  #Check if action is max_questions
+  assert result.action == "max_questions"
 
   #Check if machine state is forced to CONFIRMING
 

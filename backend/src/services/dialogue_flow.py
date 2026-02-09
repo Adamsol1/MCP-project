@@ -1,7 +1,9 @@
+from enum import Enum
+
 from src.models.dialogue import DialogueContext, DialogueResponse
 
 
-class DialogueState:
+class DialogueState(str, Enum):
   INITIAL = "initial"#State before first user input
   GATHERING = "gathering" #State when gathering information through questions
   CONFIRMING = "confirming" #Presenting summary of gathering phase. Will ask if the user finds the result approvable.
@@ -17,7 +19,7 @@ class DialogueFlow:
 
 
 
-  async def process_user_message(self, user_message, dialogue_service):
+  async def process_user_message(self, user_message, dialogue_service) -> DialogueResponse:
     #INITIAL PHASE
     if self.state == DialogueState.INITIAL:
       return await self.handle_initial_input(user_message, dialogue_service)
@@ -27,7 +29,7 @@ class DialogueFlow:
       return await self.handle_gathering_input(user_message, dialogue_service)
 
     #CONFIRMING PHASE
-    elif self.state == DialogueState.CONFIRMING:
+    else:
       return await self.handle_confirming_input(user_message, dialogue_service)
 
 
@@ -60,10 +62,7 @@ class DialogueFlow:
          dialogue_response.action = "max_questions"
          return dialogue_response
 
-
-
-
-      #Generate questions
+      #TODO : Update context with user input.
 
       #Change state GATHERING -> CONFIRMING if possible
       if(self._has_sufficient_context()):
@@ -86,10 +85,8 @@ class DialogueFlow:
   #State handler for confirming phase. Here we check if user confirm/update/reject the investigation summary.
   #Possible outcomes:
 # - User confirms the summary -> Change state CONFIRMING -> COMPLETE
-# - User updates the summary -> Change state CONFIRMING -> GATHERING
-# - User rejects the summary -> Change state CONFIRMING -> GATHERING
-
-  async def handle_confirming_input(self, user_message, dialogue_service):
+# - User rejects with modifications the summary -> Change state CONFIRMING -> GATHERING
+  async def handle_confirming_input(self, user_message, dialogue_service):  # noqa: ARG002
 
       #Set ut frontend response
       dialogue_respons = DialogueResponse()
@@ -118,5 +115,4 @@ class DialogueFlow:
       if not getattr(self.context, field):
         return False
     return True
-
 
