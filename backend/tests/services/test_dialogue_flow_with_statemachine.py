@@ -55,14 +55,14 @@ async def test_state_transition_from_gathering_to_confirming():
   dialogue_flow.context.target_entities = ["Norway"] #List of target entities
 
   #Attempt to move to the next state
-  result = await dialogue_flow.process_user_input("Ivestigate x", mock_service)
+  result = await dialogue_flow.process_user_input("Investigate x", mock_service)
 
   assert dialogue_flow.state == DialogueState.CONFIRMING
 
-#Test for checking if the machine states follow the intended path of human validation -> complete.
+#Test for checking if the machine states follow the intended path of CONFIRMING -> COMPLETE.
 #Requires that the human accepts the information gathered in the GATHERING state
 @pytest.mark.asyncio
-async def test_state_transition_from_human_validation_to_complete():
+async def test_state_transition_from_confirming_to_complete():
   #Start new work flow for test enviorment
   dialogue_flow = DialogueFlow()
   mock_service = MockDialogueService()
@@ -72,32 +72,14 @@ async def test_state_transition_from_human_validation_to_complete():
   dialogue_flow.state = DialogueState.CONFIRMING
 
   #The user acccepts the information
-  result = await dialogue_flow.process_user_input("yes", mock_service)
+  result = await dialogue_flow.process_user_input(True, mock_service)
 
   assert dialogue_flow.state == DialogueState.COMPLETE
 
-#Test for cheking if the machines state follow the inteded path of human validation -> GATHERING
-#Requires that the human denies the information gathered in GATHERING state
-@pytest.mark.asyncio
-async def test_state_transition_from_human__validation_to_gathering():
-  ##Start new work flow for test enviorment
-  dialogue_flow = DialogueFlow()
-  mock_service = MockDialogueService()
-
-
-  #Manually set state to CONFIRMING
-  dialogue_flow.state = DialogueState.CONFIRMING
-
-  ##The user denies the information
-
-  result = await dialogue_flow.process_user_input("no", mock_service)
-
-  assert dialogue_flow.state == DialogueState.GATHERING
-
-#Test for checking if the machine state follow the intended path of human validation -> Gathering with wanted modifications
+#Test for checking if the machine state follow the intended path of CONFIRMING -> GATHERING with wanted modifications
 #Requires that the human denies the information gathered in GATHERING state with input on what to change
 @pytest.mark.asyncio
-async def test_state_transition_from_human_validation_to_gathering_with_modifications():
+async def test_state_transition_from_confirming_to_gathering_with_modifications():
   #Start new workflow for test enviorment
   dialogue_flow = DialogueFlow()
   mock_service = MockDialogueService()
@@ -107,14 +89,14 @@ async def test_state_transition_from_human_validation_to_gathering_with_modifica
   dialogue_flow.state = DialogueState.CONFIRMING
 
   ##The user denies the information and gives modifications
-  result = await dialogue_flow.process_user_input("modify", mock_service)
+  result = await dialogue_flow.process_user_input(False, mock_service)
 
   assert dialogue_flow.state == DialogueState.GATHERING
 
 
-#Test for checking that the machine state is force changed from GATHERING -> CONFIRMING when question count reaches 5
+#Test for checking that the machine state is force changed from GATHERING -> CONFIRMING when question count reaches max
 @pytest.mark.asyncio
-async def test_state_transition_when_question_count_is_5():
+async def test_state_transition_when_question_count_is_max():
   #Start new workflow for test enviorment and put in relevant state
   dialogue_flow = DialogueFlow()
   mock_service = MockDialogueService()
@@ -122,7 +104,7 @@ async def test_state_transition_when_question_count_is_5():
 
 
   #Maually set question count to max and process user input
-  dialogue_flow.question_count = 5
+  dialogue_flow.question_count = dialogue_flow.max_questions
 
   await dialogue_flow.process_user_input("modify", mock_service)
 
@@ -130,6 +112,23 @@ async def test_state_transition_when_question_count_is_5():
   #Check if machine state is forced to CONFIRMING
 
   assert dialogue_flow.state == DialogueState.CONFIRMING
+
+#Test for checking that state stays on GATHERING when context is insufficient.
+@pytest.mark.asyncio
+async def test_state_stays_gathering_when_context_is_insufficient():
+  #Set new flow for test
+  dialogue_flow = DialogueFlow()
+  mock_service = MockDialogueService()
+  dialogue_flow.state = DialogueState.GATHERING
+
+  #No context set
+
+  result = await dialogue_flow.process_user_input("some input", mock_service)
+
+  #State should remain GATHERING
+  assert dialogue_flow.state == DialogueState.GATHERING
+  #Should ask for more info
+  assert result.action == "ask_question"
 
 
 
