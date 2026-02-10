@@ -25,7 +25,7 @@ export default function ChatWindow({
   };
 
   return (
-    <div className="w-[50vw] mx-auto flex flex-col">
+    <div className="w-full flex flex-col">
       {/* Message area */}
       <div className="flex-1 min-h-64 flex flex-col justify-center p-4">
         {messages.length === 0 && (

@@ -27,7 +27,7 @@ function App() {
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <ToastContainer position="top-right" />
-      <div className="text-center">
+      <div className="w-[50vw] mx-auto text-center">
         <h1 className="text-4xl font-bold text-gray-900">MCP Project</h1>
         <ChatWindow onSendMessage={(msg) => console.log("Sent:", msg)} />
         <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
