@@ -1,4 +1,5 @@
 import FileUpload from "./components/FileUpload/FileUpload";
+import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { ToastContainer } from "./components/Toast";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
@@ -28,6 +29,7 @@ function App() {
       <ToastContainer position="top-right" />
       <div className="text-center">
         <h1 className="text-4xl font-bold text-gray-900">MCP Project</h1>
+        <ChatWindow onSendMessage={(msg) => console.log("Sent:", msg)} />
         <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
       </div>
     </div>
