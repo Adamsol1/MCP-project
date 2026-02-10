@@ -3,9 +3,11 @@ import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { ToastContainer } from "./components/Toast";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
+import { useChat } from "./hooks/useChat";
 
 function App() {
   const { success, error } = useToast();
+  const { messages, sendMessage } = useChat();
 
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
@@ -29,7 +31,7 @@ function App() {
       <ToastContainer position="top-right" />
       <div className="w-[50vw] mx-auto text-center">
         <h1 className="text-4xl font-bold text-gray-900">MCP Project</h1>
-        <ChatWindow onSendMessage={(msg) => console.log("Sent:", msg)} />
+        <ChatWindow messages={messages} onSendMessage={sendMessage} />
         <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
       </div>
     </div>
