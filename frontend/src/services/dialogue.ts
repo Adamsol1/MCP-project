@@ -6,10 +6,11 @@ export async function sendMessage(
   message: string,
   sessionId: string,
   perspectives: string[] = ["NEUTRAL"],
+  approved?: boolean,
 ) {
   const httpResonse = await axios.post(
     `${API_BACKEND_URL}/api/dialogue/message`,
-    { message, session_id: sessionId, perspectives },
+    { message, session_id: sessionId, perspectives, approved },
   );
 
   return httpResonse.data;

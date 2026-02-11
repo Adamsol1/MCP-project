@@ -148,4 +148,88 @@ describe("ChatWindow", () => {
     // an element NOT to exist.
     expect(screen.queryByText(/ready to start/i)).not.toBeInTheDocument();
   });
+
+  // ---------- S2.5.2: Approve button ----------
+
+  it("shows Approve button when isConfirming is true", () => {
+    // When the dialogue flow reaches confirmation, the user should see
+    // an Approve button to accept the summary and proceed.
+    render(<ChatWindow isConfirming={true} />);
+
+    const approveBtn = screen.getByRole("button", { name: /approve/i });
+    expect(approveBtn).toBeInTheDocument();
+  });
+
+  it("calls onApprove when Approve button is clicked", async () => {
+    const user = userEvent.setup();
+    const handleApprove = vi.fn();
+
+    render(<ChatWindow isConfirming={true} onApprove={handleApprove} />);
+
+    const approveBtn = screen.getByRole("button", { name: /approve/i });
+    await user.click(approveBtn);
+
+    expect(handleApprove).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show Approve button when isConfirming is false", () => {
+    render(<ChatWindow isConfirming={false} />);
+
+    // queryByRole returns null instead of throwing when not found
+    expect(
+      screen.queryByRole("button", { name: /approve/i })
+    ).not.toBeInTheDocument();
+  });
+
+  // ---------- S2.5.4: Reject button with feedback ----------
+
+  it("shows Reject button when isConfirming is true", () => {
+    render(<ChatWindow isConfirming={true} />);
+
+    const rejectBtn = screen.getByRole("button", { name: /reject/i });
+    expect(rejectBtn).toBeInTheDocument();
+  });
+
+  it("calls onReject when Reject button is clicked", async () => {
+    const user = userEvent.setup();
+    const handleReject = vi.fn();
+
+    render(<ChatWindow isConfirming={true} onReject={handleReject} />);
+
+    const rejectBtn = screen.getByRole("button", { name: /reject/i });
+    await user.click(rejectBtn);
+
+    expect(handleReject).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show Reject button when isConfirming is false", () => {
+    render(<ChatWindow isConfirming={false} />);
+
+    expect(
+      screen.queryByRole("button", { name: /reject/i })
+    ).not.toBeInTheDocument();
+  });
+
+  // ---------- S2.5.5: Validation - prevent skipping approval ----------
+
+  it("hides text input and send button when isConfirming is true", () => {
+    // The user MUST click Approve or Reject — they cannot bypass
+    // the decision by typing a free message.
+    render(<ChatWindow isConfirming={true} />);
+
+    expect(
+      screen.queryByPlaceholderText(/ask anything/i)
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /send/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows text input and send button when isConfirming is false", () => {
+    // Normal state: the user can type and send messages
+    render(<ChatWindow isConfirming={false} />);
+
+    expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
+  });
 });

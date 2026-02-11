@@ -148,4 +148,179 @@ describe("useChat", () => {
     expect(result.current.messages[2].text).toBe("Last 6 months");
     expect(result.current.messages[3].text).toBe("What timeframe?");
   });
+
+  // ---------- S2.5.2: Approve / S2.5.4: Reject / S2.5.5: Validation ----------
+
+  it("starts with isConfirming as false", () => {
+    const { result } = renderHook(() => useChat());
+
+    // Before any messages, there's nothing to confirm
+    expect(result.current.isConfirming).toBe(false);
+  });
+
+  it("sets isConfirming to true when backend returns is_final true", async () => {
+    // When the backend says is_final: true, the gathering phase is done.
+    // The hook should signal that we're now in the confirming state.
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "Here is your investigation summary. Do you approve?",
+      type: "confirmation",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Last 6 months");
+    });
+
+    expect(result.current.isConfirming).toBe(true);
+  });
+
+  it("keeps isConfirming false when backend returns is_final false", async () => {
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "What is the scope?",
+      type: "scope",
+      is_final: false,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    expect(result.current.isConfirming).toBe(false);
+  });
+
+  it("sends 'approve' to backend when approve is called", async () => {
+    // First, get into confirming state
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce({
+        question: "Summary ready. Approve?",
+        type: "confirmation",
+        is_final: true,
+      })
+      // The approve call will also hit the backend
+      .mockResolvedValueOnce({
+        question: "Approved. Proceeding to next phase.",
+        type: "complete",
+        is_final: false,
+      });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Some answer");
+    });
+
+    expect(result.current.isConfirming).toBe(true);
+
+    await act(async () => {
+      await result.current.approve();
+    });
+
+    // The second call to the service should include approved: true (4th argument)
+    expect(vi.mocked(sendMessage).mock.calls[1][3]).toBe(true);
+  });
+
+  it("sets isConfirming to false after approve", async () => {
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce({
+        question: "Summary ready.",
+        type: "confirmation",
+        is_final: true,
+      })
+      .mockResolvedValueOnce({
+        question: "Proceeding.",
+        type: "complete",
+        is_final: false,
+      });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+    await act(async () => {
+      await result.current.approve();
+    });
+
+    expect(result.current.isConfirming).toBe(false);
+  });
+
+  it("adds a frontend-only feedback message when reject is called", async () => {
+    vi.mocked(sendMessage).mockResolvedValueOnce({
+      question: "Summary ready. Approve?",
+      type: "confirmation",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+
+    // 2 messages so far: user + system summary
+    expect(result.current.messages).toHaveLength(2);
+
+    await act(async () => {
+      result.current.reject();
+    });
+
+    // reject() should add a frontend-only system message asking for feedback
+    // This does NOT call the backend — it's purely a UI prompt
+    expect(result.current.messages).toHaveLength(3);
+    expect(result.current.messages[2]).toMatchObject({
+      text: expect.stringMatching(/what would you like to change/i),
+      sender: "system",
+    });
+  });
+
+  it("sets isConfirming to false after reject so user can type feedback", async () => {
+    vi.mocked(sendMessage).mockResolvedValueOnce({
+      question: "Summary ready.",
+      type: "confirmation",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+
+    expect(result.current.isConfirming).toBe(true);
+
+    await act(async () => {
+      result.current.reject();
+    });
+
+    // After rejecting, isConfirming should be false so the text input reappears
+    expect(result.current.isConfirming).toBe(false);
+  });
+
+  it("does not call backend when reject is called", async () => {
+    vi.mocked(sendMessage).mockResolvedValueOnce({
+      question: "Summary ready.",
+      type: "confirmation",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+
+    // Reset to track only new calls
+    vi.mocked(sendMessage).mockClear();
+
+    await act(async () => {
+      result.current.reject();
+    });
+
+    // reject() is frontend-only — no backend call
+    expect(sendMessage).not.toHaveBeenCalled();
+  });
 });
