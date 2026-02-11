@@ -3,6 +3,15 @@ from enum import Enum
 from pydantic import BaseModel
 
 
+class Perspective(str, Enum):
+    US = "us"
+    NORWAY = "norway"
+    CHINA = "china"
+    EU = "eu"
+    RUSSIA = "russia"
+    NEUTRAL = "neutral"
+
+
 class QuestionType(str, Enum):
     SCOPE = "scope"
     TIMEFRAME = "timeframe"
@@ -21,6 +30,7 @@ class DialogueContext(BaseModel):
     target_entities: list[str] = []
     threat_actors: list[str] | None = None
     priority_focus: str | None = None
+    perspectives: list[Perspective] = [Perspective.NEUTRAL]
 
 
 class DialogueResponse(BaseModel):
