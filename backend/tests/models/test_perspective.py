@@ -1,13 +1,9 @@
-"""Tests for Perspective enum and its integration with DialogueContext.
-
-S2.3.2: Implement perspective options (US, Norway, China, EU, Russia, Neutral)
-"""
+"""Tests for Perspective enum and its integration with DialogueContext."""
 
 import pytest
 from pydantic import ValidationError
 
 from src.models.dialogue import DialogueContext, Perspective
-
 
 # ---------- Perspective enum ----------
 

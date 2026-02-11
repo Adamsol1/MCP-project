@@ -75,24 +75,25 @@ describe("useChat", () => {
     });
   });
 
-  it("calls the dialogue service with the message and session id", async () => {
+  it("calls the dialogue service with the message, session id, and perspectives", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope?",
       type: "scope",
       is_final: false,
     });
 
-    const { result } = renderHook(() => useChat());
+    const { result } = renderHook(() => useChat(["US", "EU"]));
 
     await act(async () => {
       await result.current.sendMessage("Investigate APT29");
     });
 
-    // Verify the service was called with correct arguments
+    // Verify the service was called with correct arguments including perspectives
     expect(sendMessage).toHaveBeenCalledWith(
       "Investigate APT29",
       // We don't know the exact session ID, just that it's a string
-      expect.any(String)
+      expect.any(String),
+      ["US", "EU"]
     );
   });
 

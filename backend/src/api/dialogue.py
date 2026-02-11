@@ -8,6 +8,7 @@ router = APIRouter(prefix="/api/dialogue")
 class DialogueMessageRequest(BaseModel):
     message: str
     session_id: str
+    perspectives: list[str] = ["NEUTRAL"]
 
 
 # Response Model
@@ -19,6 +20,7 @@ class DialogueMessageResponse(BaseModel):
 
 @router.post("/message")
 async def send_message(request: DialogueMessageRequest) -> DialogueMessageResponse:
+    print(f"Perspectives received: {request.perspectives}")
     #
     # something
 

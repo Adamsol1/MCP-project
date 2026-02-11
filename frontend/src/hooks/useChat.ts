@@ -7,7 +7,7 @@ interface Message {
   sender: "user" | "system";
 }
 
-export function useChat() {
+export function useChat(perspectives: string[] = ["NEUTRAL"]) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessionId] = useState(() => crypto.randomUUID());
 
@@ -20,8 +20,8 @@ export function useChat() {
     };
     setMessages((prev) => [...prev, userMessage]);
 
-    // 2. Call the backend service and add system response
-    const response = await sendMessage(text, sessionId);
+    // 2. Call the backend service with current perspectives and add system response
+    const response = await sendMessage(text, sessionId, perspectives);
     const systemMessage: Message = {
       id: crypto.randomUUID(),
       text: response.question,

@@ -22,9 +22,16 @@ class DialogueService:
         """
         missing_fields = self._identify_missing_context(context)
 
+        # Include perspectives so the AI can tailor questions to the selected viewpoints
+        perspectives = [p.value for p in context.perspectives]
+
         question_result = await self.mcp_client.call_tool(
             "dialogue_question",
-            {"user_message": user_message, "missing_fields": missing_fields},
+            {
+                "user_message": user_message,
+                "missing_fields": missing_fields,
+                "perspectives": perspectives,
+            },
         )
 
         return ClarifyingQuestion(

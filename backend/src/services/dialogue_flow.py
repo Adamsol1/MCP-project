@@ -1,6 +1,6 @@
 from enum import Enum
 
-from src.models.dialogue import DialogueContext, DialogueResponse
+from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 
 
 class DialogueState(str, Enum):
@@ -19,7 +19,17 @@ class DialogueFlow:
 
 
 
-  async def process_user_message(self, user_message, dialogue_service) -> DialogueResponse:
+  def update_perspectives(self, perspectives: list[str]):
+    """Update context perspectives from frontend selection.
+    Converts string values (e.g. 'US') to Perspective enum values (e.g. 'us')."""
+    self.context.perspectives = [
+      Perspective(p.lower()) for p in perspectives
+    ]
+
+  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None) -> DialogueResponse:
+    # Update perspectives on every message if provided
+    if perspectives:
+      self.update_perspectives(perspectives)
     #INITIAL PHASE
     if self.state == DialogueState.INITIAL:
       return await self.handle_initial_input(user_message, dialogue_service)

@@ -22,12 +22,19 @@ describe("dialogue service", () => {
     // vi.mocked() gives us TypeScript-aware access to the mock
     vi.mocked(axios.post).mockResolvedValue(mockResponse);
 
-    const result = await sendMessage("Investigate APT29", "session-123");
+    const result = await sendMessage("Investigate APT29", "session-123", [
+      "US",
+      "EU",
+    ]);
 
-    // Verify axios was called with the correct URL and payload
+    // Verify axios was called with the correct URL and payload including perspectives
     expect(axios.post).toHaveBeenCalledWith(
       "http://localhost:8000/api/dialogue/message",
-      { message: "Investigate APT29", session_id: "session-123" }
+      {
+        message: "Investigate APT29",
+        session_id: "session-123",
+        perspectives: ["US", "EU"],
+      }
     );
 
     // Verify the service returns the response data

@@ -9,8 +9,8 @@ import { useChat } from "./hooks/useChat";
 
 function App() {
   const { success, error } = useToast();
-  const { messages, sendMessage } = useChat();
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>(["NEUTRAL"]);
+  const { messages, sendMessage } = useChat(selectedPerspectives);
 
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
