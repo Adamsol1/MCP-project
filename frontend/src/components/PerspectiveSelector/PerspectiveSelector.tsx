@@ -40,8 +40,8 @@ export default function PerspectiveSelector({
   };
 
   return (
-    <div>
-      <h2>Perspectives</h2>
+    <div className="flex flex-col gap-2">
+      <h2 className="text-lg font-bold text-gray-900">Perspectives</h2>
       {/* .map() transforms the perspectives array into button elements.
           React renders the returned array of JSX elements. */}
       {perspectives.map((perspective) => (
@@ -54,6 +54,11 @@ export default function PerspectiveSelector({
           // data-selected: custom attribute for CSS styling hooks
           // HTML data attributes are always strings, so we need .toString()
           data-selected={selected.includes(perspective.value).toString()}
+          className={`px-4 py-2 rounded border font-medium transition-colors ${
+            selected.includes(perspective.value)
+              ? "bg-blue-500 text-white border-blue-600"
+              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+          }`}
         >
           {perspective.label}
         </button>

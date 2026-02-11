@@ -30,14 +30,14 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex flex-col items-center">
+    <div className="relative min-h-screen bg-gray-100 flex flex-col items-center">
       <ToastContainer position="top-right" />
       <h1 className="text-4xl font-bold text-gray-900 mt-8 mb-6">MCP Project</h1>
-      <div className="flex gap-6 w-[80vw] justify-center">
-        <div className="w-[50vw]">
-          <ChatWindow messages={messages} onSendMessage={sendMessage} />
-          <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
-        </div>
+      <div className="w-[50vw]">
+        <ChatWindow messages={messages} onSendMessage={sendMessage} />
+        <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
+      </div>
+      <div className="fixed right-6 top-24">
         <PerspectiveSelector
           selected={selectedPerspectives}
           onChange={setSelectedPerspectives}
