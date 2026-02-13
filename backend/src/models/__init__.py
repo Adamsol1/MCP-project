@@ -23,6 +23,7 @@ from src.models.extraction import (
 )
 from src.models.indicators import NormalizedIndicator
 from src.models.reports import ThreatReport
+from src.models.reasoning import ReasoningLogEntry
 
 __all__ = [
     # Enums
@@ -41,4 +42,6 @@ __all__ = [
     "NormalizedIndicator",
     # Reports
     "ThreatReport",
+    #Reasoning
+    "ReasoningLogEntry",
 ]

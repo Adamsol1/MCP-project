@@ -3,6 +3,7 @@
 import pytest
 
 from src.mcp_client.client import MCPClient
+from src.models.dialogue import DialogueContext
 
 
 class TestMCPClientInit:
@@ -37,3 +38,44 @@ class TestMCPClientNotConnected:
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await client.list_tools()
+
+
+class TestMCPClientTools:
+    @pytest.mark.asyncio
+    async def test_generate_PIR_returns_result(self):
+        # Lag en mock MCPClient
+        client = MCPClient("/fake/path/server.py")
+
+        # Lag en fake session som returnerer et svar
+        class MockSession:
+            async def call_tool(self, tool_name, arguments):
+                return "Generated PIR: Investigate APT29 targeting Norway"
+
+        # Sett fake session på klienten
+        client.session = MockSession()  # type: ignore
+
+        # test data for dialoguecontext
+        context = DialogueContext()
+        context.scope = "identify attack patterns"
+        context.timeframe = "last 6 months"
+        context.target_entities = ["Norway"]
+
+        # Kall på generer PIR
+        result = await client.generate_pir(context)
+
+        # Sjekk return verdi
+        assert result == "Generated PIR: Investigate APT29 targeting Norway"
+
+    @pytest.mark.asyncio
+    async def test_call_tool_generate_pir_raises_when_not_connected(self) -> None:
+        """Calling a tool without connection should raise RuntimeError."""
+        client = MCPClient("/path/to/server.py")
+
+        # Create test data for test
+        context = DialogueContext()
+        context.scope = "identify attack patterns"
+        context.timeframe = "last 6 months"
+        context.target_entities = ["Norway"]
+
+        with pytest.raises(RuntimeError, match="Not connected"):
+            await client.generate_pir(context)
