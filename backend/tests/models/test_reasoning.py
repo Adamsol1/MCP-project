@@ -2,8 +2,10 @@
 #Test for checking that values are correctly saved when making a log
 from datetime import datetime
 from uuid import uuid4
-from pydantic import ValidationError
+
 import pytest
+from pydantic import ValidationError
+
 from src.models.reasoning import ReasoningLogEntry
 
 

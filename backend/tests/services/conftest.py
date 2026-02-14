@@ -7,7 +7,7 @@ and test_reasoning_logger.py. Defined here once to avoid duplication.
 
 # Mock AI1, generates PIR from context
 class MockGenerator:
-    async def generate_pir(self, context):
+    async def generate_pir(self, context):  # noqa: ARG002
         return "Generated PIR based on context"
 
 
@@ -19,7 +19,7 @@ class MockReviewer:
         self.responses = responses
         self.call_count = 0
 
-    async def review_pir(self, pir_report, context):
+    async def review_pir(self, pir_report, context):  # noqa: ARG002
         result = self.responses[self.call_count]
         self.call_count += 1
         return result

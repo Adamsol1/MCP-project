@@ -112,7 +112,7 @@ async def test_orchestrator_logs_reasoning():
     orchestrator = AIOrchestrator()
 
     # Perform generation and pir review with logger
-    result = await orchestrator.generate_and_review_pir(
+    result = await orchestrator.generate_and_review_pir(  # noqa: F841
         context, generator, reviewer, logger
     )
 

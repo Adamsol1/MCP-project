@@ -22,8 +22,8 @@ from src.models.extraction import (
     RawIOC,
 )
 from src.models.indicators import NormalizedIndicator
-from src.models.reports import ThreatReport
 from src.models.reasoning import ReasoningLogEntry
+from src.models.reports import ThreatReport
 
 __all__ = [
     # Enums

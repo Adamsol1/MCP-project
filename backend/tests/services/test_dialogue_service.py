@@ -6,7 +6,7 @@ from src.services.dialogue_service import DialogueService
 
 # Mock MCP client for testing
 class MockMCPClient:
-    async def call_tool(self, tool_name, params):
+    async def call_tool(self, tool_name, params):  # noqa: ARG002
         # Simulate MCP response based on missing context
         missing = params.get("missing_fields", [])
         if "scope" in missing:

@@ -11,7 +11,7 @@ class MockAIReviewService:
   def __init__(self, should_approve):
     self.should_approve = should_approve
 
-  def review(self, pir_report, context):
+  def review(self, pir_report, context):  # noqa: ARG002
     return self.should_approve
 
 

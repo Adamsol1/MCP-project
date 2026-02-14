@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from src.models.reasoning import ReasoningLogEntry
 
+
 class AIOrchestrator:
     def __init__(self):
         self.max_retries = 3

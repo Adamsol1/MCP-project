@@ -1,5 +1,5 @@
 
-class ReviewService():
+class ReviewService:
   #Review service for PIR reports
   def __init__(self, ai_service):
     self.ai_service = ai_service

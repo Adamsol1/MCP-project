@@ -48,7 +48,7 @@ class TestMCPClientTools:
 
         # Lag en fake session som returnerer et svar
         class MockSession:
-            async def call_tool(self, tool_name, arguments):
+            async def call_tool(self, tool_name, arguments):  # noqa: ARG002
                 return "Generated PIR: Investigate APT29 targeting Norway"
 
         # Sett fake session på klienten
