@@ -79,3 +79,8 @@ class TestMCPClientTools:
 
         with pytest.raises(RuntimeError, match="Not connected"):
             await client.generate_pir(context)
+
+
+
+
+
