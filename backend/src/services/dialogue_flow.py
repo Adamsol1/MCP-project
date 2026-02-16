@@ -4,10 +4,11 @@ from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 
 
 class DialogueState(str, Enum):
-  INITIAL = "initial"#State before first user input
+  INITIAL = "initial" #State before first user input
   GATHERING = "gathering" #State when gathering information through questions
-  CONFIRMING = "confirming" #Presenting summary of gathering phase. Will ask if the user finds the result approvable.
-  COMPLETE = "complete" #Ready for creating the priority intelligence requirements (PIR)
+  SUMMARY_CONFIRMING = "summary_confirming" #Presenting context summary. User can approve or reject with modifications
+  PIR_CONFIRMING = "pir_confirming" #Presenting generated PIR. User can approve or reject with modifications
+  COMPLETE = "complete" #Direction phase complete. PIR approved
 
 
 class DialogueFlow:
@@ -34,13 +35,21 @@ class DialogueFlow:
     if self.state == DialogueState.INITIAL:
       return await self.handle_initial_input(user_message, dialogue_service)
 
-    #GATHERIGN PHASE
+    #GATHERING PHASE
     elif self.state == DialogueState.GATHERING:
       return await self.handle_gathering_input(user_message, dialogue_service)
 
-    #CONFIRMING PHASE
+    #SUMMARY CONFIRMING PHASE
+    elif self.state == DialogueState.SUMMARY_CONFIRMING:
+      return await self.handle_summary_confirming(user_message, dialogue_service)
+
+    #PIR CONFIRMING PHASE
+    elif self.state == DialogueState.PIR_CONFIRMING:
+      return await self.handle_pir_confirming(user_message, dialogue_service)
+
+    #COMPLETE - should not receive messages in this state
     else:
-      return await self.handle_confirming_input(user_message, dialogue_service)
+      return DialogueResponse(action="complete", content="Direction phase already complete.")
 
 
   #State handler for initial phase. Here we will save initial query, generate questions and change state
@@ -68,50 +77,75 @@ class DialogueFlow:
   async def handle_gathering_input(self, user_message, dialogue_service):
       dialogue_response = DialogueResponse()
       if(self.question_count >= self.max_questions):
-         self.state = DialogueState.CONFIRMING
+         self.state = DialogueState.SUMMARY_CONFIRMING
          dialogue_response.action = "max_questions"
          return dialogue_response
 
-      #TODO : Update context with user input.
+      #Generate question and update context (context is updated as side effect inside dialogue_service)
+      question = await dialogue_service.generate_clarifying_question(
+        user_message=user_message,
+        context = self.context
+       )
+      self.question_count += 1
 
-      #Change state GATHERING -> CONFIRMING if possible
+      #Change state GATHERING -> SUMMARY_CONFIRMING if possible
       if(self._has_sufficient_context()):
-        self.state = DialogueState.CONFIRMING
+        self.state = DialogueState.SUMMARY_CONFIRMING
         dialogue_response.action = "show_summary"
-        self.question_count += 1
+        dialogue_response.content = self.context.model_dump_json()
         return dialogue_response
       else:
-        question = await dialogue_service.generate_clarifying_question(
-          user_message=user_message,
-          context = self.context
-         )
+        #Context not sufficient, ask the generated question
         dialogue_response.action = "ask_question"
         dialogue_response.content = question.question_text
-        #Increase counter
-        self.question_count += 1
         return dialogue_response
 
 
-  #State handler for confirming phase. Here we check if user confirm/update/reject the investigation summary.
+  #State handler for summary confirming phase.
+  #Frontend returns either: - empty user_message = user clicked "Approve" button.
+  #                         - user_message with content = user clicked "Reject" and provided modifications text.
   #Possible outcomes:
-# - User confirms the summary -> Change state CONFIRMING -> COMPLETE
-# - User rejects with modifications the summary -> Change state CONFIRMING -> GATHERING
-  async def handle_confirming_input(self, user_message, dialogue_service):  # noqa: ARG002
+  # - Approve (not user_message) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
+  # - Reject (user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
+  async def handle_summary_confirming(self, user_message, dialogue_service):
+      dialogue_response = DialogueResponse()
 
-      #Set ut frontend response
-      dialogue_respons = DialogueResponse()
-      #Check if user confirms summary
-      if user_message:
-         self.state = DialogueState.COMPLETE
-         dialogue_respons.action = "complete"
-
-
+      if not user_message:
+        #User approved context summary. Generate PIR and move to PIR_CONFIRMING
+        pir = await dialogue_service.generate_pir(self.context)
+        self.state = DialogueState.PIR_CONFIRMING
+        dialogue_response.action = "show_pir"
+        dialogue_response.content = pir
       else:
-         self.state = DialogueState.GATHERING
-         dialogue_respons.action = "ask_modification"
+        #User rejected with modifications. Save and self-loop
+        self.context.modifications = user_message
+        dialogue_response.action = "show_summary"
+        dialogue_response.content = self.context.model_dump_json()
 
-      #Return reponse to frontend
-      return dialogue_respons
+      return dialogue_response
+
+
+  #State handler for PIR confirming phase.
+  #Frontend returns either: - empty user_message = user clicked "Approve" button.
+  #                         - user_message with content = user clicked "Reject" and provided modifications text.
+  #Possible outcomes:
+  # - Approve (not user_message) -> PIR_CONFIRMING -> COMPLETE
+  # - Reject (user_message) -> Regenerate PIR with modifications, self-loop (stay in PIR_CONFIRMING)
+  async def handle_pir_confirming(self, user_message, dialogue_service):
+      dialogue_response = DialogueResponse()
+
+      if not user_message:
+        #User approved PIR. Direction phase complete
+        self.state = DialogueState.COMPLETE
+        dialogue_response.action = "complete"
+      else:
+        #User rejected with modifications. Regenerate PIR
+        self.context.modifications = user_message
+        pir = await dialogue_service.generate_pir(self.context)
+        dialogue_response.action = "show_pir"
+        dialogue_response.content = pir
+
+      return dialogue_response
 
 
 

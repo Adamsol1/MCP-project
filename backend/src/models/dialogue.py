@@ -31,6 +31,7 @@ class DialogueContext(BaseModel):
     threat_actors: list[str] | None = None
     priority_focus: str | None = None
     perspectives: list[Perspective] = [Perspective.NEUTRAL]
+    modifications: str | None = None
 
 
 class DialogueResponse(BaseModel):

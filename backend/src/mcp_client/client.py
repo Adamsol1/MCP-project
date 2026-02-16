@@ -86,31 +86,6 @@ class MCPClient:
             for tool in result.tools
         ]
 
-    async def generate_pir(self, context: DialogueContext):
-        # Generate PIR repost using the MCCP sever
-
-        # Returns a Pir report
-
-        # Raise error if not connected to the mcp server
-        if not self.session:
-            raise RuntimeError(
-                "Not connected to MCP server. Use 'async with client.connect():'"
-            )
-        # Call correct tool on mcp server with the context
-        result = await self.session.call_tool(
-            "generate_pir",
-            {
-                # Context structured to a dict to be sent to the mcp server
-                "context": {
-                    "scope": context.scope,
-                    "timeframe": context.timeframe,
-                    "target_entities": context.target_entities,
-                }
-            },
-        )
-        # Return the result from mcp server. Should be the generated PIR report
-        return result
-
 
 async def main() -> None:
     """Example usage of the MCP client."""

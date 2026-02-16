@@ -61,7 +61,12 @@ class TestMCPClientTools:
         context.target_entities = ["Norway"]
 
         # Kall på generer PIR
-        result = await client.generate_pir(context)
+        result = await client.call_tool("generate_pir", {
+                    "scope": context.scope,
+                    "timeframe": context.timeframe,
+                    "target_entities": context.target_entities,
+                    "perspectives": ["neutral"],
+        })
 
         # Sjekk return verdi
         assert result == "Generated PIR: Investigate APT29 targeting Norway"
@@ -78,7 +83,12 @@ class TestMCPClientTools:
         context.target_entities = ["Norway"]
 
         with pytest.raises(RuntimeError, match="Not connected"):
-            await client.generate_pir(context)
+            await client.call_tool("generate_pir", {
+                "scope": context.scope,
+                "timeframe": context.timeframe,
+                "target_entities": context.target_entities,
+                "perspectives": ["neutral"],
+            })
 
 
 
