@@ -75,8 +75,8 @@ async def test_state_transition_from_confirming_to_complete():
   #Manually set state to CONFIRMING
   dialogue_flow.state = DialogueState.CONFIRMING
 
-  #The user acccepts the information
-  result = await dialogue_flow.process_user_message(True, mock_service)
+  #The user acccepts the information via the approved boolean flag
+  result = await dialogue_flow.process_user_message("approve", mock_service, approved=True)
 
   assert result.action == "complete"
 

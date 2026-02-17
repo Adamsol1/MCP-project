@@ -27,7 +27,7 @@ class DialogueFlow:
       Perspective(p.lower()) for p in perspectives
     ]
 
-  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None) -> DialogueResponse:
+  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None, approved: bool | None = None) -> DialogueResponse:
     # Update perspectives on every message if provided
     if perspectives:
       self.update_perspectives(perspectives)
@@ -41,11 +41,11 @@ class DialogueFlow:
 
     #SUMMARY CONFIRMING PHASE
     elif self.state == DialogueState.SUMMARY_CONFIRMING:
-      return await self.handle_summary_confirming(user_message, dialogue_service)
+      return await self.handle_summary_confirming(user_message, dialogue_service, approved)
 
     #PIR CONFIRMING PHASE
     elif self.state == DialogueState.PIR_CONFIRMING:
-      return await self.handle_pir_confirming(user_message, dialogue_service)
+      return await self.handle_pir_confirming(user_message, dialogue_service, approved)
 
     #COMPLETE - should not receive messages in this state
     else:
@@ -102,15 +102,14 @@ class DialogueFlow:
 
 
   #State handler for summary confirming phase.
-  #Frontend returns either: - empty user_message = user clicked "Approve" button.
-  #                         - user_message with content = user clicked "Reject" and provided modifications text.
+  #Frontend sends approved=True for approve, or user_message with modifications for reject.
   #Possible outcomes:
-  # - Approve (not user_message) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
-  # - Reject (user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
-  async def handle_summary_confirming(self, user_message, dialogue_service):
+  # - Approve (approved=True) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
+  # - Reject (approved=False/None + user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
+  async def handle_summary_confirming(self, user_message, dialogue_service, approved: bool | None = None):
       dialogue_response = DialogueResponse()
 
-      if not user_message:
+      if approved:
         #User approved context summary. Generate PIR and move to PIR_CONFIRMING
         pir = await dialogue_service.generate_pir(self.context)
         self.state = DialogueState.PIR_CONFIRMING
@@ -126,15 +125,14 @@ class DialogueFlow:
 
 
   #State handler for PIR confirming phase.
-  #Frontend returns either: - empty user_message = user clicked "Approve" button.
-  #                         - user_message with content = user clicked "Reject" and provided modifications text.
+  #Frontend sends approved=True for approve, or user_message with modifications for reject.
   #Possible outcomes:
-  # - Approve (not user_message) -> PIR_CONFIRMING -> COMPLETE
-  # - Reject (user_message) -> Regenerate PIR with modifications, self-loop (stay in PIR_CONFIRMING)
-  async def handle_pir_confirming(self, user_message, dialogue_service):
+  # - Approve (approved=True) -> PIR_CONFIRMING -> COMPLETE
+  # - Reject (approved=False/None + user_message) -> Regenerate PIR with modifications, self-loop (stay in PIR_CONFIRMING)
+  async def handle_pir_confirming(self, user_message, dialogue_service, approved: bool | None = None):
       dialogue_response = DialogueResponse()
 
-      if not user_message:
+      if approved:
         #User approved PIR. Direction phase complete
         self.state = DialogueState.COMPLETE
         dialogue_response.action = "complete"
@@ -159,4 +157,3 @@ class DialogueFlow:
       if not getattr(self.context, field):
         return False
     return True
-
