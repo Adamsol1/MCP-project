@@ -9,8 +9,11 @@ import { useChat } from "./hooks/useChat";
 
 function App() {
   const { success, error } = useToast();
-  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>(["NEUTRAL"]);
-  const { messages, sendMessage } = useChat(selectedPerspectives);
+  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
+    "NEUTRAL",
+  ]);
+  const { messages, sendMessage, isConfirming, approve, reject, debugConfirm } =
+    useChat(selectedPerspectives);
 
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
@@ -32,11 +35,26 @@ function App() {
   return (
     <div className="relative min-h-screen bg-gray-100 flex flex-col items-center">
       <ToastContainer position="top-right" />
-      <h1 className="text-4xl font-bold text-gray-900 mt-8 mb-6">MCP Project</h1>
+      <h1 className="text-4xl font-bold text-gray-900 mt-8 mb-6">
+        MCP Project
+      </h1>
       <div className="w-[50vw]">
-        <ChatWindow messages={messages} onSendMessage={sendMessage} />
+        <ChatWindow
+          messages={messages}
+          onSendMessage={sendMessage}
+          isConfirming={isConfirming}
+          onApprove={approve}
+          onReject={reject}
+        />
         <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
       </div>
+      {/* DEBUG: Remove before production */}
+      <button
+        onClick={debugConfirm}
+        className="fixed left-6 top-24 px-3 py-2 bg-yellow-400 text-black rounded-lg text-sm font-medium hover:bg-yellow-500"
+      >
+        Test Confirm
+      </button>
       <div className="fixed right-6 top-24">
         <PerspectiveSelector
           selected={selectedPerspectives}

@@ -9,11 +9,17 @@ interface Message {
 interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
   messages?: Message[];
+  isConfirming?: boolean;
+  onApprove?: () => void;
+  onReject?: () => void;
 }
 
 export default function ChatWindow({
   onSendMessage,
   messages = [],
+  isConfirming = false,
+  onApprove,
+  onReject,
 }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState("");
 
@@ -50,6 +56,22 @@ export default function ChatWindow({
       </div>
 
       {/* Input area */}
+      {isConfirming ? (
+        <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
+          <button
+            onClick={onApprove}
+            className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+          >
+            Approve
+          </button>
+          <button
+            onClick={onReject}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+          >
+            Reject
+          </button>
+        </div>
+      ) : (
       <form
         onSubmit={handleSubmit}
         className="flex items-center gap-2 border-2 border-gray-300 rounded-lg p-2"
@@ -72,6 +94,7 @@ export default function ChatWindow({
           Send
         </button>
       </form>
+      )}
     </div>
   );
 }
