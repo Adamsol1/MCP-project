@@ -1,67 +1,70 @@
-import { useState } from "react";
 import { sendMessage } from "../services/dialogue";
+import type { Message } from "../types/conversation";
+import { useConversation } from "./useConversation";
 
-interface Message {
-  id: string;
-  text: string;
-  sender: "user" | "system";
-}
+export function useChat() {
+  const { activeConversation, addMessage, setIsConfirming } = useConversation();
 
-export function useChat(perspectives: string[] = ["NEUTRAL"]) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [sessionId] = useState(() => crypto.randomUUID());
-  const [isConfirming, setIsConfirming] = useState(false);
+  const messages = activeConversation?.messages ?? [];
+  const isConfirming = activeConversation?.isConfirming ?? false;
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    // 1. Create user message and add to state
-    const userMessage: Message = {
+    if (!activeConversation) return;
+    addMessage({
       id: crypto.randomUUID(),
-      text: text,
+      text,
       sender: "user",
-    };
-    setMessages((prev) => [...prev, userMessage]);
+    });
 
     // 2. Call the backend service with current perspectives and add system response
-    const response = await sendMessage(text, sessionId, perspectives, approved);
-    const systemMessage: Message = {
+    const response = await sendMessage(
+      text,
+      activeConversation.sessionId,
+      activeConversation.perspectives,
+      approved,
+    );
+
+    addMessage({
       id: crypto.randomUUID(),
       text: response.question,
       sender: "system",
-    };
-    setMessages((prev) => [...prev, systemMessage]);
-
+    });
     setIsConfirming(response.is_final);
   };
   const approve = async () => {
+    if (!activeConversation) return;
     // Send approval silently to backend — no visible "approve" message in chat
-    const response = await sendMessage("approve", sessionId, perspectives, true);
-    const systemMessage: Message = {
+    const response = await sendMessage(
+      "approve",
+      activeConversation.sessionId,
+      activeConversation.perspectives,
+      true,
+    );
+    addMessage({
       id: crypto.randomUUID(),
       text: response.question,
       sender: "system",
-    };
-    setMessages((prev) => [...prev, systemMessage]);
+    });
+
     setIsConfirming(response.is_final);
   };
 
   // DEBUG: Simulate backend returning is_final: true — remove before production
   const debugConfirm = () => {
-    const summary: Message = {
+    addMessage({
       id: crypto.randomUUID(),
       text: "Summary: Investigate APT29 activity targeting EU infrastructure over the last 6 months. Do you approve?",
       sender: "system",
-    };
-    setMessages((prev) => [...prev, summary]);
+    });
     setIsConfirming(true);
   };
 
   const reject = () => {
-    const feedbackMessage: Message = {
+    addMessage({
       id: crypto.randomUUID(),
       text: "What would you like to change?",
       sender: "system",
-    };
-    setMessages((prev) => [...prev, feedbackMessage]);
+    });
     setIsConfirming(false);
   };
 
