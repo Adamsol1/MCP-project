@@ -83,7 +83,7 @@ export default function ChatWindow({
             onChange={(event) => setInputValue(event.target.value)}
             className="flex-1 px-3 py-2 outline-none bg-transparent text-gray-700"
           />
-          {/* Disable send button when input is emptys */}
+          {/* Disable send button when input is empty */}
           <button
             disabled={inputValue.trim() === ""}
             className={`px-4 py-2 rounded-lg font-medium ${
