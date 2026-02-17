@@ -93,7 +93,9 @@ describe("useChat", () => {
       "Investigate APT29",
       // We don't know the exact session ID, just that it's a string
       expect.any(String),
-      ["US", "EU"]
+      ["US", "EU"],
+      // approved is undefined for normal messages
+      undefined
     );
   });
 

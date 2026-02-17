@@ -26,7 +26,7 @@ class DialogueFlow:
       Perspective(p.lower()) for p in perspectives
     ]
 
-  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None) -> DialogueResponse:
+  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None, approved: bool | None = None) -> DialogueResponse:
     # Update perspectives on every message if provided
     if perspectives:
       self.update_perspectives(perspectives)
@@ -40,7 +40,7 @@ class DialogueFlow:
 
     #CONFIRMING PHASE
     else:
-      return await self.handle_confirming_input(user_message, dialogue_service)
+      return await self.handle_confirming_input(user_message, dialogue_service, approved)
 
 
   #State handler for initial phase. Here we will save initial query, generate questions and change state
@@ -95,17 +95,17 @@ class DialogueFlow:
   #State handler for confirming phase. Here we check if user confirm/update/reject the investigation summary.
   #Possible outcomes:
 # - User confirms the summary -> Change state CONFIRMING -> COMPLETE
-# - User rejects with modifications the summary -> Change state CONFIRMING -> GATHERING
-  async def handle_confirming_input(self, user_message, dialogue_service):  # noqa: ARG002
+# - User rejects with feedback -> Change state CONFIRMING -> GATHERING
+  async def handle_confirming_input(self, user_message, dialogue_service, approved: bool | None = None):  # noqa: ARG002
 
       #Set ut frontend response
       dialogue_respons = DialogueResponse()
-      #Check if user confirms summary
-      if user_message:
+      #Check if user approved via boolean flag from frontend
+      if approved:
          self.state = DialogueState.COMPLETE
          dialogue_respons.action = "complete"
 
-
+      #User rejected and is sending feedback — go back to gathering
       else:
          self.state = DialogueState.GATHERING
          dialogue_respons.action = "ask_modification"

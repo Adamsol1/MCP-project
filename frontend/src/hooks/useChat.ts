@@ -33,10 +33,29 @@ export function useChat(perspectives: string[] = ["NEUTRAL"]) {
     setIsConfirming(response.is_final);
   };
   const approve = async () => {
-    await handleSendMessage("approve", true);
+    // Send approval silently to backend — no visible "approve" message in chat
+    const response = await sendMessage("approve", sessionId, perspectives, true);
+    const systemMessage: Message = {
+      id: crypto.randomUUID(),
+      text: response.question,
+      sender: "system",
+    };
+    setMessages((prev) => [...prev, systemMessage]);
+    setIsConfirming(response.is_final);
   };
 
-  const reject = async () => {
+  // DEBUG: Simulate backend returning is_final: true — remove before production
+  const debugConfirm = () => {
+    const summary: Message = {
+      id: crypto.randomUUID(),
+      text: "Summary: Investigate APT29 activity targeting EU infrastructure over the last 6 months. Do you approve?",
+      sender: "system",
+    };
+    setMessages((prev) => [...prev, summary]);
+    setIsConfirming(true);
+  };
+
+  const reject = () => {
     const feedbackMessage: Message = {
       id: crypto.randomUUID(),
       text: "What would you like to change?",
@@ -52,5 +71,6 @@ export function useChat(perspectives: string[] = ["NEUTRAL"]) {
     isConfirming,
     approve,
     reject,
+    debugConfirm,
   };
 }
