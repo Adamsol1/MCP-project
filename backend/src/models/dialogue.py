@@ -48,3 +48,10 @@ class ClarifyingQuestion(BaseModel):
     question_type: str
     is_final: bool = False
     suggested_answers: list[str] | None = None
+
+
+class QuestionResult(BaseModel):
+    """Result from generate_clarifying_question containing the question and extracted context fields"""
+
+    question: ClarifyingQuestion
+    extracted_context: dict = {}

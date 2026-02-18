@@ -1,6 +1,6 @@
 import pytest
 
-from src.models.dialogue import ClarifyingQuestion, DialogueContext
+from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
 from src.services.dialogue_service import DialogueService
 
 
@@ -9,29 +9,34 @@ class MockMCPClient:
     async def call_tool(self, tool_name, params):  # noqa: ARG002
         # Simulate MCP response based on missing context
         missing = params.get("missing_fields", [])
+        context = params.get("context", {})
         if "scope" in missing:
             return {
                 "question": "What is the scope of your investigation?",
                 "type": "scope",
-                "has_sufficient_context": False
+                "has_sufficient_context": False,
+                "context": context
             }
         elif "timeframe" in missing:
             return {
                 "question": "What time period are you interested in?",
                 "type": "timeframe",
-                "has_sufficient_context": False
+                "has_sufficient_context": False,
+                "context": context
             }
         elif "target_entities" in missing:
             return {
                 "question": "Which entities or regions are you focusing on?",
                 "type": "target_entities",
-                "has_sufficient_context": False
+                "has_sufficient_context": False,
+                "context": context
             }
         else:
             return {
                 "question": "I have enough information to proceed.",
                 "type": "confirmation",
-                "has_sufficient_context": True
+                "has_sufficient_context": True,
+                "context": context
             }
 
 
@@ -55,9 +60,11 @@ async def test_generate_clarifying_question_returns_clarifying_question():
         context=context
     )
 
-    assert isinstance(result, ClarifyingQuestion)
-    assert result.question_text != ""
-    assert result.question_type != ""
+    assert isinstance(result, QuestionResult)
+    assert isinstance(result.question, ClarifyingQuestion)
+    assert result.question.question_text != ""
+    assert result.question.question_type != ""
+    assert isinstance(result.extracted_context, dict)
 
 
 @pytest.mark.asyncio
@@ -76,8 +83,8 @@ async def test_generate_clarifying_question_asks_about_scope_when_missing():
         context=context
     )
 
-    assert result.question_type == "scope"
-    assert result.is_final is False
+    assert result.question.question_type == "scope"
+    assert result.question.is_final is False
 
 
 @pytest.mark.asyncio
@@ -97,8 +104,8 @@ async def test_generate_clarifying_question_asks_about_timeframe_when_scope_set(
         context=context
     )
 
-    assert result.question_type == "timeframe"
-    assert result.is_final is False
+    assert result.question.question_type == "timeframe"
+    assert result.question.is_final is False
 
 
 @pytest.mark.asyncio
@@ -119,4 +126,4 @@ async def test_generate_clarifying_question_is_final_when_context_complete():
         context=context
     )
 
-    assert result.is_final is True
+    assert result.question.is_final is True

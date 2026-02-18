@@ -55,7 +55,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context) -> di
     return dialogue_question
 
 @mcp.tool
-def generate_pir(scope, timeframe, target_entities, perspectives) -> str:
+def generate_pir(scope, timeframe, target_entities, perspectives, modifications=None) -> str:
     """
     Create a PIR based on investigation scope, timeframe and target entites gathered from dialogue.
 
@@ -64,6 +64,7 @@ def generate_pir(scope, timeframe, target_entities, perspectives) -> str:
         timeframe: The time period the PIR covers. e.g. "last 6 months"
         target_entities: The entities relevant to the investigation. e.g. "NATO member states"
         perspectives: The selected viewpoints for the investigation. e.g. ["norway", "neutral"]
+        modifications: Optional user feedback for regenerating the PIR. e.g. "Add focus on supply chain attacks"
 
     Returns:
         str: The formatted PIR

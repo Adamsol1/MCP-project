@@ -24,6 +24,12 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     print(f"Perspectives received: {request.perspectives}")
     print(f"Approved: {request.approved}")
 
+    # TODO: Translate DialogueFlow response.action to frontend format:
+    # is_final = response.action in ("show_summary", "show_pir", "max_questions")
+    # TODO: Frontend needs to handle "complete" state — currently no UI for finished flow
+
+
+
     # Hardcoded responses for testing the approve/reject flow
     if request.approved:
         return DialogueMessageResponse(
@@ -33,3 +39,4 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     return DialogueMessageResponse(
         question="What is the scope of your investigation", type="scope", is_final=False
     )
+

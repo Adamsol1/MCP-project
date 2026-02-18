@@ -1,4 +1,4 @@
-from src.models.dialogue import ClarifyingQuestion, DialogueContext
+from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
 
 
 class DialogueService:
@@ -8,17 +8,16 @@ class DialogueService:
 
     async def generate_clarifying_question(
         self, user_message: str, context: DialogueContext
-    ) -> ClarifyingQuestion:
+    ) -> QuestionResult:
         """
-        Base method for generates claifying questions for collection & planning phase
+        Calls the MCP tool to generate a clarifying question and extract context from the user's answer.
 
-        :param self: self
         :param user_message: User message
         :type user_message: str
-        :param context: Description
+        :param context: Current dialogue context
         :type context: DialogueContext
-        :return: Description
-        :rtype: ClarifyingQuestion
+        :return: QuestionResult with question and extracted context fields
+        :rtype: QuestionResult
         """
         missing_fields = self._identify_missing_context(context)
 
@@ -40,29 +39,25 @@ class DialogueService:
             },
         )
 
-        # Apply updated context from MCP tool response.
-        # The MCP tool analyzes the user's answer and returns updated context values.
-        updated_context = question_result.get("context", {})
-        if updated_context.get("scope"):
-            context.scope = updated_context["scope"]
-        if updated_context.get("timeframe"):
-            context.timeframe = updated_context["timeframe"]
-        if updated_context.get("target_entities"):
-            context.target_entities = updated_context["target_entities"]
+        # Return question and extracted context separately — let the caller decide what to update
+        extracted_context = question_result.get("context", {})
 
-        return ClarifyingQuestion(
+        question = ClarifyingQuestion(
             question_text=question_result["question"],
             question_type=question_result["type"],
             is_final=question_result["has_sufficient_context"],
         )
 
-    #TODO FIKS AT MODIFICATIONS BLIR SENDT MED VIDERE
-    async def generate_pir(self, context: DialogueContext, modifications == NONE) -> str:
+        return QuestionResult(question=question, extracted_context=extracted_context)
+
+    async def generate_pir(self, context: DialogueContext, modifications=None) -> str:
         """
         Calls the generate_pir MCP tool to create a PIR based on gathered context.
 
         :param context: The dialogue context with scope, timeframe, target_entities, perspectives
         :type context: DialogueContext
+        :param modifications: Optional user feedback for PIR regeneration
+        :type modifications: str | None
         :return: The generated PIR as a string
         :rtype: str
         """
@@ -75,6 +70,7 @@ class DialogueService:
                 "timeframe": context.timeframe,
                 "target_entities": context.target_entities,
                 "perspectives": perspectives,
+                "modifications": modifications,
             },
         )
 

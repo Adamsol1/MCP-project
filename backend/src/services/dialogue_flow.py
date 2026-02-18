@@ -52,6 +52,16 @@ class DialogueFlow:
       return DialogueResponse(action="complete", content="Direction phase already complete.")
 
 
+  def _apply_context_update(self, extracted_context: dict):
+    """Apply extracted context fields from MCP tool response to self.context.
+    DialogueFlow owns all context state — this is the single place where context is updated."""
+    if extracted_context.get("scope"):
+        self.context.scope = extracted_context["scope"]
+    if extracted_context.get("timeframe"):
+        self.context.timeframe = extracted_context["timeframe"]
+    if extracted_context.get("target_entities"):
+        self.context.target_entities = extracted_context["target_entities"]
+
   #State handler for initial phase. Here we will save initial query, generate questions and change state
   async def handle_initial_input(self, user_message, dialogue_service):
       self.context.initial_query = user_message #First user input is saved as initial query. This is the intended goal of the investigation
@@ -59,12 +69,13 @@ class DialogueFlow:
       dialogue_response = DialogueResponse()
       dialogue_response.action = "ask_question"
 
-      #Generate questions for user based on user_message
-      question = await dialogue_service.generate_clarifying_question(
+      #Generate question and extract context from user message
+      result = await dialogue_service.generate_clarifying_question(
           user_message=user_message,
           context = self.context
          )
-      dialogue_response.content = question.question_text
+      self._apply_context_update(result.extracted_context)
+      dialogue_response.content = result.question.question_text
       #Increase counter
       self.question_count += 1
       #Change state INITIAL -> GATHERING
@@ -79,25 +90,33 @@ class DialogueFlow:
       if(self.question_count >= self.max_questions):
          self.state = DialogueState.SUMMARY_CONFIRMING
          dialogue_response.action = "max_questions"
+         #TODO: Replace model_dump_json with generate_summary MCP call when implemented:
+         # summary = await dialogue_service.generate_summary(self.context)
+         # dialogue_response.content = summary
+         dialogue_response.content = self.context.model_dump_json()
          return dialogue_response
 
-      #Generate question and update context (context is updated as side effect inside dialogue_service)
-      question = await dialogue_service.generate_clarifying_question(
+      #Generate question and extract context from user message
+      result = await dialogue_service.generate_clarifying_question(
         user_message=user_message,
         context = self.context
        )
+      self._apply_context_update(result.extracted_context)
       self.question_count += 1
 
       #Change state GATHERING -> SUMMARY_CONFIRMING if possible
       if(self._has_sufficient_context()):
         self.state = DialogueState.SUMMARY_CONFIRMING
         dialogue_response.action = "show_summary"
+        #TODO: Replace model_dump_json with generate_summary MCP call when implemented:
+        # summary = await dialogue_service.generate_summary(self.context)
+        # dialogue_response.content = summary
         dialogue_response.content = self.context.model_dump_json()
         return dialogue_response
       else:
         #Context not sufficient, ask the generated question
         dialogue_response.action = "ask_question"
-        dialogue_response.content = question.question_text
+        dialogue_response.content = result.question.question_text
         return dialogue_response
 
 
@@ -112,6 +131,7 @@ class DialogueFlow:
       if approved:
         #User approved context summary. Generate PIR and move to PIR_CONFIRMING
         pir = await dialogue_service.generate_pir(self.context)
+        self.context.modifications = None  #Clear modifications so they don't leak into PIR phase
         self.state = DialogueState.PIR_CONFIRMING
         dialogue_response.action = "show_pir"
         dialogue_response.content = pir
@@ -119,6 +139,9 @@ class DialogueFlow:
         #User rejected with modifications. Save and self-loop
         self.context.modifications = user_message
         dialogue_response.action = "show_summary"
+        #TODO: Replace model_dump_json with generate_summary MCP call when implemented:
+        # summary = await dialogue_service.generate_summary(self.context, modifications=user_message)
+        # dialogue_response.content = summary
         dialogue_response.content = self.context.model_dump_json()
 
       return dialogue_response
@@ -139,7 +162,7 @@ class DialogueFlow:
       else:
         #User rejected with modifications. Regenerate PIR
         self.context.modifications = user_message
-        pir = await dialogue_service.generate_pir(self.context)
+        pir = await dialogue_service.generate_pir(self.context, modifications=user_message)
         dialogue_response.action = "show_pir"
         dialogue_response.content = pir
 
