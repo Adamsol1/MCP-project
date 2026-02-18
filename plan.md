@@ -15,13 +15,14 @@
 | **Team Size** | 4 developers |
 | **Methodology** | Sprints with Kanban, Test-Driven Development (TDD) |
 | **Industry Partners** | Telenor ASA, Storebrand Group, Aker ASA |
+| **AI Lab Access** | Nvidia L40s (48GB), RTX A6000 (48GB), GV100 (32GB), 2080Ti/1080Ti (11GB) — dynamically allocated |
 
 ---
 
 ## Research Questions
 
 ### Primary Research Question (RQ1)
-> **Can MCP effectively integrate AI capabilities into the Direction, Collection, and Processing phases of the Threat Intelligence cycle?**
+> **Can MCP effectively integrate AI capabilities into the Direction, Collection, Processing, and Analysis phases of the Threat Intelligence cycle?**
 
 | Sub-question | Evaluation Method |
 |--------------|-------------------|
@@ -317,7 +318,10 @@ Notes:
 | Collection: Approve/reject UI | Must Have | 3 |
 | Processing: Correlation view | Must Have | 4 |
 | Processing: MITRE mapping | Must Have | 4 |
-| Processing: Perspective summaries | Must Have | 4 |
+| Processing: Tactical perspective summaries | Must Have | 4 |
+| Analysis: Strategic assessment view | Must Have | 5 |
+| Analysis: Key findings + confidence levels | Must Have | 5 |
+| Analysis: Recommendations per perspective | Must Have | 5 |
 | Output: Report view | Must Have | 5 |
 | Output: Reasoning toggle | Must Have | 5 |
 | Output: Download/history | Must Have | 5 |
@@ -330,20 +334,20 @@ Notes:
 ## Project Goals
 
 ### Primary Objective
-Demonstrate that AI can be integrated into the first three phases of the Threat Intelligence (TI) cycle using the Model Context Protocol (MCP), while maintaining human oversight at all decision points.
+Demonstrate that AI can be integrated into the first four phases of the Threat Intelligence (TI) cycle — Direction, Collection, Processing, and Analysis — using the Model Context Protocol (MCP), while maintaining human oversight at all decision points.
 
 ### Success Criteria
-1. **Continuous Workflow**: System flows through Direction → Collection → Processing without interruption
+1. **Continuous Workflow**: System flows through Direction → Collection → Processing → Analysis without interruption
 2. **Human-in-the-Loop**: Humans have approval/rejection control at every phase transition and critical decision
 3. **Dual AI Validation**: Second AI instance reviews outputs to reduce hallucinations
 4. **Functional MCP Implementation**: Working Tools, Resources, and Prompts primitives
 5. **Working Web Application**: Usable interface for analyst interaction
 6. **Dual Mode Support**: System works both online (cloud API) and offline (local models)
-7. **Geographic Perspectives**: Analysts can view summaries from different national perspectives
+7. **Geographic Perspectives with Strategic Intelligence**: Analysts can view both tactical and strategic summaries through different national lenses
 8. **Validated Usability**: User testing with SUS score ≥ 68 (above average)
 
 ### Non-Goals (Out of Scope for MVP)
-- Analysis and Dissemination phases (phases 4-5 of TI cycle)
+- Dissemination phase (phase 5 of TI cycle)
 - MCP Sampling primitive
 - User authentication/authorization
 - Production deployment
@@ -358,7 +362,7 @@ Demonstrate that AI can be integrated into the first three phases of the Threat 
 
 | ID | Requirement | Priority |
 |----|-------------|----------|
-| F01 | Human must be involved in all phases (Direction, Collection, Processing) | Must Have |
+| F01 | Human must be involved in all phases (Direction, Collection, Processing, Analysis) | Must Have |
 | F02 | Human can review/approve/reject with feedback after each AI output | Must Have |
 | F03 | Direction phase uses dialogue to understand user goals (AI asks clarifying questions) | Must Have |
 | F04 | System retrieves data from file upload, AlienVault OTX, and MISP | Must Have |
@@ -368,7 +372,7 @@ Demonstrate that AI can be integrated into the first three phases of the Threat 
 | F08 | Second AI instance reviews each phase output for errors/hallucinations | Must Have |
 | F09 | AI auto-retries on review errors; retry process logged in reasoning file | Must Have |
 | F10 | User can select geographic perspectives (US, Norway, China, EU) or none (Neutral) | Must Have |
-| F11 | Perspective selection is optional and only affects final summary after Processing | Must Have |
+| F11 | Each perspective generates both a tactical summary and a strategic intelligence assessment | Must Have |
 | F12 | System works online (Gemini API) and offline (local small model) | Must Have |
 | F13 | Output saved as JSON and PDF files locally | Must Have |
 | F14 | User can download report as PDF | Must Have |
@@ -379,6 +383,8 @@ Demonstrate that AI can be integrated into the first three phases of the Threat 
 | F19 | AI output generated in user's selected language | Should Have |
 | F20 | Multiple AI agents debate from different perspectives | Deferred |
 | F21 | System logs AI review corrections for research analysis | Must Have |
+| F22 | Analysis phase synthesizes Processing output into analytical judgments and recommendations | Must Have |
+| F23 | Analysis phase produces finished intelligence: key findings, confidence levels, recommendations | Must Have |
 
 ### Web Interface Requirements
 
@@ -424,8 +430,8 @@ Demonstrate that AI can be integrated into the first three phases of the Threat 
 
 | ID | Requirement | Target |
 |----|-------------|--------|
-| NF06 | Workflow initialization time | ≤ 5 seconds |
-| NF07 | Page load time | ≤ 3 seconds |
+| NF06 | Workflow initialization time | â‰¤ 5 seconds |
+| NF07 | Page load time | â‰¤ 3 seconds |
 | NF08 | AI response time | No hard limit; progress bar shows status |
 
 ### Design
@@ -499,10 +505,12 @@ The system uses two AI instances to reduce hallucinations:
 └─────────────────────────────────────────────────────────────┘
 ```
 
-| Mode | AI Instance #1 | AI Instance #2 |
-|------|----------------|----------------|
-| Online | Gemini 1.5 Flash | Gemini 1.5 Flash (separate instance) |
-| Offline | Phi-3 Mini / Llama 3.2 3B | Same model (separate instance) |
+| Mode | AI Instance #1 (Generate) | AI Instance #2 (Review) |
+|------|--------------------------|------------------------|
+| Online | Gemini 2.5 Flash | Gemini 2.5 Flash (separate instance) |
+| Offline (Tier 1) | DeepSeek-R1 32B / DeepSeek-V3 (quantized) | Llama 3.3 70B (quantized) |
+| Offline (Tier 2) | DeepSeek-R1 14B | Llama 3.2 11B |
+| Offline (Tier 3 / Fallback) | Phi-3 Mini (3.8B) | Same model (separate instance) |
 
 **Key Points:**
 - Same model, two separate instances
@@ -517,7 +525,7 @@ The system uses two AI instances to reduce hallucinations:
 ┌─────────────────────────────────────────────────────────────┐
 │  ONLINE MODE                                                │
 │  ─────────────────────────────────────────────────────────  │
-│  - Gemini 1.5 Flash API (both instances)                    │
+│  - Gemini 2.5 Flash API (both instances)                    │
 │  - Live OSINT queries (OTX, MISP APIs)                      │
 │  - Real-time threat intelligence                            │
 └─────────────────────────────────────────────────────────────┘
@@ -525,11 +533,12 @@ The system uses two AI instances to reduce hallucinations:
 ┌─────────────────────────────────────────────────────────────┐
 │  OFFLINE MODE                                               │
 │  ─────────────────────────────────────────────────────────  │
-│  - Local small model via Ollama (both instances)            │
+│  - Local model via Ollama or vLLM (both instances)          │
 │  - Pre-loaded TI data (JSON, CSV uploads)                   │
 │  - Air-gapped environment support                           │
-│  - Hardware: 8-12GB VRAM, 8-32GB RAM                        │
-│  - Recommended: Phi-3 Mini (3.8B) or Llama 3.2 3B           │
+│  - Hardware: AI lab GPUs (L40s, A6000, GV100, 2080Ti)       │
+│  - Model size scales to available VRAM (see LLM Layer)      │
+│  - Preferred: DeepSeek (generate) + Llama (review)          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -580,8 +589,8 @@ The system uses two AI instances to reduce hallucinations:
 │                 LLM LAYER                                   │
 │                                                             │
 │  Online:                                                    │
-│  - Gemini 1.5 Flash (Instance #1: Generate)                 │
-│  - Gemini 1.5 Flash (Instance #2: Review)                   │
+│  - Gemini 2.5 Flash (Instance #1: Generate)                 │
+│  - Gemini 2.5 Flash (Instance #2: Review)                   │
 │                                                             │
 │  Offline:                                                   │
 │  - Ollama + Phi-3 Mini / Llama 3.2 3B (Instance #1)         │
@@ -699,10 +708,48 @@ The Direction phase is unique - it uses a conversational approach to understand 
 │     → If errors: auto-retry, log in reasoning               │
 │  6. AI Instance #1 generates perspective summaries          │
 │     (based on selections from Direction phase)              │
+│     Each perspective: tactical summary + strategic framing  │
 │  7. AI Instance #2 reviews summaries                        │
 │     → If errors: auto-retry, log in reasoning               │
 │  8. User validates correlations and summaries               │
 │  9. User approves final output                              │
+│     (Action logged for RQ2 analysis)                        │
+│                                                             │
+│  [Approve] [Reject with Feedback]                           │
+│                          ↓                                  │
+│              Proceed to Analysis Phase                      │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Analysis Phase
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    ANALYSIS PHASE                           │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  1. AI Instance #1 synthesizes Processing output into       │
+│     finished analytical intelligence:                       │
+│     - Key findings (what happened / is happening)           │
+│     - Threat actor attribution (with confidence levels)     │
+│     - Impact assessment per selected perspective            │
+│     - Strategic implications (per national lens)            │
+│     - Recommended courses of action                         │
+│                                                             │
+│  2. For each selected perspective, AI generates:            │
+│     - Tactical layer: IOCs, TTPs, affected systems          │
+│     - Strategic layer: Geopolitical framing, national       │
+│       security implications, policy-relevant insights       │
+│       (derived from national security documents)            │
+│                                                             │
+│  3. AI Instance #2 reviews analytical judgments             │
+│     → Checks: unsupported claims, attribution errors,       │
+│       inconsistencies with collected data                   │
+│     → If errors: auto-retry, log in reasoning               │
+│                                                             │
+│  4. User reviews finished intelligence product              │
+│  5. User approves final output                              │
 │     (Action logged for RQ2 analysis)                        │
 │                                                             │
 │  [Approve] [Reject with Feedback]                           │
@@ -730,7 +777,9 @@ The Direction phase is unique - it uses a conversational approach to understand 
 │  - Direction (PIRs, scope, selected perspectives)           │
 │  - Collection (sources used, data collected)                │
 │  - Processing (correlations, enrichments, MITRE mappings)   │
-│  - Perspective summaries (US, Norway, China, EU, Neutral)   │
+│  - Analysis: key findings, attribution, confidence levels   │
+│  - Per-perspective outputs (tactical + strategic layers)    │
+│  - Recommended courses of action                            │
 │  - All sources cited with timestamps                        │
 │                                                             │
 │  Reasoning file contains:                                   │
@@ -762,15 +811,26 @@ The Direction phase is unique - it uses a conversational approach to understand 
 | 🇳🇴 Norway | NO | Norwegian/NSM/PST perspective on threats |
 | 🇨🇳 China | CN | Chinese perspective on threats |
 | 🇪🇺 European Union | EU | European/Europol/ENISA perspective on threats |
-| 🌐 Neutral | NEUTRAL | Objective, non-aligned perspective (default) |
+| 🌐 Neutral | NEUTRAL | Objective, non-aligned perspective (default) |
 
 **Rules:**
 - Selection happens in Direction phase
 - User can select 0, 1, or multiple perspectives
 - If none selected → Neutral (default)
-- Perspectives only affect the final summary after Processing
-- Each perspective generates a separate summary section
+- Each perspective produces **two layers** of output:
+  - **Tactical layer**: IOC context, TTP framing, affected systems — delivered in Processing
+  - **Strategic layer**: National security implications, geopolitical framing, policy-relevant insights — delivered in Analysis
+- Each perspective generates a separate section in the final report
 - Can be extended with additional perspectives post-MVP
+
+**Strategic Perspective Source Documents (per nation):**
+| Perspective | Key Source Documents |
+|-------------|----------------------|
+| 🇳🇴 Norway | NSM Risikobilde, PST Nasjonal trusselvurdering (NTA), NIS Focus |
+| 🇺🇸 United States | CISA advisories, ODNI Annual Threat Assessment, NSA Cybersecurity Reports |
+| 🇪🇺 EU | ENISA Threat Landscape, Europol IOCTA, NIS2 Directive |
+| 🇨🇳 China | MIIT/MPS security frameworks, CNCERT annual reports |
+| 🌐 Neutral | No framing document — raw technical intelligence only |
 
 ---
 
@@ -854,17 +914,115 @@ The Direction phase is unique - it uses a conversational approach to understand 
 
 ### LLM Layer
 
-| Model | Mode | Role | Justification |
-|-------|------|------|---------------|
-| Gemini 1.5 Flash | Online | Generate + Review | Free tier; 1M token context. |
-| Phi-3 Mini (3.8B) | Offline | Generate + Review | Fits in 8GB VRAM; good quality for size. |
-| Llama 3.2 3B | Offline (alt) | Generate + Review | Alternative small model option. |
-| Ollama | Offline | Model runner | Easy local model deployment. |
+#### Online Mode
+| Model | Role | Justification |
+|-------|------|---------------|
+| Gemini 2.5 Flash | Primary: Generate + Review | Available via Google AI Studio API key; large context window. Best fit for MVP. |
 
-**Offline Hardware Requirements:**
-- GPU VRAM: 8-12GB
-- RAM: 8-32GB
-- Two instances run sequentially (not parallel) to fit in memory
+#### Online Backup / Free Tier APIs
+| Provider | Models Available | Notes |
+|----------|------------------|-------|
+| Google AI Studio | Gemini 2.5 Flash, Gemini 2.0 Flash | **Primary.** Use API key from Google AI Studio. |
+| Groq | Llama 3.3 70B, DeepSeek, Mistral | Ultra-fast inference; generous free tier. |
+| GitHub Models | GPT-4o, GPT-4o mini, Llama, Mistral | Available via GitHub account. |
+| Together AI | Llama 4 Scout, DeepSeek-R1 | $25 free credits on signup. |
+| OpenRouter | 50+ models (DeepSeek, Qwen, etc.) | $5 credits; free models available. |
+| Mistral AI | Mistral Small, Ministral 3B | Free tier; EU data compliance. |
+| Hugging Face | 300+ open-source models | Rate-limited; good for experimentation. |
+
+#### Offline / Local Mode (AI Lab)
+The project has access to an AI lab with dynamically allocated GPU resources. Model choice scales with available VRAM:
+
+| Tier | Available GPU | Primary AI (Generate) | Review AI (Validate) |
+|------|---------------|-----------------------|----------------------|
+| Tier 1 (Ideal) | L40s / A6000 (48GB each) | DeepSeek-R1 32B or DeepSeek-V3 quantized | Llama 3.3 70B (quantized) |
+| Tier 2 (Realistic) | GV100 (32GB) | DeepSeek-R1 14B | Llama 3.2 11B |
+| Tier 3 (Minimum) | 2080Ti / 1080Ti (11GB) | DeepSeek-R1 7B (quantized) | Llama 3.2 3B |
+| Fallback | Any (8GB+) | Phi-3 Mini (3.8B) | Same model, sequential |
+
+**AI Lab Hardware Available (dynamically allocated):**
+- Nvidia L40s — 48GB VRAM (best option)
+- RTX A6000 — 48GB VRAM
+- GV100 — 32GB VRAM
+- 2080Ti / 1080Ti — 11GB VRAM each
+
+**Key Constraints:**
+- Compute is dynamically allocated; model size must flex based on what is available at runtime
+- Two instances run sequentially (not parallel) when VRAM is shared
+- Offline model runner: Ollama (for simplicity) or vLLM (for performance)
+- DeepSeek models preferred for primary generation (strong analytical reasoning, structured output)
+- Llama models preferred for review/validation (different architecture reduces correlated errors)
+
+---
+
+## Perspective Architecture
+
+### Core Design Principle
+
+Geographic perspectives use **official government and national security documents as interpretation lenses**, not as neutral knowledge sources. The same technical threat data is interpreted through different geopolitical frames.
+
+### Two-Layer Architecture
+
+```
+Layer 1: Shared Neutral Technical Foundation
+─────────────────────────────────────────────
+  - MITRE ATT&CK framework (TTPs, techniques)
+  - CVE / NVD vulnerability database
+  - Threat actor profiles (neutral, factual)
+  - Raw OSINT data (OTX, MISP)
+
+             ↓  fed into  ↓
+
+Layer 2A: Tactical Perspective (Processing Phase)
+─────────────────────────────────────────────────
+  IOC context, TTP framing, affected systems
+  viewed through national security priorities
+
+             ↓  synthesized into  ↓
+
+Layer 2B: Strategic Perspective (Analysis Phase)
+─────────────────────────────────────────────────
+  Derived from national security documents:
+  - Norway: NSM Risiko, PST NTA, NIS Focus
+  - US: CISA advisories, NSA/ODNI publications
+  - EU: ENISA Threat Landscape reports
+  - China: MIIT/MPS security frameworks
+  - Neutral: No framing; raw technical summary only
+
+  Outputs: geopolitical framing, strategic implications,
+  attribution stance, recommended policy actions
+```
+
+### How Documents Are Used
+
+Official documents **define the lens**, not the facts. They provide:
+- Strategic priority rankings (which sectors/actors matter most)
+- Attribution bias and style (how to frame threat actor identification)
+- Terminology preferences (country-specific language patterns)
+- Recommended mitigations and frameworks (NIST vs GDPR vs GB/T standards)
+
+### Implementation
+
+Perspectives are stored as **MCP Prompt templates** (not RAG/vector DB):
+```
+mcp_server/src/prompts/
+  ├── neutral.md
+  ├── perspective_norway.md    ← Uses NSM/PST priorities as framing
+  ├── perspective_us.md        ← Uses CISA/NIST as framing
+  ├── perspective_eu.md        ← Uses ENISA/NIS2 as framing
+  └── perspective_china.md     ← Uses MIIT/MPS as framing
+```
+
+Each template (~200-400 words) contains:
+1. Geopolitical context and strategic priorities (from source documents)
+2. Critical sectors ranked by national priority
+3. Threat actor ranking (Critical/High/Medium/Low for this nation)
+4. Attribution style guidelines
+5. Preferred mitigation frameworks and terminology
+
+### Future Extension: Council Mode
+
+F20 (Deferred) — Multiple AI agents each adopt a perspective and debate findings. Reveals strategic trade-offs and disagreements across national viewpoints. Not part of MVP scope; preserved for future work.
 
 ---
 
@@ -883,7 +1041,10 @@ The Direction phase is unique - it uses a conversational approach to understand 
 | `enrich_ioc()` | Enrich IOCs with context | Processing |
 | `correlate_indicators()` | Find patterns across data | Processing |
 | `map_to_mitre()` | Map findings to MITRE ATT&CK | Processing |
-| `generate_perspective_summary()` | Create perspective-based summary | Processing |
+| `generate_perspective_summary()` | Create tactical perspective summary | Processing |
+| `generate_strategic_assessment()` | Create strategic intelligence per national lens | Analysis |
+| `generate_key_findings()` | Produce finished intelligence: findings + confidence | Analysis |
+| `generate_recommendations()` | Suggest courses of action per perspective | Analysis |
 | `review_output()` | AI Instance #2 reviews for errors | All |
 | `generate_report()` | Create JSON/PDF output | Output |
 
@@ -906,7 +1067,9 @@ The Direction phase is unique - it uses a conversational approach to understand 
 | `pir_generation` | Generate PIRs from dialogue context | Direction |
 | `collection_plan` | Plan data collection strategy | Collection |
 | `processing_analysis` | Structure correlation analysis | Processing |
-| `perspective_[US/NO/CN/EU]` | Geographic perspective prompts | Processing |
+| `perspective_tactical_[US/NO/CN/EU]` | Tactical perspective framing per nation | Processing |
+| `perspective_strategic_[US/NO/CN/EU]` | Strategic intelligence lens per nation (from national security docs) | Analysis |
+| `analysis_synthesis` | Synthesize processing output into finished intelligence | Analysis |
 | `review_validation` | AI #2 validation prompt | All |
 | `reasoning_explanation` | Document AI decision-making | All |
 
@@ -1033,8 +1196,8 @@ The Direction phase is unique - it uses a conversational approach to understand 
 | 1 | Feb 1-14 | Foundation: Environment, basic MCP, test infrastructure, data import | Low-fi sketches |
 | 2 | Feb 15-28 | Direction Phase: Dialogue system, PIR generation, perspective selection | Low-fi → Med-fi wireframes |
 | 3 | Mar 1-14 | Collection Phase: Multi-source queries, AI review integration | Med-fi clickable prototype |
-| 4 | Mar 15-28 | Processing Phase: Normalization, correlation, perspective summaries | High-fi implementation |
-| 5 | Mar 29 - Apr 11 | Integration: End-to-end workflow, output generation, dual AI tuning | High-fi + User testing |
+| 4 | Mar 15-28 | Processing Phase: Normalization, correlation, tactical perspective summaries | High-fi implementation |
+| 5 | Mar 29 - Apr 11 | Analysis Phase + Integration: Strategic assessments, end-to-end workflow, output generation | High-fi + User testing |
 | 6 | Apr 12-30 | Polish: Bug fixes, PDF reports, language support, documentation | Iteration + Final testing |
 
 ### Key Milestones
@@ -1044,8 +1207,8 @@ The Direction phase is unique - it uses a conversational approach to understand 
 | Feb 14 | M1: Infrastructure | Dev environment, CI, data import working |
 | Feb 28 | M2: Direction | Dialogue-based PIR workflow with AI review |
 | Mar 14 | M3: Collection | Multi-source collection with AI review |
-| Mar 28 | M4: Processing | Full processing pipeline with perspectives |
-| Apr 11 | M5: Integration | Complete workflow, JSON output, user testing done |
+| Mar 28 | M4: Processing | Full processing pipeline with tactical perspective summaries |
+| Apr 11 | M5: Analysis + Integration | Strategic assessments, complete 4-phase workflow, JSON output, user testing done |
 | May 1 | M6: Final | PDF reports, documentation, demo ready, research data analyzed |
 
 ### User Testing Schedule
@@ -1271,5 +1434,5 @@ When working on this project:
 
 ---
 
-*Last Updated: January 2025*
-*Version: 4.0 (with User Testing, UI Design Process, Research Evaluation Methods)*
+*Last Updated: February 2026*
+*Version: 6.0 (Added: Analysis phase throughout, strategic perspective layer, Gemini 2.5 Flash, fixed encoding/emojis, updated MCP tools/prompts, sprint/milestone alignment)*
