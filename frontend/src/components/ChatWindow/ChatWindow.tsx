@@ -72,28 +72,29 @@ export default function ChatWindow({
           </button>
         </div>
       ) : (
-      <form
-        onSubmit={handleSubmit}
-        className="flex items-center gap-2 border-2 border-gray-300 rounded-lg p-2"
-      >
-        <input
-          type="text"
-          placeholder="Ask anything..."
-          value={inputValue}
-          onChange={(event) => setInputValue(event.target.value)}
-          className="flex-1 px-3 py-2 outline-none bg-transparent text-gray-700"
-        />
-        <button
-          disabled={inputValue.trim() === ""}
-          className={`px-4 py-2 rounded-lg font-medium ${
-            inputValue.trim() === ""
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-blue-500 text-white hover:bg-blue-600"
-          }`}
+        <form
+          onSubmit={handleSubmit}
+          className="flex items-center gap-2 border-2 border-gray-300 rounded-lg p-2"
         >
-          Send
-        </button>
-      </form>
+          <input
+            type="text"
+            placeholder="Ask anything..."
+            value={inputValue}
+            onChange={(event) => setInputValue(event.target.value)}
+            className="flex-1 px-3 py-2 outline-none bg-transparent text-gray-700"
+          />
+          {/* Disable send button when input is empty */}
+          <button
+            disabled={inputValue.trim() === ""}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              inputValue.trim() === ""
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-blue-500 text-white hover:bg-blue-600"
+            }`}
+          >
+            Send
+          </button>
+        </form>
       )}
     </div>
   );

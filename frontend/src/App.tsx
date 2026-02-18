@@ -1,19 +1,26 @@
 import { useState } from "react";
-import FileUpload from "./components/FileUpload/FileUpload";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
-import PerspectiveSelector from "./components/PerspectiveSelector/PerspectiveSelector";
+import { Sidebar } from "./components/Sidebar/Sidebar";
+import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
+import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { ToastContainer } from "./components/Toast";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
+import { useConversation } from "./hooks/useConversation";
 
 function App() {
   const { success, error } = useToast();
-  const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
-    "NEUTRAL",
-  ]);
-  const { messages, sendMessage, isConfirming, approve, reject, debugConfirm } =
-    useChat(selectedPerspectives);
+  const {
+    conversations,
+    activeConversation,
+    createNewConversation,
+    switchConversation,
+    deleteConversation,
+    updatePerspectives,
+  } = useConversation();
+  const { messages, sendMessage, isConfirming, approve, reject } = useChat();
+  const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
 
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
@@ -30,15 +37,21 @@ function App() {
         error(`Failed to upload ${file.name}`);
       }
     }
+    setIsFileUploadOpen(false);
   };
 
   return (
-    <div className="relative min-h-screen bg-gray-100 flex flex-col items-center">
-      <ToastContainer position="top-right" />
-      <h1 className="text-4xl font-bold text-gray-900 mt-8 mb-6">
-        MCP Project
-      </h1>
-      <div className="w-[50vw]">
+    <div className="flex h-screen">
+      <Sidebar
+        conversations={conversations}
+        activeConversationId={activeConversation?.id ?? null}
+        onNewChat={createNewConversation}
+        onSwitchConversation={switchConversation}
+        onDeleteConversation={deleteConversation}
+      />
+
+      <main className="flex-1 flex flex-col bg-gray-100">
+        <ToastContainer position="top-right" />
         <ChatWindow
           messages={messages}
           onSendMessage={sendMessage}
@@ -46,21 +59,20 @@ function App() {
           onApprove={approve}
           onReject={reject}
         />
-        <FileUpload onFileSelect={handleFileSelect} onSubmit={handleSubmit} />
-      </div>
-      {/* DEBUG: Remove before production */}
-      <button
-        onClick={debugConfirm}
-        className="fixed left-6 top-24 px-3 py-2 bg-yellow-400 text-black rounded-lg text-sm font-medium hover:bg-yellow-500"
-      >
-        Test Confirm
-      </button>
-      <div className="fixed right-6 top-24">
-        <PerspectiveSelector
-          selected={selectedPerspectives}
-          onChange={setSelectedPerspectives}
-        />
-      </div>
+      </main>
+
+      <OptionsPanel
+        selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
+        onPerspectiveChange={updatePerspectives}
+        onOpenFileUpload={() => setIsFileUploadOpen(true)}
+      />
+
+      <FileUploadModal
+        isOpen={isFileUploadOpen}
+        onClose={() => setIsFileUploadOpen(false)}
+        onFileSelect={handleFileSelect}
+        onSubmit={handleSubmit}
+      />
     </div>
   );
 }

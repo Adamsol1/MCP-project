@@ -260,3 +260,4 @@ site/
 *.zip
 *.tar.gz
 *.rar
+*.env
