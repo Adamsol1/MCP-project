@@ -52,7 +52,8 @@ function App() {
         onRenameConversation={renameConversation}
       />
 
-      <main className="flex-1 flex flex-col bg-gray-100">
+      {/* mx-1 creates a slim visible gap between the sidebars and the chat area */}
+      <main className="flex-1 flex flex-col bg-gray-100 mx-1">
         <ToastContainer position="top-right" />
         <ChatWindow
           messages={messages}

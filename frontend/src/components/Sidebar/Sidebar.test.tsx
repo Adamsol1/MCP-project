@@ -73,9 +73,7 @@ describe("Sidebar", () => {
     renderSidebar({ conversations, activeConversationId: "c1" });
 
     // Use closest("[data-active]") to find the container that carries the attribute
-    const activeItem = screen
-      .getByText("Active chat")
-      .closest("[data-active]");
+    const activeItem = screen.getByText("Active chat").closest("[data-active]");
     expect(activeItem).toHaveAttribute("data-active", "true");
 
     const otherItem = screen.getByText("Other chat").closest("[data-active]");
@@ -186,10 +184,8 @@ describe("Sidebar", () => {
 
     renderSidebar({ conversations });
 
-    // The "..." button should not be in the DOM at all before any hover
-    expect(
-      screen.queryByRole("button", { name: /chat options/i }),
-    ).not.toBeInTheDocument();
+    const optionsBtn = screen.getByRole("button", { name: /chat options/i });
+    expect(optionsBtn).toHaveClass("opacity-0");
   });
 
   it("shows the options button when hovering a chat item", async () => {
@@ -317,5 +313,65 @@ describe("Sidebar", () => {
     // Input should be gone and the original title should be visible
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.getByText("My chat")).toBeInTheDocument();
+  });
+
+  // ---------- Collapsible Sidebar ----------
+  // The sidebar has a toggle button that collapses and expands the conversation
+  // list. When collapsed the list is hidden but the New Chat button remains
+  // accessible. Collapse state is managed internally by Sidebar itself.
+
+  it("renders a toggle button for collapsing the sidebar", () => {
+    renderSidebar();
+
+    expect(
+      screen.getByRole("button", { name: /toggle sidebar/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the conversation list by default (sidebar starts expanded)", () => {
+    const conversations = [makeConversation({ id: "c1", title: "My chat" })];
+
+    renderSidebar({ conversations });
+
+    // The title is visible when expanded
+    expect(screen.getByText("My chat")).toBeInTheDocument();
+  });
+
+  it("hides the conversation list after clicking the toggle button", async () => {
+    const user = userEvent.setup();
+    const conversations = [makeConversation({ id: "c1", title: "My chat" })];
+
+    renderSidebar({ conversations });
+
+    await user.click(screen.getByRole("button", { name: /toggle sidebar/i }));
+
+    expect(screen.queryByText("My chat")).not.toBeInTheDocument();
+  });
+
+  it("shows the conversation list again after toggling twice", async () => {
+    const user = userEvent.setup();
+    const conversations = [makeConversation({ id: "c1", title: "My chat" })];
+
+    renderSidebar({ conversations });
+
+    const toggle = screen.getByRole("button", { name: /toggle sidebar/i });
+
+    // Collapse then expand
+    await user.click(toggle);
+    await user.click(toggle);
+
+    expect(screen.getByText("My chat")).toBeInTheDocument();
+  });
+
+  it("keeps the New Chat button accessible when the sidebar is collapsed", async () => {
+    const user = userEvent.setup();
+
+    renderSidebar();
+
+    await user.click(screen.getByRole("button", { name: /toggle sidebar/i }));
+
+    expect(
+      screen.getByRole("button", { name: /new chat/i }),
+    ).toBeInTheDocument();
   });
 });
