@@ -17,6 +17,7 @@ function App() {
     createNewConversation,
     switchConversation,
     deleteConversation,
+    renameConversation,
     updatePerspectives,
   } = useConversation();
   const { messages, sendMessage, isConfirming, approve, reject } = useChat();
@@ -48,6 +49,7 @@ function App() {
         onNewChat={createNewConversation}
         onSwitchConversation={switchConversation}
         onDeleteConversation={deleteConversation}
+        onRenameConversation={renameConversation}
       />
 
       <main className="flex-1 flex flex-col bg-gray-100">
