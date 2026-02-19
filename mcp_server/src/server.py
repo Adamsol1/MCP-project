@@ -4,25 +4,44 @@ This server provides tools, resources, and prompts for the
 Threat Intelligence workflow (Direction, Collection, Processing phases).
 """
 
-import os
-
+import httpx
 from dotenv import load_dotenv
 from fastmcp import FastMCP
-from google import genai
 
 load_dotenv()
 
-print("Starting MCP Threat Intelligence Server...", flush=True)
+""" print("Starting MCP Threat Intelligence Server...", flush=True)
 
 api_key = os.getenv("GEMINI_API_KEY")
+
+
 print(f"API KEY FOUND: {bool(api_key)}", flush=True)
 
-client = genai.Client(api_key=api_key)
+client = genai.Client(api_key=api_key) """
+
 
 mcp = FastMCP(
     name="ThreatIntelligence",
     instructions="MCP server for Threat Intelligence workflow assistance.",
 )
+
+LM_STUDIO_URL = "http://localhost:1234/v1/chat/completions"
+MODEL = "zai-org/glm-4.7-flash"
+
+
+def query_local_llm(prompt: str) -> str:
+    response = httpx.post(
+        LM_STUDIO_URL,
+        json={
+            "model": MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.7,
+            "stream": False,
+        },
+        timeout=120.0,
+    )
+    response.raise_for_status()
+    return response.json()["choices"][0]["message"]["content"]
 
 
 @mcp.tool
@@ -63,12 +82,9 @@ def greet() -> str:
         No commentary.
         """
 
-    response = client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-    )
+    result = query_local_llm(prompt)
 
-    return f"Gemini Response: {response.text}"
+    return f"Local LLM Response: {result}"
 
 
 if __name__ == "__main__":
