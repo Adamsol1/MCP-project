@@ -9,7 +9,7 @@
     "test:e2e:report": "playwright show-report",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
-    "dev:backend": "cd backend && uvicorn src.api.main:app --reload"
+    "dev:backend": "cd backend && poetry run uvicorn src.api.main:app"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

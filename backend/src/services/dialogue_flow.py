@@ -1,3 +1,4 @@
+import json
 from enum import Enum
 
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
@@ -61,6 +62,10 @@ class DialogueFlow:
         self.context.timeframe = extracted_context["timeframe"]
     if extracted_context.get("target_entities"):
         self.context.target_entities = extracted_context["target_entities"]
+    if extracted_context.get("threat_actors"):
+       self.context.threat_actors = extracted_context["threat_actors"]
+    if extracted_context.get("priority_focus"):
+       self.context.priority_focus = extracted_context["priority_focus"]
 
   #State handler for initial phase. Here we will save initial query, generate questions and change state
   async def handle_initial_input(self, user_message, dialogue_service):
@@ -108,10 +113,8 @@ class DialogueFlow:
       if(self._has_sufficient_context()):
         self.state = DialogueState.SUMMARY_CONFIRMING
         dialogue_response.action = "show_summary"
-        #TODO: Replace model_dump_json with generate_summary MCP call when implemented:
-        # summary = await dialogue_service.generate_summary(self.context)
-        # dialogue_response.content = summary
-        dialogue_response.content = self.context.model_dump_json()
+        summary = await dialogue_service.generate_summary(self.context)
+        dialogue_response.content = json.dumps(summary) if isinstance(summary, dict) else summary
         return dialogue_response
       else:
         #Context not sufficient, ask the generated question
@@ -134,15 +137,13 @@ class DialogueFlow:
         self.context.modifications = None  #Clear modifications so they don't leak into PIR phase
         self.state = DialogueState.PIR_CONFIRMING
         dialogue_response.action = "show_pir"
-        dialogue_response.content = pir
+        dialogue_response.content = json.dumps(pir) if isinstance(pir, dict) else pir
       else:
         #User rejected with modifications. Save and self-loop
         self.context.modifications = user_message
         dialogue_response.action = "show_summary"
-        #TODO: Replace model_dump_json with generate_summary MCP call when implemented:
-        # summary = await dialogue_service.generate_summary(self.context, modifications=user_message)
-        # dialogue_response.content = summary
-        dialogue_response.content = self.context.model_dump_json()
+        summary = await dialogue_service.generate_summary(self.context, modifications=user_message)
+        dialogue_response.content = json.dumps(summary) if isinstance(summary, dict) else summary
 
       return dialogue_response
 
@@ -164,7 +165,7 @@ class DialogueFlow:
         self.context.modifications = user_message
         pir = await dialogue_service.generate_pir(self.context, modifications=user_message)
         dialogue_response.action = "show_pir"
-        dialogue_response.content = pir
+        dialogue_response.content = json.dumps(pir) if isinstance(pir, dict) else pir
 
       return dialogue_response
 
@@ -174,7 +175,7 @@ class DialogueFlow:
 
   def _has_sufficient_context(self) -> bool:
    #List of fields required for context to be deemed sufficient
-    context_fields = ["scope", "timeframe", "target_entities"]
+    context_fields = ["scope", "timeframe", "target_entities", "threat_actors", "priority_focus"]
     #Check if we have enough context. return bool
     for field in context_fields:  # noqa: SIM110
       if not getattr(self.context, field):

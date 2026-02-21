@@ -35,6 +35,8 @@ class DialogueService:
                     "scope": context.scope,
                     "timeframe": context.timeframe,
                     "target_entities": context.target_entities,
+                    "threat_actors":context.threat_actors,
+                    "priority_focus":context.priority_focus
                 }
             },
         )
@@ -71,6 +73,33 @@ class DialogueService:
                 "target_entities": context.target_entities,
                 "perspectives": perspectives,
                 "modifications": modifications,
+                "threat_actors":context.threat_actors,
+                "priority_focus":context.priority_focus,
+            },
+        )
+
+        return result
+
+    async def generate_summary(self, context: DialogueContext, modifications=None) -> dict:
+        """
+        Calls the generate_summary MCP tool to create a human-readable summary of the context.
+
+        :param context: The dialogue context gathered so far
+        :param modifications: Optional user feedback to incorporate
+        :return: Dict with a 'summary' field
+        """
+        perspectives = [p.value for p in context.perspectives]
+
+        result = await self.mcp_client.call_tool(
+            "generate_summary",
+            {
+                "scope": context.scope,
+                "timeframe": context.timeframe,
+                "target_entities": context.target_entities,
+                "threat_actors": context.threat_actors,
+                "priority_focus": context.priority_focus,
+                "perspectives": perspectives,
+                "modifications": modifications,
             },
         )
 
@@ -91,5 +120,9 @@ class DialogueService:
             missing.append("timeframe")
         if not context.target_entities:
             missing.append("target_entities")
+        if not context.threat_actors:
+            missing.append("threat_actors")
+        if not context.priority_focus:
+            missing.append("priority_focus")
 
         return missing

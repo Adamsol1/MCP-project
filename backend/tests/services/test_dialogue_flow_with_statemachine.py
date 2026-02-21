@@ -42,6 +42,9 @@ async def test_state_transition_from_gathering_to_summary_confirming():
   dialogue_flow.context.scope = "identify attack patterns"
   dialogue_flow.context.timeframe = "last 6 months"
   dialogue_flow.context.target_entities = ["Norway"]
+  dialogue_flow.context.threat_actors = ["APT29"]
+  dialogue_flow.context.priority_focus = "attack vectors"
+
 
   result = await dialogue_flow.process_user_message("Investigate x", mock_service)
 
