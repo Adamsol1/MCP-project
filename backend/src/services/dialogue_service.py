@@ -52,14 +52,12 @@ class DialogueService:
 
         return QuestionResult(question=question, extracted_context=extracted_context)
 
-    async def generate_pir(self, context: DialogueContext, modifications=None) -> str:
+    async def generate_pir(self, context: DialogueContext) -> str:
         """
         Calls the generate_pir MCP tool to create a PIR based on gathered context.
 
         :param context: The dialogue context with scope, timeframe, target_entities, perspectives
         :type context: DialogueContext
-        :param modifications: Optional user feedback for PIR regeneration
-        :type modifications: str | None
         :return: The generated PIR as a string
         :rtype: str
         """
@@ -72,7 +70,7 @@ class DialogueService:
                 "timeframe": context.timeframe,
                 "target_entities": context.target_entities,
                 "perspectives": perspectives,
-                "modifications": modifications,
+                "modifications": context.modifications,
                 "threat_actors":context.threat_actors,
                 "priority_focus":context.priority_focus,
             },

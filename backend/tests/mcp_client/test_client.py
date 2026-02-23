@@ -47,9 +47,15 @@ class TestMCPClientTools:
         client = MCPClient("/fake/path/server.py")
 
         # Lag en fake session som returnerer et svar
+        # Struktur matcher ekte MCP SDK-resultat: result.content[0].text
+        class MockTextContent:
+            text = "Generated PIR: Investigate APT29 targeting Norway"
+
         class MockSession:
             async def call_tool(self, tool_name, arguments):  # noqa: ARG002
-                return "Generated PIR: Investigate APT29 targeting Norway"
+                class MCPResult:
+                    content = [MockTextContent()]
+                return MCPResult()
 
         # Sett fake session på klienten
         client.session = MockSession()  # type: ignore

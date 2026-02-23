@@ -2,6 +2,8 @@ from enum import Enum
 
 from pydantic import BaseModel
 
+from typing import Literal
+
 
 class Perspective(str, Enum):
     US = "us"
@@ -55,3 +57,21 @@ class QuestionResult(BaseModel):
 
     question: ClarifyingQuestion
     extracted_context: dict = {}
+
+
+class Phase(str, Enum):
+    DIRECTION = "direction"
+    COLLECTION = "collection"
+    PROCESSING = "processing"
+
+
+class PIRReview(BaseModel):
+    pir_index: int
+    approved: bool
+    issue: str | None
+
+class ReviewResult(BaseModel):
+    overall_approved: bool
+    pir_reviews: list[PIRReview]
+    severity: Literal["none", "minor", "major"]
+    suggestions: str | None

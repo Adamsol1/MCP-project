@@ -4,7 +4,7 @@ import pytest
 
 from src.models.dialogue import DialogueContext
 from src.services.ai_orchestrator import AIOrchestrator
-from tests.services.conftest import MockGenerator, MockReviewer
+from tests.services.conftest import MockGenerator, MockReviewer, make_approved_result, make_rejected_result
 
 
 # Test for checking if orchestrator approves
@@ -18,12 +18,12 @@ async def test_orchestrator_approves_on_first_try():
 
     # Create enviorment for testing
     generator = MockGenerator()
-    reviewer = MockReviewer(responses=[True])
+    reviewer = MockReviewer(responses=[make_approved_result()])
     orchestrator = AIOrchestrator()
 
     # Call method
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, logger=None
+        context, generator, reviewer, phase="direction", logger=None
     )
 
     # Test result
@@ -42,12 +42,12 @@ async def test_orchestrator_retries_and_succeeds():
     # Create enivorment
     generator = MockGenerator()
     # First one is rejected, second one is accepted
-    reviewer = MockReviewer(responses=[False, True])
+    reviewer = MockReviewer(responses=[make_rejected_result(), make_approved_result()])
     orchestrator = AIOrchestrator()
 
     # Generate the PIR and review
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, logger=None
+        context, generator, reviewer, phase="direction", logger=None
     )
 
     # Test result
@@ -65,12 +65,12 @@ async def test_orchestrator_fails_after_max_retries():
 
     # Create test enviorment
     generator = MockGenerator()
-    reviewer = MockReviewer(responses=[False, False, False])
+    reviewer = MockReviewer(responses=[make_rejected_result(), make_rejected_result(), make_rejected_result()])
     orchestrator = AIOrchestrator()
 
     # Call method
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, logger=None
+        context, generator, reviewer, phase="direction", logger=None
     )
 
     # Check if rejected

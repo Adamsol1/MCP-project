@@ -4,7 +4,7 @@ import asyncio
 import json
 import os
 import sys
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +26,7 @@ class MCPClient:
         """
         self.server_script_path = server_script_path
         self.session: ClientSession | None = None
+        self._stack: AsyncExitStack | None = None
 
     @asynccontextmanager
     async def connect(self):

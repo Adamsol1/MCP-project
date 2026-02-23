@@ -1,10 +1,16 @@
 
+from src.models.dialogue import DialogueContext, ReviewResult
+
+
 class ReviewService:
   #Review service for PIR reports
-  def __init__(self, ai_service):
-    self.ai_service = ai_service
+  def __init__(self, mcp_client):
+    self.mcp_client = mcp_client
 
-  def review_pir(self, pir_report, context):
+  async def review_pir(self, content, context: DialogueContext, phase):
     #Call AI service to review PIR against context
-    result = self.ai_service.review(pir_report, context)
-    return result
+    result = await self.mcp_client.call_tool("review", {"content":content, "context":context.model_dump(), "phase":phase})
+
+    response = ReviewResult.model_validate(result)
+
+    return response

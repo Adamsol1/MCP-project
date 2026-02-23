@@ -1,6 +1,8 @@
+from datetime import datetime
 import json
 from enum import Enum
 
+from src.models.reasoning import UserActionLogEntry
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 
 
@@ -13,11 +15,13 @@ class DialogueState(str, Enum):
 
 
 class DialogueFlow:
-  def __init__(self):
+  def __init__(self, session_id : str = None, logger=None):
     self.state = DialogueState.INITIAL #Starting with first state
     self.context = DialogueContext() #Context for information used in dialogue
     self.question_count = 0 #Counter for questions
     self.max_questions = 15 #Max number of questions. Prevents infinite loops
+    self.session_id = session_id
+    self.logger = logger
 
 
 
@@ -28,7 +32,7 @@ class DialogueFlow:
       Perspective(p.lower()) for p in perspectives
     ]
 
-  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None, approved: bool | None = None) -> DialogueResponse:
+  async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None, approved: bool | None = None, orchestrator=None, reviewer=None) -> DialogueResponse:
     # Update perspectives on every message if provided
     if perspectives:
       self.update_perspectives(perspectives)
@@ -42,7 +46,7 @@ class DialogueFlow:
 
     #SUMMARY CONFIRMING PHASE
     elif self.state == DialogueState.SUMMARY_CONFIRMING:
-      return await self.handle_summary_confirming(user_message, dialogue_service, approved)
+      return await self.handle_summary_confirming(user_message, dialogue_service, approved, orchestrator, reviewer)
 
     #PIR CONFIRMING PHASE
     elif self.state == DialogueState.PIR_CONFIRMING:
@@ -128,12 +132,29 @@ class DialogueFlow:
   #Possible outcomes:
   # - Approve (approved=True) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
   # - Reject (approved=False/None + user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
-  async def handle_summary_confirming(self, user_message, dialogue_service, approved: bool | None = None):
+  async def handle_summary_confirming(self, user_message, dialogue_service, approved: bool | None = None, orchestrator=None, reviewer=None):
       dialogue_response = DialogueResponse()
 
       if approved:
         #User approved context summary. Generate PIR and move to PIR_CONFIRMING
-        pir = await dialogue_service.generate_pir(self.context)
+        #If orchestrator and reviewer are provided, use the full generate+review loop
+        if orchestrator and reviewer:
+            pir = await orchestrator.generate_and_review_pir(
+                self.context, dialogue_service, reviewer, phase="direction"
+            )
+        else:
+            pir = await dialogue_service.generate_pir(self.context)
+        log_user_interaction = UserActionLogEntry(
+          session_id = self.session_id,
+          timestamp=datetime.now(),
+          action="approve",
+          phase="summary_confirming",
+          modifications= None,
+
+
+        )
+        if self.logger:
+           self.logger.create_log(log_user_interaction)
         self.context.modifications = None  #Clear modifications so they don't leak into PIR phase
         self.state = DialogueState.PIR_CONFIRMING
         dialogue_response.action = "show_pir"
@@ -141,6 +162,15 @@ class DialogueFlow:
       else:
         #User rejected with modifications. Save and self-loop
         self.context.modifications = user_message
+        log_user_interaction = UserActionLogEntry(
+          session_id = self.session_id,
+          timestamp=datetime.now(),
+          action="reject",
+          phase="summary_confirming",
+          modifications= user_message,
+        )
+        if self.logger:
+           self.logger.create_log(log_user_interaction)
         dialogue_response.action = "show_summary"
         summary = await dialogue_service.generate_summary(self.context, modifications=user_message)
         dialogue_response.content = json.dumps(summary) if isinstance(summary, dict) else summary
@@ -158,11 +188,33 @@ class DialogueFlow:
 
       if approved:
         #User approved PIR. Direction phase complete
+        log_user_interaction = UserActionLogEntry(
+          session_id = self.session_id,
+          timestamp=datetime.now(),
+          action="approve",
+          phase="pir_confirming",
+          modifications= None,
+
+
+        )
+        if self.logger:
+           self.logger.create_log(log_user_interaction)
         self.state = DialogueState.COMPLETE
         dialogue_response.action = "complete"
       else:
         #User rejected with modifications. Regenerate PIR
         self.context.modifications = user_message
+        log_user_interaction = UserActionLogEntry(
+          session_id = self.session_id,
+          timestamp=datetime.now(),
+          action="approve",
+          phase="summary_confirming",
+          modifications= user_message,
+
+
+        )
+        if self.logger:
+           self.logger.create_log(log_user_interaction)
         pir = await dialogue_service.generate_pir(self.context, modifications=user_message)
         dialogue_response.action = "show_pir"
         dialogue_response.content = json.dumps(pir) if isinstance(pir, dict) else pir

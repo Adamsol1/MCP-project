@@ -12,6 +12,9 @@ class MockDialogueService:
   async def generate_pir(self, context, modifications=None):  # noqa: ARG002
     return "Generated PIR content"
 
+  async def generate_summary(self, context, modifications=None):  # noqa: ARG002
+    return {"summary": "Mock summary"}
+
 
 #Test for checking if state machine starts in correct state
 def test_correct_starting_state_for_dialogue_flow():

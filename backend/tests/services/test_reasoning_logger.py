@@ -7,11 +7,17 @@ from uuid import uuid4
 
 import pytest
 
+from backend.src.services.reasearch_logger import ResearchLogger
 from src.models.dialogue import DialogueContext
 from src.models.reasoning import ReasoningLogEntry
 from src.services.ai_orchestrator import AIOrchestrator
-from src.services.reasoning_logger import ReasoningLogger
-from tests.services.conftest import MockGenerator, MockLogger, MockReviewer
+from tests.services.conftest import (
+    MockGenerator,
+    MockLogger,
+    MockReviewer,
+    make_approved_result,
+    make_rejected_result,
+)
 
 
 # Test for one log
@@ -81,12 +87,12 @@ def test_logger_writes_to_jsonl_file(tmp_path):
         timestamp=datetime(2026, 2, 13, 14, 30, 0),
         generated_pir="Fake PIR report",
         generation_duration=0.5,
-        is_approved=True,
+        review_result=make_approved_result(),
         review_duration=0.3,
-        session_id=session_id
+        session_id=session_id,
     )
 
-    logger = ReasoningLogger(log_path=tmp_path / "log.jsonl")
+    logger = ResearchLogger(log_path=tmp_path / "log.jsonl")
     logger.create_log(log_entry)
 
     saved_log = tmp_path / "log.jsonl"
@@ -107,13 +113,13 @@ async def test_orchestrator_logs_reasoning():
     # Sett opp mocks for test
     generator = MockGenerator()
     # One false and one true. Will mock that first PIR generation is rejected
-    reviewer = MockReviewer(responses=[False, True])
+    reviewer = MockReviewer(responses=[make_rejected_result(), make_approved_result()])
     logger = MockLogger()
     orchestrator = AIOrchestrator()
 
     # Perform generation and pir review with logger
     result = await orchestrator.generate_and_review_pir(  # noqa: F841
-        context, generator, reviewer, logger
+        context, generator, reviewer, phase="direction", logger=logger
     )
 
     # Check amount of logs saved. Should be two
@@ -121,5 +127,5 @@ async def test_orchestrator_logs_reasoning():
     # Check that log entries contain timestamp
     assert logger.logs[0].timestamp
     assert logger.logs[1].timestamp
-    #Check that all tests get the same id
+    # Check that all tests get the same id
     assert logger.logs[0].session_id == logger.logs[1].session_id
