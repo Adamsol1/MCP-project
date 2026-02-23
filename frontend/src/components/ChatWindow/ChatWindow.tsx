@@ -10,6 +10,7 @@ interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
   messages?: Message[];
   isConfirming?: boolean;
+  isLoading?: boolean;
   onApprove?: () => void;
   onReject?: () => void;
 }
@@ -33,11 +34,13 @@ export default function ChatWindow({
   onSendMessage,
   messages = [],
   isConfirming = false,
+  isLoading = false,
   onApprove,
   onReject,
 }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Auto-resize the textarea to fit its content on every keystroke.
   // Step 1: reset to 'auto' so the element can shrink when text is deleted.
@@ -50,6 +53,11 @@ export default function ChatWindow({
     el.style.height = "auto";
     el.style.height = `${el.scrollHeight}px`;
   }, [inputValue]);
+
+  // Scroll to the bottom whenever messages arrive or the throbber appears.
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   const submitMessage = () => {
     if (inputValue.trim() === "") return;
@@ -86,6 +94,16 @@ export default function ChatWindow({
                 <p>{message.text}</p>
               </div>
             ))}
+            {isLoading && (
+              <div className="self-start bg-gray-50 rounded-lg p-3 mb-2">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
         </div>
       )}
@@ -112,13 +130,15 @@ export default function ChatWindow({
             <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
               <button
                 onClick={onApprove}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600"
+                disabled={isLoading}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Approve
               </button>
               <button
                 onClick={onReject}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                disabled={isLoading}
+                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Reject
               </button>

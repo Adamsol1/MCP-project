@@ -20,7 +20,7 @@ function App() {
     renameConversation,
     updatePerspectives,
   } = useConversation();
-  const { messages, sendMessage, isConfirming, approve, reject } = useChat();
+  const { messages, sendMessage, isConfirming, isLoading, approve, reject } = useChat();
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
 
   const handleFileSelect = (file: File) => {
@@ -59,6 +59,7 @@ function App() {
           messages={messages}
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
+          isLoading={isLoading}
           onApprove={approve}
           onReject={reject}
         />
