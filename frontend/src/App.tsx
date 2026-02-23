@@ -17,6 +17,7 @@ function App() {
     createNewConversation,
     switchConversation,
     deleteConversation,
+    renameConversation,
     updatePerspectives,
   } = useConversation();
   const { messages, sendMessage, isConfirming, approve, reject } = useChat();
@@ -48,9 +49,11 @@ function App() {
         onNewChat={createNewConversation}
         onSwitchConversation={switchConversation}
         onDeleteConversation={deleteConversation}
+        onRenameConversation={renameConversation}
       />
 
-      <main className="flex-1 flex flex-col bg-gray-100">
+      {/* mx-1 creates a slim visible gap between the sidebars and the chat area */}
+      <main className="flex-1 flex flex-col bg-gray-100 mx-1">
         <ToastContainer position="top-right" />
         <ChatWindow
           messages={messages}
