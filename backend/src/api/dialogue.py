@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
+import logging
 
 from src.services.reasearch_logger import ResearchLogger
 from src.mcp_client.client import MCPClient
@@ -12,6 +13,7 @@ from src.services.dialogue_service import DialogueService
 from src.services.review_service import ReviewService
 
 router = APIRouter(prefix="/api/dialogue")
+logger = logging.getLogger("app")
 _server_path = str(
     Path(__file__).parent.parent.parent.parent / "mcp_server" / "src" / "server.py"
 )
@@ -55,14 +57,12 @@ def _convert_to_message_response(response: DialogueResponse) -> DialogueMessageR
 
 @router.post("/message")
 async def send_message(request: DialogueMessageRequest) -> DialogueMessageResponse:
-    print(f"Perspectives received: {request.perspectives}")
-    print(f"Approved: {request.approved}")
-
     if request.session_id not in _sessions:
-        logger = ResearchLogger(session_id=request.session_id)
-        _sessions[request.session_id] = DialogueFlow(session_id=request.session_id, logger=logger)
+        research_logger = ResearchLogger(session_id=request.session_id)
+        _sessions[request.session_id] = DialogueFlow(session_id=request.session_id, research_logger=research_logger)
 
     flow = _sessions[request.session_id]
+    logger.info(f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}")
 
     # TODO (PERFORMANCE): MCPClient spawns a new subprocess on every request — this is expensive.
     # Fix: add open()/close() to MCPClient using AsyncExitStack, store the client in _sessions
@@ -73,7 +73,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     async with client.connect():
         service = DialogueService(client, None)
         review_service = ReviewService(client)
-        orchestrator = AIOrchestrator(logger=ResearchLogger())
+        orchestrator = AIOrchestrator(research_logger=flow.research_logger, generator_model="gemini-2.0-flash", reviewer_model="gemini-2.0-flash")
         response = await flow.process_user_message(
             request.message,
             service,

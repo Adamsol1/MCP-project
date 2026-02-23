@@ -1,5 +1,8 @@
 import json
+import logging
 from pathlib import Path
+
+logger = logging.getLogger("app")
 
 
 class ResearchLogger:
@@ -10,8 +13,8 @@ class ResearchLogger:
         # Use default logpath
         else:
             self.log_path = Path(
-                "data/outputs/research_log_{session_id}.jsonl"
-            )  # TODO: Update with correct name when we have disussed this. For example: filename = file_reasoning + sessionid?
+                f"data/outputs/research_log_{session_id}.jsonl"
+            )
 
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -21,7 +24,17 @@ class ResearchLogger:
             log_entry = log_entry.model_dump(mode="json")
         converted_log = json.dumps(log_entry)
 
-        log_file = self.log_path
-        # Save the file to disk
-        with open(log_file, "a") as f:
-            f.write(converted_log + "\n")
+        try:
+            with open(self.log_path, "a") as f:
+                f.write(converted_log + "\n")
+        except OSError as e:
+            logger.error(f"[ResearchLogger] Failed to write log entry: {e}")
+
+    def write_reasoning_log(self, reasoning_log: "ReasoningLog") -> None:
+        log_path = Path(f"data/outputs/reasoning_log_{reasoning_log.session_id}.json")
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(log_path, "w") as f:
+                f.write(reasoning_log.model_dump_json(indent=2))
+        except OSError as e:
+            logger.error(f"[ResearchLogger] Failed to write reasoning log: {e}")

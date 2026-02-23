@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -5,11 +7,23 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.dialogue import router as dialogue_router
 from src.importers.upload import legal_file_upload, save_uploaded_file
+from src.logging_config import setup_logging
 
-app = FastAPI()
+setup_logging()
+
+logger = logging.getLogger("app")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    logger.info("Application started")
+    yield
+    logger.info("Application stopped")
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Cors middleware to allow request from frontend
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -34,11 +48,8 @@ async def check_health():
 @app.post("/api/import/upload")
 async def upload_file(file: UploadFile = File(...)):
     isValid = legal_file_upload(file.filename or "")
-    # Check if filetype is illegal
     if not isValid:
-        # If illegal, return error message
         raise HTTPException(status_code=400, detail="Illegal filetype")
-    # If legal, return success message
     try:
         saved_path = save_uploaded_file(file.file, file.filename or "", UPLOAD_PATH)
     except Exception as e:

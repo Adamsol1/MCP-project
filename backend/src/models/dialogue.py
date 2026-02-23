@@ -34,6 +34,7 @@ class DialogueContext(BaseModel):
     priority_focus: str | None = None
     perspectives: list[Perspective] = [Perspective.NEUTRAL]
     modifications: str | None = None
+    dialogue_turns: list[dict] = []
 
 
 class DialogueResponse(BaseModel):

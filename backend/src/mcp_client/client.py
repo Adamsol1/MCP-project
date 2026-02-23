@@ -2,11 +2,15 @@
 
 import asyncio
 import json
+import logging
 import os
 import sys
+import time
 from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger("app")
 
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
@@ -52,15 +56,11 @@ class MCPClient:
             if venv_python.exists():
                 python_cmd = str(venv_python)
 
-        print(f"[MCP client] server cwd: {cwd_path}", file=sys.stderr, flush=True)
-        print(
-            f"[MCP client] GEMINI_API_KEY present: {bool(child_env.get('GEMINI_API_KEY'))}",
-            file=sys.stderr,
-            flush=True,
-        )
-        print(f"[MCP client] python cmd: {python_cmd}", file=sys.stderr, flush=True)
         child_errlog_path = project_root / "mcp_child.stderr.log"
-        print(f"[MCP client] child stderr log: {child_errlog_path}", file=sys.stderr, flush=True)
+        logger.debug(f"[MCP] Server cwd: {cwd_path}")
+        logger.debug(f"[MCP] GEMINI_API_KEY present: {bool(child_env.get('GEMINI_API_KEY'))}")
+        logger.debug(f"[MCP] Python cmd: {python_cmd}")
+        logger.debug(f"[MCP] Child stderr log: {child_errlog_path}")
 
         server_params = StdioServerParameters(
             command=python_cmd,
@@ -69,6 +69,7 @@ class MCPClient:
             cwd=str(cwd_path),
         )
 
+        logger.info("[MCP] Connecting to server...")
         with child_errlog_path.open("a", encoding="utf-8") as errlog:
             async with (
                 stdio_client(server_params, errlog=errlog) as (read, write),
@@ -76,7 +77,9 @@ class MCPClient:
             ):
                 await session.initialize()
                 self.session = session
+                logger.info("[MCP] Connected")
                 yield self
+        logger.info("[MCP] Disconnected")
 
     async def call_tool(
         self, tool_name: str, arguments: dict[str, Any] | None = None
@@ -99,7 +102,14 @@ class MCPClient:
             )
 
 
-        result = await self.session.call_tool(tool_name, arguments or {})
+        logger.info(f"[MCP] Calling tool: {tool_name}")
+        start = time.time()
+        try:
+            result = await self.session.call_tool(tool_name, arguments or {})
+        except Exception as e:
+            logger.error(f"[MCP] Tool {tool_name} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}")
+            raise
+        logger.info(f"[MCP] Tool {tool_name} completed in {time.time() - start:.2f}s")
 
         text = result.content[0].text
         try:
