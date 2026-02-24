@@ -26,6 +26,7 @@ export function useChat() {
   const { activeConversation, addMessage, setIsConfirming } = useConversation();
   const { success, info } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [devPrefill, setDevPrefill] = useState<string | null>(null);
 
   // Read message history and confirmation state from the active conversation.
   // Fall back to empty / false when no conversation is selected.
@@ -95,6 +96,19 @@ export function useChat() {
   };
 
   /**
+   * DEV ONLY: Pre-fills the chat input with the given text and auto-sends it.
+   * Triggers the ChatWindow to show the message in the textarea before submitting.
+   */
+  const triggerDevMessage = (text: string) => {
+    setDevPrefill(text);
+  };
+
+  /** Clears the dev prefill — called by ChatWindow after it has consumed the value. */
+  const clearDevPrefill = () => {
+    setDevPrefill(null);
+  };
+
+  /**
    * DEV ONLY: Simulates the backend returning is_final: true so the approval UI
    * can be tested without a live backend. Remove before production.
    */
@@ -131,5 +145,8 @@ export function useChat() {
     approve,
     reject,
     debugConfirm,
+    devPrefill,
+    triggerDevMessage,
+    clearDevPrefill,
   };
 }

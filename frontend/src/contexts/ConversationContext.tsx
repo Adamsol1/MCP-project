@@ -35,6 +35,8 @@ export interface ConversationContextValue {
   switchConversation: (id: string) => void;
   /** Permanently delete the conversation with the given id. */
   deleteConversation: (id: string) => void;
+  /** DEV: Permanently delete all conversations. */
+  deleteAllConversations: () => void;
   /** Rename the conversation with the given id to newTitle. */
   renameConversation: (id: string, newTitle: string) => void;
   /** Append a message to the active conversation's message list. */
@@ -53,6 +55,7 @@ type Action =
   | { type: "CREATE_CONVERSATION" }
   | { type: "SWITCH_CONVERSATION"; payload: string }
   | { type: "DELETE_CONVERSATION"; payload: string }
+  | { type: "DELETE_ALL_CONVERSATIONS" }
   | { type: "RENAME_CONVERSATION"; payload: { id: string; newTitle: string } }
   | {
       type: "ADD_MESSAGE";
@@ -112,6 +115,8 @@ function conversationReducer(
         activeConversationId: newActiveId,
       };
     }
+    case "DELETE_ALL_CONVERSATIONS":
+      return { ...state, conversations: [], activeConversationId: null };
     case "RENAME_CONVERSATION": {
       const { id, newTitle } = action.payload;
       return {
@@ -213,6 +218,10 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "DELETE_CONVERSATION", payload: id });
   }, []);
 
+  const deleteAllConversations = useCallback(() => {
+    dispatch({ type: "DELETE_ALL_CONVERSATIONS" });
+  }, []);
+
   const renameConversation = useCallback((id: string, newTitle: string) => {
     dispatch({ type: "RENAME_CONVERSATION", payload: { id, newTitle } });
   }, []);
@@ -248,6 +257,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     createNewConversation,
     switchConversation,
     deleteConversation,
+    deleteAllConversations,
     renameConversation,
     addMessage,
     setIsConfirming,

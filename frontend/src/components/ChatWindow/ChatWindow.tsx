@@ -25,6 +25,10 @@ interface ChatWindowProps {
   onApprove?: () => void;
   /** Called when the user clicks Reject in confirmation mode. */
   onReject?: () => void;
+  /** DEV: When set, pre-fills the textarea with this text and auto-sends it. */
+  devPrefill?: string | null;
+  /** DEV: Called once the prefill value has been consumed so parent can clear it. */
+  onDevPrefillConsumed?: () => void;
 }
 
 /**
@@ -50,6 +54,8 @@ export default function ChatWindow({
   isLoading = false,
   onApprove,
   onReject,
+  devPrefill,
+  onDevPrefillConsumed,
 }: ChatWindowProps) {
   const [inputValue, setInputValue] = useState("");
 
@@ -82,6 +88,22 @@ export default function ChatWindow({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
+
+  /**
+   * DEV ONLY: When devPrefill is set, fills the textarea with the predefined
+   * text and auto-sends it after a short delay so the text is briefly visible.
+   */
+  useEffect(() => {
+    if (!devPrefill) return;
+    setInputValue(devPrefill);
+    onDevPrefillConsumed?.();
+    const id = setTimeout(() => {
+      onSendMessage?.(devPrefill);
+      setInputValue("");
+    }, 80);
+    return () => clearTimeout(id);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devPrefill]);
 
   /** Submits the current input value if it is non-empty, then clears the field. */
   const submitMessage = () => {

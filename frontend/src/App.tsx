@@ -33,10 +33,11 @@ function App() {
     createNewConversation,
     switchConversation,
     deleteConversation,
+    deleteAllConversations,
     renameConversation,
     updatePerspectives,
   } = useConversation();
-  const { messages, sendMessage, isConfirming, isLoading, approve, reject } = useChat();
+  const { messages, sendMessage, isConfirming, isLoading, approve, reject, devPrefill, triggerDevMessage, clearDevPrefill } = useChat();
 
   /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
@@ -80,6 +81,8 @@ function App() {
         onSwitchConversation={switchConversation}
         onDeleteConversation={deleteConversation}
         onRenameConversation={renameConversation}
+        onDeleteAllConversations={deleteAllConversations}
+        onDevSendMessage={() => triggerDevMessage("What are the latest cyber threats targeting European critical infrastructure?")}
       />
 
       {/* mx-1 creates a slim visible gap between the sidebars and the chat area. */}
@@ -91,6 +94,8 @@ function App() {
           isLoading={isLoading}
           onApprove={approve}
           onReject={reject}
+          devPrefill={devPrefill}
+          onDevPrefillConsumed={clearDevPrefill}
         />
       </main>
 

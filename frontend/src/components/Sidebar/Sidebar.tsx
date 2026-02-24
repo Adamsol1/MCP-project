@@ -15,6 +15,10 @@ interface SidebarProps {
   onDeleteConversation: (id: string) => void;
   /** Called with the conversation id and new title when the user finishes renaming. */
   onRenameConversation: (id: string, newTitle: string) => void;
+  /** DEV: Deletes every conversation and clears the active selection. */
+  onDeleteAllConversations: () => void;
+  /** DEV: Injects a predefined message into the chat input and sends it. */
+  onDevSendMessage: () => void;
 }
 
 /**
@@ -44,6 +48,8 @@ export function Sidebar({
   onSwitchConversation,
   onDeleteConversation,
   onRenameConversation,
+  onDeleteAllConversations,
+  onDevSendMessage,
 }: SidebarProps) {
   // Sort a copy so the original prop array is never mutated.
   const sortedConversations = [...conversations].sort(
@@ -243,6 +249,26 @@ export function Sidebar({
               </div>
             ))
           )}
+        </div>
+      )}
+      {/* DEV TOOLS — only visible when the sidebar is expanded. */}
+      {!isCollapsed && (
+        <div className="shrink-0 border-t border-gray-600 p-2">
+          <p className="text-xs font-semibold text-amber-400 uppercase tracking-widest mb-1 px-1">
+            Dev Tools
+          </p>
+          <button
+            onClick={onDevSendMessage}
+            className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+          >
+            Send test message
+          </button>
+          <button
+            onClick={onDeleteAllConversations}
+            className="w-full text-left px-2 py-1.5 rounded text-sm text-red-400 hover:bg-gray-600"
+          >
+            Delete all conversations
+          </button>
         </div>
       )}
     </aside>
