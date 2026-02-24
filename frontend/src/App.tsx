@@ -8,6 +8,23 @@ import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 
+/**
+ * Root application component.
+ *
+ * Composes the full-screen three-column layout:
+ *   Sidebar (left) | ChatWindow (centre, flex-1) | OptionsPanel (right)
+ *
+ * Also owns the FileUploadModal overlay and wires together the file-upload flow:
+ *   1. User opens the modal via the OptionsPanel "Upload Files" button.
+ *   2. User selects files and clicks Submit.
+ *   3. handleSubmit uploads each file sequentially via the upload service and
+ *      fires a success or error toast for each result.
+ *   4. The modal closes after all uploads complete (or fail).
+ *
+ * All conversation and chat state is delegated to useConversation and useChat.
+ * App only passes the slices and callbacks that each child component needs,
+ * keeping the child components decoupled from the global state shape.
+ */
 function App() {
   const { success, error } = useToast();
   const {
@@ -20,12 +37,26 @@ function App() {
     updatePerspectives,
   } = useConversation();
   const { messages, sendMessage, isConfirming, isLoading, approve, reject } = useChat();
+
+  /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
 
+  /**
+   * Called by FileUpload when the user selects an individual file.
+   * Currently only logs — can be extended to show a preview or validate the file.
+   *
+   * @param file - The File object the user selected.
+   */
   const handleFileSelect = (file: File) => {
     console.log("Selected file:", file.name);
   };
 
+  /**
+   * Uploads all queued files sequentially and shows a toast for each result.
+   * Closes the modal when the loop completes, regardless of individual failures.
+   *
+   * @param files - The list of File objects the user submitted.
+   */
   const handleSubmit = async (files: File[]) => {
     for (const file of files) {
       try {
@@ -51,7 +82,7 @@ function App() {
         onRenameConversation={renameConversation}
       />
 
-      {/* mx-1 creates a slim visible gap between the sidebars and the chat area */}
+      {/* mx-1 creates a slim visible gap between the sidebars and the chat area. */}
       <main className="flex-1 flex flex-col bg-gray-100 mx-1">
         <ChatWindow
           messages={messages}

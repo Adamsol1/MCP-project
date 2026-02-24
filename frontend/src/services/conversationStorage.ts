@@ -1,10 +1,12 @@
 import type { Conversation, ConversationStore } from "../types/conversation";
 
-// Single localStorage key for all conversation data.
-// The entire ConversationStore is serialized as one JSON string.
+/**
+ * Single localStorage key under which the entire ConversationStore is stored
+ * as a serialised JSON string. Using one key keeps reads and writes atomic.
+ */
 const STORAGE_KEY = "mcp-conversations";
 
-// Default empty store returned when localStorage is empty or corrupted
+/** Fallback store returned when localStorage is empty or the data is corrupted. */
 const DEFAULT_STORE: ConversationStore = {
   conversations: [],
   activeConversationId: null,
@@ -12,8 +14,12 @@ const DEFAULT_STORE: ConversationStore = {
 
 /**
  * Reads the conversation store from localStorage.
- * @returns The parsed store if valid, or a default empty store if
- * localStorage has no data (first visit) or the JSON is corrupted/invalid.
+ *
+ * Used as the initialiser function for useReducer in ConversationProvider so
+ * that conversation history survives page reloads without an extra useEffect.
+ *
+ * @returns The parsed ConversationStore if the data is valid, or a copy of
+ *          DEFAULT_STORE on first visit or if the stored JSON is corrupted.
  */
 export function loadConversationStore(): ConversationStore {
   const rawConversations = localStorage.getItem(STORAGE_KEY);
@@ -29,18 +35,26 @@ export function loadConversationStore(): ConversationStore {
 
 /**
  * Persists the full conversation store to localStorage.
- * Called on every state mutation to prevent data loss if the tab is closed.
- * @param store - The complete conversation store to serialize and save.
+ *
+ * Called by a useEffect in ConversationProvider on every state change so that
+ * any mutation (new message, rename, delete) is immediately durable against
+ * tab close or page refresh.
+ *
+ * @param store - The complete ConversationStore to serialise and save.
  */
 export function saveConversationStore(store: ConversationStore) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
 /**
- * Creates a new Conversation object with generated UUIDs and timestamps.
- * The title starts as "New conversation" and gets updated to the first user message later.
- * @param perspectives - Optional array of perspective strings. Defaults to `["NEUTRAL"]`.
- * @returns A new Conversation with unique id and sessionId.
+ * Factory that creates a fresh Conversation object with generated UUIDs and
+ * current timestamps.
+ *
+ * The title starts as "New conversation" — ConversationContext's ADD_MESSAGE
+ * reducer case will replace it with the first user message automatically.
+ *
+ * @param perspectives - Optional starting perspectives. Defaults to ["NEUTRAL"].
+ * @returns A new Conversation ready to be inserted into the store.
  */
 export function createConversation(perspectives?: string[]): Conversation {
   const timeNow = Date.now();
@@ -48,10 +62,10 @@ export function createConversation(perspectives?: string[]): Conversation {
     id: crypto.randomUUID(),
     title: "New conversation",
     messages: [],
-    perspectives: perspectives ?? ["NEUTRAL"], // Use provided perspectives or default
-    sessionId: crypto.randomUUID(), // Unique backend session ID for this conversation
+    perspectives: perspectives ?? ["NEUTRAL"],
+    sessionId: crypto.randomUUID(), // Separate UUID used to identify this session on the backend.
     isConfirming: false,
     createdAt: timeNow,
-    updatedAt: timeNow, // Same as createdAt initially, updated when messages are added
+    updatedAt: timeNow, // Same as createdAt on creation; updated on every mutation.
   };
 }

@@ -2,13 +2,22 @@ import { useEffect } from 'react';
 import type { ToastType } from '../../contexts/ToastContext';
 
 interface ToastProps {
+  /** UUID of this toast — passed back to onClose so the correct toast is removed. */
   id: string;
+  /** Severity level — controls colour scheme and icon. */
   type: ToastType;
+  /** Human-readable text displayed inside the bubble. */
   message: string;
+  /** Milliseconds before the toast auto-dismisses. */
   duration: number;
+  /** Called with this toast's id when the timer expires or the user clicks ×. */
   onClose: (id: string) => void;
 }
 
+/**
+ * Tailwind class strings for each severity level.
+ * Applied to the outermost div to colour the background, border, and text together.
+ */
 const typeStyles: Record<ToastType, string> = {
   success: 'bg-green-50 border-green-500 text-green-800',
   error: 'bg-red-50 border-red-500 text-red-800',
@@ -16,6 +25,10 @@ const typeStyles: Record<ToastType, string> = {
   info: 'bg-blue-50 border-blue-500 text-blue-800',
 };
 
+/**
+ * Unicode icon characters displayed on the left of each toast.
+ * ✓ success  ✕ error  ⚠ warning  ℹ info
+ */
 const icons: Record<ToastType, string> = {
   success: '\u2713',
   error: '\u2715',
@@ -23,12 +36,32 @@ const icons: Record<ToastType, string> = {
   info: '\u2139',
 };
 
+/**
+ * A single toast notification bubble.
+ *
+ * Auto-dismisses after `duration` milliseconds via a useEffect timer.
+ * The cleanup function cancels the timer if the component unmounts before it
+ * fires (e.g. the user closed the toast manually), preventing a stale call
+ * to onClose on an already-removed toast.
+ *
+ * Accessibility:
+ *   - role="alert" causes screen readers to announce the notification immediately.
+ *   - aria-live="assertive" is used for errors so they interrupt the user;
+ *     "polite" is used for all other types, waiting for a pause in activity.
+ *
+ * @param id       - UUID used to identify this toast when calling onClose.
+ * @param type     - Severity level — controls colour scheme and icon.
+ * @param message  - Text displayed inside the bubble.
+ * @param duration - Milliseconds before auto-dismiss.
+ * @param onClose  - Called with the toast id when the timer fires or × is clicked.
+ */
 export default function Toast({ id, type, message, duration, onClose }: ToastProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose(id);
     }, duration);
 
+    // Cleanup: cancel the timer if the toast is removed before it fires.
     return () => clearTimeout(timer);
   }, [id, duration, onClose]);
 

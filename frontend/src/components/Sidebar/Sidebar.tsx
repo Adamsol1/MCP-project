@@ -1,15 +1,42 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
 
+/** Props for the Sidebar component. */
 interface SidebarProps {
+  /** Full list of all conversations to display. */
   conversations: Conversation[];
+  /** The id of the currently active conversation, or null when none is selected. */
   activeConversationId: string | null;
+  /** Called when the user clicks the New Chat button. */
   onNewChat: () => void;
+  /** Called with the conversation id when the user clicks a conversation row. */
   onSwitchConversation: (id: string) => void;
+  /** Called with the conversation id when the user confirms deletion. */
   onDeleteConversation: (id: string) => void;
+  /** Called with the conversation id and new title when the user finishes renaming. */
   onRenameConversation: (id: string, newTitle: string) => void;
 }
 
+/**
+ * Left-hand navigation sidebar showing all conversations.
+ *
+ * Features:
+ *   - Collapsible: toggles between a full w-64 panel and a slim w-14 icon rail.
+ *     Width snaps instantly (no CSS transition) to avoid text squishing during
+ *     the resize animation.
+ *   - Sorted by updatedAt descending so the most recently active conversation
+ *     is always at the top.
+ *   - Per-conversation options menu (⋯ button) with Rename and Delete actions,
+ *     closed automatically when the user clicks outside it.
+ *   - Inline rename: clicking Rename replaces the conversation title with an
+ *     auto-focused text input; Enter confirms, Escape cancels.
+ *
+ * Local state:
+ *   openMenuId  — id of the conversation whose options dropdown is open, or null.
+ *   renamingId  — id of the conversation currently being renamed, or null.
+ *   draftTitle  — controlled value of the rename input field.
+ *   isCollapsed — whether the sidebar is in its narrow rail mode.
+ */
 export function Sidebar({
   conversations,
   activeConversationId,
@@ -18,6 +45,7 @@ export function Sidebar({
   onDeleteConversation,
   onRenameConversation,
 }: SidebarProps) {
+  // Sort a copy so the original prop array is never mutated.
   const sortedConversations = [...conversations].sort(
     (a, b) => b.updatedAt - a.updatedAt,
   );
@@ -26,9 +54,16 @@ export function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  // Close dropdown when clicking outside
+  /**
+   * Closes the options dropdown when the user clicks anywhere outside it.
+   * The effect only registers the listener while a menu is open (openMenuId
+   * is non-null) and cleans up the listener when the menu closes or the
+   * component unmounts, preventing memory leaks.
+   */
   useEffect(() => {
     if (!openMenuId) return;
 
@@ -42,16 +77,19 @@ export function Sidebar({
   }, [openMenuId]);
 
   return (
-    // No CSS transition — width and content both snap instantly on toggle.
-    // A transition caused text to squish as the container narrowed; snapping
-    // avoids that artifact entirely.
+    /*
+     * No CSS transition on width — both the width and the content snap instantly.
+     * A transition caused text to squish as the container narrowed; snapping
+     * avoids that visual artifact entirely.
+     */
     <aside
       className={`${
         isCollapsed ? "w-14" : "w-64"
       } bg-gray-700 text-white flex flex-col h-full overflow-hidden`}
     >
-      {/* Toggle Button — SVG chevron, larger and clearer than a unicode char.
-          Points right (expand) when collapsed, left (collapse) when expanded. */}
+      {/* Toggle button — SVG chevron, clearer than a Unicode character.
+          Points right (›) when collapsed to signal "expand",
+          left (‹) when expanded to signal "collapse". */}
       <button
         aria-label="Toggle sidebar"
         onClick={() => setIsCollapsed((prev) => !prev)}
@@ -75,9 +113,10 @@ export function Sidebar({
         </svg>
       </button>
 
-      {/* New Chat — always visible; shows icon-only when collapsed so the
-          button stays usable in the narrow rail. aria-label keeps the
-          accessible name "New Chat" in both states so tests keep passing. */}
+      {/* New Chat button — always visible in both expanded and collapsed states.
+          When collapsed, text is hidden and the button shows only the + icon.
+          aria-label stays "New Chat" in both states so tests and screen readers
+          get a consistent accessible name. */}
       <button
         onClick={onNewChat}
         aria-label="New Chat"
@@ -89,7 +128,7 @@ export function Sidebar({
         {!isCollapsed && <span>New Chat</span>}
       </button>
 
-      {/* Conversation List (collapsible only this part) */}
+      {/* Conversation list — hidden entirely when collapsed to keep the rail clean. */}
       {!isCollapsed && (
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
@@ -106,7 +145,8 @@ export function Sidebar({
                     : "hover:bg-gray-600"
                 }`}
               >
-                {/* Rename Mode */}
+                {/* Rename mode: replaces the title button with a controlled input.
+                    Enter confirms; Escape cancels without saving. */}
                 {renamingId === conv.id ? (
                   <input
                     autoFocus
@@ -124,7 +164,7 @@ export function Sidebar({
                     className="flex-1 p-2 bg-transparent text-white outline-none"
                   />
                 ) : (
-                  /* Normal Mode */
+                  /* Normal mode: title button + options (⋯) button. */
                   <>
                     <button
                       onClick={() => onSwitchConversation(conv.id)}
@@ -136,7 +176,11 @@ export function Sidebar({
                       {conv.title}
                     </button>
 
-                    {/* Options Button — always in DOM, visible on hover via CSS */}
+                    {/* Options button — always in the DOM but only visible on
+                        row hover (opacity-0 → group-hover:opacity-100).
+                        onMouseDown stops propagation so the outside-click
+                        handler in the useEffect does not close the menu
+                        before onClick has a chance to open it. */}
                     <button
                       aria-label="Chat options"
                       aria-expanded={openMenuId === conv.id}
@@ -162,7 +206,8 @@ export function Sidebar({
                   </>
                 )}
 
-                {/* Dropdown Menu */}
+                {/* Dropdown menu — rendered only for the conversation whose
+                    options button was clicked. Positioned absolutely below the row. */}
                 {openMenuId === conv.id && (
                   <div
                     ref={menuRef}

@@ -1,12 +1,28 @@
 import FileUpload from "../FileUpload/FileUpload";
 
+/** Props for the FileUploadModal component. */
 interface FileUploadModalProps {
+  /** Whether the modal is currently visible. When false the component renders nothing. */
   isOpen: boolean;
+  /** Called when the user dismisses the modal (backdrop click or × button). */
   onClose: () => void;
+  /** Called each time the user selects an individual file inside the dropzone. */
   onFileSelect: (file: File) => void;
+  /** Called when the user clicks Submit with the full list of queued files. */
   onSubmit: (files: File[]) => void;
 }
 
+/**
+ * Modal overlay wrapping the FileUpload component.
+ *
+ * Renders nothing when isOpen is false — the component has no DOM presence
+ * while closed, avoiding hidden layout impact.
+ *
+ * Click behaviour:
+ *   - Clicking the semi-transparent backdrop calls onClose.
+ *   - Clicking inside the white content panel stops event propagation so the
+ *     backdrop handler is not triggered and the modal stays open.
+ */
 export function FileUploadModal({
   isOpen,
   onClose,

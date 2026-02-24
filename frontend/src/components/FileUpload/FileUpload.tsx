@@ -1,10 +1,26 @@
 import { useState } from "react";
 
+/** Props for the FileUpload component. */
 interface FileUploadProps {
+  /** Called for each individual file as it is added to the queue. */
   onFileSelect?: (file: File) => void;
+  /** Called when the user clicks Submit with the full list of queued files. */
   onSubmit?: (files: File[]) => void;
 }
 
+/**
+ * Drag-and-drop file upload component with a queued file list.
+ *
+ * Manages its own file queue in local state (selectedFiles). Files can be added
+ * by clicking the drop zone to open the browser file picker, or by dragging
+ * files onto it. Multiple files are supported. Each queued file can be removed
+ * individually before submission.
+ *
+ * State:
+ *   selectedFiles  — the current queue of File objects waiting to be submitted.
+ *   isDraggingOver — true while a drag is in progress over the drop zone;
+ *                    used to apply a blue highlight to the border.
+ */
 export default function FileUpload({
   onFileSelect,
   onSubmit,
@@ -13,8 +29,11 @@ export default function FileUpload({
   const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   /**
-   * Handles file input change event
-   * @param event
+   * Handles the native file input change event (browser file picker).
+   * Appends newly selected files to the queue and notifies onFileSelect for each.
+   * Resets the input value so the same file can be re-selected after removal.
+   *
+   * @param event - The React change event from the hidden <input type="file">.
    */
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -27,20 +46,23 @@ export default function FileUpload({
         }
       });
     }
-    event.target.value = ""; // Reset the input value to allow re-uploading the same file
+    event.target.value = ""; // Reset so the same file can be re-uploaded after removal.
   };
 
   /**
-   * Prevent default beheaviour from browser when file is dragged over dropzone
-   * @param event
+   * Prevents the browser's default behaviour of navigating to (or displaying)
+   * the dropped file when the user drags over the drop zone.
+   *
+   * @param event - The React drag-over event.
    */
   const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); // Prevent default browser behavior
+    event.preventDefault();
   };
 
   /**
-   * Handles drag enter event
-   * @param event
+   * Sets the dragging-over highlight when a drag enters the drop zone.
+   *
+   * @param event - The React drag-enter event.
    */
   const handleDragEnter = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -48,9 +70,12 @@ export default function FileUpload({
   };
 
   /**
-   * Handles drag leave event
-   * Only removes highlight if truly leaving the drop zone (not moving to a child element)
-   * @param event
+   * Clears the dragging-over highlight when the drag leaves the drop zone.
+   *
+   * Uses relatedTarget to check whether focus moved to a child element — if so,
+   * the drag is still inside the zone and the highlight should not be removed.
+   *
+   * @param event - The React drag-leave event.
    */
   const handleDragLeave = (event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault();
@@ -60,11 +85,13 @@ export default function FileUpload({
   };
 
   /**
-   * Handle file drop event with multiple files support
-   * @param event
+   * Handles a file drop onto the drop zone.
+   * Appends the dropped files to the queue and notifies onFileSelect for each.
+   *
+   * @param event - The React drop event containing the dragged files.
    */
   const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
-    event.preventDefault(); // Prevent default browser behavior
+    event.preventDefault();
     setIsDraggingOver(false);
     const files = event.dataTransfer.files;
     if (files && files.length > 0) {
@@ -78,22 +105,24 @@ export default function FileUpload({
     }
   };
 
+  /** Clears the entire file queue without submitting. */
   const handleCancel = () => {
     setSelectedFiles([]);
   };
 
+  /** Passes the current queue to onSubmit and clears the queue on completion. */
   const handleSubmit = () => {
     if (onSubmit) {
       onSubmit(selectedFiles);
-      // Clear selected files when submitted
       setSelectedFiles([]);
     }
   };
 
   /**
-   * Function that formats file size into human-readable string
-   * @param bytes - Bytes size of the file in numbers
-   * @returns {string} size - String of file size in bytes, KB, or MB
+   * Converts a raw byte count into a human-readable size string.
+   *
+   * @param bytes - File size in bytes.
+   * @returns A formatted string: e.g. "512 bytes", "3.50 KB", "1.20 MB".
    */
   const formatFileSize = (bytes: number): string => {
     if (bytes < 1024) return `${bytes} bytes`;
@@ -102,8 +131,9 @@ export default function FileUpload({
   };
 
   /**
-   * Handles remove of file listed
-   * @param fileToRemove
+   * Removes a single file from the queue by reference equality.
+   *
+   * @param fileToRemove - The File object to remove.
    */
   const handleRemove = (fileToRemove: File) => {
     setSelectedFiles((prev) => prev.filter((file) => file !== fileToRemove));
@@ -111,7 +141,7 @@ export default function FileUpload({
 
   return (
     <div className="w-full  mx-auto p-4">
-      {/* Drop Zone */}
+      {/* Drop Zone — clicking the label opens the hidden file input. */}
       <div
         data-testid="file-dropzone"
         onDragOver={handleDragOver}
@@ -137,6 +167,7 @@ export default function FileUpload({
             </p>
           </div>
         </label>
+        {/* Hidden input — triggered by the label above. */}
         <input
           id="file-upload"
           type="file"
@@ -147,7 +178,7 @@ export default function FileUpload({
         />
       </div>
 
-      {/* File List */}
+      {/* File List — only shown when at least one file is queued. */}
       {selectedFiles.length > 0 && (
         <div className="mt-4 space-y-2">
           {selectedFiles.map((file) => (
@@ -175,7 +206,7 @@ export default function FileUpload({
         </div>
       )}
 
-      {/* Action Buttons */}
+      {/* Action Buttons — Submit is disabled until at least one file is queued. */}
       <div className="mt-6 flex gap-3 justify-end">
         <button
           type="button"

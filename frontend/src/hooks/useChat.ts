@@ -4,14 +4,41 @@ import type { Message } from "../types/conversation";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 
+/**
+ * Orchestrates all chat interactions for the active conversation.
+ *
+ * Combines read access to the active conversation's messages and isConfirming
+ * flag (from ConversationContext) with local loading state, and connects user
+ * actions to the backend dialogue service.
+ *
+ * Returned values:
+ *   messages      — ordered message history for the active conversation.
+ *   sendMessage   — adds the user message to chat, calls the backend, then adds
+ *                   the system reply. Sets isLoading while in flight.
+ *   isConfirming  — true when the backend has returned is_final: true, meaning
+ *                   the chat is waiting for the user to approve a summary.
+ *   isLoading     — true while any backend request is in flight.
+ *   approve       — silently sends approval to the backend; displays the response.
+ *   reject        — cancels the pending summary and prompts the user to refine.
+ *   debugConfirm  — DEV ONLY: injects a fake summary to test the approval UI.
+ */
 export function useChat() {
   const { activeConversation, addMessage, setIsConfirming } = useConversation();
   const { success, info } = useToast();
   const [isLoading, setIsLoading] = useState(false);
 
+  // Read message history and confirmation state from the active conversation.
+  // Fall back to empty / false when no conversation is selected.
   const messages = activeConversation?.messages ?? [];
   const isConfirming = activeConversation?.isConfirming ?? false;
 
+  /**
+   * Sends a user message to the backend and appends both the user message and
+   * the system reply to the active conversation.
+   *
+   * @param text     - The user's input text.
+   * @param approved - Optional flag forwarded to the backend (used internally by approve()).
+   */
   const handleSendMessage = async (text: string, approved?: boolean) => {
     if (!activeConversation) return;
     addMessage({
@@ -39,11 +66,16 @@ export function useChat() {
     }
   };
 
+  /**
+   * Approves the pending summary.
+   *
+   * Sends the approval signal to the backend silently (no "approve" bubble added
+   * to the chat), then appends the backend's follow-up response.
+   */
   const approve = async () => {
     if (!activeConversation) return;
     setIsLoading(true);
     try {
-      // Send approval silently to backend — no visible "approve" message in chat
       const response = await sendMessage(
         "approve",
         activeConversation.sessionId,
@@ -62,7 +94,10 @@ export function useChat() {
     }
   };
 
-  // DEBUG: Simulate backend returning is_final: true — remove before production
+  /**
+   * DEV ONLY: Simulates the backend returning is_final: true so the approval UI
+   * can be tested without a live backend. Remove before production.
+   */
   const debugConfirm = () => {
     addMessage({
       id: crypto.randomUUID(),
@@ -72,6 +107,12 @@ export function useChat() {
     setIsConfirming(true);
   };
 
+  /**
+   * Rejects the pending summary.
+   *
+   * Adds a prompt asking the user what they'd like to change, clears the
+   * confirmation state, and shows an info toast.
+   */
   const reject = () => {
     addMessage({
       id: crypto.randomUUID(),
