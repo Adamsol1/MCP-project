@@ -191,6 +191,8 @@ data/imports/*
 data/outputs/*
 !data/imports/.gitkeep
 !data/outputs/.gitkeep
+backend/data/outputs/*
+!backend/data/outputs/.gitkeep
 
 # Local database files
 *.db
