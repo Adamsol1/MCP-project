@@ -3,7 +3,6 @@ import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
-import { ToastContainer } from "./components/Toast";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
@@ -54,7 +53,6 @@ function App() {
 
       {/* mx-1 creates a slim visible gap between the sidebars and the chat area */}
       <main className="flex-1 flex flex-col bg-gray-100 mx-1">
-        <ToastContainer position="top-right" />
         <ChatWindow
           messages={messages}
           onSendMessage={sendMessage}

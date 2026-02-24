@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { ToastContainer } from "../Toast";
 
 interface Message {
   id: string;
@@ -124,6 +125,8 @@ export default function ChatWindow({
             Ready to start?
           </p>
         )}
+
+        <ToastContainer position="above-input" />
 
         <div className="w-full max-w-3xl px-6">
           {isConfirming ? (

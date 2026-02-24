@@ -1,7 +1,7 @@
 import { useToast } from '../../hooks/useToast';
 import Toast from './Toast';
 
-type Position = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center';
+type Position = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center' | 'above-input';
 
 interface ToastContainerProps {
   position?: Position;
@@ -14,6 +14,8 @@ const positionClasses: Record<Position, string> = {
   'bottom-left': 'bottom-4 left-4',
   'top-center': 'top-4 left-1/2 -translate-x-1/2',
   'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
+  // Sits just above the chat input form (pb-6 outer gap + ~96px form height = ~120px from bottom).
+  'above-input': 'bottom-32 left-1/2 -translate-x-1/2',
 };
 
 export default function ToastContainer({ position = 'top-right' }: ToastContainerProps) {
