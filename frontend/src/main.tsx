@@ -23,13 +23,16 @@ import './index.css'
 import App from './App'
 import { ToastProvider } from './contexts/ToastContext'
 import { ConversationProvider } from './contexts/ConversationContext'
+import { SettingsProvider } from './contexts/SettingsContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ToastProvider>
-      <ConversationProvider>
-        <App />
-      </ConversationProvider>
-    </ToastProvider>
+    <SettingsProvider>
+      <ToastProvider>
+        <ConversationProvider>
+          <App />
+        </ConversationProvider>
+      </ToastProvider>
+    </SettingsProvider>
   </StrictMode>,
 )
