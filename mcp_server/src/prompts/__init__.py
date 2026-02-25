@@ -1,11 +1,32 @@
 """MCP Prompts - Workflow templates."""
 
+# Maps BCP-47 language codes to human-readable names used in language instructions.
+_LANGUAGE_NAMES: dict[str, str] = {
+    "en": "English",
+    "no": "Norwegian",
+}
+
+
+def _language_instruction(language: str, scope: str = "all output") -> str:
+    """Return a standardised language instruction line for prepending to prompts.
+
+    Args:
+        language: BCP-47 language code, e.g. "en" or "no".
+        scope: Human-readable description of what must be in that language.
+
+    Returns:
+        A single instruction line ready to prepend to the prompt.
+    """
+    language_name = _LANGUAGE_NAMES.get(language, "English")
+    return f"LANGUAGE INSTRUCTION: You MUST write {scope} in {language_name}.\n\n"
+
 
 def build_direction_dialogue_prompt(
     user_message: str,
     missing_fields: list,
     perspectives: list,
     context,
+    language: str = "en",
 ) -> str:
     """Build prompt for direction phase dialogue question generation.
 
@@ -14,11 +35,14 @@ def build_direction_dialogue_prompt(
         missing_fields: Context fields that still lack values, e.g. ["scope", "timeframe"].
         perspectives: Selected analytical viewpoints, e.g. ["neutral", "norway"].
         context: Current dialogue context (dict with scope, timeframe, etc.).
+        language: BCP-47 language code controlling which language the question is written in.
 
     Returns:
         Formatted prompt string ready to send to the AI model.
     """
-    return f"""SYSTEM_PROMPT
+    lang_instruction = _language_instruction(language, 'the "question" field')
+
+    return lang_instruction + f"""SYSTEM_PROMPT
                 You are an expert threat intelligence analyst conducting a structured
                 intelligence requirements dialogue.
 
@@ -74,7 +98,6 @@ def build_direction_dialogue_prompt(
                 Respond ONLY in valid JSON.
                 No markdown.
                 No commentary.
-                If the user message is in Norwegian, write the "question" field in Norwegian.
 
                 USER_PROMPT ==
                 The user has provided the following message:
@@ -100,6 +123,7 @@ def build_pir_generation_prompt(
     threat_actors: list,
     priority_focus: str,
     modifications: str | None = None,
+    language: str = "en",
 ) -> str:
     """Build prompt for PIR document generation.
 
@@ -111,11 +135,16 @@ def build_pir_generation_prompt(
         threat_actors: The threat actors of interest.
         priority_focus: The main aspect to emphasize.
         modifications: Optional user feedback for regenerating the PIR.
+        language: BCP-47 language code controlling which language the PIR is written in.
 
     Returns:
         Formatted prompt string ready to send to the AI model.
     """
-    return f"""SYSTEM_PROMPT
+    lang_instruction = _language_instruction(
+        language, "all PIR content (question, rationale, result, reasoning)"
+    )
+
+    return lang_instruction + f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst specializing in
 creating Priority Intelligence Requirements (PIRs).
 
@@ -155,7 +184,6 @@ Return your response in the following JSON format:
 Respond ONLY in valid JSON.
 No markdown.
 No commentary.
-If the MODIFICATIONS field is in Norwegian, write all PIR content (question, rationale, result, reasoning) in Norwegian. Otherwise write in English.
 
 USER_PROMPT
 Generate PIRs for the following intelligence investigation:
@@ -173,6 +201,7 @@ MODIFICATIONS: {modifications}
 - If MODIFICATIONS has content: Regenerate the PIRs from scratch,
   but take the requested changes into account as additional constraints.
 """
+
 
 # NOTE: Named as a constant for consistency with COLLECTION_ and PROCESSING_ stubs,
 # but this is a function — it takes content and context and returns a prompt string.
@@ -253,6 +282,7 @@ No code fences.
 
 """
 
+
 def build_summary_prompt(
     scope: str,
     timeframe: str,
@@ -261,6 +291,7 @@ def build_summary_prompt(
     priority_focus: str,
     perspectives: list,
     modifications: str | None = None,
+    language: str = "en",
 ) -> str:
     """Build prompt for intelligence context summary generation.
 
@@ -272,11 +303,14 @@ def build_summary_prompt(
         priority_focus: The main aspect to emphasize.
         perspectives: The selected analytical viewpoints.
         modifications: Optional user feedback to incorporate into the summary.
+        language: BCP-47 language code controlling which language the summary is written in.
 
     Returns:
         Formatted prompt string ready to send to the AI model.
     """
-    return f"""SYSTEM_PROMPT
+    lang_instruction = _language_instruction(language, "the summary")
+
+    return lang_instruction + f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst.
 Your task is to produce a clear, concise summary of the intelligence
 investigation context gathered so far.
@@ -294,7 +328,6 @@ Return your response in the following JSON format:
 Respond ONLY in valid JSON.
 No markdown.
 No commentary.
-If MODIFICATIONS is in Norwegian, write the summary in Norwegian. Otherwise write in English.
 
 USER_PROMPT
 Summarise the following intelligence investigation context:

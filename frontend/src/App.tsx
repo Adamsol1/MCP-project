@@ -46,18 +46,16 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   /**
-   * Called by FileUpload when the user selects an individual file.
-   * Currently only logs — can be extended to show a preview or validate the file.
-   *
-   * @param file - The File object the user selected.
+   * Tracks files that have been successfully uploaded via the FileUploadModal.
+   * Shown as a collapsible list in the OptionsPanel so the user can see what
+   * data sources are available to the current session.
    */
-  const handleFileSelect = (file: File) => {
-    console.log("Selected file:", file.name);
-  };
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
 
   /**
-   * Uploads all queued files sequentially and shows a toast for each result.
-   * Closes the modal when the loop completes, regardless of individual failures.
+   * Uploads all queued files sequentially, shows a toast for each result, and
+   * appends each successfully uploaded file to the uploadedFiles list so it
+   * appears in the OptionsPanel. Closes the modal once the loop completes.
    *
    * @param files - The list of File objects the user submitted.
    */
@@ -67,12 +65,23 @@ function App() {
         const result = await uploadFile(file);
         console.log("Upload result:", result);
         success(`Successfully uploaded ${file.name}`);
+        setUploadedFiles((prev) => [...prev, file]);
       } catch (err) {
         console.error("Upload error:", err);
         error(`Failed to upload ${file.name}`);
       }
     }
     setIsFileUploadOpen(false);
+  };
+
+  /**
+   * Removes a file from the uploaded files list shown in the OptionsPanel.
+   * This is a client-side-only operation — the file remains on the backend.
+   *
+   * @param file - The File object to remove from the display list.
+   */
+  const handleFileRemove = (file: File) => {
+    setUploadedFiles((prev) => prev.filter((f) => f !== file));
   };
 
   return (
@@ -107,12 +116,13 @@ function App() {
         selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
         onPerspectiveChange={updatePerspectives}
         onOpenFileUpload={() => setIsFileUploadOpen(true)}
+        uploadedFiles={uploadedFiles}
+        onFileRemove={handleFileRemove}
       />
 
       <FileUploadModal
         isOpen={isFileUploadOpen}
         onClose={() => setIsFileUploadOpen(false)}
-        onFileSelect={handleFileSelect}
         onSubmit={handleSubmit}
       />
 

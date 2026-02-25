@@ -41,6 +41,13 @@ class DialogueMessageRequest(BaseModel):
     session_id: str
     perspectives: list[str] = ["NEUTRAL"]
     approved: bool | None = None
+    language: str = "en"
+    """BCP-47 language code from the user's settings (e.g. 'en', 'no').
+    Forwarded to MCP tools so the ai generates responses in the correct language."""
+    settings_timeframe: str = ""
+    """Timeframe pre-set by the user in Settings → Parameters (e.g. 'Last 30 days').
+    When non-empty and the session context has no timeframe yet, the backend pre-fills
+    context.timeframe so the AI skips the timeframe clarifying question."""
 
 
 # Response Model
@@ -140,6 +147,8 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             request.approved,
             orchestrator=orchestrator,
             reviewer=review_service,
+            language=request.language,
+            settings_timeframe=request.settings_timeframe,
         )
 
     # Convert internal response to API format and return

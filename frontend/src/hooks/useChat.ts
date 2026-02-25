@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { sendMessage } from "../services/dialogue";
+import { useSettings } from "../contexts/SettingsContext";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 
@@ -24,6 +25,7 @@ import { useToast } from "./useToast";
 export function useChat() {
   const { activeConversation, addMessage, setIsConfirming } = useConversation();
   const { success, info } = useToast();
+  const { settings } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
 
@@ -54,6 +56,8 @@ export function useChat() {
         activeConversation.sessionId,
         activeConversation.perspectives,
         approved,
+        settings.language,
+        settings.inputParameters.timeframe,
       );
       addMessage({
         id: crypto.randomUUID(),
@@ -81,6 +85,8 @@ export function useChat() {
         activeConversation.sessionId,
         activeConversation.perspectives,
         true,
+        settings.language,
+        settings.inputParameters.timeframe,
       );
       addMessage({
         id: crypto.randomUUID(),
