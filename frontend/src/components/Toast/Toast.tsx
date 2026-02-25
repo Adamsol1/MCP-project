@@ -12,6 +12,12 @@ interface ToastProps {
   duration: number;
   /** Called with this toast's id when the timer expires or the user clicks ×. */
   onClose: (id: string) => void;
+  /**
+   * When true, the toast stretches to fill its container's full width instead of
+   * using the default min/max-w constraints. Used by ToastContainer in above-input
+   * mode so the toast dynamically matches the chatbox width.
+   */
+  fullWidth?: boolean;
 }
 
 /**
@@ -55,7 +61,7 @@ const icons: Record<ToastType, string> = {
  * @param duration - Milliseconds before auto-dismiss.
  * @param onClose  - Called with the toast id when the timer fires or × is clicked.
  */
-export default function Toast({ id, type, message, duration, onClose }: ToastProps) {
+export default function Toast({ id, type, message, duration, onClose, fullWidth = false }: ToastProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose(id);
@@ -69,7 +75,7 @@ export default function Toast({ id, type, message, duration, onClose }: ToastPro
     <div
       role="alert"
       aria-live={type === 'error' ? 'assertive' : 'polite'}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 shadow-lg min-w-80 max-w-md animate-[slideIn_0.3s_ease-out] ${typeStyles[type]}`}
+      className={`flex items-center gap-3 px-4 py-3 rounded-lg border-2 shadow-lg animate-[slideIn_0.3s_ease-out] ${fullWidth ? 'w-full' : 'min-w-80 max-w-md'} ${typeStyles[type]}`}
     >
       <span className="text-lg">{icons[type]}</span>
       <p className="flex-1 text-sm font-medium">{message}</p>
