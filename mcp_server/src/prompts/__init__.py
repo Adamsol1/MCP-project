@@ -7,7 +7,17 @@ def build_direction_dialogue_prompt(
     perspectives: list,
     context,
 ) -> str:
-    """Build prompt for direction phase dialogue question generation."""
+    """Build prompt for direction phase dialogue question generation.
+
+    Args:
+        user_message: The user's latest input.
+        missing_fields: Context fields that still lack values, e.g. ["scope", "timeframe"].
+        perspectives: Selected analytical viewpoints, e.g. ["neutral", "norway"].
+        context: Current dialogue context (dict with scope, timeframe, etc.).
+
+    Returns:
+        Formatted prompt string ready to send to the AI model.
+    """
     return f"""SYSTEM_PROMPT
                 You are an expert threat intelligence analyst conducting a structured
                 intelligence requirements dialogue.
@@ -91,7 +101,20 @@ def build_pir_generation_prompt(
     priority_focus: str,
     modifications: str | None = None,
 ) -> str:
-    """Build prompt for PIR document generation."""
+    """Build prompt for PIR document generation.
+
+    Args:
+        scope: The focus area of the investigation.
+        timeframe: The time period the PIR covers.
+        target_entities: The entities relevant to the investigation.
+        perspectives: The selected analytical viewpoints.
+        threat_actors: The threat actors of interest.
+        priority_focus: The main aspect to emphasize.
+        modifications: Optional user feedback for regenerating the PIR.
+
+    Returns:
+        Formatted prompt string ready to send to the AI model.
+    """
     return f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst specializing in
 creating Priority Intelligence Requirements (PIRs).
@@ -151,10 +174,21 @@ MODIFICATIONS: {modifications}
   but take the requested changes into account as additional constraints.
 """
 
+# NOTE: Named as a constant for consistency with COLLECTION_ and PROCESSING_ stubs,
+# but this is a function — it takes content and context and returns a prompt string.
 def DIRECTION_REVIEW_PROMPT(
      content,
      context,
 ) -> str:
+    """Build review prompt for PIRs generated in the Direction phase.
+
+    Args:
+        content: The generated PIRs to review.
+        context: The dialogue context used to generate the PIRs.
+
+    Returns:
+        Formatted prompt string ready to send to the AI model.
+    """
     return f"""
 You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)
 generated in the Direction phase of a threat intelligence cycle.
@@ -228,7 +262,20 @@ def build_summary_prompt(
     perspectives: list,
     modifications: str | None = None,
 ) -> str:
-    """Build prompt for intelligence context summary generation."""
+    """Build prompt for intelligence context summary generation.
+
+    Args:
+        scope: The focus area of the investigation.
+        timeframe: The time period of the investigation.
+        target_entities: The entities relevant to the investigation.
+        threat_actors: The threat actors of interest.
+        priority_focus: The main aspect to emphasize.
+        perspectives: The selected analytical viewpoints.
+        modifications: Optional user feedback to incorporate into the summary.
+
+    Returns:
+        Formatted prompt string ready to send to the AI model.
+    """
     return f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst.
 Your task is to produce a clear, concise summary of the intelligence
@@ -265,8 +312,12 @@ MODIFICATIONS: {modifications}
 """
 
 
+# TODO: Implement review prompt for the Collection phase.
 def COLLECTION_REVIEW_PROMPT():
+    """Build review prompt for the Collection phase. Not yet implemented."""
     return
 
+# TODO: Implement review prompt for the Processing phase.
 def PROCESSING_REVIEW_PROMPT():
+    """Build review prompt for the Processing phase. Not yet implemented."""
     return

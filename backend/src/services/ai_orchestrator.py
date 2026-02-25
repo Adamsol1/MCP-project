@@ -1,13 +1,23 @@
 import json
+import logging
 import time
 from datetime import datetime
-import logging
-logger = logging.getLogger("app")
 
 from src.models.reasoning import ReasoningLogEntry
 
+logger = logging.getLogger("app")
+
 
 class AIOrchestrator:
+    """
+    Orchestrator that orchestrates generation and review for PIRs
+
+    The orchestrator will run:
+        - A generator AI that will generate PIR/Summary
+        - A reviwer AI that will review PIR/summary
+
+    Each attempt is logged to the researchLogger for auditing
+    """
     def __init__(self, research_logger=None, generator_model: str = "unknown", reviewer_model: str = "unknown"):
         self.max_retries = 3
         self.research_logger = research_logger
@@ -22,6 +32,31 @@ class AIOrchestrator:
     # - Generator : AI that will generate PIR
     # - Reviewer : AI that will review PIR
     async def generate_and_review_pir(self, context, generator, reviewer, phase, session_id: str):
+        """
+        async def generate_and_review_pir(self, context, generator, reviewer, phase, session_id: str):
+
+        Generate a PIR and review it. If reviwer find major issues -> retry
+
+        Each generate and review attemps goes as following:
+            1. Calls generator.generate_pir(context)
+            2. Calls reviewer.review_pir(pir, context, phase)
+            3. Returns the PIR if severity != "major", otherwise retries
+            + Each attempt is logged via research_logger
+
+    Args:
+        context:    DialogueContext with the gathered intelligence requirements.
+        generator:  Service with a generate_pir(context) method.
+        reviewer:   Service with a review_pir(pir, context, phase) method.
+        phase:      Intelligence phase (e.g. "direction"), passed to the reviewer.
+        session_id: Used for logging.
+
+    Returns:
+        The generated PIR as a str or dict.
+
+    Raises:
+        Any exception from generate_pir or review_pir
+
+        """
         current_retries = 0
         self.generated_pirs = []
         self.review_results = []
@@ -35,16 +70,18 @@ class AIOrchestrator:
             review_duration = 0.0
             result = None
 
-            # Generate PIR with given context
+            # ---- STEP 1: Generate PIR with given context
             logger.info(f"[Orchestrator] Attempt {current_retries + 1}/{self.max_retries} — generating PIR...")
             generation_start = time.time()
             try:
                 generated_pir = await generator.generate_pir(context)
+            #If failed, throw error
             except Exception as e:
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
                 logger.error(f"[Orchestrator] Generation failed on attempt {current_retries + 1}: {error_type}: {e}")
                 current_retries += 1
+                #Log the attempt
                 log_entry = ReasoningLogEntry(
                     attempt_number=current_retries,
                     timestamp=attempt_timestamp,
@@ -63,7 +100,7 @@ class AIOrchestrator:
             generation_duration = time.time() - generation_start
             logger.info(f"[Orchestrator] PIR generated in {generation_duration:.2f}s")
 
-            # Reviews and returns a boolean value
+            # --- Step 2 : Reviews and returns a boolean value
             review_start = time.time()
             try:
                 result = await reviewer.review_pir(generated_pir, context, phase)
@@ -83,6 +120,7 @@ class AIOrchestrator:
                     model_used=self.generator_model,
                     error_type=error_type,
                 )
+                #Check if logger exist. If yes, log the entry
                 if self.research_logger is not None:
                     self.research_logger.create_log(log_entry)
                 raise
@@ -92,10 +130,13 @@ class AIOrchestrator:
                 "severity": result.severity,
                 "suggestions": result.suggestions,
                 })
+            #Log retry if explanation if the severity indicates a retry
             if result.suggestions and result.severity == "major":
                 self.retry_explanations.append(result.suggestions)
             logger.info(f"[Orchestrator] Review done in {review_duration:.2f}s — approved={result.overall_approved}, severity={result.severity}")
             current_retries += 1
+
+            #Log attempt regardles of outcome
             if result.suggestions:
                 logger.debug(f"[Orchestrator] Suggestions: {result.suggestions}")
             log_entry = ReasoningLogEntry(
@@ -112,7 +153,8 @@ class AIOrchestrator:
             # Check if logger exist. If yes, log the entry
             if self.research_logger is not None:
                 self.research_logger.create_log(log_entry)
-            # If approved return current PIR
+            #--- Step 3: If approved return current PIR.
+            #            If not approved -> retry
             if result.severity != "major":
                 logger.info(f"[Orchestrator] PIR approved on attempt {current_retries}")
                 return generated_pir

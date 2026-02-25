@@ -5,7 +5,11 @@ from pydantic import BaseModel, Field
 
 from src.models.dialogue import ReviewResult
 
+
 class ReasoningLogEntry(BaseModel):
+    """
+    Logs a AI generation + the review for PIR
+    """
     entry_type: Literal["ai_generation"] = "ai_generation"
     session_id: str = Field(..., description = "session id. Uses UUID")
     attempt_number: int = Field(..., ge=1, description="Attempt counter for current session. Starts at one")       # Must be a int
@@ -18,6 +22,9 @@ class ReasoningLogEntry(BaseModel):
     error_type: str | None = Field(default=None, description="Exception type if generation or review failed, e.g. 'TimeoutError'")
 
 class UserActionLogEntry(BaseModel):
+    """
+    Logs a single user action in the dialogue Flow. (approve or reject)
+    """
     entry_type: Literal["user_action"] = "user_action"
     session_id: str
     timestamp: datetime
@@ -28,6 +35,11 @@ class UserActionLogEntry(BaseModel):
 
 
 class ReasoningLog(BaseModel):
+    """
+    Full reasoning for a session. Writes to disk when PIR is approved.
+
+    Logs all PIR generation attempts, review results, and retry history
+    """
     session_id: str
     model_used: str
     dialogue_turns: list[dict]

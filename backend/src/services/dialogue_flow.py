@@ -1,13 +1,14 @@
-from datetime import datetime
 import json
 import logging
+from datetime import datetime
 from enum import Enum
 
-from src.models.reasoning import UserActionLogEntry
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
-from src.models.reasoning import ReasoningLog
+from src.models.reasoning import ReasoningLog, UserActionLogEntry
 
 logger = logging.getLogger("app")
+
+"TODO= lag generic phase class for each of the phases. e.g directionFlow."
 
 
 class DialogueState(str, Enum):
@@ -19,6 +20,16 @@ class DialogueState(str, Enum):
 
 
 class DialogueFlow:
+  """
+  State machine that drives the intelligence direction dialogue. Indicates and changes what state of the direction dialogue we are in
+
+  States:  INITIAL -> GATHERING -> SUMMARY_CONFIRMING -> PIR_CONFIRMING -> COMPLETE
+
+  Each state has a dedicated handler (e.g handle_gathering_input).
+  All state transistions happens in these handlers.
+  """
+
+
   def __init__(self, session_id : str = None, research_logger=None):
     self.state = DialogueState.INITIAL #Starting with first state
     self.context = DialogueContext() #Context for information used in dialogue
@@ -40,6 +51,19 @@ class DialogueFlow:
     ]
 
   async def process_user_message(self, user_message, dialogue_service, perspectives: list[str] | None = None, approved: bool | None = None, orchestrator=None, reviewer=None) -> DialogueResponse:
+    """
+    Route the incoming message to the correct state
+
+
+    Args:
+        user_message: The message sent by the user
+        dialogue_service: Service for generating questions, summaries, and PIRs.
+        perspectives: List of geopolitical perspectives from the frontend. Is the viewpoint of the investigation
+        approved: True = user accepts AI output, False = user rejects with modifications.
+        orchestrator: If provided, uses the generate and review loop for PIR generation.
+        reviewer: Required alongside orchestrator for PIR review.
+
+    """
     # Update perspectives on every message if provided
     if perspectives:
       self.update_perspectives(perspectives)
@@ -78,8 +102,11 @@ class DialogueFlow:
     if extracted_context.get("priority_focus"):
        self.context.priority_focus = extracted_context["priority_focus"]
 
-  #State handler for initial phase. Here we will save initial query, generate questions and change state
   async def handle_initial_input(self, user_message, dialogue_service):
+      """
+      State handler for initial phase. Here we will save initial query, generate questions and change state to GATHERING
+      Possible state changes: INITIAL -> GATHERING
+      """
       self.context.initial_query = user_message #First user input is saved as initial query. This is the intended goal of the investigation
       #Create response that is sent to frontend
       dialogue_response = DialogueResponse()
@@ -90,6 +117,7 @@ class DialogueFlow:
           user_message=user_message,
           context = self.context
          )
+      #Update context
       self._apply_context_update(result.extracted_context)
       dialogue_response.content = result.question.question_text
       self.context.dialogue_turns.append({
@@ -105,9 +133,20 @@ class DialogueFlow:
       #Return response to frontend
       return dialogue_response
 
-  #State handler for gathering phase.  Here we will update context with information from user input, change state if possible or generate more questions if needed
   async def handle_gathering_input(self, user_message, dialogue_service):
+      """
+      State handler for gathering phase.  Here we will update context with information from user input.
+        If we have enough context after updating context change state
+        If we do not have enough context return a follow up question
+
+       Possible state transitions:
+        -If enough context: GATHERING -> SUMMARY_CONFIRMING
+        -If not enough context rejects: GATHERING -> GATHERING
+        -If AI have reached more than 15 questions, enforce state change to prevent AI loops : GATHERING -> SUMMARY_CONFIRMING
+
+      """
       dialogue_response = DialogueResponse()
+      #If we reach max questions, force state change.
       if(self.question_count >= self.max_questions):
          self.state = DialogueState.SUMMARY_CONFIRMING
          logger.info(f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (max questions reached)")
@@ -123,6 +162,7 @@ class DialogueFlow:
         user_message=user_message,
         context = self.context
        )
+      #Update context
       self._apply_context_update(result.extracted_context)
       self.context.dialogue_turns.append({
         "question": result.question.question_text,
@@ -145,12 +185,15 @@ class DialogueFlow:
         return dialogue_response
 
 
-  #State handler for summary confirming phase.
-  #Frontend sends approved=True for approve, or user_message with modifications for reject.
-  #Possible outcomes:
-  # - Approve (approved=True) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
-  # - Reject (approved=False/None + user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
+
   async def handle_summary_confirming(self, user_message, dialogue_service, approved: bool | None = None, orchestrator=None, reviewer=None):
+      """
+      State handler for summary confirming phase.
+      Frontend sends approved=True for approve, or user_message with modifications for reject.
+      Possible outcomes:
+        - Approve (approved=True) -> Generate PIR -> SUMMARY_CONFIRMING -> PIR_CONFIRMING
+        - Reject (approved=False/None + user_message) -> Save modifications, self-loop (stay in SUMMARY_CONFIRMING)
+      """
       dialogue_response = DialogueResponse()
 
       if approved:
@@ -160,6 +203,7 @@ class DialogueFlow:
             pir = await orchestrator.generate_and_review_pir(
                 self.context, dialogue_service, reviewer, phase="direction", session_id=self.session_id
             )
+        #If no orchestator just generate pir alone
         else:
             pir = await dialogue_service.generate_pir(self.context)
         self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
@@ -214,12 +258,14 @@ class DialogueFlow:
       return dialogue_response
 
 
-  #State handler for PIR confirming phase.
-  #Frontend sends approved=True for approve, or user_message with modifications for reject.
-  #Possible outcomes:
-  # - Approve (approved=True) -> PIR_CONFIRMING -> COMPLETE
-  # - Reject (approved=False/None + user_message) -> Regenerate PIR with modifications, self-loop (stay in PIR_CONFIRMING)
   async def handle_pir_confirming(self, user_message, dialogue_service, approved: bool | None = None):
+      """
+      State handler for PIR confirming phase.
+      Frontend sends approved=True for approve, or user_message with modifications for reject.
+      Possible outcomes:
+       - Approve (approved=True) -> PIR_CONFIRMING -> COMPLETE
+       - Reject (approved=False/None + user_message) -> Regenerate PIR with modifications, self-loop (stay in PIR_CONFIRMING)
+      """
       dialogue_response = DialogueResponse()
 
       if approved:
@@ -270,6 +316,11 @@ class DialogueFlow:
 
 
   def _has_sufficient_context(self) -> bool:
+    """
+    Checks if we have enough context
+    Return True if all five required fields are provied.
+    Else return false
+    """
    #List of fields required for context to be deemed sufficient
     context_fields = ["scope", "timeframe", "target_entities", "threat_actors", "priority_focus"]
     #Check if we have enough context. return bool

@@ -39,6 +39,8 @@ class MCPClient:
         Yields:
             The connected client instance.
         """
+
+        #I do not understand this :D
         server_script = Path(self.server_script_path).resolve()
         project_root = server_script.parents[2]
         cwd_path = project_root if (project_root / ".env").exists() else server_script.parent
@@ -104,14 +106,18 @@ class MCPClient:
 
         logger.info(f"[MCP] Calling tool: {tool_name}")
         start = time.time()
+        #Attempt to call tool
         try:
             result = await self.session.call_tool(tool_name, arguments or {})
+        #Raise error
         except Exception as e:
             logger.error(f"[MCP] Tool {tool_name} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}")
             raise
         logger.info(f"[MCP] Tool {tool_name} completed in {time.time() - start:.2f}s")
 
         text = result.content[0].text
+
+        #Attempt to parse text to json
         try:
             return json.loads(text)  # returner dict hvis JSON
         except json.JSONDecodeError:

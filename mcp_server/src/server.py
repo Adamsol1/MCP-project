@@ -50,7 +50,8 @@ def greet() -> str:
 @mcp.tool
 def dialogue_question(user_message, missing_fields, perspectives, context) -> dict:
     """
-    Docstring for dialogue_question
+    Generate a clarifying question based on user input and current context.
+
     Args:
         user_message : The user's input. e.g "Investigate APT29"
         missing_fields: List of context fields that misses information. e.g (["scope", "timeframe"])
@@ -175,6 +176,22 @@ def generate_summary(scope, timeframe, target_entities, threat_actors, priority_
 
 @mcp.tool
 def review(content, context, phase) -> str:
+    """Review generated content against the dialogue context for a given intelligence cycle phase.
+
+    Args:
+        content: The generated content to review (e.g. a set of PIRs).
+        context: The dialogue context used during generation (dict).
+        phase: The intelligence cycle phase being reviewed.
+                Valid values: "direction", "collection", "processing".
+
+    Returns:
+        JSON string with overall_approved (bool), severity ("none" | "minor" | "major"),
+        pir_reviews (list) and suggestions (str | null).
+
+    Raises:
+        KeyError: If phase is not a recognised value.
+    """
+    # Dispatch to the correct review prompt based on the current intelligence cycle phase
     prompts = {
         "direction": DIRECTION_REVIEW_PROMPT,
         "collection": COLLECTION_REVIEW_PROMPT,

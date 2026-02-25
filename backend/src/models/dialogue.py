@@ -49,7 +49,7 @@ class ClarifyingQuestion(BaseModel):
 
     question_text: str
     question_type: str
-    is_final: bool = False
+    is_final: bool = False #Is true if the question should end the current phase
     suggested_answers: list[str] | None = None
 
 
@@ -67,11 +67,15 @@ class Phase(str, Enum):
 
 
 class PIRReview(BaseModel):
+    """Review result for a single PIR entry"""
     pir_index: int
     approved: bool
     issue: str | None
 
 class ReviewResult(BaseModel):
+    """
+    Aggregated review of all PIRs from the AI reviewer
+    """
     overall_approved: bool
     pir_reviews: list[PIRReview]
     severity: Literal["none", "minor", "major"]

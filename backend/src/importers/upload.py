@@ -17,9 +17,23 @@ def legal_file_upload(filetype : str) -> bool:
 
 ##Function for saving and uploading files
 def save_uploaded_file(file, filename: str, save_directory) -> Path:
+  """
+  Method used for uploading file
+
+    Args:
+    File: The file that is being uploaded
+    Filename: Name of the file being uploaded
+    Save_directory: Where the file is being saved
+
+    Returns:
+    The path where the file was being saved
+
+  """
+  #Check if file is legal. If not raise error
   if not legal_file_upload(filename):
       raise ValueError("Illegal filetype")
 
+  #Path where we save the file
   path = save_directory / filename
 
   #Add timestamp to filename only if file already exists. This is for preventing overwriting files.
