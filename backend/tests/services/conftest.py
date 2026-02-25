@@ -21,7 +21,9 @@ def make_rejected_result() -> ReviewResult:
     """Helper: lager et avvist ReviewResult (major) for bruk i tester."""
     return ReviewResult(
         overall_approved=False,
-        pir_reviews=[PIRReview(pir_index=0, approved=False, issue="Does not meet SMART criteria")],
+        pir_reviews=[
+            PIRReview(pir_index=0, approved=False, issue="Does not meet SMART criteria")
+        ],
         severity="major",
         suggestions="Be more specific",
     )

@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
 
 
@@ -24,7 +26,7 @@ class DialogueService:
         # Include perspectives so the AI can tailor questions to the selected viewpoints
         perspectives = [p.value for p in context.perspectives]
 
-        #Include context to give the tool enough information to ask context based questions instead of general questions.
+        # Include context to give the tool enough information to ask context based questions instead of general questions.
         question_result = await self.mcp_client.call_tool(
             "dialogue_question",
             {
@@ -35,9 +37,9 @@ class DialogueService:
                     "scope": context.scope,
                     "timeframe": context.timeframe,
                     "target_entities": context.target_entities,
-                    "threat_actors":context.threat_actors,
-                    "priority_focus":context.priority_focus
-                }
+                    "threat_actors": context.threat_actors,
+                    "priority_focus": context.priority_focus,
+                },
             },
         )
 
@@ -71,14 +73,16 @@ class DialogueService:
                 "target_entities": context.target_entities,
                 "perspectives": perspectives,
                 "modifications": context.modifications,
-                "threat_actors":context.threat_actors,
-                "priority_focus":context.priority_focus,
+                "threat_actors": context.threat_actors,
+                "priority_focus": context.priority_focus,
             },
         )
 
-        return result
+        return cast(str, result)
 
-    async def generate_summary(self, context: DialogueContext, modifications=None) -> dict:
+    async def generate_summary(
+        self, context: DialogueContext, modifications=None
+    ) -> dict:
         """
         Calls the generate_summary MCP tool to create a human-readable summary of the context.
 
@@ -101,7 +105,7 @@ class DialogueService:
             },
         )
 
-        return result
+        return cast(dict[Any, Any], result)
 
     def _identify_missing_context(self, context) -> list[str]:
         """

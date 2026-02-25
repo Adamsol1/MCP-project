@@ -10,7 +10,7 @@ def test_dialogue_message_endpoint_exists():
 
     response = client.post(
         "/api/dialogue/message",
-        json={"message": "Investigate APT29", "session_id": "test-session-123"}
+        json={"message": "Investigate APT29", "session_id": "test-session-123"},
     )
 
     # Should not return 404 (endpoint exists)
@@ -23,7 +23,7 @@ def test_dialogue_message_returns_question():
 
     response = client.post(
         "/api/dialogue/message",
-        json={"message": "Investigate APT29", "session_id": "test-session-123"}
+        json={"message": "Investigate APT29", "session_id": "test-session-123"},
     )
 
     assert response.status_code == 200
@@ -41,7 +41,7 @@ def test_dialogue_message_requires_message_field():
 
     response = client.post(
         "/api/dialogue/message",
-        json={"session_id": "test-session-123"}  # Missing message
+        json={"session_id": "test-session-123"},  # Missing message
     )
 
     assert response.status_code == 422  # Validation error

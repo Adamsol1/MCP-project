@@ -42,6 +42,6 @@ __all__ = [
     "NormalizedIndicator",
     # Reports
     "ThreatReport",
-    #Reasoning
+    # Reasoning
     "ReasoningLogEntry",
 ]

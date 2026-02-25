@@ -4,7 +4,12 @@ import pytest
 
 from src.models.dialogue import DialogueContext
 from src.services.ai_orchestrator import AIOrchestrator
-from tests.services.conftest import MockGenerator, MockReviewer, make_approved_result, make_rejected_result
+from tests.services.conftest import (
+    MockGenerator,
+    MockReviewer,
+    make_approved_result,
+    make_rejected_result,
+)
 
 
 # Test for checking if orchestrator approves
@@ -65,7 +70,13 @@ async def test_orchestrator_fails_after_max_retries():
 
     # Create test enviorment
     generator = MockGenerator()
-    reviewer = MockReviewer(responses=[make_rejected_result(), make_rejected_result(), make_rejected_result()])
+    reviewer = MockReviewer(
+        responses=[
+            make_rejected_result(),
+            make_rejected_result(),
+            make_rejected_result(),
+        ]
+    )
     orchestrator = AIOrchestrator()
 
     # Call method

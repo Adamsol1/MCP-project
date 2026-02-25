@@ -2,6 +2,8 @@ import json
 import logging
 from pathlib import Path
 
+from src.models.reasoning import ReasoningLog
+
 logger = logging.getLogger("app")
 
 
@@ -14,15 +16,14 @@ class ResearchLogger:
     - reasoning_log_{session_id}.json  .Single file written on PIR approval (full reasoning trace)
 
     """
+
     def __init__(self, log_path=None, session_id=None):
         # Use given log_path
         if log_path:
             self.log_path = Path(log_path)
         # Use default logpath
         else:
-            self.log_path = Path(
-                f"data/outputs/research_log_{session_id}.jsonl"
-            )
+            self.log_path = Path(f"data/outputs/research_log_{session_id}.jsonl")
 
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -32,11 +33,11 @@ class ResearchLogger:
         if hasattr(log_entry, "model_dump"):
             log_entry = log_entry.model_dump(mode="json")
         converted_log = json.dumps(log_entry)
-        #Attempt to write to disk
+        # Attempt to write to disk
         try:
             with open(self.log_path, "a") as f:
                 f.write(converted_log + "\n")
-        #Cast error if unsuccesfull.
+        # Cast error if unsuccesfull.
         except OSError as e:
             logger.error(f"[ResearchLogger] Failed to write log entry: {e}")
 

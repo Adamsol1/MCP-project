@@ -15,28 +15,28 @@ class MockMCPClient:
                 "question": "What is the scope of your investigation?",
                 "type": "scope",
                 "has_sufficient_context": False,
-                "context": context
+                "context": context,
             }
         elif "timeframe" in missing:
             return {
                 "question": "What time period are you interested in?",
                 "type": "timeframe",
                 "has_sufficient_context": False,
-                "context": context
+                "context": context,
             }
         elif "target_entities" in missing:
             return {
                 "question": "Which entities or regions are you focusing on?",
                 "type": "target_entities",
                 "has_sufficient_context": False,
-                "context": context
+                "context": context,
             }
         else:
             return {
                 "question": "I have enough information to proceed.",
                 "type": "confirmation",
                 "has_sufficient_context": True,
-                "context": context
+                "context": context,
             }
 
 
@@ -56,8 +56,7 @@ async def test_generate_clarifying_question_returns_clarifying_question():
     context.initial_query = "Investigate APT29"
 
     result = await service.generate_clarifying_question(
-        user_message="Investigate APT29",
-        context=context
+        user_message="Investigate APT29", context=context
     )
 
     assert isinstance(result, QuestionResult)
@@ -79,8 +78,7 @@ async def test_generate_clarifying_question_asks_about_scope_when_missing():
     # scope, timeframe, target_entities are all empty
 
     result = await service.generate_clarifying_question(
-        user_message="Investigate APT29",
-        context=context
+        user_message="Investigate APT29", context=context
     )
 
     assert result.question.question_type == "scope"
@@ -100,8 +98,7 @@ async def test_generate_clarifying_question_asks_about_timeframe_when_scope_set(
     # timeframe and target_entities still empty
 
     result = await service.generate_clarifying_question(
-        user_message="Focus on recent campaigns",
-        context=context
+        user_message="Focus on recent campaigns", context=context
     )
 
     assert result.question.question_type == "timeframe"
@@ -122,8 +119,7 @@ async def test_generate_clarifying_question_is_final_when_context_complete():
     context.target_entities = ["Nordic countries"]
 
     result = await service.generate_clarifying_question(
-        user_message="Nordic countries",
-        context=context
+        user_message="Nordic countries", context=context
     )
 
     assert result.question.is_final is True

@@ -10,13 +10,12 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from pathlib import Path
 from typing import Any
 
-logger = logging.getLogger("app")
-
 from dotenv import load_dotenv
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.types import TextContent
 
-from ..models.dialogue import DialogueContext
+logger = logging.getLogger("app")
 
 
 class MCPClient:
@@ -40,10 +39,12 @@ class MCPClient:
             The connected client instance.
         """
 
-        #I do not understand this :D
+        # I do not understand this :D
         server_script = Path(self.server_script_path).resolve()
         project_root = server_script.parents[2]
-        cwd_path = project_root if (project_root / ".env").exists() else server_script.parent
+        cwd_path = (
+            project_root if (project_root / ".env").exists() else server_script.parent
+        )
         load_dotenv(project_root / ".env", override=False)
         load_dotenv(project_root / "mcp_server" / ".env", override=False)
         child_env = os.environ.copy()
@@ -60,7 +61,9 @@ class MCPClient:
 
         child_errlog_path = project_root / "mcp_child.stderr.log"
         logger.debug(f"[MCP] Server cwd: {cwd_path}")
-        logger.debug(f"[MCP] GEMINI_API_KEY present: {bool(child_env.get('GEMINI_API_KEY'))}")
+        logger.debug(
+            f"[MCP] GEMINI_API_KEY present: {bool(child_env.get('GEMINI_API_KEY'))}"
+        )
         logger.debug(f"[MCP] Python cmd: {python_cmd}")
         logger.debug(f"[MCP] Child stderr log: {child_errlog_path}")
 
@@ -103,26 +106,29 @@ class MCPClient:
                 "Not connected to MCP server. Use 'async with client.connect():'"
             )
 
-
         logger.info(f"[MCP] Calling tool: {tool_name}")
         start = time.time()
-        #Attempt to call tool
+        # Attempt to call tool
         try:
             result = await self.session.call_tool(tool_name, arguments or {})
-        #Raise error
+        # Raise error
         except Exception as e:
-            logger.error(f"[MCP] Tool {tool_name} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}")
+            logger.error(
+                f"[MCP] Tool {tool_name} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}"
+            )
             raise
         logger.info(f"[MCP] Tool {tool_name} completed in {time.time() - start:.2f}s")
 
-        text = result.content[0].text
+        content_item = result.content[0]
+        if not isinstance(content_item, TextContent):
+            raise ValueError(f"Unexpected content type: {type(content_item).__name__}")
+        text = content_item.text
 
-        #Attempt to parse text to json
+        # Attempt to parse text to json
         try:
             return json.loads(text)  # returner dict hvis JSON
         except json.JSONDecodeError:
             return text
-
 
     async def list_tools(self) -> list[dict[str, Any]]:
         """List available tools on the MCP server.

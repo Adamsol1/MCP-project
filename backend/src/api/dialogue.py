@@ -12,7 +12,6 @@ from src.services.dialogue_service import DialogueService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
 
-
 """
 API router for the dialogue flow.
 
@@ -37,6 +36,7 @@ class DialogueMessageRequest(BaseModel):
     """
     Incoming request body for the /message endpoint
     """
+
     message: str
     session_id: str
     perspectives: list[str] = ["NEUTRAL"]
@@ -48,6 +48,7 @@ class DialogueMessageResponse(BaseModel):
     """
     Outgoing repsonse for the /message endpoint
     """
+
     question: str
     type: str
     is_final: bool
@@ -104,14 +105,18 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     Raises:
         Any exception given by DialogueFlow or MCPClient
     """
-    #Checks if session_id is in session. If not create a new session
+    # Checks if session_id is in session. If not create a new session
     if request.session_id not in _sessions:
         research_logger = ResearchLogger(session_id=request.session_id)
-        _sessions[request.session_id] = DialogueFlow(session_id=request.session_id, research_logger=research_logger)
+        _sessions[request.session_id] = DialogueFlow(
+            session_id=request.session_id, research_logger=research_logger
+        )
 
-    #Start a new dialogueFlow
+    # Start a new dialogueFlow
     flow = _sessions[request.session_id]
-    logger.info(f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}")
+    logger.info(
+        f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}"
+    )
 
     # TODO (PERFORMANCE): MCPClient spawns a new subprocess on every request — this is expensive.
     # Fix: add open()/close() to MCPClient using AsyncExitStack, store the client in _sessions
@@ -119,11 +124,15 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     # See code review notes for full plan.
     client = MCPClient(_server_path)
 
-    #Connect to mcp, and wait for response from state machine
+    # Connect to mcp, and wait for response from state machine
     async with client.connect():
         service = DialogueService(client, None)
         review_service = ReviewService(client)
-        orchestrator = AIOrchestrator(research_logger=flow.research_logger, generator_model="gemini-2.0-flash", reviewer_model="gemini-2.0-flash")
+        orchestrator = AIOrchestrator(
+            research_logger=flow.research_logger,
+            generator_model="gemini-2.0-flash",
+            reviewer_model="gemini-2.0-flash",
+        )
         response = await flow.process_user_message(
             request.message,
             service,
@@ -133,8 +142,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             reviewer=review_service,
         )
 
-    #Convert internal response to API format and return
+    # Convert internal response to API format and return
     converted_response = _convert_to_message_response(response)
 
     return converted_response
-

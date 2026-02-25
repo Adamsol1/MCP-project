@@ -22,7 +22,9 @@ class ReviewService:
         """
         self.mcp_client = mcp_client
 
-    async def review_pir(self, content, context: DialogueContext, phase: str) -> ReviewResult:
+    async def review_pir(
+        self, content, context: DialogueContext, phase: str
+    ) -> ReviewResult:
         """Review a generated PIR against the dialogue context.
 
         Args:
@@ -37,9 +39,14 @@ class ReviewService:
             KeyError: If phase is not a valid value.
         """
         logger.info(f"[ReviewService] Reviewing PIR — phase={phase}")
-        #Call AI service to review PIR against context
-        result = await self.mcp_client.call_tool("review", {"content":content, "context":context.model_dump(), "phase":phase})
+        # Call AI service to review PIR against context
+        result = await self.mcp_client.call_tool(
+            "review",
+            {"content": content, "context": context.model_dump(), "phase": phase},
+        )
 
         response = ReviewResult.model_validate(result)
-        logger.info(f"[ReviewService] Review result — approved={response.overall_approved}, severity={response.severity}")
+        logger.info(
+            f"[ReviewService] Review result — approved={response.overall_approved}, severity={response.severity}"
+        )
         return response

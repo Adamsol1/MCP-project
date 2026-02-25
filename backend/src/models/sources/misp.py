@@ -20,44 +20,40 @@ class MISPAttribute(BaseModel):
 
     id: str | None = Field(default=None, description="Attribute ID")
 
-    event_id: str | None = Field(
-        default=None, description="Parent event ID"
-    )
+    event_id: str | None = Field(default=None, description="Parent event ID")
 
-    type: str = Field(..., description="MISP attribute type (ip-dst, domain, md5, etc.)")
+    type: str = Field(
+        ..., description="MISP attribute type (ip-dst, domain, md5, etc.)"
+    )
 
     category: str = Field(
         default="External analysis",
-        description="Attribute category (Network activity, Payload delivery, etc.)"
+        description="Attribute category (Network activity, Payload delivery, etc.)",
     )
 
     value: str = Field(..., description="The IOC value")
 
     to_ids: bool = Field(
         default=True,
-        description="Whether this attribute should be used for IDS detection"
+        description="Whether this attribute should be used for IDS detection",
     )
 
     comment: str | None = Field(default=None, description="Attribute comment")
 
-    timestamp: datetime | None = Field(
-        default=None, description="Attribute timestamp"
-    )
+    timestamp: datetime | None = Field(default=None, description="Attribute timestamp")
 
     distribution: int = Field(
         default=0,
         ge=0,
         le=5,
-        description="Distribution level (0=org, 1=community, 2=connected, 3=all, 4=sharing group, 5=inherit)"
+        description="Distribution level (0=org, 1=community, 2=connected, 3=all, 4=sharing group, 5=inherit)",
     )
 
     first_seen: datetime | None = Field(
         default=None, description="First seen timestamp"
     )
 
-    last_seen: datetime | None = Field(
-        default=None, description="Last seen timestamp"
-    )
+    last_seen: datetime | None = Field(default=None, description="Last seen timestamp")
 
     deleted: bool = Field(default=False, description="Whether attribute is deleted")
 
@@ -83,21 +79,19 @@ class MISPEvent(BaseModel):
         default=4,
         ge=1,
         le=4,
-        description="Threat level (1=High, 2=Medium, 3=Low, 4=Undefined)"
+        description="Threat level (1=High, 2=Medium, 3=Low, 4=Undefined)",
     )
 
     analysis: int = Field(
         default=0,
         ge=0,
         le=2,
-        description="Analysis state (0=Initial, 1=Ongoing, 2=Complete)"
+        description="Analysis state (0=Initial, 1=Ongoing, 2=Complete)",
     )
 
     date: str | None = Field(default=None, description="Event date (YYYY-MM-DD)")
 
-    timestamp: datetime | None = Field(
-        default=None, description="Event timestamp"
-    )
+    timestamp: datetime | None = Field(default=None, description="Event timestamp")
 
     publish_timestamp: datetime | None = Field(
         default=None, description="When event was published"
@@ -107,18 +101,11 @@ class MISPEvent(BaseModel):
 
     orgc_id: str | None = Field(default=None, description="Creator organization ID")
 
-    distribution: int = Field(
-        default=0,
-        ge=0,
-        le=4,
-        description="Distribution level"
-    )
+    distribution: int = Field(default=0, ge=0, le=4, description="Distribution level")
 
     published: bool = Field(default=False, description="Whether event is published")
 
-    attribute_count: int = Field(
-        default=0, ge=0, description="Number of attributes"
-    )
+    attribute_count: int = Field(default=0, ge=0, description="Number of attributes")
 
     attributes: list[MISPAttribute] = Field(
         default_factory=list, description="Event attributes"

@@ -39,9 +39,7 @@ class OTXIndicator(BaseModel):
         default=None, description="When indicator expires"
     )
 
-    content: str | None = Field(
-        default=None, description="Additional content/context"
-    )
+    content: str | None = Field(default=None, description="Additional content/context")
 
 
 class OTXPulse(BaseModel):
@@ -65,13 +63,9 @@ class OTXPulse(BaseModel):
         default=None, description="Last modification timestamp"
     )
 
-    tlp: str | None = Field(
-        default=None, description="Traffic Light Protocol level"
-    )
+    tlp: str | None = Field(default=None, description="Traffic Light Protocol level")
 
-    adversary: str | None = Field(
-        default=None, description="Attributed threat actor"
-    )
+    adversary: str | None = Field(default=None, description="Attributed threat actor")
 
     targeted_countries: list[str] = Field(
         default_factory=list, description="Targeted country codes"
