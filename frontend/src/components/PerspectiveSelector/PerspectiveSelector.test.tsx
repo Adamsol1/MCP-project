@@ -15,9 +15,6 @@ import PerspectiveSelector from "./PerspectiveSelector";
  *   onChange: (perspectives: string[]) => void  — called when selection changes
  */
 
-// The 6 perspectives we expect to be rendered
-const ALL_PERSPECTIVES = ["US", "NORWAY", "CHINA", "EU", "RUSSIA", "NEUTRAL"];
-
 // Human-readable labels we expect to see in the UI
 const PERSPECTIVE_LABELS: Record<string, string> = {
   US: "United States",

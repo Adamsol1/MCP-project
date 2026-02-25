@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { sendMessage } from "../services/dialogue";
-import type { Message } from "../types/conversation";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 

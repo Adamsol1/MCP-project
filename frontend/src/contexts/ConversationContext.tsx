@@ -69,6 +69,7 @@ type Action =
  * Initialised with null — a null value at runtime means the consuming component
  * is not wrapped in a ConversationProvider (caught by the useConversation guard).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const ConversationContext =
   createContext<ConversationContextValue | null>(null);
 

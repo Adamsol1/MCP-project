@@ -8,28 +8,30 @@ interface ToastContainerProps {
   /**
    * Where on the screen to anchor the toast stack.
    * Defaults to 'top-right'.
-   * Use 'above-input' to float the stack just above the chat input form.
+   * Use 'above-input' to float the stack just above the chat input form,
+   * dynamically matching the chatbox width.
    */
   position?: Position;
 }
 
 /**
- * Maps each position key to Tailwind utility classes for that screen location.
- * All positions use fixed layout so the stack floats on top of page content
- * regardless of scroll position.
+ * Per-position layout config.
  *
- * 'above-input' sits ~128px from the viewport bottom — just above the chat
- * input form (pb-6 outer gap ≈ 24px + ~96px form height = ~120px total).
+ * positioning — 'fixed' floats over the viewport; 'absolute' anchors to the
+ *               nearest positioned ancestor (used for above-input so the stack
+ *               automatically matches the chatbox width).
+ * classes     — Tailwind utilities that set the offset / size for that anchor.
  */
-const positionClasses: Record<Position, string> = {
-  'top-right': 'top-4 right-4',
-  'top-left': 'top-4 left-4',
-  'bottom-right': 'bottom-4 right-4',
-  'bottom-left': 'bottom-4 left-4',
-  'top-center': 'top-4 left-1/2 -translate-x-1/2',
-  'bottom-center': 'bottom-4 left-1/2 -translate-x-1/2',
-  // Sits just above the chat input form (pb-6 outer gap + ~96px form height = ~120px from bottom).
-  'above-input': 'bottom-32 left-1/2 -translate-x-1/2',
+const positionConfig: Record<Position, { positioning: 'fixed' | 'absolute'; classes: string }> = {
+  'top-right':     { positioning: 'fixed',    classes: 'top-4 right-4' },
+  'top-left':      { positioning: 'fixed',    classes: 'top-4 left-4' },
+  'bottom-right':  { positioning: 'fixed',    classes: 'bottom-4 right-4' },
+  'bottom-left':   { positioning: 'fixed',    classes: 'bottom-4 left-4' },
+  'top-center':    { positioning: 'fixed',    classes: 'top-4 left-1/2 -translate-x-1/2' },
+  'bottom-center': { positioning: 'fixed',    classes: 'bottom-4 left-1/2 -translate-x-1/2' },
+  // Anchors to the relative wrapper inside ChatWindow so the stack width
+  // automatically tracks the chatbox. bottom-full places it just above the form.
+  'above-input':   { positioning: 'absolute', classes: 'bottom-full left-0 w-full pb-2' },
 };
 
 /**
@@ -49,8 +51,11 @@ export default function ToastContainer({ position = 'top-right' }: ToastContaine
     return null;
   }
 
+  const { positioning, classes } = positionConfig[position];
+  const fullWidth = position === 'above-input';
+
   return (
-    <div className={`fixed z-50 flex flex-col gap-2 ${positionClasses[position]}`}>
+    <div className={`${positioning} z-50 flex flex-col gap-2 ${classes}`}>
       {toasts.map((toast) => (
         <Toast
           key={toast.id}
@@ -59,6 +64,7 @@ export default function ToastContainer({ position = 'top-right' }: ToastContaine
           message={toast.message}
           duration={toast.duration}
           onClose={removeToast}
+          fullWidth={fullWidth}
         />
       ))}
     </div>

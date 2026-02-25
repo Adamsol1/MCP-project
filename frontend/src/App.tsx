@@ -3,6 +3,7 @@ import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
+import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
@@ -41,6 +42,8 @@ function App() {
 
   /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
+  /** Controls the visibility of the SettingsModal overlay. */
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   /**
    * Called by FileUpload when the user selects an individual file.
@@ -83,6 +86,7 @@ function App() {
         onRenameConversation={renameConversation}
         onDeleteAllConversations={deleteAllConversations}
         onDevSendMessage={() => triggerDevMessage("What are the latest cyber threats targeting European critical infrastructure?")}
+        onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
       {/* mx-1 creates a slim visible gap between the sidebars and the chat area. */}
@@ -110,6 +114,11 @@ function App() {
         onClose={() => setIsFileUploadOpen(false)}
         onFileSelect={handleFileSelect}
         onSubmit={handleSubmit}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
       />
     </div>
   );

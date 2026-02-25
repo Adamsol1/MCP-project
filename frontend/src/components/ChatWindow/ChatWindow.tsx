@@ -179,10 +179,14 @@ export default function ChatWindow({
           </p>
         )}
 
-        {/* Toast notifications float above the input (fixed, bottom-32, centred). */}
-        <ToastContainer position="above-input" />
-
+        {/*
+          Wrap the input zone in a relative container so ToastContainer can use
+          absolute positioning anchored to this element, making the toast stack
+          automatically match the chatbox width.
+        */}
         <div className="w-full max-w-3xl px-6">
+          <div className="relative">
+          <ToastContainer position="above-input" />
           {isConfirming ? (
             /* Confirmation mode: Approve / Reject replace the text input. */
             <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
@@ -255,6 +259,7 @@ export default function ChatWindow({
               </button>
             </form>
           )}
+          </div>
         </div>
       </div>
     </div>
