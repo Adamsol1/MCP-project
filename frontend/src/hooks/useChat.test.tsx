@@ -3,6 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useChat } from "./useChat";
 import { ConversationProvider } from "../contexts/ConversationContext";
+import { ToastProvider } from "../contexts/ToastContext";
 import type { ConversationStore } from "../types/conversation";
 
 // Mock the dialogue service so we don't make real API calls
@@ -11,10 +12,14 @@ import { sendMessage } from "../services/dialogue";
 
 const STORAGE_KEY = "mcp-conversations";
 
-// Helper: wraps the hook in a ConversationProvider so it has context
+// Helper: wraps the hook in ConversationProvider + ToastProvider so it has all required context
 function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <ConversationProvider>{children}</ConversationProvider>;
+    return (
+      <ToastProvider>
+        <ConversationProvider>{children}</ConversationProvider>
+      </ToastProvider>
+    );
   };
 }
 

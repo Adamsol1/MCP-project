@@ -1,14 +1,21 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
 import ChatWindow from "./ChatWindow";
+import { ToastProvider } from "../../contexts/ToastContext";
+
+// ChatWindow renders ToastContainer which requires ToastProvider in the tree
+function renderWithToast(ui: ReactNode) {
+  return render(<ToastProvider>{ui}</ToastProvider>);
+}
 
 // describe() groups related tests together under a label
 describe("ChatWindow", () => {
   // it() defines a single test case - what behavior we expect
   it("renders a greeting message", () => {
     // render() mounts the component in a virtual DOM (jsdom)
-    render(<ChatWindow />);
+    renderWithToast(<ChatWindow />);
 
     // screen.getByText() searches the rendered output for text content
     // The /regex/i syntax is case-insensitive matching
@@ -16,14 +23,14 @@ describe("ChatWindow", () => {
   });
 
   it("renders a message input field", () => {
-    render(<ChatWindow />); // Render component
+    renderWithToast(<ChatWindow />); // Render component
 
     const input = screen.getByPlaceholderText(/ask anything/i);
     expect(input).toBeInTheDocument();
   });
 
   it("renders send button", () => {
-    render(<ChatWindow />);
+    renderWithToast(<ChatWindow />);
 
     // getByRole() finds elements by their ARIA role
     const sendButton = screen.getByRole("button", { name: /send/i });
@@ -31,7 +38,7 @@ describe("ChatWindow", () => {
   });
 
   it("disables send button when input is empty", () => {
-    render(<ChatWindow />);
+    renderWithToast(<ChatWindow />);
 
     const sendButton = screen.getByRole("button", { name: /send/i });
     // toBeDisabled() checks the HTML disabled attribute
@@ -46,7 +53,7 @@ describe("ChatWindow", () => {
     // Unlike fireEvent, userEvent simulates real browser behavior
     // (keydown, keypress, keyup, input events in sequence)
     const user = userEvent.setup();
-    render(<ChatWindow />);
+    renderWithToast(<ChatWindow />);
 
     const input = screen.getByPlaceholderText(/ask anything/i);
     // user.type() simulates typing character by character, just like a real user
@@ -63,7 +70,7 @@ describe("ChatWindow", () => {
     // vi.fn() creates a mock function - it records how it was called
     // so we can assert on it later. This is how we test callback props.
     const handleSend = vi.fn();
-    render(<ChatWindow onSendMessage={handleSend} />);
+    renderWithToast(<ChatWindow onSendMessage={handleSend} />);
 
     const input = screen.getByPlaceholderText(/ask anything/i);
     await user.type(input, "Investigate recent APT activity");
@@ -78,7 +85,7 @@ describe("ChatWindow", () => {
 
   it("clears input after sending a message", async () => {
     const user = userEvent.setup();
-    render(<ChatWindow onSendMessage={vi.fn()} />);
+    renderWithToast(<ChatWindow onSendMessage={vi.fn()} />);
 
     const input = screen.getByPlaceholderText(/ask anything/i);
     await user.type(input, "Hello");
@@ -93,7 +100,7 @@ describe("ChatWindow", () => {
   it("submits on Enter key press", async () => {
     const user = userEvent.setup();
     const handleSend = vi.fn();
-    render(<ChatWindow onSendMessage={handleSend} />);
+    renderWithToast(<ChatWindow onSendMessage={handleSend} />);
 
     const input = screen.getByPlaceholderText(/ask anything/i);
     // {Enter} is userEvent syntax for pressing the Enter key
@@ -113,7 +120,7 @@ describe("ChatWindow", () => {
       { id: "2", text: "Investigate APT29", sender: "user" as const },
     ];
 
-    render(<ChatWindow messages={messages} />);
+    renderWithToast(<ChatWindow messages={messages} />);
 
     expect(screen.getByText("Hello, how can I help?")).toBeInTheDocument();
     expect(screen.getByText("Investigate APT29")).toBeInTheDocument();
@@ -125,7 +132,7 @@ describe("ChatWindow", () => {
       { id: "2", text: "User message", sender: "user" as const },
     ];
 
-    render(<ChatWindow messages={messages} />);
+    renderWithToast(<ChatWindow messages={messages} />);
 
     // data-sender is a custom data attribute we use to mark message origin
     // This lets us (and CSS) distinguish between user and system messages
@@ -141,7 +148,7 @@ describe("ChatWindow", () => {
       { id: "1", text: "Hello", sender: "system" as const },
     ];
 
-    render(<ChatWindow messages={messages} />);
+    renderWithToast(<ChatWindow messages={messages} />);
 
     // queryByText returns null instead of throwing when not found
     // (unlike getByText which throws). Use queryBy* when you expect
@@ -154,7 +161,7 @@ describe("ChatWindow", () => {
   it("shows Approve button when isConfirming is true", () => {
     // When the dialogue flow reaches confirmation, the user should see
     // an Approve button to accept the summary and proceed.
-    render(<ChatWindow isConfirming={true} />);
+    renderWithToast(<ChatWindow isConfirming={true} />);
 
     const approveBtn = screen.getByRole("button", { name: /approve/i });
     expect(approveBtn).toBeInTheDocument();
@@ -164,7 +171,7 @@ describe("ChatWindow", () => {
     const user = userEvent.setup();
     const handleApprove = vi.fn();
 
-    render(<ChatWindow isConfirming={true} onApprove={handleApprove} />);
+    renderWithToast(<ChatWindow isConfirming={true} onApprove={handleApprove} />);
 
     const approveBtn = screen.getByRole("button", { name: /approve/i });
     await user.click(approveBtn);
@@ -173,7 +180,7 @@ describe("ChatWindow", () => {
   });
 
   it("does not show Approve button when isConfirming is false", () => {
-    render(<ChatWindow isConfirming={false} />);
+    renderWithToast(<ChatWindow isConfirming={false} />);
 
     // queryByRole returns null instead of throwing when not found
     expect(
@@ -184,7 +191,7 @@ describe("ChatWindow", () => {
   // ---------- S2.5.4: Reject button with feedback ----------
 
   it("shows Reject button when isConfirming is true", () => {
-    render(<ChatWindow isConfirming={true} />);
+    renderWithToast(<ChatWindow isConfirming={true} />);
 
     const rejectBtn = screen.getByRole("button", { name: /reject/i });
     expect(rejectBtn).toBeInTheDocument();
@@ -194,7 +201,7 @@ describe("ChatWindow", () => {
     const user = userEvent.setup();
     const handleReject = vi.fn();
 
-    render(<ChatWindow isConfirming={true} onReject={handleReject} />);
+    renderWithToast(<ChatWindow isConfirming={true} onReject={handleReject} />);
 
     const rejectBtn = screen.getByRole("button", { name: /reject/i });
     await user.click(rejectBtn);
@@ -203,7 +210,7 @@ describe("ChatWindow", () => {
   });
 
   it("does not show Reject button when isConfirming is false", () => {
-    render(<ChatWindow isConfirming={false} />);
+    renderWithToast(<ChatWindow isConfirming={false} />);
 
     expect(
       screen.queryByRole("button", { name: /reject/i })
@@ -215,7 +222,7 @@ describe("ChatWindow", () => {
   it("hides text input and send button when isConfirming is true", () => {
     // The user MUST click Approve or Reject — they cannot bypass
     // the decision by typing a free message.
-    render(<ChatWindow isConfirming={true} />);
+    renderWithToast(<ChatWindow isConfirming={true} />);
 
     expect(
       screen.queryByPlaceholderText(/ask anything/i)
@@ -227,7 +234,7 @@ describe("ChatWindow", () => {
 
   it("shows text input and send button when isConfirming is false", () => {
     // Normal state: the user can type and send messages
-    render(<ChatWindow isConfirming={false} />);
+    renderWithToast(<ChatWindow isConfirming={false} />);
 
     expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();

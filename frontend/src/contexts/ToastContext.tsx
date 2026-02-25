@@ -56,6 +56,7 @@ const DEFAULT_DURATION = 5000;
  * Initialised with null — a null value at runtime means the consuming component
  * is not wrapped in a ToastProvider (caught by the useToast guard).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const ToastContext = createContext<ToastContextValue | null>(null);
 
 /** Union of all actions that can be dispatched to toastReducer. */

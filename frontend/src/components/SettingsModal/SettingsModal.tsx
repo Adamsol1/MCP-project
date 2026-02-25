@@ -120,6 +120,7 @@ function SettingRow({
   label,
   description,
   control,
+  htmlFor,
 }: {
   /** Bold setting name shown to the user. */
   label: string;
@@ -127,11 +128,19 @@ function SettingRow({
   description?: string;
   /** The interactive control element (select, buttons, input, etc.). */
   control: React.ReactNode;
+  /** When provided, renders the label as a <label> linked to the control's id. */
+  htmlFor?: string;
 }) {
   return (
     <div className="flex items-center justify-between border-b border-gray-700 py-4">
       <div className="mr-8">
-        <p className="text-sm font-medium text-gray-100">{label}</p>
+        {htmlFor ? (
+          <label htmlFor={htmlFor} className="text-sm font-medium text-gray-100">
+            {label}
+          </label>
+        ) : (
+          <p className="text-sm font-medium text-gray-100">{label}</p>
+        )}
         {description && (
           <p className="mt-0.5 text-xs text-gray-400">{description}</p>
         )}
@@ -244,10 +253,9 @@ function ParametersSection({
   return (
     <SettingRow
       label="Timeframe"
+      htmlFor="timeframe"
       description="Auto-filled into each prompt so the AI knows the relevant period."
       control={
-        /* htmlFor + id links the label to the input for accessibility.
-           This is what allows getByRole("textbox", { name: /timeframe/i }) in tests. */
         <input
           id="timeframe"
           type="text"

@@ -46,6 +46,7 @@ export interface SettingsContextValue {
  * Initialised with null — a null value at runtime means the consuming
  * component is not wrapped in a SettingsProvider (caught by useSettings).
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 /**
@@ -135,6 +136,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
  * Throws a descriptive error when used outside a SettingsProvider so
  * the developer gets a clear message instead of a cryptic null-access crash.
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useSettings(): SettingsContextValue {
   const ctx = useContext(SettingsContext);
   if (!ctx) {
