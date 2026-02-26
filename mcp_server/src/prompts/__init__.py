@@ -123,6 +123,7 @@ def build_pir_generation_prompt(
     threat_actors: list,
     priority_focus: str,
     modifications: str | None = None,
+    current_pir: str | None = None,
     language: str = "en",
 ) -> str:
     """Build prompt for PIR document generation.
@@ -195,11 +196,23 @@ THREAT ACTORS: {threat_actors}
 PRIORITY FOCUS: {priority_focus}
 ANALYTICAL PERSPECTIVES: {perspectives}
 
+EXISTING PIRs: {current_pir or "None"}
 MODIFICATIONS: {modifications}
+
+Use the following rules to decide how to respond:
 - If MODIFICATIONS is empty: Generate a fresh set of 2-5 PIRs based
   on the investigation context above.
-- If MODIFICATIONS has content: Regenerate the PIRs from scratch,
-  but take the requested changes into account as additional constraints.
+- If MODIFICATIONS has content and EXISTING PIRs is not None:
+  - First, judge whether the feedback targets specific PIRs (e.g. "change PIR 2",
+    "PIR 3 is too vague") or is general (e.g. "poor quality", "too broad",
+    "not relevant enough").
+  - Specific feedback: keep all other PIRs unchanged and only modify the ones
+    explicitly mentioned.
+  - General feedback: regenerate all PIRs from scratch, using the feedback
+    as quality guidance.
+- If MODIFICATIONS has content but EXISTING PIRs is None: Regenerate
+  PIRs from scratch, but take the requested changes into account as
+  additional constraints.
 """
 
 

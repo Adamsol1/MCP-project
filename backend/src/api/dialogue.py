@@ -1,3 +1,4 @@
+import json
 import logging
 from pathlib import Path
 
@@ -29,6 +30,25 @@ _server_path = str(
 
 
 _sessions: dict[str, DialogueFlow] = {}
+
+_SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
+_SESSIONS_DIR.mkdir(exist_ok=True)
+
+
+def _save_session(flow: DialogueFlow) -> None:
+    """Persist session state to disk so it survives server restarts."""
+    path = _SESSIONS_DIR / f"{flow.session_id}.json"
+    path.write_text(json.dumps(flow.to_dict()), encoding="utf-8")
+
+
+def _load_session(session_id: str, research_logger) -> DialogueFlow | None:
+    """Load a previously persisted session from disk. Returns None if not found."""
+    path = _SESSIONS_DIR / f"{session_id}.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text(encoding="utf-8"))
+    logger.info(f"[Session {session_id}] Restored from disk — state={data['state']}")
+    return DialogueFlow.from_dict(data, research_logger=research_logger)
 
 
 # Request model
@@ -112,14 +132,15 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     Raises:
         Any exception given by DialogueFlow or MCPClient
     """
-    # Checks if session_id is in session. If not create a new session
+    # Checks if session_id is in memory. If not, try to restore from disk, else create new.
     if request.session_id not in _sessions:
         research_logger = ResearchLogger(session_id=request.session_id)
-        _sessions[request.session_id] = DialogueFlow(
+        _sessions[request.session_id] = _load_session(
+            request.session_id, research_logger
+        ) or DialogueFlow(
             session_id=request.session_id, research_logger=research_logger
         )
 
-    # Start a new dialogueFlow
     flow = _sessions[request.session_id]
     logger.info(
         f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}"
@@ -153,5 +174,8 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
 
     # Convert internal response to API format and return
     converted_response = _convert_to_message_response(response)
+
+    # Persist updated session state to disk after every message
+    _save_session(flow)
 
     return converted_response

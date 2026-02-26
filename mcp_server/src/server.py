@@ -108,7 +108,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context, langu
     return result
 
 @mcp.tool
-def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications=None, language="en") -> str:
+def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications=None, current_pir=None, language="en") -> str:
     """
     Create a PIR based on investigation scope, timeframe and target entites gathered from dialogue.
 
@@ -138,7 +138,7 @@ def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors,
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_pir_generation_prompt(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications, language),
+        contents=build_pir_generation_prompt(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications, current_pir, language),
     )
 
     #Return the JSON

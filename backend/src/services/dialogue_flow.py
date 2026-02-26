@@ -45,6 +45,36 @@ class DialogueFlow:
         Converts string values (e.g. 'US') to Perspective enum values (e.g. 'us')."""
         self.context.perspectives = [Perspective(p.lower()) for p in perspectives]
 
+    def to_dict(self) -> dict:
+        """Serialize session state to a plain dict for JSON persistence.
+        Note: research_logger is excluded — it is reconstructed on load."""
+        return {
+            "session_id": self.session_id,
+            "state": self.state.value,
+            "context": self.context.model_dump(),
+            "question_count": self.question_count,
+            "current_pir": self.current_pir,
+            "pending_reasoning_log": (
+                self.pending_reasoning_log.model_dump() if self.pending_reasoning_log else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, research_logger=None) -> "DialogueFlow":
+        """Reconstruct a DialogueFlow from a persisted dict.
+        Called when a session is loaded from disk after a server restart."""
+        flow = cls(session_id=data["session_id"], research_logger=research_logger)
+        flow.state = DialogueState(data["state"])
+        flow.context = DialogueContext.model_validate(data["context"])
+        flow.question_count = data["question_count"]
+        flow.current_pir = data["current_pir"]
+        flow.pending_reasoning_log = (
+            ReasoningLog.model_validate(data["pending_reasoning_log"])
+            if data["pending_reasoning_log"]
+            else None
+        )
+        return flow
+
     async def process_user_message(
         self,
         user_message,
@@ -362,7 +392,7 @@ class DialogueFlow:
             )
             if self.research_logger:
                 self.research_logger.create_log(log_user_interaction)
-            pir = await dialogue_service.generate_pir(self.context, language=language)
+            pir = await dialogue_service.generate_pir(self.context, language=language, current_pir=self.current_pir)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             dialogue_response.action = "show_pir"
             dialogue_response.content = self.current_pir

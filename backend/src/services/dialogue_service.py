@@ -61,7 +61,7 @@ class DialogueService:
 
         return QuestionResult(question=question, extracted_context=extracted_context)
 
-    async def generate_pir(self, context: DialogueContext, language: str | None = None) -> str:
+    async def generate_pir(self, context: DialogueContext, language: str | None = None, current_pir: str | None = None) -> str:
         """
         Calls the generate_pir MCP tool to create a PIR based on gathered context.
 
@@ -84,6 +84,7 @@ class DialogueService:
                 "target_entities": context.target_entities,
                 "perspectives": perspectives,
                 "modifications": context.modifications,
+                "current_pir": current_pir,
                 "threat_actors": context.threat_actors,
                 "priority_focus": context.priority_focus,
                 "language": effective_language,
