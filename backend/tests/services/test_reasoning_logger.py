@@ -7,10 +7,10 @@ from uuid import uuid4
 
 import pytest
 
-from backend.src.services.reasearch_logger import ResearchLogger
 from src.models.dialogue import DialogueContext
 from src.models.reasoning import ReasoningLogEntry
 from src.services.ai_orchestrator import AIOrchestrator
+from src.services.reasearch_logger import ResearchLogger
 from tests.services.conftest import (
     MockGenerator,
     MockLogger,
