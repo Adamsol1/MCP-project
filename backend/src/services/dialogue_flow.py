@@ -53,41 +53,56 @@ class DialogueFlow:
         approved: bool | None = None,
         orchestrator=None,
         reviewer=None,
+        language: str = "en",
+        settings_timeframe: str = "",
     ) -> DialogueResponse:
         """
-        Route the incoming message to the correct state
-
+        Route the incoming message to the correct state.
 
         Args:
-            user_message: The message sent by the user
+            user_message: The message sent by the user.
             dialogue_service: Service for generating questions, summaries, and PIRs.
-            perspectives: List of geopolitical perspectives from the frontend. Is the viewpoint of the investigation
-            approved: True = user accepts AI output, False = user rejects with modifications.
-            orchestrator: If provided, uses the generate and review loop for PIR generation.
+            perspectives: List of geopolitical perspectives from the frontend.
+            approved: True = user accepts AI output, False/None = user rejects.
+            orchestrator: If provided, uses the generate-and-review loop for PIR generation.
             reviewer: Required alongside orchestrator for PIR review.
-
+            language: BCP-47 language code (e.g. "en", "no") — forwarded to MCP tools
+                      so Gemini generates all responses in the selected language.
+            settings_timeframe: Pre-set timeframe from the user's Settings → Parameters
+                                 (e.g. "Last 30 days"). Pre-fills context.timeframe when
+                                 it is currently empty, skipping the timeframe question.
         """
         # Update perspectives on every message if provided
         if perspectives:
             self.update_perspectives(perspectives)
+
+        # Pre-fill timeframe from settings if not yet gathered through dialogue.
+        # User input in chat always wins — _apply_context_update will overwrite this
+        # later if the AI extracts an explicit timeframe from the conversation.
+        if settings_timeframe.strip() and not self.context.timeframe:
+            self.context.timeframe = settings_timeframe.strip()
+            logger.info(
+                f"[Session {self.session_id}] Timeframe pre-populated from settings: '{self.context.timeframe}'"
+            )
+
         # INITIAL PHASE
         if self.state == DialogueState.INITIAL:
-            return await self.handle_initial_input(user_message, dialogue_service)
+            return await self.handle_initial_input(user_message, dialogue_service, language)
 
         # GATHERING PHASE
         elif self.state == DialogueState.GATHERING:
-            return await self.handle_gathering_input(user_message, dialogue_service)
+            return await self.handle_gathering_input(user_message, dialogue_service, language)
 
         # SUMMARY CONFIRMING PHASE
         elif self.state == DialogueState.SUMMARY_CONFIRMING:
             return await self.handle_summary_confirming(
-                user_message, dialogue_service, approved, orchestrator, reviewer
+                user_message, dialogue_service, approved, orchestrator, reviewer, language
             )
 
         # PIR CONFIRMING PHASE
         elif self.state == DialogueState.PIR_CONFIRMING:
             return await self.handle_pir_confirming(
-                user_message, dialogue_service, approved
+                user_message, dialogue_service, approved, language
             )
 
         # COMPLETE - should not receive messages in this state
@@ -111,7 +126,7 @@ class DialogueFlow:
             self.context.priority_focus = extracted_context["priority_focus"]
 
     async def handle_initial_input(
-        self, user_message, dialogue_service
+        self, user_message, dialogue_service, language: str = "en"
     ) -> DialogueResponse:
         """
         State handler for initial phase. Here we will save initial query, generate questions and change state to GATHERING
@@ -124,7 +139,7 @@ class DialogueFlow:
 
         # Generate question and extract context from user message
         result = await dialogue_service.generate_clarifying_question(
-            user_message=user_message, context=self.context
+            user_message=user_message, context=self.context, language=language
         )
         # Update context
         self._apply_context_update(result.extracted_context)
@@ -145,7 +160,7 @@ class DialogueFlow:
         return dialogue_response
 
     async def handle_gathering_input(
-        self, user_message, dialogue_service
+        self, user_message, dialogue_service, language: str = "en"
     ) -> DialogueResponse:
         """
         State handler for gathering phase.  Here we will update context with information from user input.
@@ -174,7 +189,7 @@ class DialogueFlow:
 
         # Generate question and extract context from user message
         result = await dialogue_service.generate_clarifying_question(
-            user_message=user_message, context=self.context
+            user_message=user_message, context=self.context, language=language
         )
         # Update context
         self._apply_context_update(result.extracted_context)
@@ -193,7 +208,7 @@ class DialogueFlow:
                 f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (sufficient context)"
             )
             dialogue_response.action = "show_summary"
-            summary = await dialogue_service.generate_summary(self.context)
+            summary = await dialogue_service.generate_summary(self.context, language=language)
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
             )
@@ -211,6 +226,7 @@ class DialogueFlow:
         approved: bool | None = None,
         orchestrator=None,
         reviewer=None,
+        language: str = "en",
     ) -> DialogueResponse:
         """
         State handler for summary confirming phase.
@@ -223,7 +239,11 @@ class DialogueFlow:
 
         if approved:
             # User approved context summary. Generate PIR and move to PIR_CONFIRMING
-            # If orchestrator and reviewer are provided, use the full generate+review loop
+            # If orchestrator and reviewer are provided, use the full generate+review loop.
+            # Bridge: store language on the service instance so the orchestrator path
+            # (which calls dialogue_service.generate_pir(context) with only one arg) can
+            # still pick up the correct language without touching the orchestrator API.
+            dialogue_service.language = language
             if orchestrator and reviewer:
                 pir = await orchestrator.generate_and_review_pir(
                     self.context,
@@ -234,7 +254,7 @@ class DialogueFlow:
                 )
             # If no orchestator just generate pir alone
             else:
-                pir = await dialogue_service.generate_pir(self.context)
+                pir = await dialogue_service.generate_pir(self.context, language=language)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             if orchestrator:
                 retry_count = len(orchestrator.generated_pirs) - 1
@@ -286,7 +306,7 @@ class DialogueFlow:
                 self.research_logger.create_log(log_user_interaction)
             dialogue_response.action = "show_summary"
             summary = await dialogue_service.generate_summary(
-                self.context, modifications=user_message
+                self.context, modifications=user_message, language=language
             )
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
@@ -295,7 +315,7 @@ class DialogueFlow:
         return dialogue_response
 
     async def handle_pir_confirming(
-        self, user_message, dialogue_service, approved: bool | None = None
+        self, user_message, dialogue_service, approved: bool | None = None, language: str = "en"
     ) -> DialogueResponse:
         """
         State handler for PIR confirming phase.
@@ -342,7 +362,7 @@ class DialogueFlow:
             )
             if self.research_logger:
                 self.research_logger.create_log(log_user_interaction)
-            pir = await dialogue_service.generate_pir(self.context)
+            pir = await dialogue_service.generate_pir(self.context, language=language)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             dialogue_response.action = "show_pir"
             dialogue_response.content = self.current_pir

@@ -42,28 +42,43 @@ export default function PerspectiveSelector({
   ];
 
   /**
-   * Toggles a single perspective on or off.
+   * Toggles a single perspective on or off with auto-neutral logic:
    *
-   * If the value is already in selected → remove it (filter it out).
-   * If it is not in selected → add it (spread existing + append).
-   * Either way, the updated array is forwarded to the parent via onChange.
+   * - Clicking NEUTRAL: toggles it normally (add if absent, remove if present).
+   * - Clicking a non-NEUTRAL perspective:
+   *     - If already selected → deselect it.
+   *     - If not selected → add it and automatically remove NEUTRAL (if present),
+   *       since NEUTRAL represents "no specific viewpoint" and should not coexist
+   *       with an explicit perspective unless the user manually re-adds it.
+   * - Safety net: if the resulting selection is empty (all deselected), NEUTRAL
+   *   is automatically restored so the system always has at least one perspective.
    *
    * @param value - The perspective ID to toggle (e.g. "US").
    */
   const togglePerspective = (value: string) => {
-    let updatedPerspectives: string[];
-    if (selected.includes(value)) {
-      // Keep every item that is NOT the clicked value.
-      updatedPerspectives = selected.filter((p) => p !== value);
+    let updated: string[];
+
+    if (value === "NEUTRAL") {
+      // NEUTRAL toggles normally — add if absent, remove if present.
+      updated = selected.includes("NEUTRAL")
+        ? selected.filter((p) => p !== "NEUTRAL")
+        : [...selected, "NEUTRAL"];
     } else {
-      updatedPerspectives = [...selected, value];
+      // Non-NEUTRAL: deselect if active, otherwise add and auto-remove NEUTRAL.
+      updated = selected.includes(value)
+        ? selected.filter((p) => p !== value)
+        : [...selected.filter((p) => p !== "NEUTRAL"), value];
     }
-    onChange(updatedPerspectives);
+
+    // Safety net: if all perspectives were deselected, restore NEUTRAL as default.
+    if (updated.length === 0) updated = ["NEUTRAL"];
+
+    onChange(updated);
   };
 
   return (
     <div className="flex flex-col gap-2">
-      <h2 className="text-lg font-bold text-gray-900">Perspectives</h2>
+
       {/*
         .map() transforms the perspectives array into an array of button elements.
         React renders the returned array as a sequence of sibling nodes.

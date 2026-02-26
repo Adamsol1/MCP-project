@@ -7,8 +7,12 @@ interface OptionsPanelProps {
   selectedPerspectives: string[];
   /** Called with the updated perspectives array when the user toggles one. */
   onPerspectiveChange: (perspectives: string[]) => void;
-  /** Called when the user clicks the Upload Files button. */
+  /** Called when the user clicks the Upload Files button to open the modal. */
   onOpenFileUpload: () => void;
+  /** Files that have been successfully uploaded via the FileUploadModal. */
+  uploadedFiles: File[];
+  /** Called when the user removes a file from the uploaded files list. */
+  onFileRemove: (file: File) => void;
 }
 
 /**
@@ -20,18 +24,36 @@ interface OptionsPanelProps {
  * the same decision made for the left Sidebar.
  *
  * Contents (visible when expanded):
- *   - PerspectiveSelector — toggles for geopolitical analysis angles.
- *   - Upload Files button — opens the FileUploadModal overlay.
+ *   - "Perspectives" section — PerspectiveSelector for geopolitical analysis angles.
+ *   - "Files" section — Upload Files button (opens modal) + a collapsible list of
+ *     files already uploaded during this session. If more than 2 files are present,
+ *     only the first 2 are shown and a "Show X more" toggle reveals the rest.
  *
  * Local state:
- *   isCollapsed — whether the panel is in its narrow rail mode.
+ *   isCollapsed  — whether the panel is in its narrow rail mode.
+ *   showAllFiles — whether the full file list is expanded past the 2-file threshold.
  */
+
+/** Maximum number of files shown before the "Show X more" toggle appears. */
+const VISIBLE_FILE_COUNT = 2;
+
 export function OptionsPanel({
   selectedPerspectives,
   onPerspectiveChange,
   onOpenFileUpload,
+  uploadedFiles,
+  onFileRemove,
 }: OptionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  /** Controls whether the full uploaded-files list is expanded. */
+  const [showAllFiles, setShowAllFiles] = useState(false);
+
+  /** Slice of files shown based on showAllFiles toggle. */
+  const visibleFiles = showAllFiles
+    ? uploadedFiles
+    : uploadedFiles.slice(0, VISIBLE_FILE_COUNT);
+
+  const hiddenCount = uploadedFiles.length - VISIBLE_FILE_COUNT;
 
   return (
     <aside
@@ -67,18 +89,74 @@ export function OptionsPanel({
 
       {/* Panel content — hidden entirely when collapsed. */}
       {!isCollapsed && (
-        <div className="flex flex-col gap-4 p-4">
-          <PerspectiveSelector
-            selected={selectedPerspectives}
-            onChange={onPerspectiveChange}
-          />
+        <div className="flex flex-col gap-6 p-4 overflow-y-auto">
 
-          <button
-            onClick={onOpenFileUpload}
-            className="p-2 bg-blue-600 text-white rounded"
-          >
-            Upload Files
-          </button>
+          {/* ── Section: Perspectives ─────────────────────────────── */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+              Perspectives
+            </p>
+            <PerspectiveSelector
+              selected={selectedPerspectives}
+              onChange={onPerspectiveChange}
+            />
+          </div>
+
+          {/* ── Section: Files ────────────────────────────────────── */}
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+              Files
+            </p>
+
+            {/* Opens the FileUploadModal overlay */}
+            <button
+              onClick={onOpenFileUpload}
+              className="w-full p-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+            >
+              Upload Files
+            </button>
+
+            {/* Uploaded file list — only shown when at least one file exists */}
+            {uploadedFiles.length > 0 && (
+              <>
+                <ul className="mt-3 flex flex-col gap-1">
+                  {visibleFiles.map((file) => (
+                    <li
+                      key={`${file.name}-${file.size}`}
+                      className="flex items-center justify-between gap-1 text-sm"
+                    >
+                      <span
+                        className="flex-1 truncate text-gray-700"
+                        title={file.name}
+                      >
+                        {file.name}
+                      </span>
+                      <button
+                        onClick={() => onFileRemove(file)}
+                        className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                        aria-label={`Remove ${file.name}`}
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+
+                {/* Show more / show less toggle — only when list exceeds threshold */}
+                {uploadedFiles.length > VISIBLE_FILE_COUNT && (
+                  <button
+                    onClick={() => setShowAllFiles((prev) => !prev)}
+                    className="mt-2 text-xs text-blue-600 hover:underline"
+                  >
+                    {showAllFiles
+                      ? "Show less ▴"
+                      : `Show ${hiddenCount} more ▾`}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
         </div>
       )}
     </aside>

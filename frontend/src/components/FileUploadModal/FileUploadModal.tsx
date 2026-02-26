@@ -6,8 +6,8 @@ interface FileUploadModalProps {
   isOpen: boolean;
   /** Called when the user dismisses the modal (backdrop click or × button). */
   onClose: () => void;
-  /** Called each time the user selects an individual file inside the dropzone. */
-  onFileSelect: (file: File) => void;
+  /** Called each time the user selects an individual file inside the dropzone. Optional. */
+  onFileSelect?: (file: File) => void;
   /** Called when the user clicks Submit with the full list of queued files. */
   onSubmit: (files: File[]) => void;
 }

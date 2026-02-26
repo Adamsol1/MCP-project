@@ -48,7 +48,7 @@ def greet() -> str:
 
 #Tool for generating questions.
 @mcp.tool
-def dialogue_question(user_message, missing_fields, perspectives, context) -> dict:
+def dialogue_question(user_message, missing_fields, perspectives, context, language="en") -> dict:
     """
     Generate a clarifying question based on user input and current context.
 
@@ -57,6 +57,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context) -> di
         missing_fields: List of context fields that misses information. e.g (["scope", "timeframe"])
         perspectives: List of selected viewpoints of the investigation. e.g ["neutral", "us"]
         context: Include context to give the tool enough information to ask context based questions instead of general questions.
+        language: BCP-47 language code for the response language. e.g "en" (English), "no" (Norwegian).
 
     Returns:
         dict with:
@@ -86,7 +87,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context) -> di
         perspectives = ["neutral"]
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_direction_dialogue_prompt(user_message, missing_fields, perspectives, context),
+        contents=build_direction_dialogue_prompt(user_message, missing_fields, perspectives, context, language),
     )
     #Check for faulty response
     if not response.text:
@@ -107,7 +108,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context) -> di
     return result
 
 @mcp.tool
-def generate_pir(scope, timeframe, target_entities, perspectives,threat_actors, priority_focus, modifications=None) -> str:
+def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications=None, language="en") -> str:
     """
     Create a PIR based on investigation scope, timeframe and target entites gathered from dialogue.
 
@@ -117,6 +118,7 @@ def generate_pir(scope, timeframe, target_entities, perspectives,threat_actors, 
         target_entities: The entities relevant to the investigation. e.g. "NATO member states"
         perspectives: The selected viewpoints for the investigation. e.g. ["norway", "neutral"]
         modifications: Optional user feedback for regenerating the PIR. e.g. "Add focus on supply chain attacks"
+        language: BCP-47 language code for the response language. e.g "en" (English), "no" (Norwegian).
 
     Returns:
         str: The formatted PIR
@@ -134,10 +136,9 @@ def generate_pir(scope, timeframe, target_entities, perspectives,threat_actors, 
     if not perspectives:
         perspectives = ["neutral"]
 
-
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_pir_generation_prompt(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications),
+        contents=build_pir_generation_prompt(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications, language),
     )
 
     #Return the JSON
@@ -148,7 +149,7 @@ def generate_pir(scope, timeframe, target_entities, perspectives,threat_actors, 
 
 
 @mcp.tool
-def generate_summary(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications=None) -> str:
+def generate_summary(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications=None, language="en") -> str:
     """
     Generate a human-readable summary of the gathered intelligence context.
 
@@ -160,6 +161,7 @@ def generate_summary(scope, timeframe, target_entities, threat_actors, priority_
         priority_focus: The main aspect to emphasize.
         perspectives: The selected analytical viewpoints.
         modifications: Optional user feedback to incorporate into the summary.
+        language: BCP-47 language code for the response language. e.g "en" (English), "no" (Norwegian).
 
     Returns:
         str: JSON with a 'summary' field containing a human-readable summary.
@@ -169,7 +171,7 @@ def generate_summary(scope, timeframe, target_entities, threat_actors, priority_
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_summary_prompt(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications),
+        contents=build_summary_prompt(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications, language),
     )
 
     return response.text
