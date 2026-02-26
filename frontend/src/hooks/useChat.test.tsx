@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useChat } from "./useChat";
 import { ConversationProvider } from "../contexts/ConversationContext";
 import { ToastProvider } from "../contexts/ToastContext";
+import { SettingsProvider } from "../contexts/SettingsContext";
 import type { ConversationStore } from "../types/conversation";
 
 // Mock the dialogue service so we don't make real API calls
@@ -12,13 +13,15 @@ import { sendMessage } from "../services/dialogue";
 
 const STORAGE_KEY = "mcp-conversations";
 
-// Helper: wraps the hook in ConversationProvider + ToastProvider so it has all required context
+// Helper: wraps the hook in all required providers
 function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <ToastProvider>
-        <ConversationProvider>{children}</ConversationProvider>
-      </ToastProvider>
+      <SettingsProvider>
+        <ToastProvider>
+          <ConversationProvider>{children}</ConversationProvider>
+        </ToastProvider>
+      </SettingsProvider>
     );
   };
 }
@@ -124,12 +127,45 @@ describe("useChat", () => {
     });
 
     // Now checks the exact sessionId from the seeded conversation
+    // sendMessage is called with 6 args: message, sessionId, perspectives, approved, language, timeframe
     expect(sendMessage).toHaveBeenCalledWith(
       "Investigate APT29",
       "test-session-123",
       ["US", "EU"],
       undefined,
+      "en",
+      "",
     );
+  });
+
+  it("auto-creates a conversation and sends the message when no conversation exists", async () => {
+    // Start with no conversation in localStorage — simulates a first-time visitor
+    // or a user who deleted all conversations.
+    localStorage.clear();
+
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "What is the scope of your investigation?",
+      type: "question",
+      is_final: false,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+
+    // activeConversation is null at this point — no conversations exist
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    // The message should have been added to the auto-created conversation
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toMatchObject({
+      text: "Investigate APT29",
+      sender: "user",
+    });
+    expect(result.current.messages[1]).toMatchObject({
+      text: "What is the scope of your investigation?",
+      sender: "system",
+    });
   });
 
   it("keeps the same session id across multiple messages", async () => {
@@ -366,5 +402,133 @@ describe("useChat", () => {
     });
 
     expect(sendMessage).not.toHaveBeenCalled();
+  });
+});
+
+describe("buildSystemMessage — structured response parsing", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    seedConversation();
+  });
+
+  it("stores type and parsed data when backend returns a summary response", async () => {
+    const summaryPayload = {
+      summary: "Investigation focused on APT29 targeting EU infrastructure.",
+    };
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: JSON.stringify(summaryPayload),
+      type: "summary",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    const systemMessage = result.current.messages[1];
+    expect(systemMessage.type).toBe("summary");
+    expect(systemMessage.data).toEqual(summaryPayload);
+    // Raw text is still preserved as the fallback for plain rendering
+    expect(systemMessage.text).toBe(JSON.stringify(summaryPayload));
+  });
+
+  it("stores type and parsed data when backend returns a pir response", async () => {
+    const pirPayload = {
+      result: "These PIRs address the investigation requirements.",
+      pirs: [
+        {
+          question: "What TTPs has APT29 used against EU targets?",
+          priority: "high",
+          rationale: "Core intelligence requirement for the investigation.",
+        },
+      ],
+      reasoning: "Selected based on scope and context provided.",
+    };
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: JSON.stringify(pirPayload),
+      type: "pir",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Approve summary");
+    });
+
+    const systemMessage = result.current.messages[1];
+    expect(systemMessage.type).toBe("pir");
+    expect(systemMessage.data).toEqual(pirPayload);
+  });
+
+  it("stores type but no data when backend returns a question response", async () => {
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "What is the scope of your investigation?",
+      type: "question",
+      is_final: false,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    const systemMessage = result.current.messages[1];
+    expect(systemMessage.type).toBe("question");
+    expect(systemMessage.data).toBeUndefined();
+  });
+
+  it("stores raw text and no data when summary response contains invalid JSON", async () => {
+    const malformedJson = "This is not valid JSON {{{";
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: malformedJson,
+      type: "summary",
+      is_final: true,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    const systemMessage = result.current.messages[1];
+    expect(systemMessage.type).toBe("summary");
+    expect(systemMessage.data).toBeUndefined();
+    // Raw text is still displayed so the user sees something
+    expect(systemMessage.text).toBe(malformedJson);
+  });
+
+  it("approve() also stores structured data from the backend response", async () => {
+    const pirPayload = {
+      result: "Summary of PIRs.",
+      pirs: [{ question: "Q1?", priority: "high", rationale: "R1." }],
+      reasoning: "Reasoning behind selection.",
+    };
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce({
+        question: JSON.stringify({ summary: "Investigation context summary." }),
+        type: "summary",
+        is_final: true,
+      })
+      .mockResolvedValueOnce({
+        question: JSON.stringify(pirPayload),
+        type: "pir",
+        is_final: true,
+      });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+    await act(async () => {
+      await result.current.approve();
+    });
+
+    // approve() is silent — no user message added, just the system PIR reply
+    // messages: [0] user "Answer", [1] system summary, [2] system pir
+    const pirMessage = result.current.messages.at(-1);
+    expect(pirMessage?.type).toBe("pir");
+    expect(pirMessage?.data).toEqual(pirPayload);
   });
 });

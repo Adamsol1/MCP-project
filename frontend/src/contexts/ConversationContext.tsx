@@ -29,8 +29,8 @@ export interface ConversationContextValue {
   conversations: Conversation[];
   /** The currently selected conversation, or null when none exist. */
   activeConversation: Conversation | null;
-  /** Create a brand-new conversation and make it the active one. */
-  createNewConversation: () => void;
+  /** Create a brand-new conversation, make it active, and return it. */
+  createNewConversation: () => Conversation;
   /** Switch the active conversation to the one with the given id. */
   switchConversation: (id: string) => void;
   /** Permanently delete the conversation with the given id. */
@@ -39,8 +39,11 @@ export interface ConversationContextValue {
   deleteAllConversations: () => void;
   /** Rename the conversation with the given id to newTitle. */
   renameConversation: (id: string, newTitle: string) => void;
-  /** Append a message to the active conversation's message list. */
-  addMessage: (message: Message) => void;
+  /**
+   * Append a message to a conversation's message list.
+   * When conversationId is omitted it falls back to the active conversation.
+   */
+  addMessage: (message: Message, conversationId?: string) => void;
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
   /** Replace the geopolitical perspectives of the active conversation. */
@@ -52,7 +55,7 @@ export interface ConversationContextValue {
  * Each variant maps to one public mutation in ConversationContextValue.
  */
 type Action =
-  | { type: "CREATE_CONVERSATION" }
+  | { type: "CREATE_CONVERSATION"; payload?: Conversation }
   | { type: "SWITCH_CONVERSATION"; payload: string }
   | { type: "DELETE_CONVERSATION"; payload: string }
   | { type: "DELETE_ALL_CONVERSATIONS" }
@@ -90,7 +93,7 @@ function conversationReducer(
 ): ConversationStore {
   switch (action.type) {
     case "CREATE_CONVERSATION": {
-      const newConversation = createConversation();
+      const newConversation = action.payload ?? createConversation();
       return {
         ...state,
         conversations: [...state.conversations, newConversation],
@@ -207,8 +210,10 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     state.conversations.find((c) => c.id === state.activeConversationId) ??
     null;
 
-  const createNewConversation = useCallback(() => {
-    dispatch({ type: "CREATE_CONVERSATION" });
+  const createNewConversation = useCallback((): Conversation => {
+    const newConversation = createConversation();
+    dispatch({ type: "CREATE_CONVERSATION", payload: newConversation });
+    return newConversation;
   }, []);
 
   const switchConversation = useCallback((id: string) => {
@@ -228,17 +233,19 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Appends a message to the active conversation.
-   * Does nothing if there is no active conversation.
-   * activeConversation is listed as a dependency so the closure always
-   * captures the latest active conversation id.
+   * Appends a message to a conversation.
+   * When conversationId is provided it targets that specific conversation —
+   * needed when a new conversation was just created and the React state
+   * hasn't re-rendered yet (activeConversation is still null in the closure).
+   * Falls back to the active conversation when conversationId is omitted.
    */
   const addMessage = useCallback(
-    (message: Message) => {
-      if (!activeConversation) return;
+    (message: Message, conversationId?: string) => {
+      const targetId = conversationId ?? activeConversation?.id;
+      if (!targetId) return;
       dispatch({
         type: "ADD_MESSAGE",
-        payload: { conversationId: activeConversation.id, message },
+        payload: { conversationId: targetId, message },
       });
     },
     [activeConversation],

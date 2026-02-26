@@ -126,6 +126,7 @@ class MCPClient:
 
         # Attempt to parse text to json
         try:
+            text = self._strip_fences(text)  # Strips leading ``` at start or ending
             return json.loads(text)  # returner dict hvis JSON
         except json.JSONDecodeError:
             return text
@@ -149,6 +150,24 @@ class MCPClient:
             {"name": tool.name, "description": tool.description}
             for tool in result.tools
         ]
+
+    @staticmethod
+    def _strip_fences(text: str) -> str:
+        """Removes leading whitespace and backticks (```) from output
+
+        Returns:
+            A striped text with just pure JSON or same text
+
+        Parameters:
+            text: The text to strip fences from.
+        """
+        text = text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1])
+            return text
+        else:
+            return text
 
 
 async def main() -> None:

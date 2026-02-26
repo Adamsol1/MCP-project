@@ -1,11 +1,41 @@
 import { useState, useRef, useEffect } from "react";
 import { ToastContainer } from "../Toast";
+import type { Message } from "../../types/conversation";
 
-/** Shape of a single message displayed in the chat. */
-interface Message {
-  id: string;
-  text: string;
-  sender: "user" | "system";
+/**
+ * Chevron arrow used inside <details> toggles.
+ * Tailwind's group-open variant rotates it 180° when the parent
+ * <details class="group"> gains the [open] attribute.
+ */
+function Chevron() {
+  return (
+    <svg
+      width="12"
+      height="12"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="inline-block ml-1 transition-transform group-open:rotate-180"
+    >
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+  );
+}
+
+/**
+ * Converts **bold** markers into <strong> elements.
+ * split() with a capture group alternates: even indices = plain text,
+ * odd indices = the captured bold text.
+ */
+function renderWithBold(text: string): React.ReactNode {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+  );
 }
 
 /** Props for the ChatWindow component. */
@@ -102,7 +132,7 @@ export default function ChatWindow({
       setInputValue("");
     }, 80);
     return () => clearTimeout(id);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [devPrefill]);
 
   /** Submits the current input value if it is non-empty, then clears the field. */
@@ -119,6 +149,74 @@ export default function ChatWindow({
   };
 
   const hasMessages = messages.length > 0;
+
+  const PRIORITY_LABEL: Record<string, string> = {
+    high: "High",
+    medium: "Medium",
+    low: "Low",
+  };
+
+  function renderMessageContent(message: Message) {
+    if (
+      message.type === "summary" &&
+      message.data &&
+      "summary" in message.data
+    ) {
+      return <p>{message.data.summary}</p>;
+    }
+
+    if (message.type === "pir" && message.data && "pirs" in message.data) {
+      const pirData = message.data;
+      // Split reasoning on numbered points ("1. ", "2. ", …) so each starts on
+      // its own line. The lookahead (?=\d+\.\s) keeps the number with its text.
+      const reasoningPoints = pirData.reasoning
+        .split(/(?=\d+\.\s)/)
+        .map((s) => s.trim())
+        .filter(Boolean);
+      return (
+        <div className="space-y-2">
+          <h3 className="font-semibold">
+            Priority Intelligence Requirements (PIRs)
+          </h3>
+          <p className="text-base">{pirData.result}</p>
+          <ol className="space-y-3 mt-1">
+            {pirData.pirs.map((pir, i) => (
+              <li key={i} className="flex flex-col gap-1">
+                <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">
+                  {i + 1}. {PRIORITY_LABEL[pir.priority]}
+                </span>
+                <p className="font-medium text-base leading-snug">
+                  {pir.question}
+                </p>
+                <details className="group pl-1">
+                  <summary className="cursor-pointer list-none text-sm text-gray-400 hover:text-gray-600 select-none flex items-center">
+                    Rationale
+                    <Chevron />
+                  </summary>
+                  <p className="mt-1 text-sm text-gray-500">{pir.rationale}</p>
+                </details>
+              </li>
+            ))}
+          </ol>
+          <details className="group mt-3 border-t border-gray-300 pt-2">
+            <summary className="cursor-pointer list-none text-sm font-medium text-gray-600 hover:text-gray-800 select-none flex items-center gap-1">
+              Show reasoning
+              <Chevron />
+            </summary>
+            <div className="mt-2 space-y-2 bg-gray-50 rounded-md p-2">
+              {reasoningPoints.map((point, i) => (
+                <p key={i} className="text-sm text-gray-600">
+                  {renderWithBold(point)}
+                </p>
+              ))}
+            </div>
+          </details>
+        </div>
+      );
+    }
+
+    return <p>{message.text}</p>;
+  }
 
   return (
     <div className="h-full w-full flex flex-col">
@@ -141,7 +239,7 @@ export default function ChatWindow({
                     : "self-start bg-gray-50 text-gray-700"
                 }`}
               >
-                <p>{message.text}</p>
+                {renderMessageContent(message)}
               </div>
             ))}
             {/* Animated three-dot throbber shown while a backend response is in flight. */}
@@ -186,79 +284,79 @@ export default function ChatWindow({
         */}
         <div className="w-full max-w-3xl px-6">
           <div className="relative">
-          <ToastContainer position="above-input" />
-          {isConfirming ? (
-            /* Confirmation mode: Approve / Reject replace the text input. */
-            <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
-              <button
-                onClick={onApprove}
-                disabled={isLoading}
-                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Approve
-              </button>
-              <button
-                onClick={onReject}
-                disabled={isLoading}
-                className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Reject
-              </button>
-            </div>
-          ) : (
-            /*
-             * Normal mode: growing textarea inside a relative-positioned form.
-             * relative on the form lets the send button be absolute-positioned
-             * in the bottom-right corner.
-             * pb-12 reserves space so textarea text never slides under the button.
-             */
-            <form
-              onSubmit={handleSubmit}
-              className="relative border-2 border-gray-300 rounded-xl p-3 pb-12"
-            >
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                placeholder="Ask anything..."
-                value={inputValue}
-                onChange={(event) => setInputValue(event.target.value)}
-                onKeyDown={(e) => {
-                  // Enter alone submits; Shift+Enter inserts a newline.
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    submitMessage();
-                  }
-                }}
-                className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-gray-700 resize-none overflow-y-auto max-h-64"
-              />
-              {/* Send button — absolutely positioned in the bottom-right corner
-                  of the form so the textarea scrollbar is unobstructed. */}
-              <button
-                type="submit"
-                disabled={inputValue.trim() === ""}
-                aria-label="Send message"
-                className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
-                  inputValue.trim() === ""
-                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                    : "bg-blue-500 text-white hover:bg-blue-600"
-                }`}
-              >
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
+            <ToastContainer position="above-input" />
+            {isConfirming ? (
+              /* Confirmation mode: Approve / Reject replace the text input. */
+              <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
+                <button
+                  onClick={onApprove}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-            </form>
-          )}
+                  Approve
+                </button>
+                <button
+                  onClick={onReject}
+                  disabled={isLoading}
+                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Reject
+                </button>
+              </div>
+            ) : (
+              /*
+               * Normal mode: growing textarea inside a relative-positioned form.
+               * relative on the form lets the send button be absolute-positioned
+               * in the bottom-right corner.
+               * pb-12 reserves space so textarea text never slides under the button.
+               */
+              <form
+                onSubmit={handleSubmit}
+                className="relative border-2 border-gray-300 rounded-xl p-3 pb-12"
+              >
+                <textarea
+                  ref={textareaRef}
+                  rows={1}
+                  placeholder="Ask anything..."
+                  value={inputValue}
+                  onChange={(event) => setInputValue(event.target.value)}
+                  onKeyDown={(e) => {
+                    // Enter alone submits; Shift+Enter inserts a newline.
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      submitMessage();
+                    }
+                  }}
+                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-gray-700 resize-none overflow-y-auto max-h-64"
+                />
+                {/* Send button — absolutely positioned in the bottom-right corner
+                  of the form so the textarea scrollbar is unobstructed. */}
+                <button
+                  type="submit"
+                  disabled={inputValue.trim() === ""}
+                  aria-label="Send message"
+                  className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                    inputValue.trim() === ""
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-blue-500 text-white hover:bg-blue-600"
+                  }`}
+                >
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+              </form>
+            )}
           </div>
         </div>
       </div>

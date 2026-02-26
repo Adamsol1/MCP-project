@@ -3,6 +3,7 @@ import { sendMessage } from "../services/dialogue";
 import { useSettings } from "../contexts/SettingsContext";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
+import type { Message, PirData, SummaryData } from "../types/conversation";
 
 /**
  * Orchestrates all chat interactions for the active conversation.
@@ -23,7 +24,7 @@ import { useToast } from "./useToast";
  *   debugConfirm  — DEV ONLY: injects a fake summary to test the approval UI.
  */
 export function useChat() {
-  const { activeConversation, addMessage, setIsConfirming } = useConversation();
+  const { activeConversation, addMessage, setIsConfirming, createNewConversation } = useConversation();
   const { success, info } = useToast();
   const { settings } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
@@ -33,6 +34,34 @@ export function useChat() {
   // Fall back to empty / false when no conversation is selected.
   const messages = activeConversation?.messages ?? [];
   const isConfirming = activeConversation?.isConfirming ?? false;
+  const buildSystemMessage = (response: {
+    question: string;
+    type: string;
+    is_final: boolean;
+  }): Message => {
+    if (response.type === "summary" || response.type === "pir") {
+      let data: SummaryData | PirData | undefined;
+      try {
+        data = JSON.parse(response.question);
+      } catch {
+        /* empty */
+      }
+      return {
+        id: crypto.randomUUID(),
+        text: response.question,
+        sender: "system",
+        type: response.type as Message["type"],
+        data,
+      };
+    }
+    // fallback for "question", "complete", etc.
+    return {
+      id: crypto.randomUUID(),
+      text: response.question,
+      sender: "system",
+      type: response.type as Message["type"],
+    };
+  };
 
   /**
    * Sends a user message to the backend and appends both the user message and
@@ -42,28 +71,31 @@ export function useChat() {
    * @param approved - Optional flag forwarded to the backend (used internally by approve()).
    */
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    if (!activeConversation) return;
-    addMessage({
-      id: crypto.randomUUID(),
-      text,
-      sender: "user",
-    });
+    // Auto-create a conversation when none is active (first visit, or after
+    // deleting all conversations). createNewConversation() dispatches to the
+    // reducer and returns the new Conversation synchronously so we have its
+    // sessionId and perspectives before any async work begins.
+    const conversation = activeConversation ?? createNewConversation();
+
+    // Pass conversation.id explicitly for both addMessage calls.
+    // After the awaited backend call React will have re-rendered, making the
+    // addMessage closure stale — an explicit ID avoids relying on it.
+    addMessage(
+      { id: crypto.randomUUID(), text, sender: "user" },
+      conversation.id,
+    );
 
     setIsLoading(true);
     try {
       const response = await sendMessage(
         text,
-        activeConversation.sessionId,
-        activeConversation.perspectives,
+        conversation.sessionId,
+        conversation.perspectives,
         approved,
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+      addMessage(buildSystemMessage(response), conversation.id);
       setIsConfirming(response.is_final);
     } finally {
       setIsLoading(false);
@@ -88,11 +120,9 @@ export function useChat() {
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+
+      addMessage(buildSystemMessage(response));
+
       setIsConfirming(response.is_final);
       success("Request approved");
     } finally {
