@@ -217,6 +217,276 @@ describe("ChatWindow", () => {
     ).not.toBeInTheDocument();
   });
 
+  // ---------- Structured message rendering ----------
+
+  it("renders data.summary as plain text for 'summary' type messages", () => {
+    const messages = [
+      {
+        id: "1",
+        text: JSON.stringify({ summary: "Investigation focused on APT29 targeting EU infrastructure." }),
+        sender: "system" as const,
+        type: "summary" as const,
+        data: { summary: "Investigation focused on APT29 targeting EU infrastructure." },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(
+      screen.getByText("Investigation focused on APT29 targeting EU infrastructure.")
+    ).toBeInTheDocument();
+  });
+
+  it("does not render raw JSON string when message type is 'summary'", () => {
+    const rawJson = JSON.stringify({ summary: "Some summary text." });
+    const messages = [
+      {
+        id: "1",
+        text: rawJson,
+        sender: "system" as const,
+        type: "summary" as const,
+        data: { summary: "Some summary text." },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    // The structured renderer should show data.summary, not the raw JSON blob
+    expect(screen.queryByText(rawJson)).not.toBeInTheDocument();
+  });
+
+  it("renders a PIR section heading for 'pir' type messages", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated successfully.",
+          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "Important." }],
+          reasoning: "Based on the scope provided.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText(/Priority Intelligence Requirements/)).toBeInTheDocument();
+  });
+
+  it("renders each PIR question in the list", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [
+            { question: "What TTPs has APT29 used?", priority: "high" as const, rationale: "Core requirement." },
+            { question: "Which EU sectors were targeted?", priority: "medium" as const, rationale: "Scope clarification." },
+          ],
+          reasoning: "Selected based on context.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText(/What TTPs has APT29 used\?/)).toBeInTheDocument();
+    expect(screen.getByText(/Which EU sectors were targeted\?/)).toBeInTheDocument();
+  });
+
+  it("renders the priority label for PIR items", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [
+            { question: "High priority Q?", priority: "high" as const, rationale: "Critical." },
+            { question: "Medium priority Q?", priority: "medium" as const, rationale: "Important." },
+            { question: "Low priority Q?", priority: "low" as const, rationale: "Nice to have." },
+          ],
+          reasoning: "Reasoning here.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText(/1\. High/)).toBeInTheDocument();
+    expect(screen.getByText(/2\. Medium/)).toBeInTheDocument();
+    expect(screen.getByText(/3\. Low/)).toBeInTheDocument();
+  });
+
+  it("shows a 'Rationale' toggle for each PIR item", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [
+            { question: "Q1?", priority: "high" as const, rationale: "Because it matters." },
+            { question: "Q2?", priority: "low" as const, rationale: "Secondary concern." },
+          ],
+          reasoning: "Reasoning here.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    // One "Rationale" toggle should appear per PIR item
+    const toggles = screen.getAllByText(/rationale/i);
+    expect(toggles).toHaveLength(2);
+  });
+
+  it("keeps rationale text in the DOM inside each collapsible", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "Because it matters." }],
+          reasoning: "Reasoning here.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText("Because it matters.")).toBeInTheDocument();
+  });
+
+  it("renders **bold** markers in reasoning as <strong> elements", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "R1." }],
+          reasoning: "1. **Scope**: Covers the main area.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    const boldEl = screen.getByText("Scope");
+    expect(boldEl.tagName).toBe("STRONG");
+  });
+
+  it("renders a 'Show reasoning' toggle for PIR messages", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [{ question: "Q1?", priority: "low" as const, rationale: "R1." }],
+          reasoning: "Selected based on scope and context provided.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText(/show reasoning/i)).toBeInTheDocument();
+  });
+
+  it("keeps reasoning text in the DOM inside the collapsible", () => {
+    // <details> hides content visually but keeps it in the DOM — the text
+    // should be findable even before the user expands the section.
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [{ question: "Q1?", priority: "low" as const, rationale: "R1." }],
+          reasoning: "Selected based on scope and context provided.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText("Selected based on scope and context provided.")).toBeInTheDocument();
+  });
+
+  it("splits numbered reasoning points into separate paragraphs", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          result: "PIRs generated.",
+          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "R1." }],
+          reasoning: "Intro text. 1. First point here. 2. Second point here. 3. Third point here.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    // Each numbered point should appear as its own element in the DOM
+    expect(screen.getByText(/1\. First point here/)).toBeInTheDocument();
+    expect(screen.getByText(/2\. Second point here/)).toBeInTheDocument();
+    expect(screen.getByText(/3\. Third point here/)).toBeInTheDocument();
+  });
+
+  it("falls back to plain text for 'question' type messages", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "What is the scope of your investigation?",
+        sender: "system" as const,
+        type: "question" as const,
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText("What is the scope of your investigation?")).toBeInTheDocument();
+  });
+
+  it("falls back to plain text when summary message has no data (malformed JSON upstream)", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "This is not valid JSON {{{",
+        sender: "system" as const,
+        type: "summary" as const,
+        // data is intentionally absent — upstream JSON.parse failed
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    expect(screen.getByText("This is not valid JSON {{{")).toBeInTheDocument();
+  });
+
   // ---------- S2.5.5: Validation - prevent skipping approval ----------
 
   it("hides text input and send button when isConfirming is true", () => {

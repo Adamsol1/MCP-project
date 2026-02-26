@@ -6,6 +6,8 @@ export interface Message {
   text: string;
   /** Who sent the message — the human user or the AI system. */
   sender: "user" | "system";
+  type?: "question" | "summary" | "pir" | "complete"; // The type of message, which can be "text", "summary", or "error".
+  data?: SummaryData | PirData; // JSON obj
 }
 
 /**
@@ -48,4 +50,33 @@ export interface ConversationStore {
   conversations: Conversation[];
   /** The id of the currently selected conversation, or null when none exist. */
   activeConversationId: string | null;
+}
+
+/**
+ * Summary text
+ */
+export interface SummaryData {
+  summary: string;
+}
+
+/**
+ * Each individual pirs have a question, their priority,
+ * and the rationale for that pir
+ */
+export interface PirItem {
+  question: string;
+  priority: "high" | "medium" | "low";
+  rationale: string;
+}
+
+/**
+ * The Pir generation data, that has:
+ * - Reult: What the AI did
+ * - PirItem[]: List of pirs generated
+ * - Resoning: Reasoning behind AI's desicions
+ */
+export interface PirData {
+  result: string;
+  pirs: PirItem[];
+  reasoning: string;
 }

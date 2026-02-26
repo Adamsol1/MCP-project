@@ -3,6 +3,7 @@ import { sendMessage } from "../services/dialogue";
 import { useSettings } from "../contexts/SettingsContext";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
+import type { Message, PirData, SummaryData } from "../types/conversation";
 
 /**
  * Orchestrates all chat interactions for the active conversation.
@@ -33,6 +34,34 @@ export function useChat() {
   // Fall back to empty / false when no conversation is selected.
   const messages = activeConversation?.messages ?? [];
   const isConfirming = activeConversation?.isConfirming ?? false;
+  const buildSystemMessage = (response: {
+    question: string;
+    type: string;
+    is_final: boolean;
+  }): Message => {
+    if (response.type === "summary" || response.type === "pir") {
+      let data: SummaryData | PirData | undefined;
+      try {
+        data = JSON.parse(response.question);
+      } catch {
+        /* empty */
+      }
+      return {
+        id: crypto.randomUUID(),
+        text: response.question,
+        sender: "system",
+        type: response.type as Message["type"],
+        data,
+      };
+    }
+    // fallback for "question", "complete", etc.
+    return {
+      id: crypto.randomUUID(),
+      text: response.question,
+      sender: "system",
+      type: response.type as Message["type"],
+    };
+  };
 
   /**
    * Sends a user message to the backend and appends both the user message and
@@ -59,11 +88,7 @@ export function useChat() {
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+      addMessage(buildSystemMessage(response));
       setIsConfirming(response.is_final);
     } finally {
       setIsLoading(false);
@@ -88,11 +113,9 @@ export function useChat() {
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+
+      addMessage(buildSystemMessage(response));
+
       setIsConfirming(response.is_final);
       success("Request approved");
     } finally {
