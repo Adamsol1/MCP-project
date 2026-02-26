@@ -4,10 +4,10 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from backend.src.services.state_machines.direction_flow import DirectionFlow
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
-from src.services.dialogue_flow import DialogueFlow
 from src.services.dialogue_service import DialogueService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
@@ -16,7 +16,7 @@ from src.services.review_service import ReviewService
 API router for the dialogue flow.
 
 Handles incoming messages from the frontend, routes them through
-the dialogue state machine (DialogueFlow), and returns structured responses.
+the dialogue state machine (DirectionFlow), and returns structured responses.
 
 Sessions are stored in memory in `_sessions`
 """
@@ -28,7 +28,7 @@ _server_path = str(
 )
 
 
-_sessions: dict[str, DialogueFlow] = {}
+_sessions: dict[str, DirectionFlow] = {}
 
 
 # Request model
@@ -103,12 +103,12 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         A response with the next question or summary, what type of respone, and if the dialogue flow is complete
 
     Raises:
-        Any exception given by DialogueFlow or MCPClient
+        Any exception given by DirectionFlow or MCPClient
     """
     # Checks if session_id is in session. If not create a new session
     if request.session_id not in _sessions:
         research_logger = ResearchLogger(session_id=request.session_id)
-        _sessions[request.session_id] = DialogueFlow(
+        _sessions[request.session_id] = DirectionFlow(
             session_id=request.session_id, research_logger=research_logger
         )
 

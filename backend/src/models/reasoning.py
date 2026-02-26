@@ -50,9 +50,9 @@ class UserActionLogEntry(BaseModel):
     session_id: str | None
     timestamp: datetime
     action: Literal["approve", "reject", "modify"]
-    phase: Literal["summary_confirming", "pir_confirming"]
+    phase: str
     modifications: str | None = None
-    perspectives_selected: list[str]
+    perspectives_selected: list[str] | None
 
 
 class ReasoningLog(BaseModel):
