@@ -138,6 +138,36 @@ describe("useChat", () => {
     );
   });
 
+  it("auto-creates a conversation and sends the message when no conversation exists", async () => {
+    // Start with no conversation in localStorage — simulates a first-time visitor
+    // or a user who deleted all conversations.
+    localStorage.clear();
+
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "What is the scope of your investigation?",
+      type: "question",
+      is_final: false,
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+
+    // activeConversation is null at this point — no conversations exist
+    await act(async () => {
+      await result.current.sendMessage("Investigate APT29");
+    });
+
+    // The message should have been added to the auto-created conversation
+    expect(result.current.messages).toHaveLength(2);
+    expect(result.current.messages[0]).toMatchObject({
+      text: "Investigate APT29",
+      sender: "user",
+    });
+    expect(result.current.messages[1]).toMatchObject({
+      text: "What is the scope of your investigation?",
+      sender: "system",
+    });
+  });
+
   it("keeps the same session id across multiple messages", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "Any response",
