@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
+import type { ThrobberVariant } from "../ChatWindow/ChatWindow";
 
 /** Props for the Sidebar component. */
 interface SidebarProps {
@@ -19,6 +20,10 @@ interface SidebarProps {
   onDeleteAllConversations: () => void;
   /** DEV: Injects a predefined message into the chat input and sends it. */
   onDevSendMessage: () => void;
+  /** DEV: The currently active throbber variant. */
+  throbberVariant: ThrobberVariant;
+  /** DEV: Called when the user toggles the throbber variant. */
+  onThrobberChange: (variant: ThrobberVariant) => void;
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
 }
@@ -52,6 +57,8 @@ export function Sidebar({
   onRenameConversation,
   onDeleteAllConversations,
   onDevSendMessage,
+  throbberVariant,
+  onThrobberChange,
   onOpenSettings,
 }: SidebarProps) {
   // Sort a copy so the original prop array is never mutated.
@@ -287,6 +294,31 @@ export function Sidebar({
           >
             Delete all conversations
           </button>
+          <div className="px-2 py-1.5">
+            <p className="text-xs text-gray-400 mb-1">Loading throbber</p>
+            <div className="flex gap-1">
+              <button
+                onClick={() => onThrobberChange("dots")}
+                className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  throbberVariant === "dots"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                }`}
+              >
+                Dots
+              </button>
+              <button
+                onClick={() => onThrobberChange("gif")}
+                className={`flex-1 px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  throbberVariant === "gif"
+                    ? "bg-blue-600 text-white"
+                    : "bg-gray-600 text-gray-300 hover:bg-gray-500"
+                }`}
+              >
+                GIF
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </aside>

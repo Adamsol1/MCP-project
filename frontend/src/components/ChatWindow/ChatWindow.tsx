@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ToastContainer } from "../Toast";
 import type { Message } from "../../types/conversation";
+export type ThrobberVariant = "dots" | "gif";
 
 /**
  * Chevron arrow used inside <details> toggles.
@@ -51,6 +52,8 @@ interface ChatWindowProps {
   isConfirming?: boolean;
   /** When true, disables Approve / Reject and shows the loading throbber. */
   isLoading?: boolean;
+  /** Selects which throbber style to render. Defaults to "dots". */
+  throbberVariant?: ThrobberVariant;
   /** Called when the user clicks Approve in confirmation mode. */
   onApprove?: () => void;
   /** Called when the user clicks Reject in confirmation mode. */
@@ -82,6 +85,7 @@ export default function ChatWindow({
   messages = [],
   isConfirming = false,
   isLoading = false,
+  throbberVariant = "dots",
   onApprove,
   onReject,
   devPrefill,
@@ -242,15 +246,23 @@ export default function ChatWindow({
                 {renderMessageContent(message)}
               </div>
             ))}
-            {/* Animated three-dot throbber shown while a backend response is in flight. */}
+            {/* Loading throbber shown while a backend response is in flight. */}
             {isLoading && (
-              <div className="self-start bg-gray-50 rounded-lg p-3 mb-2">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+              throbberVariant === "gif" ? (
+                <img
+                  src="https://media1.tenor.com/m/68Ad6sYP38cAAAAC/streched.gif"
+                  alt="Loading…"
+                  className="self-start h-8 w-auto mb-2"
+                />
+              ) : (
+                <div className="self-start bg-gray-50 rounded-lg p-3 mb-2">
+                  <div className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
+                    <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                  </div>
                 </div>
-              </div>
+              )
             )}
             {/* Invisible sentinel — scrolled into view to keep the list pinned to the bottom. */}
             <div ref={messagesEndRef} />

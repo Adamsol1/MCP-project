@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
+import type { ThrobberVariant } from "./components/ChatWindow/ChatWindow";
 import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
@@ -44,6 +45,8 @@ function App() {
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   /** Controls the visibility of the SettingsModal overlay. */
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  /** DEV: Which throbber style to use — "dots" (default) or "gif". */
+  const [throbberVariant, setThrobberVariant] = useState<ThrobberVariant>("dots");
 
   /**
    * Tracks files that have been successfully uploaded via the FileUploadModal.
@@ -95,6 +98,8 @@ function App() {
         onRenameConversation={renameConversation}
         onDeleteAllConversations={deleteAllConversations}
         onDevSendMessage={() => triggerDevMessage("What are the latest cyber threats targeting European critical infrastructure?")}
+        throbberVariant={throbberVariant}
+        onThrobberChange={setThrobberVariant}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -105,6 +110,7 @@ function App() {
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
           isLoading={isLoading}
+          throbberVariant={throbberVariant}
           onApprove={approve}
           onReject={reject}
           devPrefill={devPrefill}
@@ -130,6 +136,7 @@ function App() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+
     </div>
   );
 }
