@@ -19,6 +19,8 @@ interface SidebarProps {
   onDeleteAllConversations: () => void;
   /** DEV: Injects a predefined message into the chat input and sends it. */
   onDevSendMessage: () => void;
+  /** DEV: Forces chat into confirmation mode to preview approval UI. */
+  onDevShowCollectionApproval?: () => void;
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
 }
@@ -52,6 +54,7 @@ export function Sidebar({
   onRenameConversation,
   onDeleteAllConversations,
   onDevSendMessage,
+  onDevShowCollectionApproval,
   onOpenSettings,
 }: SidebarProps) {
   // Sort a copy so the original prop array is never mutated.
@@ -281,6 +284,14 @@ export function Sidebar({
           >
             Send test message
           </button>
+          {onDevShowCollectionApproval && (
+            <button
+              onClick={onDevShowCollectionApproval}
+              className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+            >
+              Show collection approval
+            </button>
+          )}
           <button
             onClick={onDeleteAllConversations}
             className="w-full text-left px-2 py-1.5 rounded text-sm text-red-400 hover:bg-gray-600"

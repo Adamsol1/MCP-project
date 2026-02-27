@@ -45,6 +45,7 @@ function App() {
     isLoading,
     approve,
     reject,
+    debugConfirm,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
@@ -100,6 +101,7 @@ function App() {
             "What are the latest cyber threats targeting European critical infrastructure?"
           )
         }
+        onDevShowCollectionApproval={debugConfirm}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 

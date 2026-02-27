@@ -93,6 +93,27 @@ describe("Sidebar", () => {
     expect(onNewChat).toHaveBeenCalledOnce();
   });
 
+  it("renders the collection-approval dev button when callback is provided", () => {
+    renderSidebar({ onDevShowCollectionApproval: vi.fn() });
+
+    expect(
+      screen.getByRole("button", { name: /show collection approval/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onDevShowCollectionApproval when clicked", async () => {
+    const user = userEvent.setup();
+    const onDevShowCollectionApproval = vi.fn();
+
+    renderSidebar({ onDevShowCollectionApproval });
+
+    await user.click(
+      screen.getByRole("button", { name: /show collection approval/i }),
+    );
+
+    expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
+  });
+
   it("calls onSwitchConversation with the conversation id when clicked", async () => {
     const onSwitch = vi.fn();
     const user = userEvent.setup();
