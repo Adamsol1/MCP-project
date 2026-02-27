@@ -38,7 +38,17 @@ function App() {
     renameConversation,
     updatePerspectives,
   } = useConversation();
-  const { messages, sendMessage, isConfirming, isLoading, approve, reject, devPrefill, triggerDevMessage, clearDevPrefill } = useChat();
+  const {
+    messages,
+    sendMessage,
+    isConfirming,
+    isLoading,
+    approve,
+    reject,
+    devPrefill,
+    triggerDevMessage,
+    clearDevPrefill,
+  } = useChat();
 
   /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
@@ -85,7 +95,11 @@ function App() {
         onDeleteConversation={deleteConversation}
         onRenameConversation={renameConversation}
         onDeleteAllConversations={deleteAllConversations}
-        onDevSendMessage={() => triggerDevMessage("What are the latest cyber threats targeting European critical infrastructure?")}
+        onDevSendMessage={() =>
+          triggerDevMessage(
+            "What are the latest cyber threats targeting European critical infrastructure?"
+          )
+        }
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
