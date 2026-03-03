@@ -193,7 +193,24 @@ export default function ChatWindow({
                     Rationale
                     <Chevron />
                   </summary>
-                  <p className="mt-1 text-sm text-text-secondary">{pir.rationale}</p>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    {pir.rationale}
+                  </p>
+                  {pir.sources && pir.sources.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      <span className="text-xs text-text-muted font-mono">
+                        Sources:
+                      </span>
+                      {pir.sources.map((src, j) => (
+                        <li
+                          key={j}
+                          className="text-xs text-text-muted font-mono"
+                        >
+                          {src}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </details>
               </li>
             ))}

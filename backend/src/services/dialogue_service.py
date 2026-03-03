@@ -97,7 +97,12 @@ class DialogueService:
         if self.knowledge_service and self.knowledge_base_path:
             scan_text = self._build_scan_text(context)
             paths = self.knowledge_service.get_relevant_resources(scan_text)
+            logger.info(f"[KnowledgeBank] Matched {len(paths)} resource(s): {paths}")
             background_knowledge = self._load_background_knowledge(paths)
+            if background_knowledge:
+                logger.info("[KnowledgeBank] Background knowledge injected into PIR prompt")
+            else:
+                logger.info("[KnowledgeBank] No background knowledge injected (no matches or files missing)")
         else:
             background_knowledge = None
 

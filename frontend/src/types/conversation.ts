@@ -67,6 +67,7 @@ export interface PirItem {
   question: string;
   priority: "high" | "medium" | "low";
   rationale: string;
+  sources?: string[];
 }
 
 /**

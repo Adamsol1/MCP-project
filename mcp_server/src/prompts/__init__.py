@@ -168,7 +168,13 @@ provided. Each PIR must be:
 - Measurable: Has a clear answer that can be found through collection
 - Prioritized: Ranked by importance to the decision at hand
 - Perspective-aware: Framed through the selected analytical viewpoint(s)
-- Incorporate any relevant background knowledge provided.
+
+CITATION RULES (apply when BACKGROUND KNOWLEDGE is present):
+- Use the provided background knowledge to inform and ground your PIRs
+- For each PIR, populate "sources" with a list of file paths from the
+  "### Source:" headers that directly support that PIR
+- Only cite a source if it genuinely influenced that specific PIR
+- Use an empty list [] if no background knowledge applies to a PIR
 
 ANALYTICAL PERSPECTIVES define the lens through which PIRs are framed:
 - Single or multiple countries/groups (e.g. "norway", "russia", "nato"):
@@ -186,7 +192,7 @@ Return your response in the following JSON format:
             "question": "The PIR formulated as a specific intelligence question",
             "priority": "high | medium | low",
             "rationale": "Why this PIR is important given the context",
-            "sources": "list all relevant sources from background knowledge that support this PIR, or null if none"
+            "sources": ["knowledge_bank/geopolitical/norway_russia.md"]
         }}
     ],
     "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected"
@@ -207,6 +213,7 @@ ANALYTICAL PERSPECTIVES: {perspectives}
 
 EXISTING PIRs: {current_pir or "None"}
 MODIFICATIONS: {modifications}
+{background_knowledge or ""}
 
 Use the following rules to decide how to respond:
 - If MODIFICATIONS is empty: Generate a fresh set of 2-5 PIRs based
