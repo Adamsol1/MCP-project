@@ -48,7 +48,7 @@ def greet() -> str:
 
 #Tool for generating questions.
 @mcp.tool
-def dialogue_question(user_message, missing_fields, perspectives, context) -> dict:
+def dialogue_question(user_message, missing_fields, perspectives, context, language="en") -> str:
     """
     Generate a clarifying question based on user input and current context.
 
@@ -104,7 +104,7 @@ def dialogue_question(user_message, missing_fields, perspectives, context) -> di
     # Backend override: if we know fields are missing, force False regardless of AI judgement
     if missing_fields:
         result["has_sufficient_context"] = False
-    return result
+    return json.dumps(result)
 
 @mcp.tool
 def generate_pir(scope, timeframe, target_entities, perspectives,threat_actors, priority_focus, modifications=None) -> str:

@@ -3,9 +3,9 @@ import logging
 from datetime import datetime
 from enum import Enum
 
+from backend.src.services.state_machines.base_phase_flow import BasePhaseFlow
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 from src.models.reasoning import ReasoningLog
-from backend.src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
@@ -235,15 +235,15 @@ class DirectionFlow(BasePhaseFlow):
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             if orchestrator:
                 retry_count = len(orchestrator.generated_pirs) - 1
-                #TODO : make method
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
+                    phase="direction",
                     model_used=orchestrator.generator_model,
                     dialogue_turns=self.context.dialogue_turns,
-                    generated_pirs_before_review=orchestrator.generated_pirs,
-                    review_reasoning_per_pir=orchestrator.review_results,
+                    generated_content_attempts=orchestrator.generated_pirs,
+                    review_reasoning=orchestrator.review_results,
                     retry_explanation=orchestrator.retry_explanations,
-                    final_approved_pir=None,
+                    final_approved_content=None,
                     timestamps={"pir_generated": datetime.now().isoformat()},
                     retry_triggered=retry_count > 0,
                     retry_count=retry_count,
@@ -293,7 +293,7 @@ class DirectionFlow(BasePhaseFlow):
                 f"[Session {self.session_id}] State: PIR_CONFIRMING -> COMPLETE. Direction phase finished"
             )
             if self.pending_reasoning_log and self.research_logger:
-                self.pending_reasoning_log.final_approved_pir = self.current_pir
+                self.pending_reasoning_log.final_approved_content = self.current_pir
                 self.pending_reasoning_log.timestamps["pir_approved"] = (
                     datetime.now().isoformat()
                 )

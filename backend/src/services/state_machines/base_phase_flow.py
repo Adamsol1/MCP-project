@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 
-from src.models.reasoning import UserActionLogEntry
+from src.models.reasoning import ReasoningLogEntry, UserActionLogEntry
 
 
 class BasePhaseFlow(ABC):
@@ -14,6 +14,22 @@ class BasePhaseFlow(ABC):
     self.max_questions = 15
 
 
+
+  def _log_reasoning(self, phase: str, attempt_number: int, generated_content: str, generation_duration: float, review_duration: float, model_used: str, review_result=None, error_type: str | None = None):
+        log_entry = ReasoningLogEntry(
+            session_id=self.session_id,
+            phase=phase,
+            attempt_number=attempt_number,
+            timestamp=datetime.now(),
+            generated_content=generated_content,
+            generation_duration=generation_duration,
+            review_result=review_result,
+            review_duration=review_duration,
+            model_used=model_used,
+            error_type=error_type,
+        )
+        if self.research_logger:
+            self.research_logger.create_log(log_entry)
 
   def _log_user_action(self, action, phase, modifications, perspectives=None):
         log_user_interaction = UserActionLogEntry(
