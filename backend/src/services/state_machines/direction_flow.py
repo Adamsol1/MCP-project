@@ -3,7 +3,7 @@ import logging
 from datetime import datetime
 from enum import Enum
 
-from backend.src.services.state_machines.base_phase_flow import BasePhaseFlow
+from src.services.state_machines.base_phase_flow import BasePhaseFlow
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 from src.models.reasoning import ReasoningLog
 
@@ -57,11 +57,11 @@ class DirectionFlow(BasePhaseFlow):
         }
 
     @classmethod
-    def from_dict(cls, data: dict, research_logger=None) -> "DialogueFlow":
-        """Reconstruct a DialogueFlow from a persisted dict.
+    def from_dict(cls, data: dict, research_logger=None) -> "DirectionFlow":
+        """Reconstruct a DirectionFlow from a persisted dict.
         Called when a session is loaded from disk after a server restart."""
         flow = cls(session_id=data["session_id"], research_logger=research_logger)
-        flow.state = DialogueState(data["state"])
+        flow.state = DirectionState(data["state"])
         flow.context = DialogueContext.model_validate(data["context"])
         flow.question_count = data["question_count"]
         flow.current_pir = data["current_pir"]

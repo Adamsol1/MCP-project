@@ -5,10 +5,10 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.dialogue_service import DialogueService
+from src.services.llm_service import LLMService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
 from src.services.state_machines.direction_flow import DirectionFlow
@@ -24,30 +24,26 @@ Sessions are stored in memory in `_sessions`
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
-_server_path = str(
-    Path(__file__).parent.parent.parent.parent / "mcp_server" / "src" / "server.py"
-)
-
 _sessions: dict[str, DirectionFlow] = {}
 
 _SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
 _SESSIONS_DIR.mkdir(exist_ok=True)
 
 
-def _save_session(flow: DialogueFlow) -> None:
+def _save_session(flow: DirectionFlow) -> None:
     """Persist session state to disk so it survives server restarts."""
     path = _SESSIONS_DIR / f"{flow.session_id}.json"
     path.write_text(json.dumps(flow.to_dict()), encoding="utf-8")
 
 
-def _load_session(session_id: str, research_logger) -> DialogueFlow | None:
+def _load_session(session_id: str, research_logger) -> DirectionFlow | None:
     """Load a previously persisted session from disk. Returns None if not found."""
     path = _SESSIONS_DIR / f"{session_id}.json"
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
     logger.info(f"[Session {session_id}] Restored from disk — state={data['state']}")
-    return DialogueFlow.from_dict(data, research_logger=research_logger)
+    return DirectionFlow.from_dict(data, research_logger=research_logger)
 
 
 # Request model
@@ -143,31 +139,24 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}"
     )
 
-    # TODO (PERFORMANCE): MCPClient spawns a new subprocess on every request — this is expensive.
-    # Fix: add open()/close() to MCPClient using AsyncExitStack, store the client in _sessions
-    # alongside DialogueFlow, and call client.close() + del _sessions[id] when is_final=True.
-    # See code review notes for full plan.
-    client = MCPClient(_server_path)
-
-    # Connect to mcp, and wait for response from state machine
-    async with client.connect():
-        service = DialogueService(client, None)
-        review_service = ReviewService(client)
-        orchestrator = AIOrchestrator(
-            research_logger=flow.research_logger,
-            generator_model="gemini-2.0-flash",
-            reviewer_model="gemini-2.0-flash",
-        )
-        response = await flow.process_user_message(
-            request.message,
-            service,
-            request.perspectives,
-            request.approved,
-            orchestrator=orchestrator,
-            reviewer=review_service,
-            language=request.language,
-            settings_timeframe=request.settings_timeframe,
-        )
+    llm = LLMService(model="gemini-2.5-flash")
+    service = DialogueService(llm, None)
+    review_service = ReviewService(llm)
+    orchestrator = AIOrchestrator(
+        research_logger=flow.research_logger,
+        generator_model="gemini-2.5-flash",
+        reviewer_model="gemini-2.5-flash",
+    )
+    response = await flow.process_user_message(
+        request.message,
+        service,
+        request.perspectives,
+        request.approved,
+        orchestrator=orchestrator,
+        reviewer=review_service,
+        language=request.language,
+        settings_timeframe=request.settings_timeframe,
+    )
 
     # Convert internal response to API format and return
     converted_response = _convert_to_message_response(response)

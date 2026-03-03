@@ -1,6 +1,6 @@
 import pytest
 
-from backend.src.services.state_machines.direction_flow import DirectionFlow, DirectionState
+from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 from src.models.dialogue import ClarifyingQuestion, QuestionResult
 
 

@@ -2,8 +2,11 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+
+load_dotenv()
 
 from src.api.dialogue import router as dialogue_router
 from src.importers.upload import legal_file_upload, save_uploaded_file
