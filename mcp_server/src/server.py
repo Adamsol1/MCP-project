@@ -20,6 +20,7 @@ from prompts import (
     build_pir_generation_prompt,
     build_summary_prompt,
 )
+from resources import RESOURCES_DIR, load_knowledge
 
 load_dotenv()
 
@@ -34,6 +35,23 @@ mcp = FastMCP(
     name="ThreatIntelligence",
     instructions="MCP server for Threat Intelligence workflow assistance.",
 )
+
+
+@mcp.resource("knowledge://{category}/{name}")
+def get_knowledge_resource(category: str, name: str) -> str:
+    """Read a knowledge bank entry directly by category and name.
+
+    Args:
+        category: One of geopolitical, sectors, threat_actors.
+        name: Entry filename without extension, e.g. norway_russia.
+
+    Returns:
+        Raw markdown content of the knowledge entry.
+    """
+    path = RESOURCES_DIR / category / f"{name}.md"
+    if not path.exists():
+        raise FileNotFoundError(f"Knowledge resource not found: {category}/{name}")
+    return path.read_text(encoding="utf-8")
 
 
 @mcp.tool
@@ -120,26 +138,35 @@ def generate_pir(
     modifications=None,
     current_pir=None,
     language="en",
-    background_knowledge=None,
 ) -> str:
     """
-    Create a PIR based on investigation scope, timeframe and target entites gathered from dialogue.
+    Create a PIR based on investigation scope, timeframe and target entities gathered from dialogue.
+
+    Automatically enriches the prompt with relevant knowledge bank entries matched
+    against the investigation context via keyword scanning.
+
+    Note: In the current architecture Gemini is called from inside this tool and cannot
+    reach back out to MCP resources. Keyword matching is therefore done here directly.
+    For future Collection/Processing phases where an AI model acts as the MCP client,
+    it will read knowledge://{category}/{name} resources directly without this step.
 
     Args:
         scope: The focus area of the investigation. e.g. "identify attack patterns"
         timeframe: The time period the PIR covers. e.g. "last 6 months"
         target_entities: The entities relevant to the investigation. e.g. "NATO member states"
         perspectives: The selected viewpoints for the investigation. e.g. ["norway", "neutral"]
-        modifications: Optional user feedback for regenerating the PIR. e.g. "Add focus on supply chain attacks"
+        threat_actors: The threat actors of interest. e.g. ["APT28", "Sandworm"]
+        priority_focus: The main aspect to emphasize. e.g. "infrastructure sabotage"
+        modifications: Optional user feedback for regenerating the PIR.
+        current_pir: Optional existing PIR to revise.
         language: BCP-47 language code for the response language. e.g "en" (English), "no" (Norwegian).
 
     Returns:
-        str: The formatted PIR
+        str: The formatted PIR JSON
 
     Raises:
         ValueError: If scope, timeframe, or target_entities is missing
     """
-    # Checks for required context. Return ValueError if not present
     if not scope:
         raise ValueError("scope is required")
     if not timeframe:
@@ -148,6 +175,26 @@ def generate_pir(
         raise ValueError("target_entities is required")
     if not perspectives:
         perspectives = ["neutral"]
+
+    # Build a scan text from all context fields and load matching knowledge bank entries.
+    # Gemini is invoked below as a generator, not as an MCP client, so it cannot read
+    # knowledge:// resources itself — we resolve them here before the prompt is built.
+    scan_parts = [scope]
+    if target_entities:
+        entities = target_entities if isinstance(target_entities, list) else [target_entities]
+        scan_parts.extend(entities)
+    if threat_actors:
+        actors = threat_actors if isinstance(threat_actors, list) else [threat_actors]
+        scan_parts.extend(actors)
+    if priority_focus:
+        scan_parts.append(priority_focus)
+    if perspectives:
+        persp = perspectives if isinstance(perspectives, list) else [perspectives]
+        scan_parts.extend(persp)
+
+    background_knowledge = load_knowledge(" ".join(scan_parts))
+    if background_knowledge:
+        print("[KnowledgeBank] Injected background knowledge into PIR prompt", file=stderr, flush=True)
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
@@ -165,7 +212,6 @@ def generate_pir(
         ),
     )
 
-    # Return the JSON
     return response.text
 
 
