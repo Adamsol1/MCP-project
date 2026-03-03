@@ -3,15 +3,15 @@ import logging
 from datetime import datetime
 from enum import Enum
 
+from backend.src.services.state_machines.base_phase_flow import BasePhaseFlow
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
-from src.models.reasoning import ReasoningLog, UserActionLogEntry
+from src.models.reasoning import ReasoningLog
 
 logger = logging.getLogger("app")
 
-"TODO= lag generic phase class for each of the phases. e.g directionFlow."
 
 
-class DialogueState(str, Enum):
+class DirectionState(str, Enum):
     INITIAL = "initial"  # State before first user input
     GATHERING = "gathering"  # State when gathering information through questions
     SUMMARY_CONFIRMING = "summary_confirming"  # Presenting context summary. User can approve or reject with modifications
@@ -19,7 +19,7 @@ class DialogueState(str, Enum):
     COMPLETE = "complete"  # Direction phase complete. PIR approved
 
 
-class DialogueFlow:
+class DirectionFlow(BasePhaseFlow):
     """
     State machine that drives the intelligence direction dialogue. Indicates and changes what state of the direction dialogue we are in
 
@@ -30,12 +30,9 @@ class DialogueFlow:
     """
 
     def __init__(self, session_id: str | None = None, research_logger=None):
-        self.state = DialogueState.INITIAL  # Starting with first state
+        super().__init__(session_id, research_logger)
+        self.state = DirectionState.INITIAL  # Starting with first state
         self.context = DialogueContext()  # Context for information used in dialogue
-        self.question_count = 0  # Counter for questions
-        self.max_questions = 15  # Max number of questions. Prevents infinite loops
-        self.session_id = session_id
-        self.research_logger = research_logger
         self.pending_reasoning_log: ReasoningLog | None = None
         self.current_pir: str | None = None
         logger.info(f"[Session {session_id}] Session started")
@@ -116,21 +113,21 @@ class DialogueFlow:
             )
 
         # INITIAL PHASE
-        if self.state == DialogueState.INITIAL:
-            return await self.handle_initial_input(user_message, dialogue_service, language)
+        if self.state == DirectionState.INITIAL:
+            return await self.handle_initial_input(user_message, dialogue_service)
 
         # GATHERING PHASE
-        elif self.state == DialogueState.GATHERING:
-            return await self.handle_gathering_input(user_message, dialogue_service, language)
+        elif self.state == DirectionState.GATHERING:
+            return await self.handle_gathering_input(user_message, dialogue_service)
 
         # SUMMARY CONFIRMING PHASE
-        elif self.state == DialogueState.SUMMARY_CONFIRMING:
+        elif self.state == DirectionState.SUMMARY_CONFIRMING:
             return await self.handle_summary_confirming(
                 user_message, dialogue_service, approved, orchestrator, reviewer, language
             )
 
         # PIR CONFIRMING PHASE
-        elif self.state == DialogueState.PIR_CONFIRMING:
+        elif self.state == DirectionState.PIR_CONFIRMING:
             return await self.handle_pir_confirming(
                 user_message, dialogue_service, approved, language
             )
@@ -143,7 +140,7 @@ class DialogueFlow:
 
     def _apply_context_update(self, extracted_context: dict):
         """Apply extracted context fields from MCP tool response to self.context.
-        DialogueFlow owns all context state — this is the single place where context is updated."""
+        DirectionFlow owns all context state — this is the single place where context is updated."""
         if extracted_context.get("scope"):
             self.context.scope = extracted_context["scope"]
         if extracted_context.get("timeframe"):
@@ -183,7 +180,7 @@ class DialogueFlow:
         # Increase counter
         self.question_count += 1
         # Change state INITIAL -> GATHERING
-        self.state = DialogueState.GATHERING
+        self.state = DirectionState.GATHERING
         logger.info(f"[Session {self.session_id}] State: INITIAL -> GATHERING")
 
         # Return response to frontend
@@ -206,7 +203,7 @@ class DialogueFlow:
         dialogue_response = DialogueResponse()
         # If we reach max questions, force state change.
         if self.question_count >= self.max_questions:
-            self.state = DialogueState.SUMMARY_CONFIRMING
+            self.state = DirectionState.SUMMARY_CONFIRMING
             logger.info(
                 f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (max questions reached)"
             )
@@ -233,7 +230,7 @@ class DialogueFlow:
 
         # Change state GATHERING -> SUMMARY_CONFIRMING if possible
         if self._has_sufficient_context():
-            self.state = DialogueState.SUMMARY_CONFIRMING
+            self.state = DirectionState.SUMMARY_CONFIRMING
             logger.info(
                 f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (sufficient context)"
             )
@@ -290,30 +287,22 @@ class DialogueFlow:
                 retry_count = len(orchestrator.generated_pirs) - 1
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
+                    phase="direction",
                     model_used=orchestrator.generator_model,
                     dialogue_turns=self.context.dialogue_turns,
-                    generated_pirs_before_review=orchestrator.generated_pirs,
-                    review_reasoning_per_pir=orchestrator.review_results,
+                    generated_content_attempts=orchestrator.generated_pirs,
+                    review_reasoning=orchestrator.review_results,
                     retry_explanation=orchestrator.retry_explanations,
-                    final_approved_pir=None,
+                    final_approved_content=None,
                     timestamps={"pir_generated": datetime.now().isoformat()},
                     retry_triggered=retry_count > 0,
                     retry_count=retry_count,
                 )
-            log_user_interaction = UserActionLogEntry(
-                session_id=self.session_id,
-                timestamp=datetime.now(),
-                action="approve",
-                phase="summary_confirming",
-                modifications=None,
-                perspectives_selected=[p.value for p in self.context.perspectives],
-            )
-            if self.research_logger:
-                self.research_logger.create_log(log_user_interaction)
+            self._log_user_action(action="approve", phase="summary_confirming", modifications=None, perspectives=self.context.perspectives)
             self.context.modifications = (
                 None  # Clear modifications so they don't leak into PIR phase
             )
-            self.state = DialogueState.PIR_CONFIRMING
+            self.state = DirectionState.PIR_CONFIRMING
             logger.info(
                 f"[Session {self.session_id}] State: SUMMARY_CONFIRMING -> PIR_CONFIRMING"
             )
@@ -324,17 +313,8 @@ class DialogueFlow:
         else:
             # User rejected with modifications. Save and self-loop
             self.context.modifications = user_message
-            log_user_interaction = UserActionLogEntry(
-                session_id=self.session_id,
-                timestamp=datetime.now(),
-                action="reject",
-                phase="summary_confirming",
-                modifications=user_message,
-                perspectives_selected=[p.value for p in self.context.perspectives],
-            )
-            if self.research_logger:
-                self.research_logger.create_log(log_user_interaction)
-            dialogue_response.action = "show_summary"
+            self._log_user_action(action="reject", phase="summary_confirming", modifications=user_message, perspectives=self.context.perspectives)
+
             summary = await dialogue_service.generate_summary(
                 self.context, modifications=user_message, language=language
             )
@@ -357,23 +337,13 @@ class DialogueFlow:
         dialogue_response = DialogueResponse()
 
         if approved:
-            # User approved PIR. Direction phase complete
-            log_user_interaction = UserActionLogEntry(
-                session_id=self.session_id,
-                timestamp=datetime.now(),
-                action="approve",
-                phase="pir_confirming",
-                modifications=None,
-                perspectives_selected=[p.value for p in self.context.perspectives],
-            )
-            if self.research_logger:
-                self.research_logger.create_log(log_user_interaction)
-            self.state = DialogueState.COMPLETE
+            self._log_user_action(action="approve", phase="pir_confirming", modifications=None, perspectives=self.context.perspectives)
+            self.state = DirectionState.COMPLETE
             logger.info(
                 f"[Session {self.session_id}] State: PIR_CONFIRMING -> COMPLETE. Direction phase finished"
             )
             if self.pending_reasoning_log and self.research_logger:
-                self.pending_reasoning_log.final_approved_pir = self.current_pir
+                self.pending_reasoning_log.final_approved_content = self.current_pir
                 self.pending_reasoning_log.timestamps["pir_approved"] = (
                     datetime.now().isoformat()
                 )
@@ -382,17 +352,8 @@ class DialogueFlow:
         else:
             # User rejected with modifications. Regenerate PIR
             self.context.modifications = user_message
-            log_user_interaction = UserActionLogEntry(
-                session_id=self.session_id,
-                timestamp=datetime.now(),
-                action="reject",
-                phase="pir_confirming",
-                modifications=user_message,
-                perspectives_selected=[p.value for p in self.context.perspectives],
-            )
-            if self.research_logger:
-                self.research_logger.create_log(log_user_interaction)
-            pir = await dialogue_service.generate_pir(self.context, language=language, current_pir=self.current_pir)
+            self._log_user_action(action="reject", phase="pir_confirming", modifications=user_message, perspectives=self.context.perspectives)
+            pir = await dialogue_service.generate_pir(self.context)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             dialogue_response.action = "show_pir"
             dialogue_response.content = self.current_pir

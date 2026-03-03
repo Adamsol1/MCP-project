@@ -140,8 +140,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     if request.session_id not in _sessions:
         research_logger = ResearchLogger(session_id=request.session_id)
         _sessions[request.session_id] = _load_session(
-            request.session_id, research_logger
-        ) or DialogueFlow(
+        _sessions[request.session_id] = DirectionFlow(
             session_id=request.session_id, research_logger=research_logger
         )
 

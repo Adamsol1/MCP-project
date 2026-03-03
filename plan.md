@@ -544,6 +544,8 @@ The system uses two AI instances to reduce hallucinations:
 
 ### Component Architecture
 
+> **Architectural note:** Direction phase calls the LLM directly from the backend (no MCP involved). This is a deliberate design decision — Direction is purely conversational and requires no external tool integration. MCP is used from Collection phase onwards, where the AI agent calls real external data sources. This distinction is itself a research finding for RQ1.1.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    FRONTEND                                 │
@@ -565,37 +567,58 @@ The system uses two AI instances to reduce hallucinations:
 │              FastAPI (Python 3.11+)                         │
 │                                                             │
 │  Responsibilities:                                          │
-│  - MCP client connection management                         │
-│  - Dual AI instance orchestration                           │
+│  - Session management across all phases                     │
+│  - Phase transition orchestration                           │
+│  - Human approval checkpoint control                        │
+│  - Dual AI instance orchestration (AIOrchestrator)          │
+│  - Direct LLM calls for Direction phase (LLMService)        │
+│  - GeminiAgent orchestration for Collection+ phases         │
+│  - MCP client connection management (Collection+)           │
 │  - Data import validation                                   │
-│  - Mode switching (online/offline)                          │
-│  - WebSocket for real-time updates                          │
 │  - Report generation (JSON, PDF)                            │
-│  - Session management (max 3 reports)                       │
 │  - Research data logging (corrections, actions, times)      │
-└─────────────────────┬───────────────────────────────────────┘
-                      │ MCP Protocol (stdio/SSE)
-┌─────────────────────▼───────────────────────────────────────┐
-│                 MCP SERVER                                  │
-│              Python (FastMCP)                               │
 │                                                             │
-│  Primitives:                                                │
-│  - Tools: OSINT queries, data processing, report generation │
-│  - Resources: Threat feeds, MITRE ATT&CK, imported data     │
-│  - Prompts: Phase templates, perspective prompts            │
-└─────────────────────┬───────────────────────────────────────┘
-                      │
-┌─────────────────────▼───────────────────────────────────────┐
-│                 LLM LAYER                                   │
+│  Services:                                                  │
+│  - LLMService        — direct Gemini calls (Direction)      │
+│  - GeminiAgent       — Gemini with MCP tools (Collection+)  │
+│  - DialogueService   — Direction dialogue (uses LLMService) │
+│  - ReviewService     — AI #2 review (uses LLMService)       │
+│  - AIOrchestrator    — generate → review → retry loop       │
+│  - CollectionService — Collection logic (uses GeminiAgent)  │
+│  - ProcessingService — Processing logic (uses GeminiAgent)  │
 │                                                             │
-│  Online:                                                    │
-│  - Gemini 2.5 Flash (Instance #1: Generate)                 │
-│  - Gemini 2.5 Flash (Instance #2: Review)                   │
-│                                                             │
-│  Offline:                                                   │
-│  - Ollama + Phi-3 Mini / Llama 3.2 3B (Instance #1)         │
-│  - Same model (Instance #2, sequential execution)           │
-└─────────────────────────────────────────────────────────────┘
+│  State Machines (human approval checkpoints only):          │
+│  - DirectionFlow   — SUMMARY_CONFIRMING, PIR_CONFIRMING     │
+│  - CollectionFlow  — PLAN_CONFIRMING, SOURCE_SELECTING,     │
+│                      REVIEWING                              │
+│  - ProcessingFlow  — CORRELATION_CONFIRMING,                │
+│                      PERSPECTIVE_CONFIRMING                 │
+└──────────┬──────────────────────────────┬───────────────────┘
+           │ Direct API call              │ MCP Protocol
+           │ (Direction only)             │ (Collection+)
+┌──────────▼──────────┐       ┌───────────▼───────────────────┐
+│     LLM LAYER       │       │         MCP SERVER            │
+│  Gemini 2.5 Flash   │       │      Python (FastMCP)         │
+│  (via LLMService)   │       │                               │
+│                     │       │  Tools:                       │
+│  Instance #1:       │       │  - query_otx()                │
+│  Generate           │       │  - search_misp()              │
+│                     │       │  - search_local_data()        │
+│  Instance #2:       │       │  - normalize_data()           │
+│  Review             │       │  - map_to_mitre()             │
+│                     │       │  - enrich_ioc()               │
+└─────────────────────┘       │  - read_knowledge_base()      │
+                              │                               │
+                              │  Resources (Knowledge Bank):  │
+                              │  - geopolitical/ context      │
+                              │  - perspectives/ (NSM, CISA,  │
+                              │    ENISA, national security)  │
+                              │  - threat_actors/ (APT29, ..) │
+                              │                               │
+                              │  Prompts:                     │
+                              │  - collection.md              │
+                              │  - processing.md              │
+                              └───────────────────────────────┘
 ```
 
 ---
@@ -604,7 +627,9 @@ The system uses two AI instances to reduce hallucinations:
 
 ### Direction Phase (Dialogue-Based)
 
-The Direction phase is unique - it uses a conversational approach to understand user goals:
+> **MCP usage:** None — deliberate design decision. Direction is purely conversational. All AI calls are made directly from the backend via LLMService (Gemini API). The state machine manages human approval checkpoints only. See Architectural Design Decisions for rationale.
+
+The Direction phase uses a conversational approach to understand user goals and produce approved PIRs:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -669,55 +694,82 @@ The Direction phase is unique - it uses a conversational approach to understand 
 
 ### Collection Phase
 
+> **MCP usage:** Full MCP integration. GeminiAgent is the AI driver — it decides which tools to call and when. MCP Tools provide access to external OSINT sources. MCP Resources (knowledge bank) provide geopolitical and threat actor context. The state machine manages human approval checkpoints only.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    COLLECTION PHASE                         │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  1. System displays approved PIRs from Direction            │
-│  2. System queries selected data sources:                   │
-│     - Uploaded files (if any)                               │
-│     - AlienVault OTX API (if selected, online mode)         │
-│     - MISP API (if selected, online mode)                   │
-│  3. AI Instance #1 aggregates and processes raw data        │
-│  4. AI Instance #2 reviews for completeness/accuracy        │
-│     → If errors: auto-retry, log in reasoning               │
-│  5. User reviews collected data with source attribution     │
-│  6. User approves/rejects/requests additional collection    │
-│     (Action logged for RQ2 analysis)                        │
+│  1. Backend generates collection plan via GeminiAgent       │
+│     → GeminiAgent reads knowledge bank for context         │
+│     → Produces structured collection plan                  │
 │                                                             │
-│  [Approve] [Reject with Feedback] [Collect More]            │
-│                          ↓                                  │
-│              Proceed to Processing Phase                    │
+│  [Human checkpoint] User approves/rejects plan              │
+│  → Reject: GeminiAgent regenerates with feedback            │
+│                                                             │
+│  2. System suggests relevant sources based on plan + PIRs   │
+│                                                             │
+│  [Human checkpoint] User selects approved sources           │
+│  → Sources: OTX, MISP, local uploaded files                 │
+│                                                             │
+│  3. GeminiAgent executes collection:                        │
+│     → Reads relevant knowledge bank entries                 │
+│     → Calls query_otx() when threat actor data needed       │
+│     → Calls search_misp() to cross-reference indicators     │
+│     → Calls search_local_data() for uploaded files          │
+│     → Synthesises findings, links each to a PIR             │
+│     → Assigns confidence level and source per finding       │
+│                                                             │
+│  4. AI Instance #2 reviews collection output                │
+│     → If severity=major: GeminiAgent retries                │
+│     → All attempts logged in reasoning file                 │
+│                                                             │
+│  [Human checkpoint] User reviews collected data             │
+│  → Approve: proceed to Processing                           │
+│  → Reject with feedback: GeminiAgent revises summary        │
+│  → Collect more: return to source selection                 │
+│     (Action logged for RQ2 analysis)                        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Processing Phase
 
+> **MCP usage:** Full MCP integration, same pattern as Collection. GeminiAgent drives the analysis — it calls normalize_data(), map_to_mitre(), enrich_ioc() and read_knowledge_base() as needed. State machine manages human approval checkpoints only.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    PROCESSING PHASE                         │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
-│  1. AI Instance #1 normalizes data formats                  │
-│  2. AI Instance #1 identifies correlations and patterns     │
-│  3. AI Instance #1 enriches IOCs with additional context    │
-│  4. AI Instance #1 maps findings to MITRE ATT&CK            │
-│  5. AI Instance #2 reviews all processing steps             │
-│     → If errors: auto-retry, log in reasoning               │
-│  6. AI Instance #1 generates perspective summaries          │
-│     (based on selections from Direction phase)              │
-│     Each perspective: tactical summary + strategic framing  │
-│  7. AI Instance #2 reviews summaries                        │
-│     → If errors: auto-retry, log in reasoning               │
-│  8. User validates correlations and summaries               │
-│  9. User approves final output                              │
-│     (Action logged for RQ2 analysis)                        │
+│  1. GeminiAgent processes collected data:                   │
+│     → Calls normalize_data() to standardise IOC formats     │
+│     → Calls enrich_ioc() for additional context             │
+│     → Calls map_to_mitre() to map TTPs to ATT&CK            │
+│     → Reads perspective knowledge bank entries              │
+│     → Correlates indicators across sources                  │
+│     → Produces structured correlation report                │
 │                                                             │
-│  [Approve] [Reject with Feedback]                           │
-│                          ↓                                  │
-│              Proceed to Analysis Phase                      │
+│  2. AI Instance #2 reviews correlation output               │
+│     → If severity=major: GeminiAgent retries                │
+│     → All attempts logged in reasoning file                 │
+│                                                             │
+│  [Human checkpoint] User validates correlations             │
+│  → Reject with feedback: GeminiAgent revises                │
+│                                                             │
+│  3. GeminiAgent generates perspective-specific analysis:    │
+│     → Reads national security documents from knowledge bank │
+│     → Each selected perspective: tactical + strategic layer │
+│     → Tactical: IOCs, TTPs, affected systems                │
+│     → Strategic: geopolitical framing, policy implications  │
+│                                                             │
+│  4. AI Instance #2 reviews perspective analysis             │
+│     → If severity=major: GeminiAgent retries                │
+│                                                             │
+│  [Human checkpoint] User approves perspective analysis      │
+│  → Reject with feedback: GeminiAgent revises                │
+│     (Action logged for RQ2 analysis)                        │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -1026,52 +1078,107 @@ F20 (Deferred) — Multiple AI agents each adopt a perspective and debate findin
 
 ---
 
+## Architectural Design Decisions
+
+### MCP Usage Per Phase — Rationale
+
+A core finding of this project is that MCP adds value proportional to the need for external tool integration. Not all phases of the TI cycle benefit equally from MCP.
+
+| Phase | MCP Used | Rationale |
+|-------|----------|-----------|
+| Direction | No | Pure conversational dialogue. No external data sources required. Gemini's training knowledge is sufficient. Using MCP here would add protocol overhead with no value. |
+| Collection | Yes | Requires external OSINT APIs (OTX, MISP) and local file search. Gemini cannot access these without tools. This is MCP's core use case. |
+| Processing | Yes | Requires MITRE ATT&CK lookups, data normalisation, IOC enrichment, and national security knowledge bank. All require external integration. |
+
+This distinction directly answers **RQ1.1** — MCP primitives are most effective when they provide access to external systems the AI cannot reach independently.
+
+### AI Agent Architecture
+
+From Collection phase onwards, Gemini acts as a true AI agent:
+- Gemini decides which tools to call and when
+- Gemini decides how many OTX queries to make
+- Gemini decides which knowledge bank entries are relevant
+- Backend only manages human approval checkpoints
+
+Direction phase uses a backend-orchestrated approach:
+- Backend state machine controls the conversation flow
+- Backend calls LLMService directly for each AI generation step
+- State machine manages human approval checkpoints
+
+This hybrid is a deliberate choice, not a compromise. Direction's value lies in structured dialogue management and human oversight — not in autonomous AI decision-making.
+
+### State Machines — Human Checkpoints Only
+
+State machines in this project manage **human decisions**, not AI decisions. Each state corresponds to a point where the analyst must approve, reject, or modify AI output before proceeding.
+
+| State | Human decision |
+|-------|---------------|
+| `SUMMARY_CONFIRMING` | Is the gathered context correctly understood? |
+| `PIR_CONFIRMING` | Are the generated PIRs acceptable? |
+| `PLAN_CONFIRMING` | Is the collection plan appropriate? |
+| `SOURCE_SELECTING` | Which data sources should be queried? |
+| `REVIEWING` | Is the collected data sufficient and accurate? |
+| `CORRELATION_CONFIRMING` | Are the correlations and MITRE mappings correct? |
+| `PERSPECTIVE_CONFIRMING` | Is the perspective analysis accurate? |
+
+AI orchestration (deciding when to call which tool) belongs to GeminiAgent, not the state machine.
+
+### Dual AI Review
+
+AI Instance #1 (generate) and AI Instance #2 (review) are both Gemini 2.5 Flash in online mode. The backend orchestrates two separate API calls — they are not the same request. The review prompt (`DIRECTION_REVIEW_PROMPT`, `COLLECTION_REVIEW_PROMPT`, `PROCESSING_REVIEW_PROMPT`) instructs AI #2 to evaluate quality and return a structured severity verdict (`none` / `minor` / `major`). On `major`, the AIOrchestrator retries generation (max 3 attempts). All attempts are logged for RQ1.3 analysis.
+
+---
+
 ## MCP Implementation
 
-### Tools (LLM-invokable functions)
+> **Note on MCP usage per phase:** Direction phase does not use MCP — all AI calls are made directly from the backend via LLMService. This is a deliberate architectural decision: Direction is purely conversational and requires no external tool integration. Collection and Processing phases use MCP correctly, with GeminiAgent calling real external integrations. See Architectural Design Decisions for full rationale.
+
+### Tools (Called by GeminiAgent — Collection and Processing only)
 
 | Tool | Purpose | Phase |
 |------|---------|-------|
-| `dialogue_question()` | Generate clarifying questions for user | Direction |
-| `generate_pirs()` | Create Priority Intelligence Requirements | Direction |
-| `query_otx()` | Query AlienVault OTX API | Collection |
-| `search_misp()` | Search MISP instance | Collection |
-| `search_local_data()` | Search uploaded files | Collection |
-| `normalize_data()` | Standardize data formats | Processing |
-| `enrich_ioc()` | Enrich IOCs with context | Processing |
-| `correlate_indicators()` | Find patterns across data | Processing |
-| `map_to_mitre()` | Map findings to MITRE ATT&CK | Processing |
-| `generate_perspective_summary()` | Create tactical perspective summary | Processing |
-| `generate_strategic_assessment()` | Create strategic intelligence per national lens | Analysis |
-| `generate_key_findings()` | Produce finished intelligence: findings + confidence | Analysis |
-| `generate_recommendations()` | Suggest courses of action per perspective | Analysis |
-| `review_output()` | AI Instance #2 reviews for errors | All |
-| `generate_report()` | Create JSON/PDF output | Output |
+| `query_otx(threat_actor, ioc_type)` | Query AlienVault OTX API for threat data | Collection |
+| `search_misp(query, limit)` | Search MISP instance for events and indicators | Collection |
+| `search_local_data(query)` | Search uploaded local TI files | Collection |
+| `normalize_data(raw_data)` | Standardize and deduplicate IOC formats | Processing |
+| `enrich_ioc(ioc, ioc_type)` | Enrich IOC with external context | Processing |
+| `map_to_mitre(technique_description)` | Map findings to MITRE ATT&CK framework | Processing |
+| `read_knowledge_base(resource_id)` | Read from knowledge bank (geopolitical, perspectives, threat actors) | Collection + Processing |
 
-### Resources (Context exposed to LLM)
+> **Removed from Tools:** `dialogue_question`, `generate_pirs`, `generate_summary`, `review_output`, `generate_perspective_summary`, `generate_strategic_assessment`, `generate_key_findings`, `generate_recommendations`. These are AI reasoning tasks — Gemini performs them directly without tool wrappers. AI generation is handled by LLMService (Direction) or GeminiAgent's own reasoning (Collection+).
 
-| Resource | Content | Phase |
-|----------|---------|-------|
-| `user_context` | Dialogue history with user | Direction |
-| `imported_data` | User-uploaded TI data | Collection |
-| `osint_results` | Data from OTX/MISP queries | Collection |
-| `ioc_list` | Collected indicators | Processing |
-| `mitre_attack` | MITRE ATT&CK framework | Processing |
-| `perspective_definitions` | Geographic perspective prompts | Processing |
+### Resources (Knowledge Bank — exposed via read_knowledge_base tool)
 
-### Prompts (Workflow templates)
+| Resource ID | Content | Used In |
+|-------------|---------|---------|
+| `geopolitical/norway-russia` | Norway-Russia relations, tensions, historical context | Collection + Processing |
+| `geopolitical/norway-usa` | NATO cooperation, dependencies, interest differences | Collection + Processing |
+| `geopolitical/norway-china` | Chinese presence in Norway, investment risk | Collection + Processing |
+| `geopolitical/russia-nato` | Russian threat posture toward NATO | Collection + Processing |
+| `geopolitical/china-eu` | China-EU strategic relationship | Collection + Processing |
+| `perspective/norway` | NSM/PST priorities, Norwegian national security law | Processing |
+| `perspective/us` | CISA, NIST, Five Eyes perspective | Processing |
+| `perspective/eu` | ENISA, NIS2, GDPR implications | Processing |
+| `perspective/china` | Chinese state perspective, domestic APT groups | Processing |
+| `threat-actor/apt29` | Cozy Bear — TTPs, history, known Nordic targets | Collection + Processing |
+| `threat-actor/apt28` | Fancy Bear — TTPs, history | Collection + Processing |
+| `threat-actor/lazarus-group` | North Korea — TTPs, financial targeting | Collection + Processing |
+| `threat-actor/killnet` | Russian hacktivist group | Collection + Processing |
 
-| Prompt | Purpose | Phase |
-|--------|---------|-------|
-| `direction_dialogue` | Guide conversation to understand goals | Direction |
-| `pir_generation` | Generate PIRs from dialogue context | Direction |
-| `collection_plan` | Plan data collection strategy | Collection |
-| `processing_analysis` | Structure correlation analysis | Processing |
-| `perspective_tactical_[US/NO/CN/EU]` | Tactical perspective framing per nation | Processing |
-| `perspective_strategic_[US/NO/CN/EU]` | Strategic intelligence lens per nation (from national security docs) | Analysis |
-| `analysis_synthesis` | Synthesize processing output into finished intelligence | Analysis |
-| `review_validation` | AI #2 validation prompt | All |
-| `reasoning_explanation` | Document AI decision-making | All |
+### Prompts (Workflow templates — used in backend, not MCP Prompts primitive)
+
+> **Implementation note:** Prompt templates for Direction phase remain in `mcp_server/src/prompts/__init__.py` and are imported directly by backend services. System prompts for Collection and Processing agents are stored as markdown files in `backend/src/prompts/`.
+
+| Prompt | Purpose | Phase | Location |
+|--------|---------|-------|----------|
+| `build_direction_dialogue_prompt()` | Guide conversation to gather intelligence requirements | Direction | `mcp_server/src/prompts/__init__.py` |
+| `build_pir_generation_prompt()` | Generate PIRs from gathered context | Direction | `mcp_server/src/prompts/__init__.py` |
+| `build_summary_prompt()` | Summarise gathered context for analyst review | Direction | `mcp_server/src/prompts/__init__.py` |
+| `DIRECTION_REVIEW_PROMPT()` | AI #2 quality review of PIRs | Direction | `mcp_server/src/prompts/__init__.py` |
+| `COLLECTION_REVIEW_PROMPT()` | AI #2 review of collected data | Collection | `mcp_server/src/prompts/__init__.py` |
+| `PROCESSING_REVIEW_PROMPT()` | AI #2 review of processed analysis | Processing | `mcp_server/src/prompts/__init__.py` |
+| `collection.md` | System prompt for GeminiAgent in Collection phase | Collection | `backend/src/prompts/collection.md` |
+| `processing.md` | System prompt for GeminiAgent in Processing phase | Processing | `backend/src/prompts/processing.md` |
 
 ---
 
@@ -1286,23 +1393,44 @@ project-root/
 │
 ├── backend/
 │   ├── src/
-│   │   ├── api/                # FastAPI routes
-│   │   ├── mcp_client/         # MCP client
-│   │   ├── services/           # Business logic
-│   │   │   ├── ai_orchestrator.py   # Dual AI management
-│   │   │   ├── review_service.py    # AI review logic
-│   │   │   ├── research_logger.py   # RQ data collection
-│   │   │   └── perspective_service.py
-│   │   ├── importers/          # Data import handlers
-│   │   └── models/             # Pydantic models
+│   │   ├── api/                     # FastAPI routes
+│   │   │   ├── dialogue.py          # Main phase endpoint + session mgmt
+│   │   │   └── main.py
+│   │   ├── mcp_client/              # MCP client (used by Collection+)
+│   │   │   └── client.py
+│   │   ├── services/                # Business logic
+│   │   │   ├── llm_service.py       # Direct Gemini calls (Direction)
+│   │   │   ├── gemini_agent.py      # Gemini + MCP tool-loop (Collection+)
+│   │   │   ├── ai_orchestrator.py   # Dual AI generate→review→retry
+│   │   │   ├── dialogue_service.py  # Direction dialogue (uses LLMService)
+│   │   │   ├── review_service.py    # AI #2 review (uses LLMService)
+│   │   │   ├── collection_service.py # Collection logic (uses GeminiAgent)
+│   │   │   ├── processing_service.py # Processing logic (uses GeminiAgent)
+│   │   │   ├── reasearch_logger.py  # RQ data collection
+│   │   │   └── state_machines/
+│   │   │       ├── base_phase_flow.py
+│   │   │       ├── direction_flow.py   # Human checkpoints only
+│   │   │       ├── collection_flow.py  # Human checkpoints only
+│   │   │       └── processing_flow.py  # Human checkpoints only
+│   │   ├── prompts/                 # Agent system prompts
+│   │   │   ├── collection.md        # GeminiAgent system prompt
+│   │   │   └── processing.md        # GeminiAgent system prompt
+│   │   ├── importers/               # Data import handlers
+│   │   └── models/                  # Pydantic models
 │   └── tests/
 │
 ├── mcp_server/
 │   ├── src/
-│   │   ├── tools/              # MCP tools
-│   │   ├── resources/          # MCP resources
-│   │   ├── prompts/            # MCP prompts + perspectives
-│   │   └── server.py
+│   │   ├── tools/                   # MCP tools (external integrations only)
+│   │   │   ├── osint.py             # query_otx, search_misp, search_local_data
+│   │   │   └── processing.py        # normalize_data, map_to_mitre, enrich_ioc
+│   │   ├── resources/               # Knowledge bank
+│   │   │   ├── geopolitical/        # Country relationship markdown files
+│   │   │   ├── perspectives/        # National security framework files
+│   │   │   └── threat_actors/       # Threat actor context files
+│   │   ├── prompts/                 # Direction phase prompt builders
+│   │   │   └── __init__.py          # build_direction_dialogue_prompt, etc.
+│   │   └── server.py                # FastMCP server + tool/resource registration
 │   └── tests/
 │
 ├── frontend/
