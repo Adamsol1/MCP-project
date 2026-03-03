@@ -3,6 +3,7 @@ import {
   useState,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useContext,
   type ReactNode,
 } from "react";
@@ -92,6 +93,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     saveSettings(settings);
   }, [settings]);
+
+  // Sync <html class="dark"> before paint to prevent flash of wrong theme.
+  useLayoutEffect(() => {
+    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+  }, [settings.theme]);
 
   const updateLanguage = useCallback((language: Language) => {
     setSettings((prev) => ({ ...prev, language }));
