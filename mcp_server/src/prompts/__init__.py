@@ -42,7 +42,9 @@ def build_direction_dialogue_prompt(
     """
     lang_instruction = _language_instruction(language, 'the "question" field')
 
-    return lang_instruction + f"""SYSTEM_PROMPT
+    return (
+        lang_instruction
+        + f"""SYSTEM_PROMPT
                 You are an expert threat intelligence analyst conducting a structured
                 intelligence requirements dialogue.
 
@@ -113,6 +115,7 @@ def build_direction_dialogue_prompt(
                 1. Extract any new context from the user message and update the context above
                 2. Generate one follow-up question targeting the most critical missing field
                 """
+    )
 
 
 def build_pir_generation_prompt(
@@ -125,6 +128,7 @@ def build_pir_generation_prompt(
     modifications: str | None = None,
     current_pir: str | None = None,
     language: str = "en",
+    background_knowledge: str | None = None,
 ) -> str:
     """Build prompt for PIR document generation.
 
@@ -137,6 +141,7 @@ def build_pir_generation_prompt(
         priority_focus: The main aspect to emphasize.
         modifications: Optional user feedback for regenerating the PIR.
         language: BCP-47 language code controlling which language the PIR is written in.
+        background_knowledge: Optional additional knowledge to incorporate into the PIR generation.
 
     Returns:
         Formatted prompt string ready to send to the AI model.
@@ -145,7 +150,9 @@ def build_pir_generation_prompt(
         language, "all PIR content (question, rationale, result, reasoning)"
     )
 
-    return lang_instruction + f"""SYSTEM_PROMPT
+    return (
+        lang_instruction
+        + f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst specializing in
 creating Priority Intelligence Requirements (PIRs).
 
@@ -161,6 +168,7 @@ provided. Each PIR must be:
 - Measurable: Has a clear answer that can be found through collection
 - Prioritized: Ranked by importance to the decision at hand
 - Perspective-aware: Framed through the selected analytical viewpoint(s)
+- Incorporate any relevant background knowledge provided.
 
 ANALYTICAL PERSPECTIVES define the lens through which PIRs are framed:
 - Single or multiple countries/groups (e.g. "norway", "russia", "nato"):
@@ -177,7 +185,8 @@ Return your response in the following JSON format:
         {{
             "question": "The PIR formulated as a specific intelligence question",
             "priority": "high | medium | low",
-            "rationale": "Why this PIR is important given the context"
+            "rationale": "Why this PIR is important given the context",
+            "sources": "list all relevant sources from background knowledge that support this PIR, or null if none"
         }}
     ],
     "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected"
@@ -214,13 +223,14 @@ Use the following rules to decide how to respond:
   PIRs from scratch, but take the requested changes into account as
   additional constraints.
 """
+    )
 
 
 # NOTE: Named as a constant for consistency with COLLECTION_ and PROCESSING_ stubs,
 # but this is a function — it takes content and context and returns a prompt string.
 def DIRECTION_REVIEW_PROMPT(
-     content,
-     context,
+    content,
+    context,
 ) -> str:
     """Build review prompt for PIRs generated in the Direction phase.
 
@@ -323,7 +333,9 @@ def build_summary_prompt(
     """
     lang_instruction = _language_instruction(language, "the summary")
 
-    return lang_instruction + f"""SYSTEM_PROMPT
+    return (
+        lang_instruction
+        + f"""SYSTEM_PROMPT
 You are an expert threat intelligence analyst.
 Your task is to produce a clear, concise summary of the intelligence
 investigation context gathered so far.
@@ -356,12 +368,14 @@ MODIFICATIONS: {modifications}
 - If MODIFICATIONS is empty: summarise the context as-is.
 - If MODIFICATIONS has content: incorporate the requested changes into the summary.
 """
+    )
 
 
 # TODO: Implement review prompt for the Collection phase.
 def COLLECTION_REVIEW_PROMPT():
     """Build review prompt for the Collection phase. Not yet implemented."""
     return
+
 
 # TODO: Implement review prompt for the Processing phase.
 def PROCESSING_REVIEW_PROMPT():

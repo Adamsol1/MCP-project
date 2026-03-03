@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 
+
 class Perspective(str, Enum):
     US = "us"
     NORWAY = "norway"
@@ -63,6 +64,7 @@ class Phase(str, Enum):
     DIRECTION = "direction"
     COLLECTION = "collection"
     PROCESSING = "processing"
+    ANALYSIS = "analysis"
 
 
 class PIRReview(BaseModel):

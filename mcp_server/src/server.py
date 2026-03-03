@@ -13,12 +13,12 @@ from fastmcp import FastMCP
 from google import genai
 
 from prompts import (
-    build_direction_dialogue_prompt,
-    build_pir_generation_prompt,
-    build_summary_prompt,
     COLLECTION_REVIEW_PROMPT,
     DIRECTION_REVIEW_PROMPT,
     PROCESSING_REVIEW_PROMPT,
+    build_direction_dialogue_prompt,
+    build_pir_generation_prompt,
+    build_summary_prompt,
 )
 
 load_dotenv()
@@ -46,9 +46,12 @@ def greet() -> str:
 
     return f"Hello, this is the MCP Threat Intelligence server! Gemini Response: {response.text}"
 
-#Tool for generating questions.
+
+# Tool for generating questions.
 @mcp.tool
-def dialogue_question(user_message, missing_fields, perspectives, context, language="en") -> dict:
+def dialogue_question(
+    user_message, missing_fields, perspectives, context, language="en"
+) -> dict:
     """
     Generate a clarifying question based on user input and current context.
 
@@ -87,28 +90,40 @@ def dialogue_question(user_message, missing_fields, perspectives, context, langu
         perspectives = ["neutral"]
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_direction_dialogue_prompt(user_message, missing_fields, perspectives, context, language),
+        contents=build_direction_dialogue_prompt(
+            user_message, missing_fields, perspectives, context, language
+        ),
     )
-    #Check for faulty response
+    # Check for faulty response
     if not response.text:
-            raise ValueError("Gemini returned emtpy response")
+        raise ValueError("Gemini returned emtpy response")
 
     try:
         result = json.loads(response.text)
 
-
     except json.JSONDecodeError as e:
         print("Ai did not return valid JSON", e, file=stderr, flush=True)
         raise
-
 
     # Backend override: if we know fields are missing, force False regardless of AI judgement
     if missing_fields:
         result["has_sufficient_context"] = False
     return result
 
+
 @mcp.tool
-def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications=None, current_pir=None, language="en") -> str:
+def generate_pir(
+    scope,
+    timeframe,
+    target_entities,
+    perspectives,
+    threat_actors,
+    priority_focus,
+    modifications=None,
+    current_pir=None,
+    language="en",
+    background_knowledge=None,
+) -> str:
     """
     Create a PIR based on investigation scope, timeframe and target entites gathered from dialogue.
 
@@ -126,7 +141,7 @@ def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors,
     Raises:
         ValueError: If scope, timeframe, or target_entities is missing
     """
-    #Checks for required context. Return ValueError if not present
+    # Checks for required context. Return ValueError if not present
     if not scope:
         raise ValueError("scope is required")
     if not timeframe:
@@ -138,18 +153,35 @@ def generate_pir(scope, timeframe, target_entities, perspectives, threat_actors,
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_pir_generation_prompt(scope, timeframe, target_entities, perspectives, threat_actors, priority_focus, modifications, current_pir, language),
+        contents=build_pir_generation_prompt(
+            scope,
+            timeframe,
+            target_entities,
+            perspectives,
+            threat_actors,
+            priority_focus,
+            modifications,
+            current_pir,
+            language,
+            background_knowledge=background_knowledge,
+        ),
     )
 
-    #Return the JSON
+    # Return the JSON
     return response.text
 
 
-
-
-
 @mcp.tool
-def generate_summary(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications=None, language="en") -> str:
+def generate_summary(
+    scope,
+    timeframe,
+    target_entities,
+    threat_actors,
+    priority_focus,
+    perspectives,
+    modifications=None,
+    language="en",
+) -> str:
     """
     Generate a human-readable summary of the gathered intelligence context.
 
@@ -171,10 +203,20 @@ def generate_summary(scope, timeframe, target_entities, threat_actors, priority_
 
     response = client.models.generate_content(
         model="gemini-2.5-flash",
-        contents=build_summary_prompt(scope, timeframe, target_entities, threat_actors, priority_focus, perspectives, modifications, language),
+        contents=build_summary_prompt(
+            scope,
+            timeframe,
+            target_entities,
+            threat_actors,
+            priority_focus,
+            perspectives,
+            modifications,
+            language,
+        ),
     )
 
     return response.text
+
 
 @mcp.tool
 def review(content, context, phase) -> str:
@@ -202,12 +244,10 @@ def review(content, context, phase) -> str:
     prompt = prompts[phase]
 
     response = client.models.generate_content(
-        model = "gemini-2.5-flash",
-        contents = prompt(content, context)
+        model="gemini-2.5-flash", contents=prompt(content, context)
     )
 
     return response.text
-
 
 
 if __name__ == "__main__":

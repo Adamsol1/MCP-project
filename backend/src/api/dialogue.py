@@ -5,6 +5,8 @@ from pathlib import Path
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from knowledge_bank.knowledge_registry import KNOWLEDGE_REGISTRY
+from knowledge_bank.service import KnowledgeService
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
@@ -28,6 +30,8 @@ _server_path = str(
     Path(__file__).parent.parent.parent.parent / "mcp_server" / "src" / "server.py"
 )
 
+_knowledge_service = KnowledgeService(KNOWLEDGE_REGISTRY)
+_knowledge_base_path = Path(__file__).parent.parent.parent  # → backend/
 
 _sessions: dict[str, DialogueFlow] = {}
 
@@ -154,7 +158,12 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
 
     # Connect to mcp, and wait for response from state machine
     async with client.connect():
-        service = DialogueService(client, None)
+        service = DialogueService(
+            client,
+            None,
+            knowledge_service=_knowledge_service,
+            knowledge_base_path=str(_knowledge_base_path),
+        )
         review_service = ReviewService(client)
         orchestrator = AIOrchestrator(
             research_logger=flow.research_logger,
