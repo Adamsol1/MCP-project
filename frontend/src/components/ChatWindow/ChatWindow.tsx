@@ -182,30 +182,30 @@ export default function ChatWindow({
           <ol className="space-y-3 mt-1">
             {pirData.pirs.map((pir, i) => (
               <li key={i} className="flex flex-col gap-1">
-                <span className="text-sm font-bold text-gray-500 uppercase tracking-wide">
+                <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
                   {i + 1}. {PRIORITY_LABEL[pir.priority]}
                 </span>
                 <p className="font-medium text-base leading-snug">
                   {pir.question}
                 </p>
                 <details className="group pl-1">
-                  <summary className="cursor-pointer list-none text-sm text-gray-400 hover:text-gray-600 select-none flex items-center">
+                  <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
                     Rationale
                     <Chevron />
                   </summary>
-                  <p className="mt-1 text-sm text-gray-500">{pir.rationale}</p>
+                  <p className="mt-1 text-sm text-text-secondary">{pir.rationale}</p>
                 </details>
               </li>
             ))}
           </ol>
-          <details className="group mt-3 border-t border-gray-300 pt-2">
-            <summary className="cursor-pointer list-none text-sm font-medium text-gray-600 hover:text-gray-800 select-none flex items-center gap-1">
+          <details className="group mt-3 border-t border-border pt-2">
+            <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
               Show reasoning
               <Chevron />
             </summary>
-            <div className="mt-2 space-y-2 bg-gray-50 rounded-md p-2">
+            <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
               {reasoningPoints.map((point, i) => (
-                <p key={i} className="text-sm text-gray-600">
+                <p key={i} className="text-sm text-text-secondary">
                   {renderWithBold(point)}
                 </p>
               ))}
@@ -235,8 +235,8 @@ export default function ChatWindow({
                 data-sender={message.sender}
                 className={`max-w-[75%] p-3 rounded-lg mb-2 ${
                   message.sender === "user"
-                    ? "self-end bg-blue-500 text-white"
-                    : "self-start bg-gray-50 text-gray-700"
+                    ? "self-end bg-primary text-text-inverse"
+                    : "self-start bg-surface-muted text-text-primary"
                 }`}
               >
                 {renderMessageContent(message)}
@@ -244,11 +244,11 @@ export default function ChatWindow({
             ))}
             {/* Animated three-dot throbber shown while a backend response is in flight. */}
             {isLoading && (
-              <div className="self-start bg-gray-50 rounded-lg p-3 mb-2">
+              <div className="self-start bg-surface-muted rounded-lg p-3 mb-2">
                 <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:300ms]" />
+                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" />
+                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce [animation-delay:300ms]" />
                 </div>
               </div>
             )}
@@ -272,7 +272,7 @@ export default function ChatWindow({
       >
         {/* "Ready to start?" placeholder — only shown in the empty state. */}
         {!hasMessages && (
-          <p className="text-2xl font-normal text-gray-500 text-center">
+          <p className="text-2xl font-normal text-text-secondary text-center">
             Ready to start?
           </p>
         )}
@@ -287,18 +287,18 @@ export default function ChatWindow({
             <ToastContainer position="above-input" />
             {isConfirming ? (
               /* Confirmation mode: Approve / Reject replace the text input. */
-              <div className="flex items-center gap-4 p-4 border-t-2 border-gray-300">
+              <div className="flex items-center gap-4 p-4 border-t-2 border-border">
                 <button
                   onClick={onApprove}
                   disabled={isLoading}
-                  className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-dark disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Approve
                 </button>
                 <button
                   onClick={onReject}
                   disabled={isLoading}
-                  className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 bg-error text-text-inverse rounded-lg hover:bg-error-dark disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Reject
                 </button>
@@ -312,7 +312,7 @@ export default function ChatWindow({
                */
               <form
                 onSubmit={handleSubmit}
-                className="relative border-2 border-gray-300 rounded-xl p-3 pb-12"
+                className="relative border-2 border-border rounded-xl p-3 pb-12"
               >
                 <textarea
                   ref={textareaRef}
@@ -327,7 +327,7 @@ export default function ChatWindow({
                       submitMessage();
                     }
                   }}
-                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-gray-700 resize-none overflow-y-auto max-h-64"
+                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
                 />
                 {/* Send button — absolutely positioned in the bottom-right corner
                   of the form so the textarea scrollbar is unobstructed. */}
@@ -337,8 +337,8 @@ export default function ChatWindow({
                   aria-label="Send message"
                   className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
                     inputValue.trim() === ""
-                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                      : "bg-blue-500 text-white hover:bg-blue-600"
+                      ? "bg-surface-elevated text-text-muted cursor-not-allowed"
+                      : "bg-primary text-text-inverse hover:bg-primary-dark"
                   }`}
                 >
                   <svg

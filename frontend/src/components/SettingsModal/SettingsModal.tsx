@@ -46,12 +46,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex h-130 w-185 overflow-hidden rounded-lg bg-gray-800 text-gray-100 shadow-2xl"
+        className="flex h-130 w-185 overflow-hidden rounded-lg bg-surface-deep text-text-inverse shadow-2xl"
       >
         {/* ── Left nav ─────────────────────────────────────── */}
         {/* Each button sets activeSection, which swaps the right panel content. */}
-        <nav className="flex w-48 flex-col gap-1 border-r border-gray-700 p-4 pt-6">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-gray-400">
+        <nav className="flex w-48 flex-col gap-1 border-r border-border-inverse p-4 pt-6">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
             Options
           </p>
           {(["language", "appearance", "parameters"] as const).map((section) => (
@@ -60,8 +60,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               onClick={() => setActiveSection(section)}
               className={`rounded px-3 py-2 text-left text-sm capitalize ${
                 activeSection === section
-                  ? "bg-gray-600 text-white"
-                  : "text-gray-300 hover:bg-gray-700"
+                  ? "bg-surface-inverse-hover text-text-inverse"
+                  : "text-text-on-inverse hover:bg-surface-inverse"
               }`}
             >
               {section}
@@ -75,13 +75,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <button
             aria-label="Close settings"
             onClick={onClose}
-            className="absolute right-4 top-4 text-gray-400 hover:text-white"
+            className="absolute right-4 top-4 text-text-muted hover:text-text-inverse"
           >
             ✕
           </button>
 
           {/* Section heading mirrors the active nav item. */}
-          <h2 className="mb-1 text-base font-semibold capitalize text-gray-100">
+          <h2 className="mb-1 text-base font-semibold capitalize text-text-inverse">
             {activeSection}
           </h2>
 
@@ -132,17 +132,17 @@ function SettingRow({
   htmlFor?: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-gray-700 py-4">
+    <div className="flex items-center justify-between border-b border-border-inverse py-4">
       <div className="mr-8">
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-sm font-medium text-gray-100">
+          <label htmlFor={htmlFor} className="text-sm font-medium text-text-inverse">
             {label}
           </label>
         ) : (
-          <p className="text-sm font-medium text-gray-100">{label}</p>
+          <p className="text-sm font-medium text-text-inverse">{label}</p>
         )}
         {description && (
-          <p className="mt-0.5 text-xs text-gray-400">{description}</p>
+          <p className="mt-0.5 text-xs text-text-muted">{description}</p>
         )}
       </div>
       {/* shrink-0 prevents the control from being squeezed by long label text. */}
@@ -156,11 +156,11 @@ function SettingRow({
 
 /** Tailwind classes applied to every <select> element in the modal. */
 const selectClass =
-  "rounded border border-gray-600 bg-gray-700 px-3 py-1.5 text-sm text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "rounded border border-border-inverse bg-surface-inverse px-3 py-1.5 text-sm text-text-inverse focus:outline-none focus:ring-1 focus:ring-primary";
 
 /** Tailwind classes applied to every <input type="text"> element in the modal. */
 const inputClass =
-  "w-52 rounded border border-gray-600 bg-gray-700 px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-blue-500";
+  "w-52 rounded border border-border-inverse bg-surface-inverse px-3 py-1.5 text-sm text-text-inverse placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary";
 
 // ─── Section components ───────────────────────────────────────────────────────
 
@@ -223,8 +223,8 @@ function AppearanceSection({
               onClick={() => onChange(t)}
               className={`rounded border px-4 py-1.5 text-sm capitalize transition-colors ${
                 theme === t
-                  ? "border-blue-500 bg-blue-600 text-white"
-                  : "border-gray-600 bg-gray-700 text-gray-300 hover:bg-gray-600"
+                  ? "border-primary bg-primary-dark text-text-inverse"
+                  : "border-border-inverse bg-surface-inverse text-text-on-inverse hover:bg-surface-inverse-hover"
               }`}
             >
               {t}

@@ -40,9 +40,9 @@ describe("Toast", () => {
     );
 
     const toast = screen.getByRole("alert");
-    expect(toast).toHaveClass("bg-green-50");
-    expect(toast).toHaveClass("border-green-500");
-    expect(toast).toHaveClass("text-green-800");
+    expect(toast).toHaveClass("bg-success-subtle");
+    expect(toast).toHaveClass("border-success");
+    expect(toast).toHaveClass("text-success-text");
   });
 
   it("renders with error styling", () => {
@@ -58,9 +58,9 @@ describe("Toast", () => {
     );
 
     const toast = screen.getByRole("alert");
-    expect(toast).toHaveClass("bg-red-50");
-    expect(toast).toHaveClass("border-red-500");
-    expect(toast).toHaveClass("text-red-800");
+    expect(toast).toHaveClass("bg-error-subtle");
+    expect(toast).toHaveClass("border-error");
+    expect(toast).toHaveClass("text-error-text");
   });
 
   it("renders with warning styling", () => {
@@ -76,9 +76,9 @@ describe("Toast", () => {
     );
 
     const toast = screen.getByRole("alert");
-    expect(toast).toHaveClass("bg-yellow-50");
-    expect(toast).toHaveClass("border-yellow-500");
-    expect(toast).toHaveClass("text-yellow-800");
+    expect(toast).toHaveClass("bg-warning-subtle");
+    expect(toast).toHaveClass("border-warning");
+    expect(toast).toHaveClass("text-warning-text");
   });
 
   it("renders with info styling", () => {
@@ -94,9 +94,9 @@ describe("Toast", () => {
     );
 
     const toast = screen.getByRole("alert");
-    expect(toast).toHaveClass("bg-blue-50");
-    expect(toast).toHaveClass("border-blue-500");
-    expect(toast).toHaveClass("text-blue-800");
+    expect(toast).toHaveClass("bg-info-subtle");
+    expect(toast).toHaveClass("border-info");
+    expect(toast).toHaveClass("text-info-text");
   });
 
   it("auto-dismisses after duration", () => {

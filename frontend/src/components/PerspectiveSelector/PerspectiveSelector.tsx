@@ -92,8 +92,8 @@ export default function PerspectiveSelector({
           data-selected={selected.includes(perspective.value).toString()}
           className={`px-4 py-2 rounded border font-medium transition-colors ${
             selected.includes(perspective.value)
-              ? "bg-blue-500 text-white border-blue-600"
-              : "bg-white text-gray-700 border-gray-300 hover:bg-gray-50"
+              ? "bg-primary text-text-inverse border-primary-dark"
+              : "bg-surface text-text-primary border-border hover:bg-surface-muted"
           }`}
         >
           {perspective.label}

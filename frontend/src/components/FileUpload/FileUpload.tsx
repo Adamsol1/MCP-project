@@ -150,8 +150,8 @@ export default function FileUpload({
         onDrop={handleDrop}
         className={`relative border-2 border-dashed p-42 rounded-lg min-h-64 text-center transition-colors cursor-pointer ${
           isDraggingOver
-            ? "border-blue-500 bg-blue-50"
-            : "border-gray-300 hover:border-blue-400"
+            ? "border-primary bg-primary-subtle"
+            : "border-border hover:border-primary"
         }`}
       >
         <label
@@ -159,10 +159,10 @@ export default function FileUpload({
           className="absolute inset-0 flex items-center justify-center cursor-pointer"
         >
           <span className="sr-only">Upload File</span>
-          <div className="text-gray-500">
+          <div className="text-text-secondary">
             <p className="text-2xl font-normal">Drag & drop files here</p>
             <p className="text-md">or click to browse</p>
-            <p className="text-sm mt-2 text-gray-400">
+            <p className="text-sm mt-2 text-text-muted">
               Supported: .json, .csv, .pdf, .txt
             </p>
           </div>
@@ -184,20 +184,20 @@ export default function FileUpload({
           {selectedFiles.map((file) => (
             <div
               key={file.name}
-              className="flex items-center justify-between bg-gray-50 p-3 rounded-lg"
+              className="flex items-center justify-between bg-surface-muted p-3 rounded-lg"
             >
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-700 truncate">
+                <p className="text-sm font-medium text-text-primary truncate">
                   {file.name}
                 </p>
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-text-secondary">
                   {formatFileSize(file.size)}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => handleRemove(file)}
-                className="ml-4 text-red-500 hover:text-red-700 text-sm font-medium"
+                className="ml-4 text-error hover:text-error-dark text-sm font-medium"
               >
                 Remove
               </button>
@@ -211,7 +211,7 @@ export default function FileUpload({
         <button
           type="button"
           onClick={handleCancel}
-          className="px-4 py-2 text-gray-600 hover:text-gray-800 font-medium"
+          className="px-4 py-2 text-text-secondary hover:text-text-primary font-medium"
         >
           Cancel
         </button>
@@ -221,8 +221,8 @@ export default function FileUpload({
           disabled={selectedFiles.length === 0}
           className={`px-4 py-2 rounded-lg font-medium ${
             selectedFiles.length === 0
-              ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-              : "bg-blue-500 text-white hover:bg-blue-600"
+              ? "bg-surface-elevated text-text-secondary cursor-not-allowed"
+              : "bg-primary text-text-inverse hover:bg-primary-dark"
           }`}
         >
           Submit

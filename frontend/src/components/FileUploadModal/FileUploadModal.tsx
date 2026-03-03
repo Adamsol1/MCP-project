@@ -40,14 +40,14 @@ export function FileUploadModal({
       <div
         data-testid="modal-content"
         onClick={(e) => e.stopPropagation()}
-        className="bg-white rounded-lg p-6 w-full max-w-lg"
+        className="bg-surface rounded-lg p-6 w-full max-w-lg"
       >
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-lg font-semibold">Upload Files</h2>
           <button
             aria-label="close"
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-text-muted hover:text-text-secondary"
           >
             X
           </button>

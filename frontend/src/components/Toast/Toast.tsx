@@ -25,10 +25,10 @@ interface ToastProps {
  * Applied to the outermost div to colour the background, border, and text together.
  */
 const typeStyles: Record<ToastType, string> = {
-  success: 'bg-green-50 border-green-500 text-green-800',
-  error: 'bg-red-50 border-red-500 text-red-800',
-  warning: 'bg-yellow-50 border-yellow-500 text-yellow-800',
-  info: 'bg-blue-50 border-blue-500 text-blue-800',
+  success: 'bg-success-subtle border-success text-success-text',
+  error: 'bg-error-subtle border-error text-error-text',
+  warning: 'bg-warning-subtle border-warning text-warning-text',
+  info: 'bg-info-subtle border-info text-info-text',
 };
 
 /**
@@ -82,7 +82,7 @@ export default function Toast({ id, type, message, duration, onClose, fullWidth 
       <button
         type="button"
         onClick={() => onClose(id)}
-        className="text-gray-400 hover:text-gray-600 font-bold text-xl leading-none"
+        className="text-text-muted hover:text-text-secondary font-bold text-xl leading-none"
         aria-label="Close notification"
       >
         &times;

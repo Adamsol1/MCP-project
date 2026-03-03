@@ -99,7 +99,7 @@ function App() {
       />
 
       {/* mx-1 creates a slim visible gap between the sidebars and the chat area. */}
-      <main className="flex-1 flex flex-col bg-gray-100 mx-1">
+      <main className="flex-1 flex flex-col bg-surface-elevated mx-1">
         <ChatWindow
           messages={messages}
           onSendMessage={sendMessage}

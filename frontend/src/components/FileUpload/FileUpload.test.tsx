@@ -184,7 +184,7 @@ describe("FileUpload", () => {
     const dropZone = screen.getByTestId("file-dropzone");
 
     // Initially, no highlight
-    expect(dropZone).not.toHaveClass("border-blue-500");
+    expect(dropZone).not.toHaveClass("border-primary");
 
     // Drag enter
     fireEvent.dragEnter(dropZone, {
@@ -192,13 +192,13 @@ describe("FileUpload", () => {
     });
 
     // Should now be highlighted
-    expect(dropZone).toHaveClass("border-blue-500");
+    expect(dropZone).toHaveClass("border-primary");
 
     // Drag leave
     fireEvent.dragLeave(dropZone);
 
     // Highlight should be gone
-    expect(dropZone).not.toHaveClass("border-blue-500");
+    expect(dropZone).not.toHaveClass("border-primary");
   });
 
   it("enables Submit button when files are selected", async () => {

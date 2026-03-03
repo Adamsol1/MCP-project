@@ -59,7 +59,7 @@ export function OptionsPanel({
     <aside
       className={`${
         isCollapsed ? "w-14" : "w-64"
-      } bg-gray-50 border-l border-gray-200 flex flex-col overflow-hidden`}
+      } bg-surface-muted border-l border-border-muted flex flex-col overflow-hidden`}
     >
       {/* Toggle button — chevron points left (‹) when expanded to signal "collapse",
           right (›) when collapsed to signal "expand".
@@ -67,7 +67,7 @@ export function OptionsPanel({
       <button
         aria-label="Toggle options"
         onClick={() => setIsCollapsed((prev) => !prev)}
-        className="p-2 flex items-center justify-center shrink-0 hover:bg-gray-200 rounded"
+        className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
         <svg
           width="20"
@@ -93,7 +93,7 @@ export function OptionsPanel({
 
           {/* ── Section: Perspectives ─────────────────────────────── */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
               Perspectives
             </p>
             <PerspectiveSelector
@@ -104,14 +104,14 @@ export function OptionsPanel({
 
           {/* ── Section: Files ────────────────────────────────────── */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
               Files
             </p>
 
             {/* Opens the FileUploadModal overlay */}
             <button
               onClick={onOpenFileUpload}
-              className="w-full p-2 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700 transition-colors"
+              className="w-full p-2 bg-primary-dark text-text-inverse rounded text-sm font-medium hover:bg-primary-hover transition-colors"
             >
               Upload Files
             </button>
@@ -126,14 +126,14 @@ export function OptionsPanel({
                       className="flex items-center justify-between gap-1 text-sm"
                     >
                       <span
-                        className="flex-1 truncate text-gray-700"
+                        className="flex-1 truncate text-text-primary"
                         title={file.name}
                       >
                         {file.name}
                       </span>
                       <button
                         onClick={() => onFileRemove(file)}
-                        className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                        className="shrink-0 text-text-muted hover:text-error transition-colors"
                         aria-label={`Remove ${file.name}`}
                       >
                         ✕
@@ -146,7 +146,7 @@ export function OptionsPanel({
                 {uploadedFiles.length > VISIBLE_FILE_COUNT && (
                   <button
                     onClick={() => setShowAllFiles((prev) => !prev)}
-                    className="mt-2 text-xs text-blue-600 hover:underline"
+                    className="mt-2 text-xs text-primary-dark hover:underline"
                   >
                     {showAllFiles
                       ? "Show less ▴"
