@@ -46,11 +46,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div
         role="dialog"
         aria-modal="true"
-        className="flex h-130 w-185 overflow-hidden rounded-lg bg-surface-deep text-text-inverse shadow-2xl"
+        className="flex h-130 w-185 overflow-hidden rounded-lg border border-border bg-surface text-text-primary shadow-2xl"
       >
         {/* ── Left nav ─────────────────────────────────────── */}
         {/* Each button sets activeSection, which swaps the right panel content. */}
-        <nav className="flex w-48 flex-col gap-1 border-r border-border-inverse p-4 pt-6">
+        <nav className="flex w-48 flex-col gap-1 border-r border-border p-4 pt-6">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
             Options
           </p>
@@ -60,8 +60,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               onClick={() => setActiveSection(section)}
               className={`rounded px-3 py-2 text-left text-sm capitalize ${
                 activeSection === section
-                  ? "bg-surface-inverse-hover text-text-inverse"
-                  : "text-text-on-inverse hover:bg-surface-inverse"
+                  ? "bg-surface-elevated text-text-primary"
+                  : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
               }`}
             >
               {section}
@@ -75,13 +75,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <button
             aria-label="Close settings"
             onClick={onClose}
-            className="absolute right-4 top-4 text-text-muted hover:text-text-inverse"
+            className="absolute right-4 top-4 text-text-muted hover:text-text-primary"
           >
             ✕
           </button>
 
           {/* Section heading mirrors the active nav item. */}
-          <h2 className="mb-1 text-base font-semibold capitalize text-text-inverse">
+          <h2 className="mb-1 text-base font-semibold capitalize text-text-primary">
             {activeSection}
           </h2>
 
@@ -132,14 +132,14 @@ function SettingRow({
   htmlFor?: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-border-inverse py-4">
+    <div className="flex items-center justify-between border-b border-border py-4">
       <div className="mr-8">
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-sm font-medium text-text-inverse">
+          <label htmlFor={htmlFor} className="text-sm font-medium text-text-primary">
             {label}
           </label>
         ) : (
-          <p className="text-sm font-medium text-text-inverse">{label}</p>
+          <p className="text-sm font-medium text-text-primary">{label}</p>
         )}
         {description && (
           <p className="mt-0.5 text-xs text-text-muted">{description}</p>
@@ -156,11 +156,11 @@ function SettingRow({
 
 /** Tailwind classes applied to every <select> element in the modal. */
 const selectClass =
-  "rounded border border-border-inverse bg-surface-inverse px-3 py-1.5 text-sm text-text-inverse focus:outline-none focus:ring-1 focus:ring-primary";
+  "rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-primary";
 
 /** Tailwind classes applied to every <input type="text"> element in the modal. */
 const inputClass =
-  "w-52 rounded border border-border-inverse bg-surface-inverse px-3 py-1.5 text-sm text-text-inverse placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary";
+  "w-52 rounded border border-border bg-surface px-3 py-1.5 text-sm text-text-primary placeholder-text-secondary focus:outline-none focus:ring-1 focus:ring-primary";
 
 // ─── Section components ───────────────────────────────────────────────────────
 
@@ -224,7 +224,7 @@ function AppearanceSection({
               className={`rounded border px-4 py-1.5 text-sm capitalize transition-colors ${
                 theme === t
                   ? "border-primary bg-primary-dark text-text-inverse"
-                  : "border-border-inverse bg-surface-inverse text-text-on-inverse hover:bg-surface-inverse-hover"
+                  : "border-border bg-surface text-text-primary hover:bg-surface-elevated"
               }`}
             >
               {t}
