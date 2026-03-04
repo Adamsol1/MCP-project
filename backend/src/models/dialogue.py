@@ -14,6 +14,14 @@ class Perspective(str, Enum):
     NEUTRAL = "neutral"
 
 
+class DialogueAction(str, Enum):
+    ASK_QUESTION = "ask_question"
+    SHOW_SUMMARY = "show_summary"
+    SHOW_PIR = "show_pir"
+    MAX_QUESTIONS = "max_questions"
+    COMPLETE = "complete"
+
+
 class QuestionType(str, Enum):
     SCOPE = "scope"
     TIMEFRAME = "timeframe"
@@ -40,7 +48,7 @@ class DialogueContext(BaseModel):
 class DialogueResponse(BaseModel):
     """Response object returned by dialogue flow to frontend"""
 
-    action: str = ""
+    action: DialogueAction = DialogueAction.ASK_QUESTION
     content: str = ""
 
 

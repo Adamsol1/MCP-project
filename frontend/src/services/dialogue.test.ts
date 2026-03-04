@@ -13,8 +13,7 @@ describe("dialogue service", () => {
     const mockResponse = {
       data: {
         question: "What is the scope of your investigation?",
-        type: "scope",
-        is_final: false,
+        action: "ask_question",
       },
     };
 
@@ -43,8 +42,7 @@ describe("dialogue service", () => {
     // Verify the service returns the response data
     expect(result).toEqual({
       question: "What is the scope of your investigation?",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
   });
 

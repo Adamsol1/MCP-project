@@ -1,160 +1,135 @@
-# Backend API Contract — Frontend Perspective
+# Backend API Contract - Frontend Perspective
 
-## Context
-You are working on the backend (FastAPI/Python) of an MCP Threat Intelligence application. The frontend is a React/TypeScript app that communicates with a single dialogue endpoint. This document describes exactly what the frontend sends, what it expects back, and how the conversation flow works.
+## Endpoint
+`POST /api/dialogue/message`
 
-## Endpoint: POST /api/dialogue/message
-
-### Request Body (what the frontend sends)
+## Request Body
 
 ```json
 {
   "message": "string",
   "session_id": "string (UUID)",
   "perspectives": ["string"],
-  "approved": true | false | null
+  "approved": true | false | null,
+  "language": "en",
+  "settings_timeframe": ""
 }
 ```
 
 | Field | Type | Description |
-|-------|------|-------------|
-| `message` | `string` (required) | The user's text input. During approval, this is `"approve"` (but the backend should use the `approved` flag, not this string). |
-| `session_id` | `string` (required) | UUID generated per conversation. Stays the same for all messages in one conversation. Different conversations have different session IDs. |
-| `perspectives` | `string[]` (default `["NEUTRAL"]`) | Geopolitical perspectives selected by the user. Sent with every message. Possible values: `"US"`, `"EU"`, `"NORWAY"`, `"CHINA"`, `"RUSSIA"`, `"NEUTRAL"`. Can be multiple. |
-| `approved` | `bool \| null` (optional) | Only set to `true` when the user clicks the Approve button during the confirmation phase. Is `undefined`/`null` for all normal messages and for rejection feedback. |
+|---|---|---|
+| `message` | `string` | User input text. During approval clicks frontend sends `"approve"`, but backend should rely on `approved`. |
+| `session_id` | `string` | Conversation UUID used to maintain backend session state. |
+| `perspectives` | `string[]` | Selected geopolitical perspectives. Sent on every request. |
+| `approved` | `bool \| null` | `true` when the user approves a pending summary/PIR. |
+| `language` | `string` | BCP-47 language code (for example `en`, `no`). |
+| `settings_timeframe` | `string` | Optional prefilled timeframe from Settings. |
 
-### Response Body (what the frontend expects)
+## Response Body (Action-Only)
 
 ```json
 {
   "question": "string",
-  "type": "string",
-  "is_final": true | false
+  "action": "ask_question | show_summary | show_pir | max_questions | complete",
+  "stage": "initial | gathering | summary_confirming | pir_confirming | complete",
+  "sub_state": "awaiting_decision | awaiting_modifications | null"
 }
 ```
 
 | Field | Type | Description |
-|-------|------|-------------|
-| `question` | `string` (required) | The system's response text displayed to the user in the chat. This could be a clarifying question, a summary, or a confirmation message. |
-| `type` | `string` (required) | The type of response. Used for frontend logic. Known values: `"scope"`, `"timeframe"`, `"targets"`, `"confirmation"`, `"complete"`. |
-| `is_final` | `bool` (required) | **Critical flag.** When `true`, the frontend hides the text input and shows Approve/Reject buttons. When `false`, the normal text input is shown. |
+|---|---|---|
+| `question` | `string` | System message shown in chat. |
+| `action` | `string` | Canonical backend action from `DialogueFlow`. |
+| `stage` | `string` | Canonical dialogue stage for UI state. |
+| `sub_state` | `string \| null` | Optional sub-state for confirm stages. |
 
-### How `is_final` controls the UI
+## Action Semantics
 
-```
-is_final: false  →  User sees text input + Send button (normal chat mode)
-is_final: true   →  User sees Approve + Reject buttons (confirmation mode)
-```
+| `action` | Frontend render type | Confirming mode |
+|---|---|---|
+| `ask_question` | `question` | no |
+| `show_summary` | `summary` | yes |
+| `max_questions` | `summary` | yes |
+| `show_pir` | `pir` | yes |
+| `complete` | `complete` | no |
 
-The frontend does NOT have a separate "get summary" or "approve" endpoint. Everything goes through this single endpoint. The backend must track what phase the conversation is in using the `session_id`.
+`max_questions` intentionally uses summary confirmation UX.
 
 ## Conversation Flow
 
-### Phase 1: Gathering (INITIAL → GATHERING)
+### Gathering (`INITIAL -> GATHERING`)
 
-```
-Frontend sends:  { message: "Investigate APT29", session_id: "abc-123", perspectives: ["US", "EU"] }
-Backend returns: { question: "What is the scope of your investigation?", type: "scope", is_final: false }
-
-Frontend sends:  { message: "European critical infrastructure", session_id: "abc-123", perspectives: ["US", "EU"] }
-Backend returns: { question: "What timeframe are you interested in?", type: "timeframe", is_final: false }
-
-Frontend sends:  { message: "Last 6 months", session_id: "abc-123", perspectives: ["US", "EU"] }
-Backend returns: { question: "Which entities should we focus on?", type: "targets", is_final: false }
+```text
+Frontend sends: { message: "Investigate APT29", session_id: "abc-123", perspectives: ["US", "EU"] }
+Backend returns: { question: "What is the scope of your investigation?", action: "ask_question" }
 ```
 
-The backend asks clarifying questions until it has sufficient context (scope, timeframe, target_entities).
+### Summary Confirming (`GATHERING -> SUMMARY_CONFIRMING`)
 
-### Phase 2: Confirmation (GATHERING → CONFIRMING)
-
-When the backend has enough information, it sends a summary with `is_final: true`:
-
-```
-Frontend sends:  { message: "Energy sector organizations", session_id: "abc-123", perspectives: ["US", "EU"] }
-Backend returns: { question: "Here is your investigation summary: ... Do you approve?", type: "confirmation", is_final: true }
+```text
+Frontend sends: { message: "Energy sector organizations", session_id: "abc-123", perspectives: ["US", "EU"] }
+Backend returns: { question: "{...summary json...}", action: "show_summary" }
 ```
 
-**This is the critical moment.** The frontend now shows Approve/Reject buttons instead of the text input.
+### Approve Summary (`SUMMARY_CONFIRMING -> PIR_CONFIRMING`)
 
-### Phase 3a: User Approves (CONFIRMING → COMPLETE)
-
-```
-Frontend sends:  { message: "approve", session_id: "abc-123", perspectives: ["US", "EU"], approved: true }
-Backend returns: { question: "Approved! Proceeding to intelligence gathering.", type: "complete", is_final: false }
+```text
+Frontend sends: { message: "approve", session_id: "abc-123", perspectives: ["US", "EU"], approved: true }
+Backend returns: { question: "{...pir json...}", action: "show_pir" }
 ```
 
-**Important:** The `approved: true` flag is the reliable indicator. Do NOT check if `message === "approve"` — use the boolean flag.
+### Reject Summary (summary regeneration loop)
 
-The frontend shows the response as a system message. The approval is sent silently (no user message bubble appears in the chat for "approve").
-
-### Phase 3b: User Rejects (CONFIRMING → GATHERING)
-
-When the user clicks Reject, the frontend does NOT call the backend immediately. Instead:
-
-1. Frontend shows a system message: "What would you like to change?" (frontend-only, no API call)
-2. The text input reappears
-3. User types their feedback and hits Send
-
-```
-Frontend sends:  { message: "I want to focus on energy sector specifically", session_id: "abc-123", perspectives: ["US", "EU"] }
-Backend returns: { question: "Updated. What timeframe should we use?", type: "scope", is_final: false }
+```text
+Frontend sends: { message: "Narrow to energy sector", session_id: "abc-123", perspectives: ["US", "EU"] }
+Backend returns: { question: "{...updated summary json...}", action: "show_summary" }
 ```
 
-**Important:** The rejection feedback arrives as a normal message with `approved: undefined/null`. The backend should recognize that a message in CONFIRMING state without `approved: true` means the user wants modifications, and should transition back to GATHERING state.
+### Approve PIR (`PIR_CONFIRMING -> COMPLETE`)
+
+```text
+Frontend sends: { message: "approve", session_id: "abc-123", perspectives: ["US", "EU"], approved: true }
+Backend returns: { question: "Direction phase already complete.", action: "complete" }
+```
 
 ## Perspectives
 
-The `perspectives` array is sent with **every** message. It represents which geopolitical viewpoints the AI should consider when generating questions and analysis.
+Possible values:
+- `US`
+- `EU`
+- `NORWAY`
+- `CHINA`
+- `RUSSIA`
+- `NEUTRAL`
 
-| Value | Meaning |
-|-------|---------|
-| `"US"` | United States perspective |
-| `"EU"` | European Union perspective |
-| `"NORWAY"` | Norwegian perspective |
-| `"CHINA"` | Chinese perspective |
-| `"RUSSIA"` | Russian perspective |
-| `"NEUTRAL"` | Neutral/unbiased perspective (default) |
+Multiple values are allowed and can change between turns.
 
-Users can select multiple perspectives simultaneously. The perspectives can change mid-conversation (user toggles them between messages). The backend receives the current selection with each message.
+## State Machine
 
-## Session Management
-
-- Each conversation has a unique `session_id` (UUID v4) generated by the frontend
-- The same `session_id` is sent with every message in that conversation
-- The backend must maintain conversation state (DialogueFlow, DialogueContext) per session_id
-- Multiple conversations can exist simultaneously (different tabs, or user switches between conversations)
-- Currently there is NO session storage on the backend — this needs to be implemented (in-memory dict or database)
-
-## State Machine (Backend DialogueFlow)
-
-```
-INITIAL → GATHERING → CONFIRMING → COMPLETE
-                ↑          |
-                |__________|
-                (rejection with feedback)
+```text
+INITIAL -> GATHERING -> SUMMARY_CONFIRMING -> PIR_CONFIRMING -> COMPLETE
 ```
 
-| State | Trigger | Next State |
-|-------|---------|------------|
-| INITIAL | First user message | GATHERING |
-| GATHERING | Sufficient context collected | CONFIRMING |
-| GATHERING | Max questions reached (15) | CONFIRMING |
-| CONFIRMING | `approved: true` | COMPLETE |
-| CONFIRMING | Message without `approved: true` | GATHERING |
+Reject loops:
+- `SUMMARY_CONFIRMING` + feedback -> `SUMMARY_CONFIRMING` (regenerate summary)
+- `PIR_CONFIRMING` + feedback -> `PIR_CONFIRMING` (regenerate PIR)
 
-## Error Handling
+## Required Success Fields
 
-The frontend does not currently handle error responses gracefully. If the backend returns an error (4xx, 5xx), the frontend will show a network error in the console. The response must always include `question`, `type`, and `is_final` fields — missing fields will cause the frontend to crash.
+On successful responses, backend must include:
+- `question`
+- `action`
+- `stage`
 
-## Files Reference
+## File References
 
-### Frontend files that interact with the backend:
-- `frontend/src/services/dialogue.ts` — The HTTP service that makes the POST request
-- `frontend/src/hooks/useChat.ts` — The hook that calls the service and manages chat state
-- `frontend/src/types/conversation.ts` — Type definitions for Message, Conversation
+Frontend:
+- `frontend/src/services/dialogue.ts`
+- `frontend/src/hooks/useChat.ts`
+- `frontend/src/types/conversation.ts`
 
-### Backend files to modify:
-- `backend/src/api/dialogue.py` — The endpoint (currently hardcoded, needs to use DialogueFlow)
-- `backend/src/services/dialogue_flow.py` — The state machine (working, needs session integration)
-- `backend/src/services/dialogue_service.py` — Question generation via MCP
-- `backend/src/models/dialogue.py` — Pydantic models (DialogueContext, DialogueResponse, Perspective enum)
+Backend:
+- `backend/src/api/dialogue.py`
+- `backend/src/services/dialogue_flow.py`
+- `backend/src/services/dialogue_service.py`
+- `backend/src/models/dialogue.py`

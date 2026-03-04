@@ -31,9 +31,10 @@ def test_dialogue_message_returns_question():
 
     # Should have these fields
     assert "question" in data
-    assert "type" in data
-    assert "is_final" in data
+    assert "action" in data
     assert "stage" in data
+    assert "type" not in data
+    assert "is_final" not in data
 
 
 def test_dialogue_message_requires_message_field():

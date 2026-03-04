@@ -1,13 +1,16 @@
 import axios from "axios";
-import type { DialogueStage, DialogueSubState } from "../types/dialogue";
+import type {
+  DialogueAction,
+  DialogueStage,
+  DialogueSubState,
+} from "../types/dialogue";
 
 /** Base URL for the backend REST API. */
 const API_BACKEND_URL = "http://localhost:8000";
 
 export interface DialogueApiResponse {
   question: string;
-  type: string;
-  is_final: boolean;
+  action: DialogueAction;
   stage?: DialogueStage;
   sub_state?: DialogueSubState;
 }
@@ -44,8 +47,9 @@ export interface DialogueDevStateResponse {
  *                            has no timeframe yet, the backend pre-fills it so the AI
  *                            skips the timeframe clarifying question. Defaults to "".
  * @returns The backend response object containing:
- *          - `question`  — the next system message text to display in the chat.
- *          - `is_final`  — true when the backend is requesting user approval.
+ *          - `question`  - the next system message text to display in the chat.
+ *          - `action`    - canonical backend action.
+ *          - `stage`     - canonical backend stage (optional fallback inferred from action).
  */
 export async function sendMessage(
   message: string,

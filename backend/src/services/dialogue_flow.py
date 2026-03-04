@@ -4,7 +4,12 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
+from src.models.dialogue import (
+    DialogueAction,
+    DialogueContext,
+    DialogueResponse,
+    Perspective,
+)
 from src.models.reasoning import ReasoningLog, UserActionLogEntry
 
 logger = logging.getLogger("app")
@@ -231,7 +236,8 @@ class DialogueFlow:
         # COMPLETE - should not receive messages in this state
         else:
             return DialogueResponse(
-                action="complete", content="Direction phase already complete."
+                action=DialogueAction.COMPLETE,
+                content="Direction phase already complete.",
             )
 
     def _apply_context_update(self, extracted_context: dict):
@@ -258,7 +264,7 @@ class DialogueFlow:
         self.context.initial_query = user_message  # First user input is saved as initial query. This is the intended goal of the investigation
         # Create response that is sent to frontend
         dialogue_response = DialogueResponse()
-        dialogue_response.action = "ask_question"
+        dialogue_response.action = DialogueAction.ASK_QUESTION
 
         # Generate question and extract context from user message
         result = await dialogue_service.generate_clarifying_question(
@@ -303,7 +309,7 @@ class DialogueFlow:
             logger.info(
                 f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (max questions reached)"
             )
-            dialogue_response.action = "max_questions"
+            dialogue_response.action = DialogueAction.MAX_QUESTIONS
             # TODO: Replace model_dump_json with generate_summary MCP call when implemented:
             # summary = await dialogue_service.generate_summary(self.context)
             # dialogue_response.content = summary
@@ -330,7 +336,7 @@ class DialogueFlow:
             logger.info(
                 f"[Session {self.session_id}] State: GATHERING -> SUMMARY_CONFIRMING (sufficient context)"
             )
-            dialogue_response.action = "show_summary"
+            dialogue_response.action = DialogueAction.SHOW_SUMMARY
             summary = await dialogue_service.generate_summary(self.context, language=language)
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
@@ -338,7 +344,7 @@ class DialogueFlow:
             return dialogue_response
         else:
             # Context not sufficient, ask the generated question
-            dialogue_response.action = "ask_question"
+            dialogue_response.action = DialogueAction.ASK_QUESTION
             dialogue_response.content = result.question.question_text
             return dialogue_response
 
@@ -411,7 +417,7 @@ class DialogueFlow:
             logger.info(
                 f"[Session {self.session_id}] State: SUMMARY_CONFIRMING -> PIR_CONFIRMING"
             )
-            dialogue_response.action = "show_pir"
+            dialogue_response.action = DialogueAction.SHOW_PIR
             dialogue_response.content = (
                 json.dumps(pir) if isinstance(pir, dict) else pir
             )
@@ -428,7 +434,7 @@ class DialogueFlow:
             )
             if self.research_logger:
                 self.research_logger.create_log(log_user_interaction)
-            dialogue_response.action = "show_summary"
+            dialogue_response.action = DialogueAction.SHOW_SUMMARY
             summary = await dialogue_service.generate_summary(
                 self.context, modifications=user_message, language=language
             )
@@ -474,7 +480,7 @@ class DialogueFlow:
                     datetime.now().isoformat()
                 )
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
-            dialogue_response.action = "complete"
+            dialogue_response.action = DialogueAction.COMPLETE
         else:
             # User rejected with modifications. Regenerate PIR
             self.context.modifications = user_message
@@ -490,7 +496,7 @@ class DialogueFlow:
                 self.research_logger.create_log(log_user_interaction)
             pir = await dialogue_service.generate_pir(self.context, language=language, current_pir=self.current_pir)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
-            dialogue_response.action = "show_pir"
+            dialogue_response.action = DialogueAction.SHOW_PIR
             dialogue_response.content = self.current_pir
             self.sub_state = "awaiting_decision"
 

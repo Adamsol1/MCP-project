@@ -6,11 +6,29 @@ import {
   setDevDialogueState,
   type DialogueApiResponse,
 } from "../services/dialogue";
-import type { DialogueStage, DialogueSubState } from "../types/dialogue";
+import type {
+  DialogueAction,
+  DialogueStage,
+  DialogueSubState,
+} from "../types/dialogue";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 import type { Message, PirData, SummaryData } from "../types/conversation";
 import { useSettings } from "../contexts/SettingsContext";
+
+const ACTION_TO_MESSAGE_TYPE: Record<DialogueAction, NonNullable<Message["type"]>> = {
+  ask_question: "question",
+  show_summary: "summary",
+  show_pir: "pir",
+  max_questions: "summary",
+  complete: "complete",
+};
+
+function resolveMessageType(
+  response: DialogueApiResponse,
+): Message["type"] | undefined {
+  return ACTION_TO_MESSAGE_TYPE[response.action];
+}
 
 function inferStageFromResponse(
   response: DialogueApiResponse,
@@ -25,17 +43,17 @@ function inferStageFromResponse(
     return { stage: response.stage, subState };
   }
 
-  if (response.type === "summary") {
+  if (response.action === "show_summary" || response.action === "max_questions") {
     return { stage: "summary_confirming", subState: "awaiting_decision" };
   }
-  if (response.type === "pir") {
+  if (response.action === "show_pir") {
     return { stage: "pir_confirming", subState: "awaiting_decision" };
   }
-  if (response.type === "complete") {
+  if (response.action === "complete") {
     return { stage: "complete", subState: null };
   }
-  if (response.is_final) {
-    return { stage: "summary_confirming", subState: "awaiting_decision" };
+  if (response.action === "ask_question") {
+    return { stage: "gathering", subState: null };
   }
   return { stage: "gathering", subState: null };
 }
@@ -47,16 +65,12 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     sender: "system",
   };
 
-  if (
-    response.type === "question" ||
-    response.type === "summary" ||
-    response.type === "pir" ||
-    response.type === "complete"
-  ) {
-    message.type = response.type;
+  const messageType = resolveMessageType(response);
+  if (messageType) {
+    message.type = messageType;
   }
 
-  if (response.type === "summary" || response.type === "pir") {
+  if (messageType === "summary" || messageType === "pir") {
     try {
       const parsed = JSON.parse(response.question) as SummaryData | PirData;
       message.data = parsed;

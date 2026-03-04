@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from knowledge_bank.knowledge_registry import KNOWLEDGE_REGISTRY
 from knowledge_bank.service import KnowledgeService
 from src.mcp_client.client import MCPClient
-from src.models.dialogue import DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.dialogue_flow import DialogueFlow, DialogueState
 from src.services.dialogue_service import DialogueService
@@ -84,8 +84,7 @@ class DialogueMessageResponse(BaseModel):
     """
 
     question: str
-    type: str
-    is_final: bool
+    action: DialogueAction
     stage: str
     sub_state: str | None = None
 
@@ -110,17 +109,13 @@ class DialogueDevStateRequest(BaseModel):
     current_pir: str | None = None
 
 
-"""
-Action map that maps dialogueFlow action names to respone type, is_final).
-Is final = True, indicates to the frontend that the conversaton is complete
-"""
-action_map = {
-    "ask_question": ("question", False),
-    "show_summary": ("summary", True),
-    "show_pir": ("pir", True),
-    "max_questions": ("summary", True),
-    "complete": ("complete", True),
-}
+def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
+    if isinstance(action, DialogueAction):
+        return action
+    try:
+        return DialogueAction(action)
+    except ValueError as exc:
+        raise ValueError(f"Unsupported dialogue action: {action}") from exc
 
 
 def _convert_to_message_response(
@@ -132,14 +127,18 @@ def _convert_to_message_response(
     Converts internal DialogueRespone to the API respone format
     Example:
         Input:  DialogueResponse(action="ask_question", content="What is the scope?")
-        Output: DialogueMessageResponse(question="What is the scope?", type="question", is_final=False)
+        Output: DialogueMessageResponse(question="What is the scope?", action="ask_question")
 
     """
-    type_, is_final = action_map[response.action]
+    try:
+        action = _normalize_dialogue_action(response.action)
+    except ValueError as exc:
+        logger.error("Failed to convert dialogue response action: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
     result = DialogueMessageResponse(
         question=response.content,
-        type=type_,
-        is_final=is_final,
+        action=action,
         stage=stage,
         sub_state=sub_state,
     )
@@ -191,7 +190,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             - Approved status: If the user approves or rejects ai output. Is only used when the user is given a choice.
 
     Returns:
-        A response with the next question or summary, what type of respone, and if the dialogue flow is complete
+        A response with the next question or summary and canonical action/state metadata.
 
     Raises:
         Any exception given by DialogueFlow or MCPClient
@@ -212,7 +211,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
 
     # TODO (PERFORMANCE): MCPClient spawns a new subprocess on every request — this is expensive.
     # Fix: add open()/close() to MCPClient using AsyncExitStack, store the client in _sessions
-    # alongside DialogueFlow, and call client.close() + del _sessions[id] when is_final=True.
+    # alongside DialogueFlow, and call client.close() + del _sessions[id] when the flow reaches COMPLETE.
     # See code review notes for full plan.
     client = MCPClient(_server_path)
 

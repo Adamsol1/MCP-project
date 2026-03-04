@@ -68,8 +68,7 @@ describe("useChat", () => {
   it("adds a user message when sendMessage is called", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope?",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -90,8 +89,7 @@ describe("useChat", () => {
   it("adds a system response after the user message", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope of your investigation?",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -116,8 +114,7 @@ describe("useChat", () => {
 
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope?",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -147,8 +144,7 @@ describe("useChat", () => {
 
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope of your investigation?",
-      type: "question",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -173,8 +169,7 @@ describe("useChat", () => {
   it("keeps the same session id across multiple messages", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "Any response",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -197,13 +192,11 @@ describe("useChat", () => {
     vi.mocked(sendMessage)
       .mockResolvedValueOnce({
         question: "What is the scope?",
-        type: "scope",
-        is_final: false,
+        action: "ask_question",
       })
       .mockResolvedValueOnce({
         question: "What timeframe?",
-        type: "timeframe",
-        is_final: false,
+        action: "ask_question",
       });
 
     const { result } = renderHook(() => useChat(), {
@@ -234,11 +227,10 @@ describe("useChat", () => {
     expect(result.current.isConfirming).toBe(false);
   });
 
-  it("sets isConfirming to true when backend returns is_final true", async () => {
+  it("sets isConfirming to true when backend returns show_summary action", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "Here is your investigation summary. Do you approve?",
-      type: "confirmation",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -252,11 +244,10 @@ describe("useChat", () => {
     expect(result.current.isConfirming).toBe(true);
   });
 
-  it("keeps isConfirming false when backend returns is_final false", async () => {
+  it("keeps isConfirming false when backend returns ask_question action", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope?",
-      type: "scope",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -274,13 +265,11 @@ describe("useChat", () => {
     vi.mocked(sendMessage)
       .mockResolvedValueOnce({
         question: "Summary ready. Approve?",
-        type: "confirmation",
-        is_final: true,
+        action: "show_summary",
       })
       .mockResolvedValueOnce({
         question: "Approved. Proceeding to next phase.",
-        type: "complete",
-        is_final: false,
+        action: "complete",
       });
 
     const { result } = renderHook(() => useChat(), {
@@ -305,13 +294,11 @@ describe("useChat", () => {
     vi.mocked(sendMessage)
       .mockResolvedValueOnce({
         question: "Summary ready.",
-        type: "confirmation",
-        is_final: true,
+        action: "show_summary",
       })
       .mockResolvedValueOnce({
         question: "Proceeding.",
-        type: "complete",
-        is_final: false,
+        action: "complete",
       });
 
     const { result } = renderHook(() => useChat(), {
@@ -331,8 +318,7 @@ describe("useChat", () => {
   it("adds a frontend-only feedback message when reject is called", async () => {
     vi.mocked(sendMessage).mockResolvedValueOnce({
       question: "Summary ready. Approve?",
-      type: "confirmation",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -361,8 +347,7 @@ describe("useChat", () => {
   it("sets isConfirming to false after reject so user can type feedback", async () => {
     vi.mocked(sendMessage).mockResolvedValueOnce({
       question: "Summary ready.",
-      type: "confirmation",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -385,8 +370,7 @@ describe("useChat", () => {
   it("does not call backend when reject is called", async () => {
     vi.mocked(sendMessage).mockResolvedValueOnce({
       question: "Summary ready.",
-      type: "confirmation",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), {
@@ -420,8 +404,7 @@ describe("buildSystemMessage — structured response parsing", () => {
     };
     vi.mocked(sendMessage).mockResolvedValue({
       question: JSON.stringify(summaryPayload),
-      type: "summary",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -450,8 +433,7 @@ describe("buildSystemMessage — structured response parsing", () => {
     };
     vi.mocked(sendMessage).mockResolvedValue({
       question: JSON.stringify(pirPayload),
-      type: "pir",
-      is_final: true,
+      action: "show_pir",
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -467,8 +449,7 @@ describe("buildSystemMessage — structured response parsing", () => {
   it("stores type but no data when backend returns a question response", async () => {
     vi.mocked(sendMessage).mockResolvedValue({
       question: "What is the scope of your investigation?",
-      type: "question",
-      is_final: false,
+      action: "ask_question",
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -485,8 +466,7 @@ describe("buildSystemMessage — structured response parsing", () => {
     const malformedJson = "This is not valid JSON {{{";
     vi.mocked(sendMessage).mockResolvedValue({
       question: malformedJson,
-      type: "summary",
-      is_final: true,
+      action: "show_summary",
     });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -510,13 +490,11 @@ describe("buildSystemMessage — structured response parsing", () => {
     vi.mocked(sendMessage)
       .mockResolvedValueOnce({
         question: JSON.stringify({ summary: "Investigation context summary." }),
-        type: "summary",
-        is_final: true,
+        action: "show_summary",
       })
       .mockResolvedValueOnce({
         question: JSON.stringify(pirPayload),
-        type: "pir",
-        is_final: true,
+        action: "show_pir",
       });
 
     const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
@@ -534,3 +512,70 @@ describe("buildSystemMessage — structured response parsing", () => {
     expect(pirMessage?.data).toEqual(pirPayload);
   });
 });
+
+describe("action-first response handling", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    localStorage.clear();
+    seedConversation();
+  });
+
+  it("maps max_questions action to summary message rendering", async () => {
+    const summaryPayload = {
+      summary: "Reached max questions. Please confirm current direction.",
+    };
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: JSON.stringify(summaryPayload),
+      action: "max_questions",
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Continue");
+    });
+
+    const systemMessage = result.current.messages[1];
+    expect(systemMessage.type).toBe("summary");
+    expect(systemMessage.data).toEqual(summaryPayload);
+    expect(result.current.stage).toBe("summary_confirming");
+    expect(result.current.isConfirming).toBe(true);
+  });
+
+  it("infers pir_confirming stage from show_pir action when stage is omitted", async () => {
+    const pirPayload = {
+      result: "Generated PIRs",
+      pirs: [{ question: "Q1", priority: "high", rationale: "R1" }],
+      reasoning: "Reasoning",
+    };
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: JSON.stringify(pirPayload),
+      action: "show_pir",
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Approve summary");
+    });
+
+    expect(result.current.stage).toBe("pir_confirming");
+    expect(result.current.isConfirming).toBe(true);
+    expect(result.current.messages[1].type).toBe("pir");
+  });
+
+  it("keeps summary-confirming behavior for show_summary action", async () => {
+    vi.mocked(sendMessage).mockResolvedValue({
+      question: "Summary response",
+      action: "show_summary",
+    });
+
+    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    await act(async () => {
+      await result.current.sendMessage("Summary path");
+    });
+
+    expect(result.current.stage).toBe("summary_confirming");
+    expect(result.current.isConfirming).toBe(true);
+    expect(result.current.messages[1].type).toBe("summary");
+  });
+});
+
