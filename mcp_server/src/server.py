@@ -1,14 +1,14 @@
-"""MCP Threat Intelligence Server.
+"""MCP Threat Intelligence Server — Generation Server (port 8001).
 
-This server provides Tools and Resources for the Collection and Processing
-phases of the Threat Intelligence workflow. The AI agent (GeminiAgent) running
-in the backend calls these tools directly via the MCP protocol.
+This server is for Agent #1 (GeminiAgent). It provides:
+  - Tools: OSINT sources, knowledge bank access, data processing
+  - Prompts: System prompt templates for Direction and Collection phases
 
-Direction phase does NOT use this server — all Direction AI calls go through
-LLMService directly in the backend. See plan.md Architectural Design Decisions.
+The review server (port 8002) is a separate process for Agent #2.
 """
 
 import json
+import os
 from pathlib import Path
 from sys import stderr
 
@@ -16,6 +16,11 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
+from prompts import (
+    build_direction_dialogue_prompt,
+    build_pir_generation_prompt,
+    build_summary_prompt,
+)
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
 
 load_dotenv()
@@ -72,6 +77,106 @@ def read_knowledge_base(resource_id: str) -> str:
     return path.read_text(encoding="utf-8")
 
 
+# ── Direction Prompts ─────────────────────────────────────────────────────────
+
+@mcp.prompt
+def direction_gathering(
+    user_message: str,
+    missing_fields: str,
+    context: str,
+    language: str = "en",
+) -> str:
+    """Prompt for generating a clarifying question in the Direction dialogue phase.
+
+    Args:
+        user_message: The user's latest message.
+        missing_fields: JSON array of context field names still missing.
+        context: JSON object of the current dialogue context.
+        language: BCP-47 language code (e.g. "en", "no").
+    """
+    ctx = json.loads(context)
+    return build_direction_dialogue_prompt(
+        user_message=user_message,
+        missing_fields=json.loads(missing_fields),
+        perspectives=ctx.get("perspectives", []),
+        context=ctx,
+        language=language,
+    )
+
+
+@mcp.prompt
+def direction_summary(
+    scope: str,
+    timeframe: str,
+    target_entities: str,
+    threat_actors: str,
+    priority_focus: str,
+    perspectives: str,
+    modifications: str = "",
+    language: str = "en",
+) -> str:
+    """Prompt for generating a context summary in the Direction phase.
+
+    Args:
+        scope: The focus area of the investigation.
+        timeframe: The time period of the investigation.
+        target_entities: JSON array of relevant entities.
+        threat_actors: JSON array of threat actors.
+        priority_focus: The main aspect to emphasize.
+        perspectives: JSON array of selected perspectives.
+        modifications: Optional user feedback to incorporate.
+        language: BCP-47 language code.
+    """
+    return build_summary_prompt(
+        scope=scope,
+        timeframe=timeframe,
+        target_entities=json.loads(target_entities),
+        threat_actors=json.loads(threat_actors),
+        priority_focus=priority_focus,
+        perspectives=json.loads(perspectives),
+        modifications=modifications or None,
+        language=language,
+    )
+
+
+@mcp.prompt
+def direction_pir(
+    scope: str,
+    timeframe: str,
+    target_entities: str,
+    threat_actors: str,
+    priority_focus: str,
+    perspectives: str,
+    modifications: str = "",
+    current_pir: str = "",
+    language: str = "en",
+) -> str:
+    """Prompt for generating PIRs from gathered dialogue context.
+
+    Args:
+        scope: The focus area of the investigation.
+        timeframe: The time period the PIR covers.
+        target_entities: JSON array of relevant entities.
+        threat_actors: JSON array of threat actors.
+        priority_focus: The main aspect to emphasize.
+        perspectives: JSON array of selected analytical perspectives.
+        modifications: Optional user feedback for regenerating PIRs.
+        current_pir: Existing PIR JSON string for modification requests.
+        language: BCP-47 language code.
+    """
+    return build_pir_generation_prompt(
+        scope=scope,
+        timeframe=timeframe,
+        target_entities=json.loads(target_entities),
+        threat_actors=json.loads(threat_actors),
+        priority_focus=priority_focus,
+        perspectives=json.loads(perspectives),
+        modifications=modifications or None,
+        current_pir=current_pir or None,
+        language=language,
+    )
+
+
 # ── OSINT Tools (Collection phase) ───────────────────────────────────────────
 # TODO: Implement query_otx, search_misp, search_local_data
 
@@ -98,7 +203,5 @@ def greet() -> str:
 
 
 if __name__ == "__main__":
-    import os
-
     port = int(os.getenv("MCP_SERVER_PORT", "8001"))
     mcp.run(transport="sse", host="127.0.0.1", port=port, show_banner=False, log_level="INFO")

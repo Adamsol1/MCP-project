@@ -24,6 +24,33 @@ _SERVER_PATH = str(
 )
 
 
+def _json_schema_to_gemini(schema: dict) -> types.Schema:
+    """Convert a JSON Schema dict to a Gemini types.Schema object.
+
+    Used to pass MCP tool inputSchemas to Gemini so it knows what
+    arguments each tool accepts. Called recursively for nested objects.
+    """
+    type_map = {
+        "string": types.Type.STRING,
+        "integer": types.Type.INTEGER,
+        "boolean": types.Type.BOOLEAN,
+        "number": types.Type.NUMBER,
+        "array": types.Type.ARRAY,
+        "object": types.Type.OBJECT,
+    }
+    schema_type = type_map.get(schema.get("type", "string"), types.Type.STRING)
+    properties = {
+        k: _json_schema_to_gemini(v)
+        for k, v in schema.get("properties", {}).items()
+    }
+    return types.Schema(
+        type=schema_type,
+        description=schema.get("description"),
+        properties=properties or None,
+        required=schema.get("required"),
+    )
+
+
 class GeminiAgent:
     """Gemini AI agent that autonomously calls MCP tools to complete tasks.
 
@@ -141,16 +168,27 @@ class GeminiAgent:
         return last_text or "Agent reached maximum tool iterations without completing."
 
     async def _get_tool_declarations(self) -> list:
-        """Fetch available tools from the MCP server and convert to Gemini format."""
+        """Fetch available tools from the MCP server and convert to Gemini format.
+
+        Converts each tool's inputSchema to a Gemini Schema so Gemini knows
+        what arguments to pass when calling the tool.
+        """
         raw_tools = await self.mcp_client.list_tools()
         declarations = []
         for tool in raw_tools:
+            input_schema = tool.get("inputSchema", {})
+            parameters = (
+                _json_schema_to_gemini(input_schema)
+                if input_schema.get("properties")
+                else None
+            )
             declarations.append(
                 types.Tool(
                     function_declarations=[
                         types.FunctionDeclaration(
                             name=tool["name"],
                             description=tool.get("description", ""),
+                            parameters=parameters,
                         )
                     ]
                 )

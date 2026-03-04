@@ -1,27 +1,29 @@
-"""ReviewService — AI review for generated content.
+"""ReviewService — AI review for generated content via Review MCP Server.
 
-All review calls go directly through LLMService (direct Gemini API).
-No MCP is involved — the review prompts are backend-side concerns.
+Prompts are fetched from the dedicated review MCP server (port 8002).
+The AI call is made via LLMService — no tool loop needed, review is pure synthesis.
 """
 
+import json
 import logging
 
+from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueContext, ReviewResult
-from src.prompts.direction import build_direction_review_prompt
 from src.services.llm_service import LLMService
 
 logger = logging.getLogger("app")
 
 
 class ReviewService:
-    """AI review wrapper using LLMService.
+    """AI review wrapper using the Review MCP Server for prompts and LLMService for generation.
 
-    Sends generated content to the AI reviewer and validates
-    the response into a ReviewResult model.
+    Fetches review prompt templates from the dedicated review MCP server (port 8002),
+    then calls LLMService (Gemini) to perform the actual review.
     """
 
-    def __init__(self, llm_service: LLMService):
+    def __init__(self, llm_service: LLMService, review_mcp_client: MCPClient):
         self.llm_service = llm_service
+        self.review_mcp_client = review_mcp_client
 
     async def review_pir(
         self, content, context: DialogueContext, phase: str
@@ -37,21 +39,26 @@ class ReviewService:
             ReviewResult with overall_approved, severity, and suggestions.
 
         Raises:
-            KeyError: If phase is not a recognised value.
+            ValueError: If phase is not a recognised value.
         """
-        logger.info(f"[ReviewService] Reviewing content — phase={phase}")
+        valid_phases = {"direction", "collection", "processing"}
+        if phase not in valid_phases:
+            raise ValueError(
+                f"[ReviewService] Unknown phase: '{phase}'. Valid: {list(valid_phases)}"
+            )
 
-        prompts = {
-            "direction": build_direction_review_prompt,
-            # collection and processing prompts added when those phases are built
-        }
+        logger.info(f"[ReviewService] Fetching review prompt for phase={phase}")
 
-        if phase not in prompts:
-            raise KeyError(f"[ReviewService] Unknown phase: '{phase}'. Valid: {list(prompts)}")
+        async with self.review_mcp_client.connect():
+            prompt = await self.review_mcp_client.get_prompt(
+                f"{phase}_review",
+                {
+                    "content": json.dumps(content),
+                    "context": json.dumps(context.model_dump()),
+                },
+            )
 
-        prompt = prompts[phase](content, context.model_dump())
         result = await self.llm_service.generate_json(prompt)
-
         response = ReviewResult.model_validate(result)
         logger.info(
             f"[ReviewService] Review result — approved={response.overall_approved}, severity={response.severity}"

@@ -104,7 +104,8 @@ class MCPClient:
         """List available tools on the MCP server.
 
         Returns:
-            List of dicts with 'name' and 'description' keys.
+            List of dicts with 'name', 'description', and 'inputSchema' keys.
+            inputSchema follows JSON Schema format and describes the tool's parameters.
 
         Raises:
             RuntimeError: If not connected to the server.
@@ -115,10 +116,46 @@ class MCPClient:
             )
 
         result = await self.session.list_tools()
+        def _schema(s):
+            if s is None:
+                return {}
+            if isinstance(s, dict):
+                return s
+            return s.model_dump()
+
         return [
-            {"name": tool.name, "description": tool.description}
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": _schema(tool.inputSchema),
+            }
             for tool in result.tools
         ]
+
+    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> str:
+        """Fetch a rendered prompt template from the MCP server.
+
+        Args:
+            name: Registered prompt name, e.g. "direction_gathering".
+            arguments: Key-value arguments to fill into the template.
+                       All values must be strings per the MCP Prompts spec.
+
+        Returns:
+            The rendered prompt text, ready to send to an LLM.
+
+        Raises:
+            RuntimeError: If not connected to the server.
+        """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        logger.info(f"[MCP] Fetching prompt: {name}")
+        result = await self.session.get_prompt(name, arguments or {})
+        return "\n".join(
+            msg.content.text for msg in result.messages if hasattr(msg.content, "text")
+        )
 
     @staticmethod
     def _strip_fences(text: str) -> str:

@@ -7,10 +7,11 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:headed": "playwright test --headed",
     "test:e2e:report": "playwright show-report",
-    "dev": "concurrently \"npm run dev:mcp\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:mcp\" \"npm run dev:review\" \"npm run dev:backend\" \"npm run dev:frontend\"",
     "dev:frontend": "cd frontend && npm run dev",
     "dev:backend": "cd backend && poetry run uvicorn src.api.main:app",
-    "dev:mcp": "cd mcp_server && poetry run python src/server.py"
+    "dev:mcp": "cd mcp_server && poetry run python src/server.py",
+    "dev:review": "cd review_mcp_server && poetry run python src/server.py"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.0",

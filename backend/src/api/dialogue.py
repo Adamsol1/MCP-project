@@ -1,10 +1,12 @@
 import json
 import logging
+import os
 from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.dialogue_service import DialogueService
@@ -12,6 +14,8 @@ from src.services.llm_service import LLMService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
 from src.services.state_machines.direction_flow import DirectionFlow
+
+_REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 
 """
 API router for the dialogue flow.
@@ -140,8 +144,10 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     )
 
     llm = LLMService(model="gemini-2.5-flash")
-    service = DialogueService(llm, None)
-    review_service = ReviewService(llm)
+    mcp_client = MCPClient()
+    review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
+    service = DialogueService(mcp_client, None)
+    review_service = ReviewService(llm, review_mcp_client)
     orchestrator = AIOrchestrator(
         research_logger=flow.research_logger,
         generator_model="gemini-2.5-flash",
