@@ -194,6 +194,10 @@ data/outputs/*
 backend/data/outputs/*
 !backend/data/outputs/.gitkeep
 
+# Session files (persisted dialogue state)
+backend/sessions/*
+!backend/sessions/.gitkeep
+
 # Local database files
 *.db
 *.sqlite
