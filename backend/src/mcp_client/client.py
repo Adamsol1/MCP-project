@@ -15,6 +15,7 @@ from typing import Any
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 from mcp.types import TextContent
+from pydantic import AnyUrl
 
 logger = logging.getLogger("app")
 
@@ -156,6 +157,66 @@ class MCPClient:
         return "\n".join(
             msg.content.text for msg in result.messages if hasattr(msg.content, "text")
         )
+
+    async def list_resources(self) -> list[dict[str, Any]]:
+        """List available resources on the MCP server.
+
+        Returns:
+            List of dicts with 'uri', 'name', 'description', and 'mimeType' keys.
+
+        Raises:
+            RuntimeError: If not connected to the server.
+        """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        result = await self.session.list_resources()
+        return [
+            {
+                "uri": str(resource.uri),
+                "name": resource.name,
+                "description": resource.description,
+                "mimeType": getattr(resource, "mimeType", None),
+            }
+            for resource in result.resources
+        ]
+
+    async def read_resource(self, uri: str) -> str:
+        """Read a resource by URI from the MCP server.
+
+        Args:
+            uri: The resource URI, e.g. "knowledge://geopolitical/norway_russia"
+                 or "knowledge://index".
+
+        Returns:
+            The text content of the resource.
+
+        Raises:
+            RuntimeError: If not connected to the server.
+            ValueError: If the resource has no text content.
+        """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        logger.info(f"[MCP] Reading resource: {uri}")
+        start = time.time()
+        try:
+            result = await self.session.read_resource(AnyUrl(uri))
+        except Exception as e:
+            logger.error(
+                f"[MCP] Resource {uri} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}"
+            )
+            raise
+        logger.info(f"[MCP] Resource {uri} read in {time.time() - start:.2f}s")
+
+        for content_item in result.contents:
+            if hasattr(content_item, "text"):
+                return content_item.text
+        raise ValueError(f"No text content in resource: {uri}")
 
     @staticmethod
     def _strip_fences(text: str) -> str:

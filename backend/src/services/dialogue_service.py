@@ -80,6 +80,10 @@ class DialogueService:
     ) -> Any:
         """Generate PIRs from gathered dialogue context.
 
+        Uses the MCP Resources primitive to pre-fetch relevant knowledge before
+        generation (host-driven), in addition to the AI's autonomous tool calls
+        (model-driven). This demonstrates both access patterns for RQ1.1.
+
         Args:
             context: The dialogue context with scope, timeframe, target_entities, perspectives.
             language: BCP-47 language code. Falls back to self.language when not passed directly.
@@ -92,6 +96,10 @@ class DialogueService:
         perspectives = [p.value for p in context.perspectives]
 
         async with self.mcp_client.connect():
+            # MCP Resources primitive: backend pre-fetches relevant knowledge
+            # based on context (host-driven), before the AI starts generating.
+            background_knowledge = await self._fetch_relevant_resources(context)
+
             system_prompt = await self.mcp_client.get_prompt(
                 "direction_pir",
                 {
@@ -104,8 +112,11 @@ class DialogueService:
                     "modifications": context.modifications or "",
                     "current_pir": current_pir or "",
                     "language": effective_language,
+                    "background_knowledge": background_knowledge,
                 },
             )
+            # MCP Tools primitive: AI may still call read_knowledge_base()
+            # autonomously during the tool-loop to explore additional knowledge.
             agent = GeminiAgent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
@@ -113,6 +124,74 @@ class DialogueService:
             )
 
         return self._parse_json(raw)
+
+    async def _fetch_relevant_resources(self, context: DialogueContext) -> str:
+        """Pre-fetch relevant knowledge using the MCP Resources primitive.
+
+        This is the host-driven counterpart to AI-driven tool calls. The backend
+        reads the knowledge index resource, matches resources against the current
+        investigation context, and fetches the top matches to inject into the
+        PIR generation prompt as grounding knowledge.
+
+        This demonstrates the Resources primitive (RQ1.1): the host decides what
+        knowledge is relevant and fetches it proactively, rather than leaving it
+        entirely to the AI to discover via tools.
+
+        Args:
+            context: Current dialogue context to match knowledge against.
+
+        Returns:
+            Formatted background knowledge string, or empty string if no matches.
+        """
+        try:
+            # Step 1: read the index resource to discover available knowledge
+            index_json = await self.mcp_client.read_resource("knowledge://index")
+            index: list[dict] = json.loads(index_json)
+        except Exception as e:
+            logger.warning(f"[MCP] Could not read knowledge index resource: {e}")
+            return ""
+
+        # Step 2: build a scan text from the investigation context
+        scan_parts = [
+            context.scope,
+            " ".join(context.target_entities),
+            " ".join(context.threat_actors or []),
+            context.priority_focus or "",
+        ]
+        scan_text = " ".join(scan_parts).lower()
+
+        if not scan_text.strip():
+            return ""
+
+        # Step 3: match resources by keywords, sort by priority
+        matches = []
+        for entry in index:
+            for keyword in entry.get("keywords", []):
+                if keyword.lower() in scan_text:
+                    matches.append(entry)
+                    break
+        matches.sort(key=lambda e: e.get("priority", 99))
+
+        if not matches:
+            logger.info("[MCP] No matching resources found for current context")
+            return ""
+
+        logger.info(
+            f"[MCP] Pre-fetching {min(len(matches), 5)} resources via Resources primitive: "
+            f"{[m['id'] for m in matches[:5]]}"
+        )
+
+        # Step 4: fetch top 5 matching resources
+        parts = ["## Background Knowledge (pre-fetched via MCP Resources)"]
+        for entry in matches[:5]:
+            try:
+                content = await self.mcp_client.read_resource(entry["uri"])
+                parts.append(f"### Source: {entry['id']}")
+                parts.append(content)
+            except Exception as e:
+                logger.warning(f"[MCP] Failed to read resource {entry['uri']}: {e}")
+
+        return "\n".join(parts) if len(parts) > 1 else ""
 
     async def generate_summary(
         self, context: DialogueContext, modifications=None, language: str = "en"

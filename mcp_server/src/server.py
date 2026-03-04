@@ -33,7 +33,57 @@ mcp = FastMCP(
 )
 
 
-# ── Knowledge Bank ────────────────────────────────────────────────────────────
+# ── Knowledge Bank Resources ──────────────────────────────────────────────────
+
+@mcp.resource("knowledge://index", mime_type="application/json")
+def knowledge_index() -> str:
+    """Index of all knowledge bank resources with their keywords and URIs.
+
+    Read this to discover what knowledge is available and which resources
+    are relevant to an investigation. Use the keywords to match against
+    context fields (scope, target_entities, threat_actors).
+
+    Returns:
+        JSON array of resource descriptors with uri, id, keywords, priority fields.
+    """
+    return json.dumps([
+        {
+            "uri": f"knowledge://{resource_id}",
+            "id": resource_id,
+            "keywords": entry["keywords"],
+            "priority": entry["priority"],
+        }
+        for resource_id, entry in KNOWLEDGE_REGISTRY.items()
+    ])
+
+
+@mcp.resource("knowledge://{category}/{name}", mime_type="text/markdown")
+def knowledge_resource(category: str, name: str) -> str:
+    """Read a specific knowledge bank resource by category and name.
+
+    Args:
+        category: Resource category — geopolitical, sectors, or threat_actors.
+        name: Resource name within its category, e.g. norway_russia, energy.
+
+    Returns:
+        Full markdown content of the knowledge resource.
+
+    Raises:
+        ValueError: If the resource does not exist.
+    """
+    resource_id = f"{category}/{name}"
+    if resource_id not in KNOWLEDGE_REGISTRY:
+        available = list(KNOWLEDGE_REGISTRY.keys())
+        raise ValueError(f"Unknown resource: '{resource_id}'. Available: {available}")
+
+    path = RESOURCES_DIR / f"{resource_id}.md"
+    if not path.exists():
+        raise ValueError(f"Resource file not found: {resource_id}")
+
+    return path.read_text(encoding="utf-8")
+
+
+# ── Knowledge Bank Tools ───────────────────────────────────────────────────────
 
 @mcp.tool
 def list_knowledge_base() -> str:
@@ -150,6 +200,7 @@ def direction_pir(
     modifications: str = "",
     current_pir: str = "",
     language: str = "en",
+    background_knowledge: str = "",
 ) -> str:
     """Prompt for generating PIRs from gathered dialogue context.
 
@@ -163,6 +214,8 @@ def direction_pir(
         modifications: Optional user feedback for regenerating PIRs.
         current_pir: Existing PIR JSON string for modification requests.
         language: BCP-47 language code.
+        background_knowledge: Pre-fetched knowledge content from MCP Resources,
+                              injected by the backend before prompt rendering.
     """
     return build_pir_generation_prompt(
         scope=scope,
@@ -174,6 +227,7 @@ def direction_pir(
         modifications=modifications or None,
         current_pir=current_pir or None,
         language=language,
+        background_knowledge=background_knowledge or None,
     )
 
 
