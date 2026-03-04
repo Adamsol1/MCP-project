@@ -1,5 +1,6 @@
 import { useState } from "react";
-import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
+import { PhaseTimeline } from "../PhaseTimeline/PhaseTimeline";
+import type { DialogueStage } from "../../types/dialogue";
 
 /** Props for the OptionsPanel component. */
 interface OptionsPanelProps {
@@ -13,6 +14,8 @@ interface OptionsPanelProps {
   uploadedFiles?: File[];
   /** Called when the user removes a file from the uploaded files list. */
   onFileRemove?: (file: File) => void;
+  /** Current dialogue stage for the phase timeline. */
+  stage?: DialogueStage;
 }
 
 /**
@@ -43,6 +46,7 @@ export function OptionsPanel({
   onOpenFileUpload,
   uploadedFiles = [],
   onFileRemove,
+  stage,
 }: OptionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   /** Controls whether the full uploaded-files list is expanded. */
@@ -91,13 +95,16 @@ export function OptionsPanel({
       {!isCollapsed && (
         <div className="flex flex-col gap-6 p-4 overflow-y-auto">
 
-          {/* ── Section: Perspectives ─────────────────────────────── */}
-          <div>
-            <PerspectiveSelector
-              selected={selectedPerspectives}
-              onChange={onPerspectiveChange}
-            />
-          </div>
+          {/* ── Section: Phase Timeline (includes Perspectives + Timeframe in Direction) */}
+          {stage && (
+            <div>
+              <PhaseTimeline
+                stage={stage}
+                selectedPerspectives={selectedPerspectives}
+                onPerspectiveChange={onPerspectiveChange}
+              />
+            </div>
+          )}
 
           {/* ── Section: Files ────────────────────────────────────── */}
           <div>

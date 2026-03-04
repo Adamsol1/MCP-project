@@ -4,7 +4,8 @@
       "Bash(python -m pytest:*)",
       "Bash(dir:*)",
       "Bash(git status:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(npx tsc --noEmit)"
     ]
   }
 }

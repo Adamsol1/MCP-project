@@ -143,6 +143,7 @@ function App() {
         onOpenFileUpload={() => setIsFileUploadOpen(true)}
         uploadedFiles={uploadedFiles}
         onFileRemove={handleFileRemove}
+        stage={stage}
       />
 
       <FileUploadModal
