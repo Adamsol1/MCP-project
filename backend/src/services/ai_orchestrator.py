@@ -97,7 +97,8 @@ class AIOrchestrator:
                 log_entry = ReasoningLogEntry(
                     attempt_number=current_retries,
                     timestamp=attempt_timestamp,
-                    generated_pir="",
+                    phase="pir_generation",
+                    generated_content="",
                     generation_duration=generation_duration,
                     review_result=None,
                     review_duration=0.0,
@@ -126,7 +127,8 @@ class AIOrchestrator:
                 log_entry = ReasoningLogEntry(
                     attempt_number=current_retries,
                     timestamp=attempt_timestamp,
-                    generated_pir=json.dumps(generated_pir)
+                    phase="pir_generation",
+                    generated_content=json.dumps(generated_pir)
                     if isinstance(generated_pir, dict)
                     else generated_pir,
                     generation_duration=generation_duration,
@@ -162,7 +164,8 @@ class AIOrchestrator:
             log_entry = ReasoningLogEntry(
                 attempt_number=current_retries,
                 timestamp=attempt_timestamp,
-                generated_pir=json.dumps(generated_pir)
+                phase="pir_generation",
+                generated_content=json.dumps(generated_pir)
                 if isinstance(generated_pir, dict)
                 else generated_pir,
                 generation_duration=generation_duration,

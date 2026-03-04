@@ -85,11 +85,13 @@ def test_logger_writes_to_jsonl_file(tmp_path):
     log_entry = ReasoningLogEntry(
         attempt_number=1,
         timestamp=datetime(2026, 2, 13, 14, 30, 0),
-        generated_pir="Fake PIR report",
+        phase="pir_generation",
+        generated_content="Fake PIR report",
         generation_duration=0.5,
         review_result=make_approved_result(),
         review_duration=0.3,
         session_id=session_id,
+        model_used="test-model",
     )
 
     logger = ResearchLogger(log_path=tmp_path / "log.jsonl")
@@ -115,11 +117,11 @@ async def test_orchestrator_logs_reasoning():
     # One false and one true. Will mock that first PIR generation is rejected
     reviewer = MockReviewer(responses=[make_rejected_result(), make_approved_result()])
     logger = MockLogger()
-    orchestrator = AIOrchestrator()
+    orchestrator = AIOrchestrator(research_logger=logger)
 
     # Perform generation and pir review with logger
     result = await orchestrator.generate_and_review_pir(  # noqa: F841
-        context, generator, reviewer, phase="direction", logger=logger
+        context, generator, reviewer, phase="direction", session_id="test-session"
     )
 
     # Check amount of logs saved. Should be two

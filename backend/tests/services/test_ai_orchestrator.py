@@ -28,7 +28,7 @@ async def test_orchestrator_approves_on_first_try():
 
     # Call method
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, phase="direction", logger=None
+        context, generator, reviewer, phase="direction", session_id="test-session"
     )
 
     # Test result
@@ -52,7 +52,7 @@ async def test_orchestrator_retries_and_succeeds():
 
     # Generate the PIR and review
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, phase="direction", logger=None
+        context, generator, reviewer, phase="direction", session_id="test-session"
     )
 
     # Test result
@@ -81,7 +81,7 @@ async def test_orchestrator_fails_after_max_retries():
 
     # Call method
     result = await orchestrator.generate_and_review_pir(
-        context, generator, reviewer, phase="direction", logger=None
+        context, generator, reviewer, phase="direction", session_id="test-session"
     )
 
     # Check if rejected
