@@ -48,9 +48,19 @@ export default function PerspectiveSelector({
    * @param value - The perspective ID to toggle (e.g. "US").
    */
   const togglePerspective = (value: string) => {
-    let updated = selected.includes(value)
-      ? selected.filter((p) => p !== value)
-      : [...selected, value];
+    const isSelected = selected.includes(value);
+    const isNeutralOnly =
+      selected.length === 1 && selected[0] === "NEUTRAL";
+
+    let updated: string[];
+    if (isSelected) {
+      updated = selected.filter((p) => p !== value);
+    } else if (value !== "NEUTRAL" && isNeutralOnly) {
+      // First non-neutral pick replaces default NEUTRAL.
+      updated = [value];
+    } else {
+      updated = [...selected, value];
+    }
 
     // Safety net: if all perspectives were deselected, restore NEUTRAL as default.
     if (updated.length === 0) updated = ["NEUTRAL"];

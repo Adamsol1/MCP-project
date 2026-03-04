@@ -76,11 +76,9 @@ describe("PerspectiveSelector", () => {
     const usBtn = screen.getByRole("button", { name: /united states/i });
     await user.click(usBtn);
 
-    // Should be called with NEUTRAL (existing) + US (newly added)
+    // A first non-neutral selection should replace default NEUTRAL.
     expect(handleChange).toHaveBeenCalledTimes(1);
-    expect(handleChange).toHaveBeenCalledWith(
-      expect.arrayContaining(["NEUTRAL", "US"])
-    );
+    expect(handleChange).toHaveBeenCalledWith(["US"]);
   });
 
   it("calls onChange with perspective removed when clicking a selected option", async () => {
@@ -117,6 +115,22 @@ describe("PerspectiveSelector", () => {
 
     expect(handleChange).toHaveBeenCalledWith(
       expect.arrayContaining(["US", "EU", "NORWAY"])
+    );
+  });
+
+  it("allows selecting NEUTRAL together with other perspectives", async () => {
+    const user = userEvent.setup();
+    const handleChange = vi.fn();
+
+    render(
+      <PerspectiveSelector selected={["US"]} onChange={handleChange} />
+    );
+
+    const neutralBtn = screen.getByRole("button", { name: /neutral/i });
+    await user.click(neutralBtn);
+
+    expect(handleChange).toHaveBeenCalledWith(
+      expect.arrayContaining(["US", "NEUTRAL"])
     );
   });
 
