@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
+import type { DialogueStage } from "../../types/dialogue";
 
 /** Props for the Sidebar component. */
 interface SidebarProps {
@@ -19,9 +20,25 @@ interface SidebarProps {
   onDeleteAllConversations: () => void;
   /** DEV: Injects a predefined message into the chat input and sends it. */
   onDevSendMessage: () => void;
+  /** DEV: Forces chat into confirmation mode to preview approval UI. */
+  onDevShowCollectionApproval?: () => void;
+  /** DEV: Force the backend/session to a specific stage. */
+  onDevJumpToStage?: (stage: DialogueStage) => void;
+  /** DEV: Pull latest stage snapshot from backend. */
+  onDevSyncStage?: () => void;
+  /** DEV: Reset session stage to initial. */
+  onDevResetStage?: () => void;
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
 }
+
+const DEV_STAGE_ACTIONS: Array<{ label: string; stage: DialogueStage }> = [
+  { label: "Jump to Initial", stage: "initial" },
+  { label: "Jump to Gathering", stage: "gathering" },
+  { label: "Jump to Summary", stage: "summary_confirming" },
+  { label: "Jump to PIR", stage: "pir_confirming" },
+  { label: "Jump to Complete", stage: "complete" },
+];
 
 /**
  * Left-hand navigation sidebar showing all conversations.
@@ -52,6 +69,10 @@ export function Sidebar({
   onRenameConversation,
   onDeleteAllConversations,
   onDevSendMessage,
+  onDevShowCollectionApproval,
+  onDevJumpToStage,
+  onDevSyncStage,
+  onDevResetStage,
   onOpenSettings,
 }: SidebarProps) {
   // Sort a copy so the original prop array is never mutated.
@@ -63,6 +84,9 @@ export function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isDevToolsMinimized, setIsDevToolsMinimized] = useState(true);
+  const [isCollectionPhaseMinimized, setIsCollectionPhaseMinimized] =
+    useState(true);
 
   // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -271,22 +295,95 @@ export function Sidebar({
       </div>
       {/* DEV TOOLS — only visible when the sidebar is expanded. */}
       {!isCollapsed && (
-        <div className="shrink-0 border-t border-border-inverse p-2">
-          <p className="text-xs font-semibold text-dev uppercase tracking-widest mb-1 px-1">
-            Dev Tools
-          </p>
-          <button
-            onClick={onDevSendMessage}
-            className="w-full text-left px-2 py-1.5 rounded text-sm text-text-on-inverse hover:bg-surface-inverse-hover"
-          >
-            Send test message
-          </button>
-          <button
-            onClick={onDeleteAllConversations}
-            className="w-full text-left px-2 py-1.5 rounded text-sm text-error hover:bg-surface-inverse-hover"
-          >
-            Delete all conversations
-          </button>
+        <div className="shrink-0 border-t border-gray-600 p-2">
+          <div className="mb-1 flex items-center justify-between">
+            <p className="px-1 text-xs font-semibold uppercase tracking-widest text-amber-400">
+              Dev Tools
+            </p>
+            <button
+              type="button"
+              aria-label={
+                isDevToolsMinimized ? "Expand dev tools" : "Minimize dev tools"
+              }
+              onClick={() => setIsDevToolsMinimized((prev) => !prev)}
+              className="rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-600"
+            >
+              {isDevToolsMinimized ? "Show" : "Hide"}
+            </button>
+          </div>
+          {!isDevToolsMinimized && (
+            <>
+              <button
+                onClick={onDevSendMessage}
+                className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+              >
+                Send test message
+              </button>
+              {onDevShowCollectionApproval && (
+                <button
+                  onClick={onDevShowCollectionApproval}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                >
+                  Show collection approval
+                </button>
+              )}
+              {onDevJumpToStage && (
+                <div className="mt-1">
+                  <button
+                    type="button"
+                    aria-label={
+                      isCollectionPhaseMinimized
+                        ? "Expand direction phase"
+                        : "Minimize direction phase"
+                    }
+                    onClick={() =>
+                      setIsCollectionPhaseMinimized((prev) => !prev)
+                    }
+                    className="w-full rounded px-2 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-600"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span aria-hidden="true" className="text-xs text-gray-300">
+                        {isCollectionPhaseMinimized ? ">" : "v"}
+                      </span>
+                      <span>Direction Phase</span>
+                    </span>
+                  </button>
+                  {!isCollectionPhaseMinimized &&
+                    DEV_STAGE_ACTIONS.map((item) => (
+                      <button
+                        key={item.stage}
+                        onClick={() => onDevJumpToStage(item.stage)}
+                        className="w-full pl-5 pr-2 py-1.5 rounded text-left text-sm text-gray-300 hover:bg-gray-600"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                </div>
+              )}
+              {onDevSyncStage && (
+                <button
+                  onClick={onDevSyncStage}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                >
+                  Sync stage
+                </button>
+              )}
+              {onDevResetStage && (
+                <button
+                  onClick={onDevResetStage}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                >
+                  Reset stage
+                </button>
+              )}
+              <button
+                onClick={onDeleteAllConversations}
+                className="w-full text-left px-2 py-1.5 rounded text-sm text-red-400 hover:bg-gray-600"
+              >
+                Delete all conversations
+              </button>
+            </>
+          )}
         </div>
       )}
     </aside>

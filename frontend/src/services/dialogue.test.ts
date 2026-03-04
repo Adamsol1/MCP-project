@@ -34,6 +34,7 @@ describe("dialogue service", () => {
         message: "Investigate APT29",
         session_id: "session-123",
         perspectives: ["US", "EU"],
+        approved: undefined,
       }
     );
 

@@ -29,13 +29,15 @@ function createWrapper() {
 // Pre-seeds localStorage with an active conversation before the provider mounts.
 // The provider reads from localStorage on init, so this must be called BEFORE renderHook.
 function seedConversation(overrides: Record<string, unknown> = {}) {
-  const conv = {
+  const conv: ConversationStore["conversations"][number] = {
     id: "test-conv-1",
     title: "New conversation",
     messages: [],
     perspectives: ["NEUTRAL"],
     sessionId: "test-session-123",
     isConfirming: false,
+    stage: "initial",
+    subState: null,
     createdAt: 1000,
     updatedAt: 1000,
     ...overrides,

@@ -51,6 +51,8 @@ interface ChatWindowProps {
   isConfirming?: boolean;
   /** When true, disables Approve / Reject and shows the loading throbber. */
   isLoading?: boolean;
+  /** Canonical stage used to tailor the approval prompt content. */
+  stage?: DialogueStage;
   /** Called when the user clicks Approve in confirmation mode. */
   onApprove?: () => void;
   /** Called when the user clicks Reject in confirmation mode. */
@@ -82,6 +84,7 @@ export default function ChatWindow({
   messages = [],
   isConfirming = false,
   isLoading = false,
+  stage,
   onApprove,
   onReject,
   devPrefill,
@@ -301,14 +304,63 @@ export default function ChatWindow({
         */}
         <div className="w-full max-w-3xl px-6">
           <div className="relative">
-            <ToastContainer position="above-input" />
-            {isConfirming ? (
-              /* Confirmation mode: Approve / Reject replace the text input. */
-              <div className="flex items-center gap-4 p-4 border-t-2 border-border">
-                <button
-                  onClick={onApprove}
-                  disabled={isLoading}
-                  className="px-4 py-2 bg-success text-text-inverse rounded-lg hover:bg-success-dark disabled:opacity-50 disabled:cursor-not-allowed"
+          <ToastContainer position="above-input" />
+          {isConfirming ? (
+            /* Confirmation mode: ApprovalPrompt replaces the text input. */
+            <ApprovalPrompt
+              isLoading={isLoading}
+              stage={stage}
+              onApproveContinue={onApprove}
+              onRejectWithFeedback={() => onReject?.()}
+            />
+          ) : (
+            /*
+             * Normal mode: growing textarea inside a relative-positioned form.
+             * relative on the form lets the send button be absolute-positioned
+             * in the bottom-right corner.
+             * pb-12 reserves space so textarea text never slides under the button.
+             */
+            <form
+              onSubmit={handleSubmit}
+              className="relative border-2 border-gray-300 rounded-xl p-3 pb-12"
+            >
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                placeholder="Ask anything..."
+                value={inputValue}
+                onChange={(event) => setInputValue(event.target.value)}
+                onKeyDown={(e) => {
+                  // Enter alone submits; Shift+Enter inserts a newline.
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    submitMessage();
+                  }
+                }}
+                className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-gray-700 resize-none overflow-y-auto max-h-64"
+              />
+              {/* Send button — absolutely positioned in the bottom-right corner
+                  of the form so the textarea scrollbar is unobstructed. */}
+              <button
+                type="submit"
+                disabled={inputValue.trim() === ""}
+                aria-label="Send message"
+                className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                  inputValue.trim() === ""
+                    ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                    : "bg-blue-500 text-white hover:bg-blue-600"
+                }`}
+              >
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
                 >
                   Approve
                 </button>

@@ -13,6 +13,8 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
     perspectives: ["NEUTRAL"],
     sessionId: crypto.randomUUID(),
     isConfirming: false,
+    stage: "initial",
+    subState: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
     ...overrides,
@@ -32,6 +34,9 @@ function renderSidebar(
       onSwitchConversation={vi.fn()}
       onDeleteConversation={vi.fn()}
       onRenameConversation={vi.fn()}
+      onDeleteAllConversations={vi.fn()}
+      onDevSendMessage={vi.fn()}
+      onOpenSettings={vi.fn()}
       {...props}
     />,
   );
@@ -91,6 +96,84 @@ describe("Sidebar", () => {
     await user.click(screen.getByRole("button", { name: /new chat/i }));
 
     expect(onNewChat).toHaveBeenCalledOnce();
+  });
+
+  it("starts with dev tools minimized", () => {
+    renderSidebar({ onDevShowCollectionApproval: vi.fn() });
+
+    expect(
+      screen.queryByRole("button", { name: /show collection approval/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /expand dev tools/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders the collection-approval dev button when callback is provided", async () => {
+    const user = userEvent.setup();
+    renderSidebar({ onDevShowCollectionApproval: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+
+    expect(
+      screen.getByRole("button", { name: /show collection approval/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onDevShowCollectionApproval when clicked", async () => {
+    const user = userEvent.setup();
+    const onDevShowCollectionApproval = vi.fn();
+
+    renderSidebar({ onDevShowCollectionApproval });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+
+    await user.click(
+      screen.getByRole("button", { name: /show collection approval/i }),
+    );
+
+    expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
+  });
+
+  it("starts with direction phase minimized", async () => {
+    const user = userEvent.setup();
+    renderSidebar({ onDevJumpToStage: vi.fn() });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+
+    expect(
+      screen.queryByRole("button", { name: /jump to initial/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /expand direction phase/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders stage jump dev buttons when callback is provided", async () => {
+    const user = userEvent.setup();
+    renderSidebar({ onDevJumpToStage: vi.fn() });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(
+      screen.getByRole("button", { name: /expand direction phase/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /jump to initial/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /jump to complete/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onDevJumpToStage with stage when clicked", async () => {
+    const user = userEvent.setup();
+    const onDevJumpToStage = vi.fn();
+    renderSidebar({ onDevJumpToStage });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(
+      screen.getByRole("button", { name: /expand direction phase/i }),
+    );
+
+    await user.click(screen.getByRole("button", { name: /jump to pir/i }));
+    expect(onDevJumpToStage).toHaveBeenCalledWith("pir_confirming");
   });
 
   it("calls onSwitchConversation with the conversation id when clicked", async () => {

@@ -1,3 +1,5 @@
+import type { DialogueStage, DialogueSubState } from "./dialogue";
+
 /** A single chat message exchanged between the user and the system. */
 export interface Message {
   /** Unique identifier (UUID) for this message. */
@@ -35,6 +37,10 @@ export interface Conversation {
    * with Approve / Reject buttons.
    */
   isConfirming: boolean;
+  /** Canonical dialogue stage received from backend. */
+  stage: DialogueStage;
+  /** Optional under-state for confirm stages, used by devtools/UI behavior. */
+  subState: DialogueSubState;
   /** Unix timestamp (ms) when this conversation was created. */
   createdAt: number;
   /** Unix timestamp (ms) of the last mutation — used for sidebar sort order. */

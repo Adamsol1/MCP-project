@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useConversation } from "../hooks/useConversation";
@@ -42,6 +42,8 @@ describe("ConversationContext", () => {
             perspectives: ["US"],
             sessionId: "session-1",
             isConfirming: false,
+            stage: "initial",
+            subState: null,
             createdAt: 1000,
             updatedAt: 2000,
           },

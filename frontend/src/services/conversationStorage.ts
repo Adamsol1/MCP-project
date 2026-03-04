@@ -1,4 +1,5 @@
 import type { Conversation, ConversationStore } from "../types/conversation";
+import type { DialogueStage, DialogueSubState } from "../types/dialogue";
 
 /**
  * Single localStorage key under which the entire ConversationStore is stored
@@ -11,6 +12,42 @@ const DEFAULT_STORE: ConversationStore = {
   conversations: [],
   activeConversationId: null,
 };
+
+function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
+  if (
+    rawStage === "initial" ||
+    rawStage === "gathering" ||
+    rawStage === "summary_confirming" ||
+    rawStage === "pir_confirming" ||
+    rawStage === "complete"
+  ) {
+    return rawStage;
+  }
+  return isConfirming ? "summary_confirming" : "initial";
+}
+
+function coerceSubState(rawSubState: unknown): DialogueSubState {
+  if (
+    rawSubState === "awaiting_decision" ||
+    rawSubState === "awaiting_modifications"
+  ) {
+    return rawSubState;
+  }
+  return null;
+}
+
+function normalizeConversation(raw: Conversation): Conversation {
+  const stage = coerceStage(raw.stage, raw.isConfirming);
+  const subState = coerceSubState(raw.subState);
+  return {
+    ...raw,
+    stage,
+    subState,
+    isConfirming:
+      (stage === "summary_confirming" || stage === "pir_confirming") &&
+      subState !== "awaiting_modifications",
+  };
+}
 
 /**
  * Reads the conversation store from localStorage.
@@ -25,7 +62,11 @@ export function loadConversationStore(): ConversationStore {
   const rawConversations = localStorage.getItem(STORAGE_KEY);
   if (rawConversations) {
     try {
-      return JSON.parse(rawConversations);
+      const parsed = JSON.parse(rawConversations) as ConversationStore;
+      return {
+        ...parsed,
+        conversations: parsed.conversations.map(normalizeConversation),
+      };
     } catch {
       return { ...DEFAULT_STORE };
     }
@@ -65,6 +106,8 @@ export function createConversation(perspectives?: string[]): Conversation {
     perspectives: perspectives ?? ["NEUTRAL"],
     sessionId: crypto.randomUUID(), // Separate UUID used to identify this session on the backend.
     isConfirming: false,
+    stage: "initial",
+    subState: null,
     createdAt: timeNow,
     updatedAt: timeNow, // Same as createdAt on creation; updated on every mutation.
   };

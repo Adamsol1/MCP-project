@@ -8,6 +8,7 @@ import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
+import type { DialogueStage } from "./types/dialogue";
 
 /**
  * Root application component.
@@ -38,7 +39,22 @@ function App() {
     renameConversation,
     updatePerspectives,
   } = useConversation();
-  const { messages, sendMessage, isConfirming, isLoading, approve, reject, devPrefill, triggerDevMessage, clearDevPrefill } = useChat();
+  const {
+    messages,
+    sendMessage,
+    isConfirming,
+    stage,
+    isLoading,
+    approve,
+    reject,
+    debugConfirm,
+    jumpToDevStage,
+    syncDevStage,
+    resetDevStage,
+    devPrefill,
+    triggerDevMessage,
+    clearDevPrefill,
+  } = useChat();
 
   /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
@@ -94,7 +110,15 @@ function App() {
         onDeleteConversation={deleteConversation}
         onRenameConversation={renameConversation}
         onDeleteAllConversations={deleteAllConversations}
-        onDevSendMessage={() => triggerDevMessage("What are the latest cyber threats targeting European critical infrastructure?")}
+        onDevSendMessage={() =>
+          triggerDevMessage(
+            "What are the latest cyber threats targeting European critical infrastructure?"
+          )
+        }
+        onDevShowCollectionApproval={debugConfirm}
+        onDevJumpToStage={(stage: DialogueStage) => jumpToDevStage(stage)}
+        onDevSyncStage={syncDevStage}
+        onDevResetStage={resetDevStage}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -104,6 +128,7 @@ function App() {
           messages={messages}
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
+          stage={stage}
           isLoading={isLoading}
           onApprove={approve}
           onReject={reject}

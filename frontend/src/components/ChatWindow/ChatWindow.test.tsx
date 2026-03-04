@@ -167,7 +167,7 @@ describe("ChatWindow", () => {
     expect(approveBtn).toBeInTheDocument();
   });
 
-  it("calls onApprove when Approve button is clicked", async () => {
+  it("calls onApprove when approve is clicked", async () => {
     const user = userEvent.setup();
     const handleApprove = vi.fn();
 
