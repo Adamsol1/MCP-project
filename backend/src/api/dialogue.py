@@ -14,7 +14,7 @@ from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
-from src.services.state_machines.direction_flow import DirectionFlow
+from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 
@@ -143,16 +143,16 @@ def _ensure_dev_tools_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
 
-def _get_or_create_session(session_id: str) -> DialogueFlow:
+def _get_or_create_session(session_id: str) -> DirectionFlow:
     if session_id not in _sessions:
         research_logger = ResearchLogger(session_id=session_id)
-        _sessions[session_id] = DialogueFlow(
+        _sessions[session_id] = DirectionFlow(
             session_id=session_id, research_logger=research_logger
         )
     return _sessions[session_id]
 
 
-def _build_dev_state_response(session_id: str, flow: DialogueFlow) -> DialogueDevStateResponse:
+def _build_dev_state_response(session_id: str, flow: DirectionFlow) -> DialogueDevStateResponse:
     state = flow.get_debug_state()
     return DialogueDevStateResponse(
         session_id=session_id,
@@ -224,7 +224,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     # Convert internal response to API format and return
     default_sub_state = (
         "awaiting_decision"
-        if flow.state in (DialogueState.SUMMARY_CONFIRMING, DialogueState.PIR_CONFIRMING)
+        if flow.state in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
         else None
     )
     converted_response = _convert_to_message_response(
@@ -253,9 +253,9 @@ async def set_dev_state(request: DialogueDevStateRequest) -> DialogueDevStateRes
     _ensure_dev_tools_enabled()
     flow = _get_or_create_session(request.session_id)
     try:
-        stage = DialogueState(request.stage)
+        stage = DirectionState(request.stage)
     except ValueError as exc:
-        allowed = ", ".join(state.value for state in DialogueState)
+        allowed = ", ".join(state.value for state in DirectionState)
         raise HTTPException(
             status_code=400,
             detail=f"Invalid stage '{request.stage}'. Allowed: {allowed}",
@@ -275,5 +275,5 @@ async def reset_dev_session(session_id: str) -> DialogueDevStateResponse:
     """DEV endpoint: reset a session to INITIAL."""
     _ensure_dev_tools_enabled()
     flow = _get_or_create_session(session_id)
-    flow.force_state(DialogueState.INITIAL, sub_state=None)
+    flow.force_state(DirectionState.INITIAL, sub_state=None)
     return _build_dev_state_response(session_id, flow)

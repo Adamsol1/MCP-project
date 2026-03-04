@@ -4,14 +4,14 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from src.services.state_machines.base_phase_flow import BasePhaseFlow
 from src.models.dialogue import (
     DialogueAction,
     DialogueContext,
     DialogueResponse,
     Perspective,
 )
-from src.models.reasoning import ReasoningLog
+from src.models.reasoning import ReasoningLog, UserActionLogEntry
+from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
@@ -112,7 +112,7 @@ class DirectionFlow(BasePhaseFlow):
 
     def force_state(
         self,
-        state: DialogueState,
+        state: DirectionState,
         seed_context: dict[str, Any] | None = None,
         current_pir: str | None = None,
         sub_state: str | None = None,
