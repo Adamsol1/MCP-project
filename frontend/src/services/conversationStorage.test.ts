@@ -35,6 +35,8 @@ describe("conversationStorage", () => {
             perspectives: ["US", "EU"],
             sessionId: "session-456",
             isConfirming: false,
+            stage: "initial",
+            subState: null,
             createdAt: 1000,
             updatedAt: 2000,
           },
@@ -94,6 +96,8 @@ describe("conversationStorage", () => {
             perspectives: ["NEUTRAL"],
             sessionId: "s1",
             isConfirming: false,
+            stage: "initial",
+            subState: null,
             createdAt: 1000,
             updatedAt: 1000,
           },
@@ -156,6 +160,16 @@ describe("conversationStorage", () => {
       const conv = createConversation();
 
       expect(conv.isConfirming).toBe(false);
+    });
+
+    it("creates a conversation with stage set to initial", () => {
+      const conv = createConversation();
+      expect(conv.stage).toBe("initial");
+    });
+
+    it("creates a conversation with subState set to null", () => {
+      const conv = createConversation();
+      expect(conv.subState).toBeNull();
     });
 
     it("creates a conversation with createdAt and updatedAt timestamps", () => {

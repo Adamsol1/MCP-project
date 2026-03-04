@@ -167,7 +167,7 @@ describe("ChatWindow", () => {
     expect(approveBtn).toBeInTheDocument();
   });
 
-  it("calls onApprove when approval is confirmed", async () => {
+  it("calls onApprove when approve is clicked", async () => {
     const user = userEvent.setup();
     const handleApprove = vi.fn();
 
@@ -175,7 +175,6 @@ describe("ChatWindow", () => {
 
     const approveBtn = screen.getByRole("button", { name: /approve/i });
     await user.click(approveBtn);
-    await user.click(screen.getByRole("button", { name: /confirm approve/i }));
 
     expect(handleApprove).toHaveBeenCalledTimes(1);
   });

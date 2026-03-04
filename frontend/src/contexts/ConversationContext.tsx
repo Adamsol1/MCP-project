@@ -10,6 +10,7 @@ import type {
   Message,
   ConversationStore,
 } from "../types/conversation";
+import type { DialogueStage, DialogueSubState } from "../types/dialogue";
 import {
   loadConversationStore,
   saveConversationStore,
@@ -43,6 +44,8 @@ export interface ConversationContextValue {
   addMessage: (message: Message) => void;
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
+  /** Set canonical backend dialogue stage and optional sub-state. */
+  setStage: (stage: DialogueStage, subState?: DialogueSubState) => void;
   /** Replace the geopolitical perspectives of the active conversation. */
   updatePerspectives: (perspectives: string[]) => void;
 }
@@ -62,6 +65,10 @@ type Action =
       payload: { conversationId: string; message: Message };
     }
   | { type: "SET_IS_CONFIRMING"; payload: boolean }
+  | {
+      type: "SET_STAGE";
+      payload: { stage: DialogueStage; subState: DialogueSubState };
+    }
   | { type: "UPDATE_PERSPECTIVES"; payload: string[] };
 
 /**
@@ -156,11 +163,38 @@ function conversationReducer(
     }
 
     case "SET_IS_CONFIRMING": {
+      const stage: DialogueStage = action.payload
+        ? "summary_confirming"
+        : "gathering";
       return {
         ...state,
         conversations: state.conversations.map((conv) =>
           conv.id === state.activeConversationId
-            ? { ...conv, isConfirming: action.payload }
+            ? {
+                ...conv,
+                isConfirming: action.payload,
+                stage,
+                subState: action.payload ? "awaiting_decision" : null,
+              }
+            : conv,
+        ),
+      };
+    }
+    case "SET_STAGE": {
+      const { stage, subState } = action.payload;
+      const isConfirming =
+        (stage === "summary_confirming" || stage === "pir_confirming") &&
+        subState !== "awaiting_modifications";
+      return {
+        ...state,
+        conversations: state.conversations.map((conv) =>
+          conv.id === state.activeConversationId
+            ? {
+                ...conv,
+                stage,
+                subState,
+                isConfirming,
+              }
             : conv,
         ),
       };
@@ -248,6 +282,13 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_IS_CONFIRMING", payload: value });
   }, []);
 
+  const setStage = useCallback(
+    (stage: DialogueStage, subState: DialogueSubState = null) => {
+      dispatch({ type: "SET_STAGE", payload: { stage, subState } });
+    },
+    [],
+  );
+
   const updatePerspectives = useCallback((perspectives: string[]) => {
     dispatch({ type: "UPDATE_PERSPECTIVES", payload: perspectives });
   }, []);
@@ -262,6 +303,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     renameConversation,
     addMessage,
     setIsConfirming,
+    setStage,
     updatePerspectives,
   };
 

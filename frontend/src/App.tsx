@@ -8,6 +8,7 @@ import { useToast } from "./hooks/useToast";
 import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
+import type { DialogueStage } from "./types/dialogue";
 
 /**
  * Root application component.
@@ -42,10 +43,14 @@ function App() {
     messages,
     sendMessage,
     isConfirming,
+    stage,
     isLoading,
     approve,
     reject,
     debugConfirm,
+    jumpToDevStage,
+    syncDevStage,
+    resetDevStage,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
@@ -102,6 +107,9 @@ function App() {
           )
         }
         onDevShowCollectionApproval={debugConfirm}
+        onDevJumpToStage={(stage: DialogueStage) => jumpToDevStage(stage)}
+        onDevSyncStage={syncDevStage}
+        onDevResetStage={resetDevStage}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -111,6 +119,7 @@ function App() {
           messages={messages}
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
+          stage={stage}
           isLoading={isLoading}
           onApprove={approve}
           onReject={reject}

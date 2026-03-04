@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ToastContainer } from "../Toast";
-import CollectionApproval from "../CollectionApproval/CollectionApproval";
+import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
+import type { DialogueStage } from "../../types/dialogue";
 
 /** Shape of a single message displayed in the chat. */
 interface Message {
@@ -22,6 +23,8 @@ interface ChatWindowProps {
   isConfirming?: boolean;
   /** When true, disables Approve / Reject and shows the loading throbber. */
   isLoading?: boolean;
+  /** Canonical stage used to tailor the approval prompt content. */
+  stage?: DialogueStage;
   /** Called when the user clicks Approve in confirmation mode. */
   onApprove?: () => void;
   /** Called when the user clicks Reject in confirmation mode. */
@@ -53,6 +56,7 @@ export default function ChatWindow({
   messages = [],
   isConfirming = false,
   isLoading = false,
+  stage,
   onApprove,
   onReject,
   devPrefill,
@@ -189,10 +193,10 @@ export default function ChatWindow({
           <div className="relative">
           <ToastContainer position="above-input" />
           {isConfirming ? (
-            /* Confirmation mode: CollectionApproval replaces the text input. */
-            <CollectionApproval
+            /* Confirmation mode: ApprovalPrompt replaces the text input. */
+            <ApprovalPrompt
               isLoading={isLoading}
-              minReviewSeconds={0}
+              stage={stage}
               onApproveContinue={onApprove}
               onRejectWithFeedback={() => onReject?.()}
             />

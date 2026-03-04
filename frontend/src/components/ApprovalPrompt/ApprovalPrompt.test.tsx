@@ -54,7 +54,19 @@ describe("ApprovalPrompt", () => {
     ).toBeDisabled();
   });
 
-  it("shows a confirmation dialog when approve is clicked", async () => {
+  it("calls onApproveContinue immediately when approve is clicked", async () => {
+    const user = userEvent.setup();
+    const onApproveContinue = vi.fn();
+    render(<ApprovalPrompt onApproveContinue={onApproveContinue} />);
+
+    await user.click(
+      screen.getByRole("button", { name: /approve & continue/i })
+    );
+
+    expect(onApproveContinue).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not show a confirmation dialog on approve", async () => {
     const user = userEvent.setup();
     render(<ApprovalPrompt />);
 
@@ -62,38 +74,6 @@ describe("ApprovalPrompt", () => {
       screen.getByRole("button", { name: /approve & continue/i })
     );
 
-    expect(
-      screen.getByRole("dialog", { name: /confirm approval/i })
-    ).toBeInTheDocument();
-  });
-
-  it("calls onApproveContinue only after confirmation", async () => {
-    const user = userEvent.setup();
-    const onApproveContinue = vi.fn();
-    render(<ApprovalPrompt onApproveContinue={onApproveContinue} />);
-
-    await user.click(
-      screen.getByRole("button", { name: /approve & continue/i })
-    );
-
-    expect(onApproveContinue).not.toHaveBeenCalled();
-
-    await user.click(screen.getByRole("button", { name: /confirm approve/i }));
-
-    expect(onApproveContinue).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not approve when the confirmation dialog is cancelled", async () => {
-    const user = userEvent.setup();
-    const onApproveContinue = vi.fn();
-    render(<ApprovalPrompt onApproveContinue={onApproveContinue} />);
-
-    await user.click(
-      screen.getByRole("button", { name: /approve & continue/i })
-    );
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
-
-    expect(onApproveContinue).not.toHaveBeenCalled();
     expect(
       screen.queryByRole("dialog", { name: /confirm approval/i })
     ).not.toBeInTheDocument();

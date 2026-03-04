@@ -2,6 +2,7 @@ import json
 import logging
 from datetime import datetime
 from enum import Enum
+from typing import Any
 
 from src.models.dialogue import DialogueContext, DialogueResponse, Perspective
 from src.models.reasoning import ReasoningLog, UserActionLogEntry
@@ -38,12 +39,103 @@ class DialogueFlow:
         self.research_logger = research_logger
         self.pending_reasoning_log: ReasoningLog | None = None
         self.current_pir: str | None = None
+        self.sub_state: str | None = None
         logger.info(f"[Session {session_id}] Session started")
 
     def update_perspectives(self, perspectives: list[str]):
         """Update context perspectives from frontend selection.
         Converts string values (e.g. 'US') to Perspective enum values (e.g. 'us')."""
         self.context.perspectives = [Perspective(p.lower()) for p in perspectives]
+
+    def _required_context_fields(self) -> list[str]:
+        """Fields required to move from GATHERING to SUMMARY_CONFIRMING."""
+        return [
+            "scope",
+            "timeframe",
+            "target_entities",
+            "threat_actors",
+            "priority_focus",
+        ]
+
+    def get_missing_context_fields(self) -> list[str]:
+        """Return context fields that are still missing."""
+        return [
+            field for field in self._required_context_fields() if not getattr(self.context, field)
+        ]
+
+    def _ensure_minimum_context(self):
+        """Seed minimum viable context for confirm states in dev shortcuts."""
+        if not self.context.initial_query:
+            self.context.initial_query = "DEV seeded investigation"
+        if not self.context.scope:
+            self.context.scope = "Monitor cyber threats"
+        if not self.context.timeframe:
+            self.context.timeframe = "Last 6 months"
+        if not self.context.target_entities:
+            self.context.target_entities = ["European critical infrastructure"]
+        if not self.context.threat_actors:
+            self.context.threat_actors = ["APT29"]
+        if not self.context.priority_focus:
+            self.context.priority_focus = "Operational impact"
+
+    def force_state(
+        self,
+        state: DialogueState,
+        seed_context: dict[str, Any] | None = None,
+        current_pir: str | None = None,
+        sub_state: str | None = None,
+    ):
+        """
+        DEV helper that force-sets the flow state and optionally seeds context.
+        Keeps transitions safe by filling minimum required fields for confirm states.
+        """
+        if seed_context:
+            self._apply_context_update(seed_context)
+            if seed_context.get("initial_query"):
+                self.context.initial_query = seed_context["initial_query"]
+            if seed_context.get("modifications") is not None:
+                self.context.modifications = seed_context["modifications"]
+
+        if state in (DialogueState.SUMMARY_CONFIRMING, DialogueState.PIR_CONFIRMING, DialogueState.COMPLETE):
+            self._ensure_minimum_context()
+
+        if state == DialogueState.PIR_CONFIRMING:
+            self.current_pir = current_pir or self.current_pir or (
+                '{"result":"DEV generated PIR","pirs":[],"reasoning":"DEV seed"}'
+            )
+        elif state == DialogueState.COMPLETE:
+            self.current_pir = current_pir or self.current_pir or (
+                '{"result":"DEV approved PIR","pirs":[],"reasoning":"DEV seed"}'
+            )
+        else:
+            self.current_pir = None
+
+        if state == DialogueState.INITIAL:
+            self.question_count = 0
+            self.pending_reasoning_log = None
+        elif state == DialogueState.GATHERING and self.question_count < 1:
+            self.question_count = 1
+
+        self.state = state
+        self.sub_state = sub_state
+
+    def get_debug_state(self) -> dict[str, Any]:
+        """Return a compact, derived debug snapshot for frontend devtools."""
+        missing_fields = self.get_missing_context_fields()
+        is_confirm_state = self.state in (
+            DialogueState.SUMMARY_CONFIRMING,
+            DialogueState.PIR_CONFIRMING,
+        )
+        return {
+            "stage": self.state.value,
+            "sub_state": self.sub_state,
+            "question_count": self.question_count,
+            "max_questions": self.max_questions,
+            "missing_context_fields": missing_fields,
+            "has_sufficient_context": len(missing_fields) == 0,
+            "awaiting_user_decision": is_confirm_state and self.sub_state != "awaiting_modifications",
+            "has_modifications": bool(self.context.modifications),
+        }
 
     async def process_user_message(
         self,
@@ -72,10 +164,12 @@ class DialogueFlow:
             self.update_perspectives(perspectives)
         # INITIAL PHASE
         if self.state == DialogueState.INITIAL:
+            self.sub_state = None
             return await self.handle_initial_input(user_message, dialogue_service)
 
         # GATHERING PHASE
         elif self.state == DialogueState.GATHERING:
+            self.sub_state = None
             return await self.handle_gathering_input(user_message, dialogue_service)
 
         # SUMMARY CONFIRMING PHASE
@@ -264,6 +358,7 @@ class DialogueFlow:
                 None  # Clear modifications so they don't leak into PIR phase
             )
             self.state = DialogueState.PIR_CONFIRMING
+            self.sub_state = "awaiting_decision"
             logger.info(
                 f"[Session {self.session_id}] State: SUMMARY_CONFIRMING -> PIR_CONFIRMING"
             )
@@ -291,6 +386,7 @@ class DialogueFlow:
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
             )
+            self.sub_state = "awaiting_decision"
 
         return dialogue_response
 
@@ -319,6 +415,7 @@ class DialogueFlow:
             if self.research_logger:
                 self.research_logger.create_log(log_user_interaction)
             self.state = DialogueState.COMPLETE
+            self.sub_state = None
             logger.info(
                 f"[Session {self.session_id}] State: PIR_CONFIRMING -> COMPLETE. Direction phase finished"
             )
@@ -346,6 +443,7 @@ class DialogueFlow:
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             dialogue_response.action = "show_pir"
             dialogue_response.content = self.current_pir
+            self.sub_state = "awaiting_decision"
 
         return dialogue_response
 
@@ -355,16 +453,8 @@ class DialogueFlow:
         Return True if all five required fields are provied.
         Else return false
         """
-        # List of fields required for context to be deemed sufficient
-        context_fields = [
-            "scope",
-            "timeframe",
-            "target_entities",
-            "threat_actors",
-            "priority_focus",
-        ]
         # Check if we have enough context. return bool
-        for field in context_fields:  # noqa: SIM110
+        for field in self._required_context_fields():  # noqa: SIM110
             if not getattr(self.context, field):
                 return False
         return True

@@ -7,7 +7,7 @@ interface RejectPayload {
 }
 
 interface ApprovalPromptProps {
-  /** Called after the user confirms approval. */
+  /** Called when the user approves and continues. */
   onApproveContinue?: () => void;
   /** Called when the user rejects with structured feedback. */
   onRejectWithFeedback?: (payload: RejectPayload) => void;
@@ -23,7 +23,6 @@ interface PromptCopy {
   title: string;
   subtitle: string;
   defaultReviewText: string;
-  confirmText: string;
 }
 
 const DEFAULT_PROMPT_COPY: PromptCopy = {
@@ -31,7 +30,6 @@ const DEFAULT_PROMPT_COPY: PromptCopy = {
   subtitle: "Review the generated output before continuing.",
   defaultReviewText:
     "Review the generated output below before confirming approval.",
-  confirmText: "Confirm that you want to approve this output and continue.",
 };
 
 const PROMPT_COPY_BY_STAGE: Partial<Record<DialogueStage, PromptCopy>> = {
@@ -40,14 +38,12 @@ const PROMPT_COPY_BY_STAGE: Partial<Record<DialogueStage, PromptCopy>> = {
     subtitle: "Review the generated summary before continuing to PIR.",
     defaultReviewText:
       "Review the generated summary below before approving PIR generation.",
-    confirmText: "Confirm that you want to approve this summary and continue.",
   },
   pir_confirming: {
     title: "PIR Approval Prompt",
     subtitle: "Review the generated PIR before completing Direction.",
     defaultReviewText:
       "Review the generated PIR below before approving Direction completion.",
-    confirmText: "Confirm that you want to approve this PIR and complete Direction.",
   },
 };
 
@@ -59,7 +55,6 @@ export default function ApprovalPrompt({
   reviewContent,
 }: ApprovalPromptProps) {
   const [keepPartialResults, setKeepPartialResults] = useState(false);
-  const [isApproveDialogOpen, setIsApproveDialogOpen] = useState(false);
   const promptCopy = stage
     ? (PROMPT_COPY_BY_STAGE[stage] ?? DEFAULT_PROMPT_COPY)
     : DEFAULT_PROMPT_COPY;
@@ -102,7 +97,7 @@ export default function ApprovalPrompt({
       <div className="mt-4 flex items-center gap-3">
         <button
           type="button"
-          onClick={() => setIsApproveDialogOpen(true)}
+          onClick={() => onApproveContinue?.()}
           disabled={!canApprove}
           className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -118,38 +113,6 @@ export default function ApprovalPrompt({
           Reject with Feedback
         </button>
       </div>
-
-      {isApproveDialogOpen && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-label="Confirm approval"
-          className="mt-4 rounded-lg border border-gray-300 bg-gray-50 p-4"
-        >
-          <p className="text-sm text-gray-700">
-            {promptCopy.confirmText}
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setIsApproveDialogOpen(false)}
-              className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setIsApproveDialogOpen(false);
-                onApproveContinue?.();
-              }}
-              className="rounded-lg bg-green-600 px-3 py-2 text-sm text-white hover:bg-green-700"
-            >
-              Confirm Approve
-            </button>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
