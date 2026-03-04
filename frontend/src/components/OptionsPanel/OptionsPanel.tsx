@@ -93,9 +93,6 @@ export function OptionsPanel({
 
           {/* ── Section: Perspectives ─────────────────────────────── */}
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
-              Perspectives
-            </p>
             <PerspectiveSelector
               selected={selectedPerspectives}
               onChange={onPerspectiveChange}
