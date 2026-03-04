@@ -35,6 +35,8 @@ describe("dialogue service", () => {
         session_id: "session-123",
         perspectives: ["US", "EU"],
         approved: undefined,
+        language: "en",
+        settings_timeframe: "",
       }
     );
 

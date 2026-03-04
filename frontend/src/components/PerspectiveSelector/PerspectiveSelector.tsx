@@ -42,33 +42,15 @@ export default function PerspectiveSelector({
   ];
 
   /**
-   * Toggles a single perspective on or off with auto-neutral logic:
-   *
-   * - Clicking NEUTRAL: toggles it normally (add if absent, remove if present).
-   * - Clicking a non-NEUTRAL perspective:
-   *     - If already selected → deselect it.
-   *     - If not selected → add it and automatically remove NEUTRAL (if present),
-   *       since NEUTRAL represents "no specific viewpoint" and should not coexist
-   *       with an explicit perspective unless the user manually re-adds it.
-   * - Safety net: if the resulting selection is empty (all deselected), NEUTRAL
-   *   is automatically restored so the system always has at least one perspective.
+   * Toggles a single perspective on or off.
+   * Safety net: if the resulting selection is empty, restore NEUTRAL.
    *
    * @param value - The perspective ID to toggle (e.g. "US").
    */
   const togglePerspective = (value: string) => {
-    let updated: string[];
-
-    if (value === "NEUTRAL") {
-      // NEUTRAL toggles normally — add if absent, remove if present.
-      updated = selected.includes("NEUTRAL")
-        ? selected.filter((p) => p !== "NEUTRAL")
-        : [...selected, "NEUTRAL"];
-    } else {
-      // Non-NEUTRAL: deselect if active, otherwise add and auto-remove NEUTRAL.
-      updated = selected.includes(value)
-        ? selected.filter((p) => p !== value)
-        : [...selected.filter((p) => p !== "NEUTRAL"), value];
-    }
+    let updated = selected.includes(value)
+      ? selected.filter((p) => p !== value)
+      : [...selected, value];
 
     // Safety net: if all perspectives were deselected, restore NEUTRAL as default.
     if (updated.length === 0) updated = ["NEUTRAL"];
@@ -78,6 +60,9 @@ export default function PerspectiveSelector({
 
   return (
     <div className="flex flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+        Perspectives
+      </p>
 
       {/*
         .map() transforms the perspectives array into an array of button elements.

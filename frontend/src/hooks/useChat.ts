@@ -10,6 +10,7 @@ import type { DialogueStage, DialogueSubState } from "../types/dialogue";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 import type { Message, PirData, SummaryData } from "../types/conversation";
+import { useSettings } from "../contexts/SettingsContext";
 
 function inferStageFromResponse(
   response: DialogueApiResponse,
@@ -39,9 +40,43 @@ function inferStageFromResponse(
   return { stage: "gathering", subState: null };
 }
 
+function buildSystemMessage(response: DialogueApiResponse): Message {
+  const message: Message = {
+    id: crypto.randomUUID(),
+    text: response.question,
+    sender: "system",
+  };
+
+  if (
+    response.type === "question" ||
+    response.type === "summary" ||
+    response.type === "pir" ||
+    response.type === "complete"
+  ) {
+    message.type = response.type;
+  }
+
+  if (response.type === "summary" || response.type === "pir") {
+    try {
+      const parsed = JSON.parse(response.question) as SummaryData | PirData;
+      message.data = parsed;
+    } catch {
+      // Keep raw text if backend does not return valid JSON.
+    }
+  }
+
+  return message;
+}
+
 export function useChat() {
-  const { activeConversation, addMessage, setIsConfirming, setStage } =
-    useConversation();
+  const {
+    activeConversation,
+    createNewConversation,
+    addMessage,
+    setIsConfirming,
+    setStage,
+  } = useConversation();
+  const { settings } = useSettings();
   const { success, info, error } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
@@ -60,9 +95,6 @@ export function useChat() {
     // sessionId and perspectives before any async work begins.
     const conversation = activeConversation ?? createNewConversation();
 
-    // Pass conversation.id explicitly for both addMessage calls.
-    // After the awaited backend call React will have re-rendered, making the
-    // addMessage closure stale — an explicit ID avoids relying on it.
     addMessage(
       { id: crypto.randomUUID(), text, sender: "user" },
       conversation.id,
@@ -78,11 +110,7 @@ export function useChat() {
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+      addMessage(buildSystemMessage(response), conversation.id);
       const next = inferStageFromResponse(response);
       setStage(next.stage, next.subState);
     } finally {
@@ -102,11 +130,7 @@ export function useChat() {
         settings.language,
         settings.inputParameters.timeframe,
       );
-      addMessage({
-        id: crypto.randomUUID(),
-        text: response.question,
-        sender: "system",
-      });
+      addMessage(buildSystemMessage(response), activeConversation.id);
       const next = inferStageFromResponse(response);
       setStage(next.stage, next.subState);
       success("Request approved");

@@ -209,11 +209,11 @@ class DialogueFlow:
 
         # INITIAL PHASE
         if self.state == DialogueState.INITIAL:
+            self.sub_state = None
             return await self.handle_initial_input(user_message, dialogue_service, language)
-         self.sub_state = None
         # GATHERING PHASE
         elif self.state == DialogueState.GATHERING:
-    self.sub_state = None
+            self.sub_state = None
             return await self.handle_gathering_input(user_message, dialogue_service, language)
 
         # SUMMARY CONFIRMING PHASE

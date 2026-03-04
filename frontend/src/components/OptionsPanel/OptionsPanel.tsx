@@ -10,9 +10,9 @@ interface OptionsPanelProps {
   /** Called when the user clicks the Upload Files button to open the modal. */
   onOpenFileUpload: () => void;
   /** Files that have been successfully uploaded via the FileUploadModal. */
-  uploadedFiles: File[];
+  uploadedFiles?: File[];
   /** Called when the user removes a file from the uploaded files list. */
-  onFileRemove: (file: File) => void;
+  onFileRemove?: (file: File) => void;
 }
 
 /**
@@ -41,7 +41,7 @@ export function OptionsPanel({
   selectedPerspectives,
   onPerspectiveChange,
   onOpenFileUpload,
-  uploadedFiles,
+  uploadedFiles = [],
   onFileRemove,
 }: OptionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -132,7 +132,7 @@ export function OptionsPanel({
                         {file.name}
                       </span>
                       <button
-                        onClick={() => onFileRemove(file)}
+                        onClick={() => onFileRemove?.(file)}
                         className="shrink-0 text-text-muted hover:text-error transition-colors"
                         aria-label={`Remove ${file.name}`}
                       >
