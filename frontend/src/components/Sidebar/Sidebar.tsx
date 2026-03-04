@@ -118,7 +118,7 @@ export function Sidebar({
     <aside
       className={`${
         isCollapsed ? "w-14" : "w-64"
-      } bg-surface-inverse text-text-inverse flex flex-col h-full overflow-hidden`}
+      } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden`}
     >
       {/* Toggle button — SVG chevron, clearer than a Unicode character.
           Points right (›) when collapsed to signal "expand",
@@ -126,7 +126,7 @@ export function Sidebar({
       <button
         aria-label="Toggle sidebar"
         onClick={() => setIsCollapsed((prev) => !prev)}
-        className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-inverse-hover rounded"
+        className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
         <svg
           width="20"
@@ -153,7 +153,7 @@ export function Sidebar({
       <button
         onClick={onNewChat}
         aria-label="New Chat"
-        className={`mx-2 mb-2 p-2 bg-primary-dark rounded flex items-center justify-center gap-2 shrink-0 ${
+        className={`mx-2 mb-2 p-2 bg-primary-dark text-white rounded flex items-center justify-center gap-2 shrink-0 ${
           isCollapsed ? "" : "w-[calc(100%-1rem)]"
         }`}
       >
@@ -174,8 +174,8 @@ export function Sidebar({
                 key={conv.id}
                 className={`group relative flex items-center rounded mx-1 my-0.5 ${
                   conv.id === activeConversationId
-                    ? "bg-surface-inverse-hover"
-                    : "hover:bg-surface-inverse-hover"
+                    ? "bg-surface-elevated"
+                    : "hover:bg-surface-elevated"
                 }`}
               >
                 {/* Rename mode: replaces the title button with a controlled input.
@@ -194,7 +194,7 @@ export function Sidebar({
                         setRenamingId(null);
                       }
                     }}
-                    className="flex-1 p-2 bg-transparent text-text-inverse outline-none"
+                    className="flex-1 p-2 bg-transparent text-text-primary outline-none"
                   />
                 ) : (
                   /* Normal mode: title button + options (⋯) button. */
@@ -222,7 +222,7 @@ export function Sidebar({
                         e.stopPropagation();
                         setOpenMenuId(conv.id);
                       }}
-                      className="p-1 mr-1 rounded text-text-muted hover:text-text-inverse hover:bg-surface-inverse-hover opacity-0 group-hover:opacity-100 focus:opacity-100"
+                      className="p-1 mr-1 rounded text-text-muted hover:text-text-primary hover:bg-surface-elevated opacity-0 group-hover:opacity-100 focus:opacity-100"
                     >
                       <svg
                         width="16"
@@ -245,7 +245,7 @@ export function Sidebar({
                   <div
                     ref={menuRef}
                     role="menu"
-                    className="absolute right-0 top-full bg-surface-deep border border-border-inverse rounded shadow-lg z-10"
+                    className="absolute right-0 top-full bg-surface border border-border rounded shadow-lg z-10"
                   >
                     <button
                       role="menuitem"
@@ -255,7 +255,7 @@ export function Sidebar({
                         setRenamingId(conv.id);
                         setOpenMenuId(null);
                       }}
-                      className="block w-full text-left px-4 py-2 hover:bg-surface-inverse"
+                      className="block w-full text-left px-4 py-2 hover:bg-surface-elevated"
                     >
                       Rename
                     </button>
@@ -267,7 +267,7 @@ export function Sidebar({
                         onDeleteConversation(conv.id);
                         setOpenMenuId(null);
                       }}
-                      className="block w-full text-left px-4 py-2 hover:bg-surface-inverse text-error"
+                      className="block w-full text-left px-4 py-2 hover:bg-surface-elevated text-error"
                     >
                       Delete
                     </button>
@@ -279,11 +279,11 @@ export function Sidebar({
         </div>
       )}
       {/* Settings gear — sits just above Dev Tools */}
-      <div className="shrink-0 border-t border-border-inverse p-2 flex justify-end">
+      <div className="shrink-0 border-t border-border p-2 flex justify-end">
         <button
           aria-label="Open settings"
           onClick={onOpenSettings}
-          className="p-2 rounded text-text-muted hover:bg-surface-inverse-hover hover:text-text-inverse"
+          className="p-2 rounded text-text-muted hover:bg-surface-elevated hover:text-text-primary"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
             stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
@@ -295,9 +295,9 @@ export function Sidebar({
       </div>
       {/* DEV TOOLS — only visible when the sidebar is expanded. */}
       {!isCollapsed && (
-        <div className="shrink-0 border-t border-gray-600 p-2">
+        <div className="shrink-0 border-t border-border p-2">
           <div className="mb-1 flex items-center justify-between">
-            <p className="px-1 text-xs font-semibold uppercase tracking-widest text-amber-400">
+            <p className="px-1 text-xs font-semibold uppercase tracking-widest text-warning">
               Dev Tools
             </p>
             <button
@@ -306,7 +306,7 @@ export function Sidebar({
                 isDevToolsMinimized ? "Expand dev tools" : "Minimize dev tools"
               }
               onClick={() => setIsDevToolsMinimized((prev) => !prev)}
-              className="rounded px-2 py-1 text-xs text-gray-300 hover:bg-gray-600"
+              className="rounded px-2 py-1 text-xs text-text-secondary hover:bg-surface-elevated"
             >
               {isDevToolsMinimized ? "Show" : "Hide"}
             </button>
@@ -315,14 +315,14 @@ export function Sidebar({
             <>
               <button
                 onClick={onDevSendMessage}
-                className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
               >
                 Send test message
               </button>
               {onDevShowCollectionApproval && (
                 <button
                   onClick={onDevShowCollectionApproval}
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   Show collection approval
                 </button>
@@ -339,10 +339,10 @@ export function Sidebar({
                     onClick={() =>
                       setIsCollectionPhaseMinimized((prev) => !prev)
                     }
-                    className="w-full rounded px-2 py-1.5 text-left text-sm text-gray-200 hover:bg-gray-600"
+                    className="w-full rounded px-2 py-1.5 text-left text-sm text-text-primary hover:bg-surface-elevated"
                   >
                     <span className="flex items-center gap-2">
-                      <span aria-hidden="true" className="text-xs text-gray-300">
+                      <span aria-hidden="true" className="text-xs text-text-secondary">
                         {isCollectionPhaseMinimized ? ">" : "v"}
                       </span>
                       <span>Direction Phase</span>
@@ -353,7 +353,7 @@ export function Sidebar({
                       <button
                         key={item.stage}
                         onClick={() => onDevJumpToStage(item.stage)}
-                        className="w-full pl-5 pr-2 py-1.5 rounded text-left text-sm text-gray-300 hover:bg-gray-600"
+                        className="w-full pl-5 pr-2 py-1.5 rounded text-left text-sm text-text-secondary hover:bg-surface-elevated"
                       >
                         {item.label}
                       </button>
@@ -363,7 +363,7 @@ export function Sidebar({
               {onDevSyncStage && (
                 <button
                   onClick={onDevSyncStage}
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   Sync stage
                 </button>
@@ -371,14 +371,14 @@ export function Sidebar({
               {onDevResetStage && (
                 <button
                   onClick={onDevResetStage}
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-gray-300 hover:bg-gray-600"
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   Reset stage
                 </button>
               )}
               <button
                 onClick={onDeleteAllConversations}
-                className="w-full text-left px-2 py-1.5 rounded text-sm text-red-400 hover:bg-gray-600"
+                className="w-full text-left px-2 py-1.5 rounded text-sm text-error hover:bg-surface-elevated"
               >
                 Delete all conversations
               </button>
