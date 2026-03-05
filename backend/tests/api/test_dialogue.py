@@ -1,6 +1,49 @@
+import pytest
 from fastapi.testclient import TestClient
 
 from src.api.main import app
+from src.api import dialogue as dialogue_api
+from src.models.dialogue import ClarifyingQuestion, PIRReview, QuestionResult, ReviewResult
+
+
+class _FakeDialogueService:
+    def __init__(self, *args, **kwargs):  # noqa: ARG002
+        self.language = "en"
+
+    async def generate_clarifying_question(self, user_message, context, language="en"):  # noqa: ARG002
+        question = ClarifyingQuestion(
+            question_text="What is your scope?",
+            question_type="scope",
+            is_final=False,
+        )
+        return QuestionResult(question=question, extracted_context={})
+
+    async def generate_pir(self, context, language=None, current_pir=None):  # noqa: ARG002
+        return {"result": "Mock PIR", "pirs": [], "reasoning": "Mock"}
+
+    async def generate_summary(self, context, modifications=None, language="en"):  # noqa: ARG002
+        return {"summary": "Mock summary"}
+
+
+class _FakeReviewService:
+    def __init__(self, *args, **kwargs):  # noqa: ARG002
+        pass
+
+    async def review_pir(self, content, context, phase):  # noqa: ARG002
+        return ReviewResult(
+            overall_approved=True,
+            pir_reviews=[PIRReview(pir_index=0, approved=True, issue=None)],
+            severity="none",
+            suggestions=None,
+        )
+
+
+@pytest.fixture(autouse=True)
+def _mock_api_dependencies(monkeypatch):
+    dialogue_api._sessions.clear()
+    monkeypatch.setattr(dialogue_api, "DialogueService", _FakeDialogueService)
+    monkeypatch.setattr(dialogue_api, "ReviewService", _FakeReviewService)
+    monkeypatch.setattr(dialogue_api, "DEV_TOOLS_ENABLED", True)
 
 
 # Test that the endpoint exists and accepts POST requests

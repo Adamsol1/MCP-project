@@ -17,6 +17,7 @@ from src.services.review_service import ReviewService
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
+DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
 
 """
 API router for the dialogue flow.

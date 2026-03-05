@@ -11,9 +11,9 @@ class TestMCPClientInit:
     """Test MCP client initialization."""
 
     def test_client_stores_server_path(self) -> None:
-        """Client should store the server script path."""
-        client = MCPClient("/path/to/server.py")
-        assert client.server_script_path == "/path/to/server.py"
+        """Client should store the configured server URL."""
+        client = MCPClient("http://127.0.0.1:9999/sse")
+        assert client.server_url == "http://127.0.0.1:9999/sse"
 
     def test_client_session_initially_none(self) -> None:
         """Client session should be None before connecting."""

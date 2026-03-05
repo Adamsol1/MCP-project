@@ -128,24 +128,28 @@ class DirectionFlow(BasePhaseFlow):
             if seed_context.get("modifications") is not None:
                 self.context.modifications = seed_context["modifications"]
 
-        if state in (DialogueState.SUMMARY_CONFIRMING, DialogueState.PIR_CONFIRMING, DialogueState.COMPLETE):
+        if state in (
+            DirectionState.SUMMARY_CONFIRMING,
+            DirectionState.PIR_CONFIRMING,
+            DirectionState.COMPLETE,
+        ):
             self._ensure_minimum_context()
 
-        if state == DialogueState.PIR_CONFIRMING:
+        if state == DirectionState.PIR_CONFIRMING:
             self.current_pir = current_pir or self.current_pir or (
                 '{"result":"DEV generated PIR","pirs":[],"reasoning":"DEV seed"}'
             )
-        elif state == DialogueState.COMPLETE:
+        elif state == DirectionState.COMPLETE:
             self.current_pir = current_pir or self.current_pir or (
                 '{"result":"DEV approved PIR","pirs":[],"reasoning":"DEV seed"}'
             )
         else:
             self.current_pir = None
 
-        if state == DialogueState.INITIAL:
+        if state == DirectionState.INITIAL:
             self.question_count = 0
             self.pending_reasoning_log = None
-        elif state == DialogueState.GATHERING and self.question_count < 1:
+        elif state == DirectionState.GATHERING and self.question_count < 1:
             self.question_count = 1
 
         self.state = state
@@ -155,8 +159,8 @@ class DirectionFlow(BasePhaseFlow):
         """Return a compact, derived debug snapshot for frontend devtools."""
         missing_fields = self.get_missing_context_fields()
         is_confirm_state = self.state in (
-            DialogueState.SUMMARY_CONFIRMING,
-            DialogueState.PIR_CONFIRMING,
+            DirectionState.SUMMARY_CONFIRMING,
+            DirectionState.PIR_CONFIRMING,
         )
         return {
             "stage": self.state.value,
