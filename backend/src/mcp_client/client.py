@@ -1,89 +1,63 @@
-"""MCP Client for connecting to the Threat Intelligence MCP Server."""
+"""MCP Client — connects to the standalone MCP server via SSE/HTTP.
 
-import asyncio
+The MCP server runs as a separate process (started independently via
+`python mcp_server/src/server.py`). This client connects to it over HTTP
+using Server-Sent Events (SSE) transport — no subprocess management needed.
+"""
+
 import json
 import logging
 import os
-import sys
 import time
-from contextlib import AsyncExitStack, asynccontextmanager
-from pathlib import Path
+from contextlib import asynccontextmanager
 from typing import Any
 
-from dotenv import load_dotenv
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import ClientSession
+from mcp.client.sse import sse_client
 from mcp.types import TextContent
+from pydantic import AnyUrl
 
 logger = logging.getLogger("app")
 
+_DEFAULT_URL = "http://127.0.0.1:8001/sse"
+
 
 class MCPClient:
-    """Client for communicating with the MCP Threat Intelligence server."""
+    """Client for communicating with the MCP Threat Intelligence server.
 
-    def __init__(self, server_script_path: str) -> None:
-        """Initialize the MCP client.
+    Connects to a running MCP server via SSE (HTTP). The server must be
+    started separately before calling connect().
 
-        Args:
-            server_script_path: Path to the MCP server script (server.py).
-        """
-        self.server_script_path = server_script_path
+    Args:
+        server_url: SSE endpoint URL of the running MCP server.
+                    Defaults to the MCP_SERVER_URL env var, or
+                    http://127.0.0.1:8001/sse if unset.
+    """
+
+    def __init__(self, server_url: str | None = None) -> None:
+        self.server_url = server_url or os.getenv("MCP_SERVER_URL", _DEFAULT_URL)
         self.session: ClientSession | None = None
-        self._stack: AsyncExitStack | None = None
 
     @asynccontextmanager
     async def connect(self):
-        """Connect to the MCP server.
+        """Connect to the running MCP server.
 
         Yields:
             The connected client instance.
+
+        Raises:
+            httpx.ConnectError: If the MCP server is not running at server_url.
         """
-
-        # I do not understand this :D
-        server_script = Path(self.server_script_path).resolve()
-        project_root = server_script.parents[2]
-        cwd_path = (
-            project_root if (project_root / ".env").exists() else server_script.parent
-        )
-        load_dotenv(project_root / ".env", override=False)
-        load_dotenv(project_root / "mcp_server" / ".env", override=False)
-        child_env = os.environ.copy()
-        child_env.pop("PYTHONHOME", None)
-        child_env.pop("PYTHONPATH", None)
-        child_env["PYTHONUNBUFFERED"] = "1"
-        child_env["PYTHONIOENCODING"] = "utf-8"
-        python_cmd = sys.executable
-        venv = child_env.get("VIRTUAL_ENV")
-        if venv:
-            venv_python = Path(venv) / "Scripts" / "python.exe"
-            if venv_python.exists():
-                python_cmd = str(venv_python)
-
-        child_errlog_path = project_root / "mcp_child.stderr.log"
-        logger.debug(f"[MCP] Server cwd: {cwd_path}")
-        logger.debug(
-            f"[MCP] GEMINI_API_KEY present: {bool(child_env.get('GEMINI_API_KEY'))}"
-        )
-        logger.debug(f"[MCP] Python cmd: {python_cmd}")
-        logger.debug(f"[MCP] Child stderr log: {child_errlog_path}")
-
-        server_params = StdioServerParameters(
-            command=python_cmd,
-            args=[str(server_script)],
-            env=child_env,
-            cwd=str(cwd_path),
-        )
-
-        logger.info("[MCP] Connecting to server...")
-        with child_errlog_path.open("a", encoding="utf-8") as errlog:
-            async with (
-                stdio_client(server_params, errlog=errlog) as (read, write),
-                ClientSession(read, write) as session,
-            ):
-                await session.initialize()
-                self.session = session
-                logger.info("[MCP] Connected")
-                yield self
+        logger.info(f"[MCP] Connecting to {self.server_url}...")
+        async with (
+            sse_client(self.server_url) as (read, write),
+            ClientSession(read, write) as session,
+        ):
+            await session.initialize()
+            self.session = session
+            logger.info("[MCP] Connected")
+            yield self
+        self.session = None
         logger.info("[MCP] Disconnected")
 
     async def call_tool(
@@ -96,7 +70,7 @@ class MCPClient:
             arguments: Arguments to pass to the tool.
 
         Returns:
-            The tool's response.
+            Parsed JSON dict if the response is valid JSON, otherwise raw string.
 
         Raises:
             RuntimeError: If not connected to the server.
@@ -108,10 +82,8 @@ class MCPClient:
 
         logger.info(f"[MCP] Calling tool: {tool_name}")
         start = time.time()
-        # Attempt to call tool
         try:
             result = await self.session.call_tool(tool_name, arguments or {})
-        # Raise error
         except Exception as e:
             logger.error(
                 f"[MCP] Tool {tool_name} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}"
@@ -124,10 +96,8 @@ class MCPClient:
             raise ValueError(f"Unexpected content type: {type(content_item).__name__}")
         text = content_item.text
 
-        # Attempt to parse text to json
         try:
-            text = self._strip_fences(text)  # Strips leading ``` at start or ending
-            return json.loads(text)  # returner dict hvis JSON
+            return json.loads(self._strip_fences(text))
         except json.JSONDecodeError:
             return text
 
@@ -135,7 +105,8 @@ class MCPClient:
         """List available tools on the MCP server.
 
         Returns:
-            List of available tools with their metadata.
+            List of dicts with 'name', 'description', and 'inputSchema' keys.
+            inputSchema follows JSON Schema format and describes the tool's parameters.
 
         Raises:
             RuntimeError: If not connected to the server.
@@ -146,55 +117,112 @@ class MCPClient:
             )
 
         result = await self.session.list_tools()
+        def _schema(s):
+            if s is None:
+                return {}
+            if isinstance(s, dict):
+                return s
+            return s.model_dump()
+
         return [
-            {"name": tool.name, "description": tool.description}
+            {
+                "name": tool.name,
+                "description": tool.description,
+                "inputSchema": _schema(tool.inputSchema),
+            }
             for tool in result.tools
         ]
 
-    @staticmethod
-    def _strip_fences(text: str) -> str:
-        """Removes leading whitespace and backticks (```) from output
+    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> str:
+        """Fetch a rendered prompt template from the MCP server.
+
+        Args:
+            name: Registered prompt name, e.g. "direction_gathering".
+            arguments: Key-value arguments to fill into the template.
+                       All values must be strings per the MCP Prompts spec.
 
         Returns:
-            A striped text with just pure JSON or same text
+            The rendered prompt text, ready to send to an LLM.
 
-        Parameters:
-            text: The text to strip fences from.
+        Raises:
+            RuntimeError: If not connected to the server.
         """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        logger.info(f"[MCP] Fetching prompt: {name}")
+        result = await self.session.get_prompt(name, arguments or {})
+        return "\n".join(
+            msg.content.text for msg in result.messages if hasattr(msg.content, "text")
+        )
+
+    async def list_resources(self) -> list[dict[str, Any]]:
+        """List available resources on the MCP server.
+
+        Returns:
+            List of dicts with 'uri', 'name', 'description', and 'mimeType' keys.
+
+        Raises:
+            RuntimeError: If not connected to the server.
+        """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        result = await self.session.list_resources()
+        return [
+            {
+                "uri": str(resource.uri),
+                "name": resource.name,
+                "description": resource.description,
+                "mimeType": getattr(resource, "mimeType", None),
+            }
+            for resource in result.resources
+        ]
+
+    async def read_resource(self, uri: str) -> str:
+        """Read a resource by URI from the MCP server.
+
+        Args:
+            uri: The resource URI, e.g. "knowledge://geopolitical/norway_russia"
+                 or "knowledge://index".
+
+        Returns:
+            The text content of the resource.
+
+        Raises:
+            RuntimeError: If not connected to the server.
+            ValueError: If the resource has no text content.
+        """
+        if not self.session:
+            raise RuntimeError(
+                "Not connected to MCP server. Use 'async with client.connect():'"
+            )
+
+        logger.info(f"[MCP] Reading resource: {uri}")
+        start = time.time()
+        try:
+            result = await self.session.read_resource(AnyUrl(uri))
+        except Exception as e:
+            logger.error(
+                f"[MCP] Resource {uri} failed in {time.time() - start:.2f}s: {type(e).__name__}: {e}"
+            )
+            raise
+        logger.info(f"[MCP] Resource {uri} read in {time.time() - start:.2f}s")
+
+        for content_item in result.contents:
+            if hasattr(content_item, "text"):
+                return content_item.text
+        raise ValueError(f"No text content in resource: {uri}")
+
+    @staticmethod
+    def _strip_fences(text: str) -> str:
+        """Strip markdown code fences (``` ... ```) from text."""
         text = text.strip()
         if text.startswith("```"):
             lines = text.splitlines()
-            text = "\n".join(lines[1:-1])
-            return text
-        else:
-            return text
-
-
-async def main() -> None:
-    """Example usage of the MCP client."""
-    from pathlib import Path
-
-    # Get path to server script
-    project_root = Path(__file__).parent.parent.parent.parent
-    server_path = project_root / "mcp_server" / "src" / "server.py"
-
-    if not server_path.exists():
-        print(f"Server not found at: {server_path}")
-        sys.exit(1)
-
-    client = MCPClient(str(server_path))
-
-    async with client.connect():
-        # List available tools
-        tools = await client.list_tools()
-        print("Available tools:")
-        for tool in tools:
-            print(f"  - {tool['name']}: {tool['description']}")
-
-        # Call the greet tool
-        result = await client.call_tool("greet")
-        print(f"\nGreet result: {result}")
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+            return "\n".join(lines[1:-1])
+        return text

@@ -1,0 +1,156 @@
+"""Review MCP Server — Prompt builders for AI #2 review in all intelligence phases."""
+
+
+def build_direction_review_prompt(content: str, context: str) -> str:
+    """Build review prompt for PIRs generated in the Direction phase.
+
+    Args:
+        content: The generated PIRs to review (JSON string).
+        context: The dialogue context used to generate the PIRs (JSON string).
+
+    Returns:
+        Formatted prompt string ready to send to the AI reviewer.
+    """
+    return f"""
+You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)
+generated in the Direction phase of a threat intelligence cycle.
+
+Your role is to ensure PIRs meet professional intelligence standards before
+they are presented to the analyst. You are NOT a grammar checker — you
+evaluate substance, relevance, and analytical quality.
+
+You will receive:
+- CONTEXT: The analyst's intelligence problem and dialogue: {context}
+- Content: The generated PIRs to review: {content}
+
+## Review each PIR against these criteria:
+
+### 1. SMART criteria
+- Specific: One clear intelligence need, preferably in a single sentence
+- Measurable: It must be possible to determine when the requirement is fulfilled
+- Realistic: Achievable given realistic collection capabilities
+- Timely: Deadline or time scope must be clearly stated
+
+### 2. Decision support
+Does this PIR directly support a concrete decision stated or implied in the context?
+A PIR that is "interesting" but does not enable a decision must be rejected.
+
+### 3. Knowledge gap
+Does this PIR address a real gap in understanding — not something already
+known or trivially answerable? "Nice to know" is not enough.
+
+### 4. Answers the actual problem
+Compare each PIR against the analyst's original intelligence problem in CONTEXT.
+A technically correct PIR that answers the wrong question must be rejected.
+
+### 5. Number of PIRs
+The set should contain 2-5 PIRs. Flag if:
+- Only 1 PIR: likely too narrow or the problem is underdefined
+- More than 5 PIRs: likely too broad or poorly prioritized
+
+## Severity threshold
+This is the Direction phase — poor PIRs propagate errors through the entire
+intelligence cycle. When in doubt, mark as MAJOR.
+
+- MAJOR: Missing one or more criteria, or PIR answers wrong question
+- MINOR: Correct substance but could be more precise in formulation
+
+## Output
+Return valid JSON only. No explanation outside the JSON.
+No markdown. No code fences.
+
+{{
+  "overall_approved": bool,
+  "severity": "none" | "minor" | "major",
+  "pir_reviews": [
+    {{
+      "pir_index": int,
+      "approved": bool,
+      "issue": "string or null"
+    }}
+  ],
+  "suggestions": "string or null"
+}}
+"""
+
+
+def build_collection_review_prompt(content: str, context: str) -> str:
+    """Build review prompt for data collected in the Collection phase.
+
+    Args:
+        content: The collected data summary to review (JSON string).
+        context: The collection plan and PIRs used as basis (JSON string).
+
+    Returns:
+        Formatted prompt string ready to send to the AI reviewer.
+    """
+    # TODO: Implement full collection review criteria
+    return f"""
+You are a strict quality reviewer for collected threat intelligence data.
+
+Review the following collected data against the collection plan and PIRs.
+
+CONTEXT (PIRs and collection plan): {context}
+COLLECTED DATA: {content}
+
+Evaluate:
+1. Coverage: Does the collected data address the approved PIRs?
+2. Source quality: Are sources credible and relevant?
+3. Confidence levels: Are confidence assessments realistic?
+4. Gaps: Are there significant gaps in coverage?
+
+Severity:
+- MAJOR: Collected data does not address PIRs, or sources are unreliable
+- MINOR: Minor gaps or low-confidence findings that could be improved
+- NONE: Data adequately addresses the PIRs with credible sources
+
+Return valid JSON only. No markdown. No code fences.
+
+{{
+  "overall_approved": bool,
+  "severity": "none" | "minor" | "major",
+  "pir_reviews": [],
+  "suggestions": "string or null"
+}}
+"""
+
+
+def build_processing_review_prompt(content: str, context: str) -> str:
+    """Build review prompt for correlations produced in the Processing phase.
+
+    Args:
+        content: The correlation report to review (JSON string).
+        context: The collected data used as input (JSON string).
+
+    Returns:
+        Formatted prompt string ready to send to the AI reviewer.
+    """
+    # TODO: Implement full processing review criteria
+    return f"""
+You are a strict quality reviewer for threat intelligence processing output.
+
+Review the following correlation report against the collected data.
+
+COLLECTED DATA (input): {context}
+CORRELATION REPORT: {content}
+
+Evaluate:
+1. Evidence-based: Are correlations supported by the collected data?
+2. MITRE mapping: Are ATT&CK technique mappings accurate?
+3. No hallucination: Are all claims traceable to collected sources?
+4. Completeness: Are key indicators covered?
+
+Severity:
+- MAJOR: Correlations not supported by data, or hallucinated claims
+- MINOR: Minor inaccuracies or unsupported claims
+- NONE: Correlations are well-supported and accurate
+
+Return valid JSON only. No markdown. No code fences.
+
+{{
+  "overall_approved": bool,
+  "severity": "none" | "minor" | "major",
+  "pir_reviews": [],
+  "suggestions": "string or null"
+}}
+"""

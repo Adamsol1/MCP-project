@@ -24,7 +24,8 @@ class TestReasoningLogEntry:
         log_entry = ReasoningLogEntry(
             attempt_number=1,
             timestamp=datetime(2026, 2, 13, 14, 30, 0),
-            generated_pir="Test PIR",
+            phase="pir_generation",
+            generated_content="Test PIR",
             generation_duration=0.5,
             review_result=_make_approved_result(),
             review_duration=0.3,
@@ -41,7 +42,8 @@ class TestReasoningLogEntry:
             ReasoningLogEntry(
                 attempt_number="hei",  # type: ignore
                 timestamp=datetime(2026, 2, 13, 14, 30, 0),
-                generated_pir="Test PIR",
+                phase="pir_generation",
+                generated_content="Test PIR",
                 generation_duration=0.5,
                 review_result=_make_approved_result(),
                 review_duration=0.3,
