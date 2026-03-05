@@ -118,7 +118,7 @@ describe("SourceList — type badge", () => {
       />
     );
 
-    expect(screen.getByText("kb")).toBeInTheDocument();
+    expect(screen.getByText("[kb]")).toBeInTheDocument();
   });
 
   it("renders the ref marker alongside the source", () => {
