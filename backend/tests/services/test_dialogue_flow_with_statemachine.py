@@ -5,26 +5,62 @@ from src.services.dialogue_flow import DialogueFlow, DialogueState
 
 
 class MockDialogueService:
-    async def generate_clarifying_question(self, user_message, context):  # noqa: ARG002
+    def __init__(self):
+        self.clarifying_calls = []
+        self.pir_calls = []
+        self.summary_calls = []
+
+    async def generate_clarifying_question(
+        self, user_message, context, language="en"
+    ):  # noqa: ARG002
+        self.clarifying_calls.append(
+            {
+                "user_message": user_message,
+                "language": language,
+            }
+        )
         question = ClarifyingQuestion(
-            question_text="What is your scope", question_type="scope"
+            question_text="What is your scope",
+            question_type="scope",
         )
         return QuestionResult(question=question, extracted_context={})
 
-    async def generate_pir(self, context, modifications=None):  # noqa: ARG002
+    async def generate_pir(
+        self,
+        context,
+        modifications=None,
+        language=None,
+        current_pir=None,
+    ):  # noqa: ARG002
+        self.pir_calls.append(
+            {
+                "language": language,
+                "current_pir": current_pir,
+                "modifications": modifications,
+            }
+        )
         return "Generated PIR content"
 
-    async def generate_summary(self, context, modifications=None):  # noqa: ARG002
+    async def generate_summary(
+        self,
+        context,
+        modifications=None,
+        language="en",
+    ):  # noqa: ARG002
+        self.summary_calls.append(
+            {
+                "language": language,
+                "modifications": modifications,
+            }
+        )
         return {"summary": "Mock summary"}
 
 
-# Test for checking if state machine starts in correct state
 def test_correct_starting_state_for_dialogue_flow():
     dialogue_flow = DialogueFlow()
     assert dialogue_flow.state == DialogueState.INITIAL
 
 
-# Test for checking if the machine state follows the intended path of initial -> gathering
 @pytest.mark.asyncio
 async def test_state_transition_from_initial_to_gathering():
     dialogue_flow = DialogueFlow()
@@ -35,9 +71,9 @@ async def test_state_transition_from_initial_to_gathering():
     assert dialogue_flow.state == DialogueState.GATHERING
     assert dialogue_flow.context.initial_query == "Investigate x"
     assert result.action == "ask_question"
+    assert mock_service.clarifying_calls[0]["language"] == "en"
 
 
-# Test for checking if the machine states follow the intended path of gathering -> summary_confirming
 @pytest.mark.asyncio
 async def test_state_transition_from_gathering_to_summary_confirming():
     dialogue_flow = DialogueFlow()
@@ -54,9 +90,9 @@ async def test_state_transition_from_gathering_to_summary_confirming():
 
     assert result.action == "show_summary"
     assert dialogue_flow.state == DialogueState.SUMMARY_CONFIRMING
+    assert mock_service.summary_calls[0]["language"] == "en"
 
 
-# Test for checking summary_confirming -> pir_confirming when user approves summary
 @pytest.mark.asyncio
 async def test_state_transition_from_summary_confirming_to_pir_confirming():
     dialogue_flow = DialogueFlow()
@@ -68,9 +104,9 @@ async def test_state_transition_from_summary_confirming_to_pir_confirming():
 
     assert result.action == "show_pir"
     assert dialogue_flow.state == DialogueState.PIR_CONFIRMING
+    assert mock_service.pir_calls[0]["language"] == "en"
 
 
-# Test for checking summary_confirming stays when user rejects with modifications
 @pytest.mark.asyncio
 async def test_state_stays_summary_confirming_on_reject():
     dialogue_flow = DialogueFlow()
@@ -79,15 +115,18 @@ async def test_state_stays_summary_confirming_on_reject():
     dialogue_flow.state = DialogueState.SUMMARY_CONFIRMING
 
     result = await dialogue_flow.process_user_message(
-        "add China to targets", mock_service, approved=False
+        "add China to targets",
+        mock_service,
+        approved=False,
     )
 
     assert result.action == "show_summary"
     assert dialogue_flow.state == DialogueState.SUMMARY_CONFIRMING
     assert dialogue_flow.context.modifications == "add China to targets"
+    assert mock_service.summary_calls[0]["language"] == "en"
+    assert mock_service.summary_calls[0]["modifications"] == "add China to targets"
 
 
-# Test for checking pir_confirming -> complete when user approves PIR
 @pytest.mark.asyncio
 async def test_state_transition_from_pir_confirming_to_complete():
     dialogue_flow = DialogueFlow()
@@ -101,24 +140,27 @@ async def test_state_transition_from_pir_confirming_to_complete():
     assert dialogue_flow.state == DialogueState.COMPLETE
 
 
-# Test for checking pir_confirming stays when user rejects with modifications
 @pytest.mark.asyncio
 async def test_state_stays_pir_confirming_on_reject():
     dialogue_flow = DialogueFlow()
     mock_service = MockDialogueService()
 
     dialogue_flow.state = DialogueState.PIR_CONFIRMING
+    dialogue_flow.current_pir = "Existing PIR content"
 
     result = await dialogue_flow.process_user_message(
-        "focus more on TTPs", mock_service, approved=False
+        "focus more on TTPs",
+        mock_service,
+        approved=False,
     )
 
     assert result.action == "show_pir"
     assert dialogue_flow.state == DialogueState.PIR_CONFIRMING
     assert dialogue_flow.context.modifications == "focus more on TTPs"
+    assert mock_service.pir_calls[0]["language"] == "en"
+    assert mock_service.pir_calls[0]["current_pir"] == "Existing PIR content"
 
 
-# Test for checking that the machine state is force changed from GATHERING -> SUMMARY_CONFIRMING when question count reaches max
 @pytest.mark.asyncio
 async def test_state_transition_when_question_count_is_max():
     dialogue_flow = DialogueFlow()
@@ -134,7 +176,6 @@ async def test_state_transition_when_question_count_is_max():
     assert dialogue_flow.state == DialogueState.SUMMARY_CONFIRMING
 
 
-# Test for checking that state stays on GATHERING when context is insufficient.
 @pytest.mark.asyncio
 async def test_state_stays_gathering_when_context_is_insufficient():
     dialogue_flow = DialogueFlow()
@@ -145,3 +186,4 @@ async def test_state_stays_gathering_when_context_is_insufficient():
 
     assert dialogue_flow.state == DialogueState.GATHERING
     assert result.action == "ask_question"
+    assert mock_service.clarifying_calls[0]["language"] == "en"

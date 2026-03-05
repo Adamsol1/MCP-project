@@ -29,6 +29,7 @@ class TestReasoningLogEntry:
             review_result=_make_approved_result(),
             review_duration=0.3,
             session_id=session_id,
+            model_used="test-model",
         )
         assert log_entry.attempt_number == 1
         assert log_entry.review_result.overall_approved
@@ -36,7 +37,7 @@ class TestReasoningLogEntry:
 
     def test_log_entry_rejects_invalid_type(self):
         session_id = str(uuid4())
-        with pytest.raises(ValidationError):
+        with pytest.raises(ValidationError) as exc_info:
             ReasoningLogEntry(
                 attempt_number="hei",  # type: ignore
                 timestamp=datetime(2026, 2, 13, 14, 30, 0),
@@ -45,4 +46,20 @@ class TestReasoningLogEntry:
                 review_result=_make_approved_result(),
                 review_duration=0.3,
                 session_id=session_id,
+                model_used="test-model",
             )
+        assert any(error["loc"] == ("attempt_number",) for error in exc_info.value.errors())
+
+    def test_log_entry_requires_model_used(self):
+        session_id = str(uuid4())
+        with pytest.raises(ValidationError) as exc_info:
+            ReasoningLogEntry(
+                attempt_number=1,
+                timestamp=datetime(2026, 2, 13, 14, 30, 0),
+                generated_pir="Test PIR",
+                generation_duration=0.5,
+                review_result=_make_approved_result(),
+                review_duration=0.3,
+                session_id=session_id,
+            )
+        assert any(error["loc"] == ("model_used",) for error in exc_info.value.errors())
