@@ -127,6 +127,8 @@ export function useChat() {
       addMessage(buildSystemMessage(response), conversation.id);
       const next = inferStageFromResponse(response);
       setStage(next.stage, next.subState);
+    } catch (e) {
+      error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setIsLoading(false);
     }
@@ -148,6 +150,8 @@ export function useChat() {
       const next = inferStageFromResponse(response);
       setStage(next.stage, next.subState);
       success("Request approved");
+    } catch (e) {
+      error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setIsLoading(false);
     }

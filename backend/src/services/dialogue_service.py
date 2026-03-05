@@ -122,8 +122,25 @@ class DialogueService:
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
             )
+            result = self._parse_json(raw)
 
-        return self._parse_json(raw)
+            # Enrich sources with citation metadata from the knowledge index.
+            try:
+                index_json = await self.mcp_client.read_resource("knowledge://index")
+                index: list[dict] = json.loads(index_json)
+                citation_by_id = {
+                    entry["id"]: entry["citation"]
+                    for entry in index
+                    if entry.get("citation")
+                }
+                for source in result.get("sources", []):
+                    cit = citation_by_id.get(source.get("id", ""))
+                    if cit:
+                        source["citation"] = cit
+            except Exception as e:
+                logger.warning(f"[MCP] Source citation enrichment failed: {e}")
+
+        return result
 
     async def _fetch_relevant_resources(self, context: DialogueContext) -> str:
         """Pre-fetch relevant knowledge using the MCP Resources primitive.

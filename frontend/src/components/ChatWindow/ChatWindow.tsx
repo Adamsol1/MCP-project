@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { ToastContainer } from "../Toast";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
-import type { Message } from "../../types/conversation";
+import CitationText from "../CitationText/CitationText";
+import SourceList from "../SourceList/SourceList";
+import type { Message, PirData } from "../../types/conversation";
 import type { DialogueStage } from "../../types/dialogue";
 
 function Chevron() {
@@ -24,10 +26,83 @@ function Chevron() {
   );
 }
 
+const PRIORITY_LABEL: Record<string, string> = {
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
+
 function renderWithBold(text: string): ReactNode {
   const parts = text.split(/\*\*(.*?)\*\*/g);
   return parts.map((part, i) =>
     i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
+  );
+}
+
+function PirMessage({ pirData }: { pirData: PirData }) {
+  const [highlightedRef, setHighlightedRef] = useState<string | null>(null);
+
+  const reasoningPoints = (pirData.reasoning ?? "")
+    .split(/(?=\d+\.\s)/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold">
+        Priority Intelligence Requirements (PIRs)
+      </h3>
+      {pirData.pir_text && (
+        <CitationText
+          pirText={pirData.pir_text}
+          claims={pirData.claims}
+          highlightedRef={highlightedRef}
+          onRefHover={setHighlightedRef}
+        />
+      )}
+      <ol className="space-y-3 mt-1">
+        {pirData.pirs.map((pir, i) => (
+          <li key={i} className="flex flex-col gap-1">
+            <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
+              {i + 1}. {PRIORITY_LABEL[pir.priority]}
+            </span>
+            <p className="font-medium text-base leading-snug">{pir.question}</p>
+            <details className="group pl-1">
+              <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
+                Rationale
+                <Chevron />
+              </summary>
+              <p className="mt-1 text-sm text-text-secondary">{pir.rationale}</p>
+            </details>
+          </li>
+        ))}
+      </ol>
+      {pirData.sources && pirData.sources.length > 0 && (
+        <div className="mt-3 border-t border-border pt-2">
+          <p className="text-sm font-medium text-text-secondary mb-2">Sources</p>
+          <SourceList
+            sources={pirData.sources}
+            highlightedRef={highlightedRef}
+            onSourceHover={setHighlightedRef}
+          />
+        </div>
+      )}
+      {reasoningPoints.length > 0 && (
+        <details className="group mt-3 border-t border-border pt-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+            Show reasoning
+            <Chevron />
+          </summary>
+          <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
+            {reasoningPoints.map((point, i) => (
+              <p key={i} className="text-sm text-text-secondary">
+                {renderWithBold(point)}
+              </p>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
   );
 }
 
@@ -93,76 +168,13 @@ export default function ChatWindow({
 
   const hasMessages = messages.length > 0;
 
-  const PRIORITY_LABEL: Record<string, string> = {
-    high: "High",
-    medium: "Medium",
-    low: "Low",
-  };
-
   function renderMessageContent(message: Message) {
     if (message.type === "summary" && message.data && "summary" in message.data) {
       return <p>{message.data.summary}</p>;
     }
 
-    if (message.type === "pir" && message.data && "pirs" in message.data) {
-      const pirData = message.data;
-      const reasoningPoints = (pirData.reasoning ?? "")
-        .split(/(?=\d+\.\s)/)
-        .map((s) => s.trim())
-        .filter(Boolean);
-
-      return (
-        <div className="space-y-2">
-          <h3 className="font-semibold">
-            Priority Intelligence Requirements (PIRs)
-          </h3>
-          <p className="text-base">{pirData.result}</p>
-          <ol className="space-y-3 mt-1">
-            {pirData.pirs.map((pir, i) => (
-              <li key={i} className="flex flex-col gap-1">
-                <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
-                  {i + 1}. {PRIORITY_LABEL[pir.priority]}
-                </span>
-                <p className="font-medium text-base leading-snug">{pir.question}</p>
-                <details className="group pl-1">
-                  <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
-                    Rationale
-                    <Chevron />
-                  </summary>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    {pir.rationale}
-                  </p>
-                  {pir.sources && pir.sources.length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      <li className="text-xs text-text-muted font-mono">Sources:</li>
-                      {pir.sources.map((src, j) => (
-                        <li key={j} className="text-xs text-text-muted font-mono">
-                          {src}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </details>
-              </li>
-            ))}
-          </ol>
-          {reasoningPoints.length > 0 && (
-            <details className="group mt-3 border-t border-border pt-2">
-              <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
-                Show reasoning
-                <Chevron />
-              </summary>
-              <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
-                {reasoningPoints.map((point, i) => (
-                  <p key={i} className="text-sm text-text-secondary">
-                    {renderWithBold(point)}
-                  </p>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
-      );
+    if (message.type === "pir" && message.data && "pir_text" in message.data) {
+      return <PirMessage pirData={message.data as PirData} />;
     }
 
     return <p>{message.text}</p>;
