@@ -52,6 +52,7 @@ def knowledge_index() -> str:
             "id": resource_id,
             "keywords": entry["keywords"],
             "priority": entry["priority"],
+            "citation": entry.get("citation"),
         }
         for resource_id, entry in KNOWLEDGE_REGISTRY.items()
     ])

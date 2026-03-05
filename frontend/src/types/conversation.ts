@@ -66,14 +66,47 @@ export interface SummaryData {
 }
 
 /**
- * Each individual pirs have a question, their priority,
- * and the rationale for that pir
+ * Metadata about a source used in the conversation,
+ * including author, year, title, and publisher.
+ */
+export interface CitationMetadata {
+  author: string;
+  year: string;
+  title: string;
+  publisher: string;
+}
+
+/**
+ * Metadata about a source used in the conversation, including its unique ID,
+ * reference string, type, and citation metadata.
+ */
+export interface Source {
+  id: string;
+  ref: string;
+  source_type: string;
+  citation?: CitationMetadata;
+}
+
+/**
+ * A claim made by the AI system, including its unique ID, text content,
+ * and reference to the source that supports it.
+ */
+export interface Claim {
+  id: string;
+  text: string;
+  source_ref: string;
+  source_id: string;
+}
+
+/**
+ * A Priority Information Requirement (PIR) item, which includes the question being asked,
+ * its priority level, the rationale behind it, and the source IDs that informed this PIR.
  */
 export interface PirItem {
   question: string;
   priority: "high" | "medium" | "low";
   rationale: string;
-  sources?: string[];
+  source_ids: string[]; // List of source IDs that informed this PIR
 }
 
 /**
@@ -83,7 +116,9 @@ export interface PirItem {
  * - Resoning: Reasoning behind AI's desicions
  */
 export interface PirData {
-  result: string;
+  pir_text: string;
+  claims: Claim[];
+  sources: Source[];
   pirs: PirItem[];
   reasoning: string;
 }

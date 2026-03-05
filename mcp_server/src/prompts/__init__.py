@@ -170,11 +170,23 @@ provided. Each PIR must be:
 - Perspective-aware: Framed through the selected analytical viewpoint(s)
 
 CITATION RULES (apply when BACKGROUND KNOWLEDGE is present):
-- Use the provided background knowledge to inform and ground your PIRs
-- For each PIR, populate "sources" with a list of file paths from the
-  "### Source:" headers that directly support that PIR
-- Only cite a source if it genuinely influenced that specific PIR
-- Use an empty list [] if no background knowledge applies to a PIR
+- Build a top-level "sources" list from the "### Source: <id>" headers in the
+  background knowledge. Each entry must have:
+    {{ "id": "<source id>", "ref": "[N]", "source_type": "kb" }}
+  where N is the 1-based position of the source in the sources list.
+- In "pir_text", insert [N] superscript markers inline after any claim that is
+  directly supported by a source. Example: "Russia has GPS jamming capability[1]"
+- When a claim is supported by multiple sources, write consecutive separate markers
+  with no space between them: "claim text[1][2]". Never combine as "[1,2]".
+- For every [N] marker in pir_text, add a matching entry to "claims":
+    {{ "id": "claim_<N>", "text": "<claim text without the marker>",
+      "source_ref": "[N]", "source_id": "<matching source id>" }}
+- Only insert [N] markers in pir_text. Do NOT insert [N] markers inside pir items'
+  question or rationale fields — link pir items to sources via source_ids only.
+- In each PIR item, set "source_ids" to a list of source IDs (not refs) that
+  support that PIR. Use [] if no background knowledge applies.
+- Only cite sources that genuinely influenced the content — do not fabricate links.
+- Sentences with no verifiable source get no [N] marker and no claims entry.
 
 ANALYTICAL PERSPECTIVES define the lens through which PIRs are framed:
 - Single or multiple countries/groups (e.g. "norway", "russia", "nato"):
@@ -186,17 +198,36 @@ ANALYTICAL PERSPECTIVES define the lens through which PIRs are framed:
 
 Return your response in the following JSON format:
 {{
-    "result": "A concise, human-readable summary of the generated PIRs and what they collectively aim to answer",
+    "pir_text": "A concise human-readable summary of what the PIRs collectively aim to answer. Insert [N] markers inline after any claim supported by background knowledge.",
+    "claims": [
+        {{
+            "id": "claim_1",
+            "text": "The claim text without the [N] marker",
+            "source_ref": "[1]",
+            "source_id": "geopolitical/norway_russia"
+        }}
+    ],
+    "sources": [
+        {{
+            "id": "geopolitical/norway_russia",
+            "ref": "[1]",
+            "source_type": "kb"
+        }}
+    ],
     "pirs": [
         {{
             "question": "The PIR formulated as a specific intelligence question",
             "priority": "high | medium | low",
             "rationale": "Why this PIR is important given the context",
-            "sources": ["knowledge_bank/geopolitical/norway_russia.md"]
+            "source_ids": ["geopolitical/norway_russia"]
         }}
     ],
     "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected"
 }}
+
+
+
+
 Respond ONLY in valid JSON.
 No markdown.
 No commentary.
