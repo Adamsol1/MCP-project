@@ -6,6 +6,7 @@ import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
 import type { Message, PirData } from "../../types/conversation";
 import type { DialogueStage } from "../../types/dialogue";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
 function Chevron() {
   return (
@@ -40,7 +41,11 @@ function renderWithBold(text: string): ReactNode {
 }
 
 function PirMessage({ pirData }: { pirData: PirData }) {
-  const [highlightedRef, setHighlightedRef] = useState<string | null>(null);
+  const { highlightedRef, setHighlightedRef, setPirData } = useWorkspace();
+
+  useEffect(() => {
+    setPirData(pirData);
+  }, [pirData, setPirData]);
 
   const reasoningPoints = (pirData.reasoning ?? "")
     .split(/(?=\d+\.\s)/)
@@ -54,7 +59,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
       </h3>
       {pirData.pir_text && (
         <CitationText
-          pirText={pirData.pir_text}
+          text={pirData.pir_text}
           claims={pirData.claims}
           highlightedRef={highlightedRef}
           onRefHover={setHighlightedRef}
@@ -72,14 +77,23 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 Rationale
                 <Chevron />
               </summary>
-              <p className="mt-1 text-sm text-text-secondary">{pir.rationale}</p>
+              <p className="mt-1 text-sm text-text-secondary">
+                <CitationText
+                  text={pir.rationale}
+                  claims={pirData.claims}
+                  highlightedRef={highlightedRef}
+                  onRefHover={setHighlightedRef}
+                />
+              </p>
             </details>
           </li>
         ))}
       </ol>
       {pirData.sources && pirData.sources.length > 0 && (
         <div className="mt-3 border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary mb-2">Sources</p>
+          <p className="text-sm font-medium text-text-secondary mb-2">
+            Sources
+          </p>
           <SourceList
             sources={pirData.sources}
             highlightedRef={highlightedRef}
@@ -169,7 +183,11 @@ export default function ChatWindow({
   const hasMessages = messages.length > 0;
 
   function renderMessageContent(message: Message) {
-    if (message.type === "summary" && message.data && "summary" in message.data) {
+    if (
+      message.type === "summary" &&
+      message.data &&
+      "summary" in message.data
+    ) {
       return <p>{message.data.summary}</p>;
     }
 

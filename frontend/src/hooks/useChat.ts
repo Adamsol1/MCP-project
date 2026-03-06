@@ -14,9 +14,12 @@ import type {
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 import type { Message, PirData, SummaryData } from "../types/conversation";
-import { useSettings } from "../contexts/SettingsContext";
+import { useSettings } from "../contexts/SettingsContext/SettingsContext";
 
-const ACTION_TO_MESSAGE_TYPE: Record<DialogueAction, NonNullable<Message["type"]>> = {
+const ACTION_TO_MESSAGE_TYPE: Record<
+  DialogueAction,
+  NonNullable<Message["type"]>
+> = {
   ask_question: "question",
   show_summary: "summary",
   show_pir: "pir",
@@ -30,9 +33,10 @@ function resolveMessageType(
   return ACTION_TO_MESSAGE_TYPE[response.action];
 }
 
-function inferStageFromResponse(
-  response: DialogueApiResponse,
-): { stage: DialogueStage; subState: DialogueSubState } {
+function inferStageFromResponse(response: DialogueApiResponse): {
+  stage: DialogueStage;
+  subState: DialogueSubState;
+} {
   if (response.stage) {
     const subState =
       response.sub_state ??
@@ -43,7 +47,10 @@ function inferStageFromResponse(
     return { stage: response.stage, subState };
   }
 
-  if (response.action === "show_summary" || response.action === "max_questions") {
+  if (
+    response.action === "show_summary" ||
+    response.action === "max_questions"
+  ) {
     return { stage: "summary_confirming", subState: "awaiting_decision" };
   }
   if (response.action === "show_pir") {
@@ -220,7 +227,9 @@ export function useChat() {
   const resetDevStage = async () => {
     if (!activeConversation) return;
     try {
-      const response = await resetDevDialogueState(activeConversation.sessionId);
+      const response = await resetDevDialogueState(
+        activeConversation.sessionId,
+      );
       setStage(response.stage, response.sub_state);
       info("Reset stage to initial");
     } catch {

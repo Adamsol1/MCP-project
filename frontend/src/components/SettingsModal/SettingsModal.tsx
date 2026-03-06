@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSettings } from "../../contexts/SettingsContext";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import type { Language, Theme } from "../../types/settings";
 
 /** Props for the SettingsModal component. */
@@ -54,19 +54,21 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
             Options
           </p>
-          {(["language", "appearance", "parameters"] as const).map((section) => (
-            <button
-              key={section}
-              onClick={() => setActiveSection(section)}
-              className={`rounded px-3 py-2 text-left text-sm capitalize ${
-                activeSection === section
-                  ? "bg-surface-elevated text-text-primary"
-                  : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
-              }`}
-            >
-              {section}
-            </button>
-          ))}
+          {(["language", "appearance", "parameters"] as const).map(
+            (section) => (
+              <button
+                key={section}
+                onClick={() => setActiveSection(section)}
+                className={`rounded px-3 py-2 text-left text-sm capitalize ${
+                  activeSection === section
+                    ? "bg-surface-elevated text-text-primary"
+                    : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
+                }`}
+              >
+                {section}
+              </button>
+            ),
+          )}
         </nav>
 
         {/* ── Right panel ──────────────────────────────────── */}
@@ -94,7 +96,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               />
             )}
             {activeSection === "appearance" && (
-              <AppearanceSection theme={settings.theme} onChange={updateTheme} />
+              <AppearanceSection
+                theme={settings.theme}
+                onChange={updateTheme}
+              />
             )}
             {activeSection === "parameters" && (
               <ParametersSection
@@ -135,7 +140,10 @@ function SettingRow({
     <div className="flex items-center justify-between border-b border-border py-4">
       <div className="mr-8">
         {htmlFor ? (
-          <label htmlFor={htmlFor} className="text-sm font-medium text-text-primary">
+          <label
+            htmlFor={htmlFor}
+            className="text-sm font-medium text-text-primary"
+          >
             {label}
           </label>
         ) : (

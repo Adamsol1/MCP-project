@@ -1,5 +1,5 @@
-import { useContext } from 'react';
-import { ToastContext } from '../contexts/ToastContext';
+import { useContext } from "react";
+import { ToastContext } from "../contexts/Toast/ToastContext";
 
 /**
  * Convenience hook for accessing the toast notification system.
@@ -14,7 +14,7 @@ import { ToastContext } from '../contexts/ToastContext';
 export function useToast() {
   const context = useContext(ToastContext);
   if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
+    throw new Error("useToast must be used within a ToastProvider");
   }
   return context;
 }

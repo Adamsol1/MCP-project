@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useConversation } from "../hooks/useConversation";
+import { useConversation } from "../../hooks/useConversation";
 import { ConversationProvider } from "./ConversationContext";
-import type { ConversationStore } from "../types/conversation";
+import type { ConversationStore } from "../../types/conversation";
 
 const STORAGE_KEY = "mcp-conversations";
 
@@ -58,7 +58,7 @@ describe("ConversationContext", () => {
 
       expect(result.current.conversations).toHaveLength(1);
       expect(result.current.conversations[0].title).toBe(
-        "Existing conversation"
+        "Existing conversation",
       );
       expect(result.current.activeConversation?.id).toBe("conv-1");
     });
@@ -90,7 +90,7 @@ describe("ConversationContext", () => {
 
       expect(result.current.activeConversation).not.toBeNull();
       expect(result.current.activeConversation?.id).toBe(
-        result.current.conversations[0].id
+        result.current.conversations[0].id,
       );
     });
 
@@ -120,7 +120,7 @@ describe("ConversationContext", () => {
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
       expect(stored.conversations).toHaveLength(1);
       expect(stored.activeConversationId).toBe(
-        result.current.conversations[0].id
+        result.current.conversations[0].id,
       );
     });
   });
@@ -200,7 +200,7 @@ describe("ConversationContext", () => {
 
       expect(result.current.activeConversation?.messages).toHaveLength(1);
       expect(result.current.activeConversation?.messages[0].text).toBe(
-        "Investigate APT29"
+        "Investigate APT29",
       );
     });
 
@@ -214,9 +214,7 @@ describe("ConversationContext", () => {
       });
 
       // Title should be default before any messages
-      expect(result.current.activeConversation?.title).toBe(
-        "New conversation"
-      );
+      expect(result.current.activeConversation?.title).toBe("New conversation");
 
       act(() => {
         result.current.addMessage({
@@ -228,7 +226,7 @@ describe("ConversationContext", () => {
 
       // Title should now be derived from the first user message
       expect(result.current.activeConversation?.title).toBe(
-        "Investigate APT29 targeting EU infrastructure"
+        "Investigate APT29 targeting EU infrastructure",
       );
     });
 
@@ -275,9 +273,7 @@ describe("ConversationContext", () => {
       });
 
       // Title should still be the default since only user messages set the title
-      expect(result.current.activeConversation?.title).toBe(
-        "New conversation"
-      );
+      expect(result.current.activeConversation?.title).toBe("New conversation");
     });
 
     it("does not update title on subsequent user messages", () => {
@@ -330,7 +326,7 @@ describe("ConversationContext", () => {
 
       // updatedAt should be >= createdAt (could be equal if very fast)
       expect(
-        result.current.activeConversation!.updatedAt
+        result.current.activeConversation!.updatedAt,
       ).toBeGreaterThanOrEqual(createdAt);
     });
 
@@ -432,10 +428,7 @@ describe("ConversationContext", () => {
       });
 
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
-      expect(stored.conversations[0].perspectives).toEqual([
-        "CHINA",
-        "RUSSIA",
-      ]);
+      expect(stored.conversations[0].perspectives).toEqual(["CHINA", "RUSSIA"]);
     });
   });
 

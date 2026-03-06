@@ -3,11 +3,17 @@ import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import ChatWindow from "./ChatWindow";
-import { ToastProvider } from "../../contexts/ToastContext";
+import { ToastProvider } from "../../contexts/Toast/ToastContext";
+import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
-// ChatWindow renders ToastContainer which requires ToastProvider in the tree
+// ChatWindow renders ToastContainer (needs ToastProvider) and PirMessage
+// calls useWorkspace (needs WorkspaceProvider).
 function renderWithToast(ui: ReactNode) {
-  return render(<ToastProvider>{ui}</ToastProvider>);
+  return render(
+    <WorkspaceProvider>
+      <ToastProvider>{ui}</ToastProvider>
+    </WorkspaceProvider>
+  );
 }
 
 // describe() groups related tests together under a label
@@ -144,9 +150,7 @@ describe("ChatWindow", () => {
   });
 
   it("hides greeting when messages are present", () => {
-    const messages = [
-      { id: "1", text: "Hello", sender: "system" as const },
-    ];
+    const messages = [{ id: "1", text: "Hello", sender: "system" as const }];
 
     renderWithToast(<ChatWindow messages={messages} />);
 
@@ -171,7 +175,9 @@ describe("ChatWindow", () => {
     const user = userEvent.setup();
     const handleApprove = vi.fn();
 
-    renderWithToast(<ChatWindow isConfirming={true} onApprove={handleApprove} />);
+    renderWithToast(
+      <ChatWindow isConfirming={true} onApprove={handleApprove} />,
+    );
 
     const approveBtn = screen.getByRole("button", { name: /approve/i });
     await user.click(approveBtn);
@@ -184,7 +190,7 @@ describe("ChatWindow", () => {
 
     // queryByRole returns null instead of throwing when not found
     expect(
-      screen.queryByRole("button", { name: /approve/i })
+      screen.queryByRole("button", { name: /approve/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -213,7 +219,7 @@ describe("ChatWindow", () => {
     renderWithToast(<ChatWindow isConfirming={false} />);
 
     expect(
-      screen.queryByRole("button", { name: /reject/i })
+      screen.queryByRole("button", { name: /reject/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -223,17 +229,25 @@ describe("ChatWindow", () => {
     const messages = [
       {
         id: "1",
-        text: JSON.stringify({ summary: "Investigation focused on APT29 targeting EU infrastructure." }),
+        text: JSON.stringify({
+          summary:
+            "Investigation focused on APT29 targeting EU infrastructure.",
+        }),
         sender: "system" as const,
         type: "summary" as const,
-        data: { summary: "Investigation focused on APT29 targeting EU infrastructure." },
+        data: {
+          summary:
+            "Investigation focused on APT29 targeting EU infrastructure.",
+        },
       },
     ];
 
     renderWithToast(<ChatWindow messages={messages} />);
 
     expect(
-      screen.getByText("Investigation focused on APT29 targeting EU infrastructure.")
+      screen.getByText(
+        "Investigation focused on APT29 targeting EU infrastructure.",
+      ),
     ).toBeInTheDocument();
   });
 
@@ -266,7 +280,14 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated successfully.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "Important.", source_ids: [] }],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "high" as const,
+              rationale: "Important.",
+              source_ids: [],
+            },
+          ],
           reasoning: "Based on the scope provided.",
         },
       },
@@ -274,7 +295,9 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    expect(screen.getByText(/Priority Intelligence Requirements/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Priority Intelligence Requirements/),
+    ).toBeInTheDocument();
   });
 
   it("renders each PIR question in the list", () => {
@@ -289,8 +312,18 @@ describe("ChatWindow", () => {
           claims: [],
           sources: [],
           pirs: [
-            { question: "What TTPs has APT29 used?", priority: "high" as const, rationale: "Core requirement.", source_ids: [] },
-            { question: "Which EU sectors were targeted?", priority: "medium" as const, rationale: "Scope clarification.", source_ids: [] },
+            {
+              question: "What TTPs has APT29 used?",
+              priority: "high" as const,
+              rationale: "Core requirement.",
+              source_ids: [],
+            },
+            {
+              question: "Which EU sectors were targeted?",
+              priority: "medium" as const,
+              rationale: "Scope clarification.",
+              source_ids: [],
+            },
           ],
           reasoning: "Selected based on context.",
         },
@@ -300,7 +333,9 @@ describe("ChatWindow", () => {
     renderWithToast(<ChatWindow messages={messages} />);
 
     expect(screen.getByText(/What TTPs has APT29 used\?/)).toBeInTheDocument();
-    expect(screen.getByText(/Which EU sectors were targeted\?/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Which EU sectors were targeted\?/),
+    ).toBeInTheDocument();
   });
 
   it("renders the priority label for PIR items", () => {
@@ -315,9 +350,24 @@ describe("ChatWindow", () => {
           claims: [],
           sources: [],
           pirs: [
-            { question: "High priority Q?", priority: "high" as const, rationale: "Critical.", source_ids: [] },
-            { question: "Medium priority Q?", priority: "medium" as const, rationale: "Important.", source_ids: [] },
-            { question: "Low priority Q?", priority: "low" as const, rationale: "Nice to have.", source_ids: [] },
+            {
+              question: "High priority Q?",
+              priority: "high" as const,
+              rationale: "Critical.",
+              source_ids: [],
+            },
+            {
+              question: "Medium priority Q?",
+              priority: "medium" as const,
+              rationale: "Important.",
+              source_ids: [],
+            },
+            {
+              question: "Low priority Q?",
+              priority: "low" as const,
+              rationale: "Nice to have.",
+              source_ids: [],
+            },
           ],
           reasoning: "Reasoning here.",
         },
@@ -343,8 +393,18 @@ describe("ChatWindow", () => {
           claims: [],
           sources: [],
           pirs: [
-            { question: "Q1?", priority: "high" as const, rationale: "Because it matters.", source_ids: [] },
-            { question: "Q2?", priority: "low" as const, rationale: "Secondary concern.", source_ids: [] },
+            {
+              question: "Q1?",
+              priority: "high" as const,
+              rationale: "Because it matters.",
+              source_ids: [],
+            },
+            {
+              question: "Q2?",
+              priority: "low" as const,
+              rationale: "Secondary concern.",
+              source_ids: [],
+            },
           ],
           reasoning: "Reasoning here.",
         },
@@ -369,7 +429,14 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "Because it matters.", source_ids: [] }],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "high" as const,
+              rationale: "Because it matters.",
+              source_ids: [],
+            },
+          ],
           reasoning: "Reasoning here.",
         },
       },
@@ -391,7 +458,14 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "R1.", source_ids: [] }],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "high" as const,
+              rationale: "R1.",
+              source_ids: [],
+            },
+          ],
           reasoning: "1. **Scope**: Covers the main area.",
         },
       },
@@ -414,7 +488,14 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "low" as const, rationale: "R1.", source_ids: [] }],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "low" as const,
+              rationale: "R1.",
+              source_ids: [],
+            },
+          ],
           reasoning: "Selected based on scope and context provided.",
         },
       },
@@ -438,7 +519,14 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "low" as const, rationale: "R1.", source_ids: [] }],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "low" as const,
+              rationale: "R1.",
+              source_ids: [],
+            },
+          ],
           reasoning: "Selected based on scope and context provided.",
         },
       },
@@ -446,7 +534,9 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    expect(screen.getByText("Selected based on scope and context provided.")).toBeInTheDocument();
+    expect(
+      screen.getByText("Selected based on scope and context provided."),
+    ).toBeInTheDocument();
   });
 
   it("splits numbered reasoning points into separate paragraphs", () => {
@@ -460,8 +550,16 @@ describe("ChatWindow", () => {
           pir_text: "PIRs generated.",
           claims: [],
           sources: [],
-          pirs: [{ question: "Q1?", priority: "high" as const, rationale: "R1.", source_ids: [] }],
-          reasoning: "Intro text. 1. First point here. 2. Second point here. 3. Third point here.",
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "high" as const,
+              rationale: "R1.",
+              source_ids: [],
+            },
+          ],
+          reasoning:
+            "Intro text. 1. First point here. 2. Second point here. 3. Third point here.",
         },
       },
     ];
@@ -486,7 +584,9 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    expect(screen.getByText("What is the scope of your investigation?")).toBeInTheDocument();
+    expect(
+      screen.getByText("What is the scope of your investigation?"),
+    ).toBeInTheDocument();
   });
 
   it("falls back to plain text when summary message has no data (malformed JSON upstream)", () => {
@@ -513,10 +613,10 @@ describe("ChatWindow", () => {
     renderWithToast(<ChatWindow isConfirming={true} />);
 
     expect(
-      screen.queryByPlaceholderText(/ask anything/i)
+      screen.queryByPlaceholderText(/ask anything/i),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /send/i })
+      screen.queryByRole("button", { name: /send/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -526,5 +626,108 @@ describe("ChatWindow", () => {
 
     expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
+  });
+});
+
+// ---------- Rationale citation rendering ----------
+// pir.rationale can contain [N] markers just like pir_text.
+// These tests verify that rationale is rendered through CitationText so
+// markers become interactive superscripts wired to the shared hover state.
+
+describe("PirMessage — rationale citation rendering", () => {
+  // Shared fixture: a PIR message where only the rationale contains a [N] marker.
+  // pir_text is marker-free so any <sup> in the DOM must come from the rationale.
+  const rationaleMessage = [
+    {
+      id: "1",
+      text: "{}",
+      sender: "system" as const,
+      type: "pir" as const,
+      data: {
+        pir_text: "PIRs generated successfully.",
+        claims: [],
+        sources: [
+          {
+            id: "geopolitical/norway_russia",
+            ref: "[1]",
+            source_type: "kb",
+            citation: {
+              author: "Threat Intelligence System",
+              year: "2025",
+              title: "Norwegian-Russian Geopolitical Relations",
+              publisher: "Internal Knowledge Bank",
+            },
+          },
+        ],
+        pirs: [
+          {
+            question: "What is the threat level for Norway?",
+            priority: "high" as const,
+            rationale:
+              "Norway faces elevated risk[1] based on recent intelligence.",
+            source_ids: [],
+          },
+        ],
+        reasoning: "",
+      },
+    },
+  ];
+
+  it("renders [N] markers in rationale as superscript elements", () => {
+    // If rationale is passed as plain text, [1] stays as a string character.
+    // CitationText splits on [N] patterns and wraps each in a <sup>.
+    renderWithToast(<ChatWindow messages={rationaleMessage} />);
+
+    const sups = document.querySelectorAll("sup");
+    expect(sups).toHaveLength(1);
+    expect(sups[0]).toHaveTextContent("[1]");
+  });
+
+  it("hovering a [N] marker in rationale highlights the matching source card", async () => {
+    // Hovering the <sup> calls onRefHover("[1]"), which sets highlightedRef in
+    // PirMessage, which flows into SourceList and highlights the matching <li>.
+    const user = userEvent.setup();
+    renderWithToast(<ChatWindow messages={rationaleMessage} />);
+
+    const sup = document.querySelector("sup")!;
+    await user.hover(sup);
+
+    // Multiple listitems exist (PIR items + source items), so scope to the
+    // source card by finding its unique citation text and walking up to the <li>.
+    const sourceCard = screen
+      .getByText(/Norwegian-Russian Geopolitical Relations/)
+      .closest("li")!;
+    expect(sourceCard).toHaveClass("bg-primary-subtle");
+  });
+
+  it("renders rationale without [N] markers as plain text with no superscripts", () => {
+    // Regression guard: plain rationale text must still appear in the DOM.
+    const plainMessage = [
+      {
+        id: "2",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          pir_text: "PIRs generated.",
+          claims: [],
+          sources: [],
+          pirs: [
+            {
+              question: "Q1?",
+              priority: "low" as const,
+              rationale: "Because it matters.",
+              source_ids: [],
+            },
+          ],
+          reasoning: "",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={plainMessage} />);
+
+    expect(screen.getByText("Because it matters.")).toBeInTheDocument();
+    expect(document.querySelectorAll("sup")).toHaveLength(0);
   });
 });

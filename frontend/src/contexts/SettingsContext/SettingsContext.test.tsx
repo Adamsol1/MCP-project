@@ -3,7 +3,7 @@ import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { SettingsProvider } from "./SettingsContext";
 import { useSettings } from "./SettingsContext";
-import { DEFAULT_SETTINGS } from "../types/settings";
+import { DEFAULT_SETTINGS } from "../../types/settings";
 
 // ─── Test helper ────────────────────────────────────────────────────────────
 // Every renderHook call needs the hook to live inside a SettingsProvider.
@@ -195,9 +195,7 @@ describe("SettingsContext", () => {
         result.current.updateInputParameters({ timeframe: "Q1 2025" });
       });
 
-      expect(result.current.settings.inputParameters.timeframe).toBe(
-        "Q1 2025",
-      );
+      expect(result.current.settings.inputParameters.timeframe).toBe("Q1 2025");
     });
 
     it("persists the updated inputParameters to localStorage", () => {
@@ -239,9 +237,7 @@ describe("SettingsContext", () => {
       // Suppress the expected React error boundary console output.
       const spy = vi.spyOn(console, "error").mockImplementation(() => {});
 
-      expect(() => renderHook(() => useSettings())).toThrow(
-        /SettingsProvider/,
-      );
+      expect(() => renderHook(() => useSettings())).toThrow(/SettingsProvider/);
 
       spy.mockRestore();
     });

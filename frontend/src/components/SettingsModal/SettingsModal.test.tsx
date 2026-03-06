@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { SettingsProvider } from "../../contexts/SettingsContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 import { SettingsModal } from "./SettingsModal";
 
 // ─── Test helper ─────────────────────────────────────────────────────────────
@@ -28,7 +28,6 @@ function renderModal(props: { isOpen?: boolean; onClose?: () => void } = {}) {
 
 // ─── SettingsModal tests ──────────────────────────────────────────────────────
 describe("SettingsModal", () => {
-
   // ── Visibility ───────────────────────────────────────────────────────────
   // The modal must only be in the DOM when isOpen is true.
   // This is the most fundamental test — if this fails, nothing else matters.
@@ -52,14 +51,22 @@ describe("SettingsModal", () => {
   describe("structure", () => {
     it("renders a close button", () => {
       renderModal();
-      expect(screen.getByRole("button", { name: /close/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /close/i }),
+      ).toBeInTheDocument();
     });
 
     it("renders all three nav categories", () => {
       renderModal();
-      expect(screen.getByRole("button", { name: /language/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /appearance/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /parameters/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /language/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /appearance/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /parameters/i }),
+      ).toBeInTheDocument();
     });
 
     it("shows Language section content by default", () => {
@@ -123,8 +130,12 @@ describe("SettingsModal", () => {
   describe("Language section", () => {
     it("renders English and Norwegian options", () => {
       renderModal();
-      expect(screen.getByRole("option", { name: /english/i })).toBeInTheDocument();
-      expect(screen.getByRole("option", { name: /norwegian/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: /english/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("option", { name: /norwegian/i }),
+      ).toBeInTheDocument();
     });
 
     it("selecting Norwegian updates the dropdown value", async () => {
@@ -137,7 +148,11 @@ describe("SettingsModal", () => {
       );
 
       expect(
-        (screen.getByRole("option", { name: /norwegian/i }) as HTMLOptionElement).selected,
+        (
+          screen.getByRole("option", {
+            name: /norwegian/i,
+          }) as HTMLOptionElement
+        ).selected,
       ).toBe(true);
     });
   });
@@ -151,8 +166,12 @@ describe("SettingsModal", () => {
 
       await user.click(screen.getByRole("button", { name: /appearance/i }));
 
-      expect(screen.getByRole("button", { name: /^light$/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /^dark$/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^light$/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /^dark$/i }),
+      ).toBeInTheDocument();
     });
 
     it("clicking Light theme button selects it", async () => {
@@ -178,7 +197,9 @@ describe("SettingsModal", () => {
 
       await user.click(screen.getByRole("button", { name: /parameters/i }));
 
-      expect(screen.getByRole("textbox", { name: /timeframe/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole("textbox", { name: /timeframe/i }),
+      ).toBeInTheDocument();
     });
 
     it("typing in the Timeframe field updates its value", async () => {

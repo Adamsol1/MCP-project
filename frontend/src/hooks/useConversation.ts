@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ConversationContext } from "../contexts/ConversationContext";
+import { ConversationContext } from "../contexts/ConversationContext/ConversationContext";
 
 /**
  * Convenience hook for reading from and writing to ConversationContext.
@@ -16,7 +16,7 @@ export function useConversation() {
   const context = useContext(ConversationContext);
   if (!context) {
     throw new Error(
-      "useConversation must be used within a ConversationProvider"
+      "useConversation must be used within a ConversationProvider",
     );
   }
   return context;

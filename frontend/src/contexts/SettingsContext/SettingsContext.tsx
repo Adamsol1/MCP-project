@@ -14,7 +14,7 @@ import {
   type Language,
   type Theme,
   type InputParameters,
-} from "../types/settings";
+} from "../../types/settings";
 
 /** localStorage key under which the settings object is stored as JSON. */
 const STORAGE_KEY = "mcp-settings";
@@ -96,7 +96,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // Sync <html class="dark"> before paint to prevent flash of wrong theme.
   useLayoutEffect(() => {
-    document.documentElement.classList.toggle('dark', settings.theme === 'dark');
+    document.documentElement.classList.toggle(
+      "dark",
+      settings.theme === "dark",
+    );
   }, [settings.theme]);
 
   const updateLanguage = useCallback((language: Language) => {

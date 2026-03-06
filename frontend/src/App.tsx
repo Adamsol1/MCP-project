@@ -9,6 +9,8 @@ import { uploadFile } from "./services/upload";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
+import { WorkspaceProvider } from "./contexts/WorkspaceContext/WorkspaceContext";
+import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 
 /**
  * Root application component.
@@ -101,6 +103,7 @@ function App() {
   };
 
   return (
+    <WorkspaceProvider>
     <div className="flex h-screen">
       <Sidebar
         conversations={conversations}
@@ -137,6 +140,10 @@ function App() {
         />
       </main>
 
+      <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+        <IntelligencePanel />
+      </div>
+
       <OptionsPanel
         selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
         onPerspectiveChange={updatePerspectives}
@@ -156,6 +163,7 @@ function App() {
         onClose={() => setIsSettingsOpen(false)}
       />
     </div>
+    </WorkspaceProvider>
   );
 }
 

@@ -1,19 +1,19 @@
 import type { Claim } from "../../types/conversation";
 
 interface CitationTextProps {
-  pirText: string;
+  text: string;
   claims: Claim[];
   highlightedRef: string | null;
   onRefHover: (ref: string | null) => void;
 }
 
 export default function CitationText({
-  pirText,
+  text,
   claims,
   highlightedRef,
   onRefHover,
 }: CitationTextProps) {
-  const parts = pirText.split(/(\[\d+\])/g);
+  const parts = text.split(/(\[\d+\])/g);
 
   return (
     <span>

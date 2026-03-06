@@ -2,9 +2,9 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useChat } from "./useChat";
-import { ConversationProvider } from "../contexts/ConversationContext";
-import { ToastProvider } from "../contexts/ToastContext";
-import { SettingsProvider } from "../contexts/SettingsContext";
+import { ConversationProvider } from "../contexts/ConversationContext/ConversationContext";
+import { ToastProvider } from "../contexts/Toast/ToastContext";
+import { SettingsProvider } from "../contexts/SettingsContext/SettingsContext";
 import type { ConversationStore } from "../types/conversation";
 
 // Mock the dialogue service so we don't make real API calls
@@ -147,7 +147,9 @@ describe("useChat", () => {
       action: "ask_question",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
 
     // activeConversation is null at this point — no conversations exist
     await act(async () => {
@@ -407,7 +409,9 @@ describe("buildSystemMessage — structured response parsing", () => {
       action: "show_summary",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Investigate APT29");
     });
@@ -436,7 +440,9 @@ describe("buildSystemMessage — structured response parsing", () => {
       action: "show_pir",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Approve summary");
     });
@@ -452,7 +458,9 @@ describe("buildSystemMessage — structured response parsing", () => {
       action: "ask_question",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Investigate APT29");
     });
@@ -469,7 +477,9 @@ describe("buildSystemMessage — structured response parsing", () => {
       action: "show_summary",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Investigate APT29");
     });
@@ -497,7 +507,9 @@ describe("buildSystemMessage — structured response parsing", () => {
         action: "show_pir",
       });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Answer");
     });
@@ -529,7 +541,9 @@ describe("action-first response handling", () => {
       action: "max_questions",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Continue");
     });
@@ -552,7 +566,9 @@ describe("action-first response handling", () => {
       action: "show_pir",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Approve summary");
     });
@@ -568,7 +584,9 @@ describe("action-first response handling", () => {
       action: "show_summary",
     });
 
-    const { result } = renderHook(() => useChat(), { wrapper: createWrapper() });
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
     await act(async () => {
       await result.current.sendMessage("Summary path");
     });
@@ -578,4 +596,3 @@ describe("action-first response handling", () => {
     expect(result.current.messages[1].type).toBe("summary");
   });
 });
-

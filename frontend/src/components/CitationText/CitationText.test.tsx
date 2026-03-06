@@ -39,7 +39,7 @@ describe("CitationText — plain text", () => {
   it("renders prose with no claims as a single text node", () => {
     render(
       <CitationText
-        pirText="No sources here, just analysis."
+        text="No sources here, just analysis."
         claims={[]}
         highlightedRef={null}
         onRefHover={vi.fn()}
@@ -55,7 +55,7 @@ describe("CitationText — plain text", () => {
   it("renders text that has no matching claim marker as plain prose", () => {
     render(
       <CitationText
-        pirText="Some analytic sentence without a marker."
+        text="Some analytic sentence without a marker."
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={vi.fn()}
@@ -75,7 +75,7 @@ describe("CitationText — marker rendering", () => {
   it("renders [N] marker as a superscript element", () => {
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={vi.fn()}
@@ -90,7 +90,7 @@ describe("CitationText — marker rendering", () => {
   it("renders multiple [N] markers as separate superscript elements", () => {
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1] and Energy infrastructure is vulnerable[2]"
+        text="Norway faces elevated risk[1] and Energy infrastructure is vulnerable[2]"
         claims={[claimNorway, claimEnergy]}
         highlightedRef={null}
         onRefHover={vi.fn()}
@@ -113,7 +113,7 @@ describe("CitationText — marker hover", () => {
 
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={onRefHover}
@@ -132,7 +132,7 @@ describe("CitationText — marker hover", () => {
 
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={onRefHover}
@@ -156,7 +156,7 @@ describe("CitationText — claim text hover", () => {
 
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={onRefHover}
@@ -175,7 +175,7 @@ describe("CitationText — claim text hover", () => {
 
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={onRefHover}
@@ -196,7 +196,7 @@ describe("CitationText — highlight state", () => {
   it("claim text span is highlighted when highlightedRef matches its source_ref", () => {
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef="[1]"
         onRefHover={vi.fn()}
@@ -210,7 +210,7 @@ describe("CitationText — highlight state", () => {
   it("claim text span is not highlighted when highlightedRef is null", () => {
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1]"
+        text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
         highlightedRef={null}
         onRefHover={vi.fn()}
@@ -224,7 +224,7 @@ describe("CitationText — highlight state", () => {
   it("only the matching claim is highlighted when multiple claims exist", () => {
     render(
       <CitationText
-        pirText="Norway faces elevated risk[1] Energy infrastructure is vulnerable[2]"
+        text="Norway faces elevated risk[1] Energy infrastructure is vulnerable[2]"
         claims={[claimNorway, claimEnergy]}
         highlightedRef="[1]"
         onRefHover={vi.fn()}

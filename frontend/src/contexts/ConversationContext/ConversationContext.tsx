@@ -9,13 +9,13 @@ import type {
   Conversation,
   Message,
   ConversationStore,
-} from "../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../types/dialogue";
+} from "../../types/conversation";
+import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 import {
   loadConversationStore,
   saveConversationStore,
   createConversation,
-} from "../services/conversationStorage";
+} from "../../services/conversationStorage";
 
 /**
  * The value exposed by ConversationContext to any consuming component.
