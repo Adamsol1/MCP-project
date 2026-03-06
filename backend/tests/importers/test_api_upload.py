@@ -8,141 +8,141 @@ from src.api.main import app
 client = TestClient(app)
 
 
-class TestFileUploads:
+class TestSessionScopedUploads:
     @pytest.mark.parametrize(
         "file_name, content",
         [
-            ("test.txt", "test data"),
-            ("test.pdf", "test data"),
-            ("test.json", "test data"),
-            ("test.csv", "test data"),
+            ("test.txt", b"test data"),
+            ("test.pdf", b"%PDF-1.4\n% mock"),
+            ("test.json", b'{"ok":true}'),
+            ("test.csv", b"a,b\n1,2\n"),
         ],
     )
-    ##Test for uploading json file
-    def test_upload_legal_filetype(self, file_name, content, mock_upload_path):  # noqa: ARG002 //Disable mock_upload_path warning because pytest uses it for test setup
-        ##Attempt to upload file
-        http_response = client.post(
+    def test_upload_legal_filetype(self, file_name, content, mock_upload_path):  # noqa: ARG002
+        response = client.post(
             "/api/import/upload",
-            files={"file": (file_name, content, "application/json")},
+            data={"session_id": "session-a"},
+            files={"file": (file_name, content, "application/octet-stream")},
         )
 
-        ##Check the results
-        assert http_response.status_code == 200
+        assert response.status_code == 200
+        data = response.json()
+        assert data["status"] == "success"
+        assert data["session_id"] == "session-a"
+        assert data["file_upload_id"]
+        assert data["stored_path"]
 
-    ##Files used for testing
     @pytest.mark.parametrize(
         "file_name, content",
         [
-            ("test.exe", "test data"),
-            ("test.bat", "test data"),
-            ("test.sh", "test data"),
-            ("test.docx", "test data"),
+            ("test.exe", b"test data"),
+            ("test.bat", b"test data"),
+            ("test.sh", b"test data"),
+            ("test.docx", b"test data"),
         ],
     )
-    ##Test for checking http response with illegal filetypes
     def test_upload_illegal_filetype(self, file_name, content):
-        # Perform a request towards api with different files and save the http respone
-        http_response = client.post(
+        response = client.post(
             "/api/import/upload",
-            files={"file": (file_name, content, "application/json")},
+            data={"session_id": "session-a"},
+            files={"file": (file_name, content, "application/octet-stream")},
         )
-        ##Test if the http reponse is correct
-        assert http_response.status_code == 400
-
-    def test_if_uploaded_file_is_saved_to_file(self, mock_upload_path):  # noqa: ARG002
-        file_content = b"test data"
-        filename = "test.txt"
-
-        # Attempt to upload file
-        http_respone = client.post(
-            "/api/import/upload",
-            files={"file": (filename, file_content, "application/json")},
-        )
-
-        # Check result
-        respone_data = http_respone.json()
-        saved_path = respone_data.get("path")
-
-        assert saved_path is not None
-
-    def test_if_uploaded_file_is_saved_to_correct_place(self, mock_upload_path):
-        # Create mock data for test
-        file_content = b"test data"
-        filename = "test.txt"
-
-        # Attempt to upload file
-        client.post(
-            "/api/import/upload",
-            files={"file": (filename, file_content, "application/json")},
-        )
-        # Check if file was saved in correct place with correct content
-        saved_file = mock_upload_path / filename
-        assert saved_file.exists()
-        assert saved_file.read_bytes() == file_content
-
-    def test_if_uploaded_response_contains_filename(self, mock_upload_path):  # noqa: ARG002
-        # Create mock data for test
-        file_content = b"test data"
-        filename = "test.txt"
-
-        # Attempt to upload file
-        http_reponse = client.post(
-            "/api/import/upload",
-            files={"file": (filename, file_content, "application/json")},
-        )
-        # Check if response contains filename
-        respone_data = http_reponse.json()
-        assert "filename" in respone_data
-
-    def test_upload_empty_file(self, mock_upload_path):
-        # Create mock data for test
-        file_content = b""
-        filename = "empty.txt"
-
-        # Attempt to upload file
-        http_response = client.post(
-            "/api/import/upload",
-            files={"file": (filename, file_content, "application/json")},
-        )
-
-        # Check if upload was successful
-        assert http_response.status_code == 200
-        saved_file = mock_upload_path / filename
-        assert saved_file.exists()
-        assert saved_file.read_bytes() == b""
-
-    def test_upload_does_not_overwrite_existing_files(self, mock_upload_path):
-        # Create mock data for test with same filename but different content
-        filename_first_file = "test.txt"
-        filename_second_file = "test.txt"
-        first_content = b"first version"
-        second_content = b"second version"
-
-        # Upload first file
-        response1 = client.post(
-            "/api/import/upload",
-            files={"file": (filename_first_file, first_content, "application/json")},
-        )
-        path1 = response1.json().get("path")
-
-        # Upload second file with same name
-        response2 = client.post(
-            "/api/import/upload",
-            files={"file": (filename_second_file, second_content, "application/json")},
-        )
-        path2 = response2.json().get("path")
-
-        # Check that paths are different
-        assert path1 != path2
-
-        # Check that both files exist with correct content
-        saved_first_file = mock_upload_path / Path(path1).name
-        saved_second_file = mock_upload_path / Path(path2).name
-
-        assert saved_first_file.read_bytes() == first_content
-        assert saved_second_file.read_bytes() == second_content
+        assert response.status_code == 400
 
     def test_upload_without_file_returns_error(self):
-        http_response = client.post("/api/import/upload")
+        response = client.post("/api/import/upload", data={"session_id": "session-a"})
+        assert response.status_code == 422
 
-        assert http_response.status_code == 422
+    def test_upload_without_session_returns_error(self):
+        response = client.post(
+            "/api/import/upload",
+            files={"file": ("test.txt", b"test data", "text/plain")},
+        )
+        assert response.status_code == 422
+
+    def test_uploaded_file_is_saved_in_session_directory(self, mock_upload_path):
+        response = client.post(
+            "/api/import/upload",
+            data={"session_id": "session-a"},
+            files={"file": ("test.txt", b"hello", "text/plain")},
+        )
+        payload = response.json()
+        saved_path = Path(payload["stored_path"])
+
+        assert saved_path.exists()
+        assert saved_path.read_bytes() == b"hello"
+        assert str(mock_upload_path / "session-a" / "files") in str(saved_path)
+
+    def test_upload_empty_file(self, mock_upload_path):
+        response = client.post(
+            "/api/import/upload",
+            data={"session_id": "session-a"},
+            files={"file": ("empty.txt", b"", "text/plain")},
+        )
+        payload = response.json()
+        saved_file = Path(payload["stored_path"])
+
+        assert response.status_code == 200
+        assert saved_file.exists()
+        assert saved_file.read_bytes() == b""
+        assert payload["size_bytes"] == 0
+
+    def test_list_uploaded_files_by_session(self, mock_upload_path):  # noqa: ARG002
+        client.post(
+            "/api/import/upload",
+            data={"session_id": "session-list"},
+            files={"file": ("one.txt", b"one", "text/plain")},
+        )
+        response = client.get("/api/import/files", params={"session_id": "session-list"})
+
+        assert response.status_code == 200
+        payload = response.json()
+        assert payload["status"] == "success"
+        assert payload["session_id"] == "session-list"
+        assert len(payload["files"]) == 1
+        assert payload["files"][0]["filename"] == "one.txt"
+
+    def test_list_is_session_isolated(self, mock_upload_path):  # noqa: ARG002
+        client.post(
+            "/api/import/upload",
+            data={"session_id": "session-1"},
+            files={"file": ("one.txt", b"1", "text/plain")},
+        )
+        client.post(
+            "/api/import/upload",
+            data={"session_id": "session-2"},
+            files={"file": ("two.txt", b"2", "text/plain")},
+        )
+
+        response1 = client.get("/api/import/files", params={"session_id": "session-1"})
+        response2 = client.get("/api/import/files", params={"session_id": "session-2"})
+
+        assert len(response1.json()["files"]) == 1
+        assert response1.json()["files"][0]["filename"] == "one.txt"
+        assert len(response2.json()["files"]) == 1
+        assert response2.json()["files"][0]["filename"] == "two.txt"
+
+    def test_delete_uploaded_file(self, mock_upload_path):
+        upload_response = client.post(
+            "/api/import/upload",
+            data={"session_id": "session-delete"},
+            files={"file": ("to-delete.txt", b"delete-me", "text/plain")},
+        )
+        payload = upload_response.json()
+        file_upload_id = payload["file_upload_id"]
+        saved_path = Path(payload["stored_path"])
+        assert saved_path.exists()
+
+        delete_response = client.delete(
+            f"/api/import/files/{file_upload_id}",
+            params={"session_id": "session-delete"},
+        )
+        assert delete_response.status_code == 204
+        assert not saved_path.exists()
+
+    def test_delete_missing_file_returns_404(self):
+        response = client.delete(
+            "/api/import/files/not-found",
+            params={"session_id": "session-delete"},
+        )
+        assert response.status_code == 404

@@ -3,13 +3,18 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 from src.api.dialogue import router as dialogue_router
-from src.importers.upload import legal_file_upload, save_uploaded_file
+from src.importers.session_uploads import (
+    default_uploads_root,
+    delete_session_upload,
+    list_session_uploads,
+    save_session_upload,
+)
 from src.logging_config import setup_logging
 
 setup_logging()
@@ -46,8 +51,8 @@ app.add_middleware(
 # Includes
 app.include_router(dialogue_router)
 
-# Path for saving uploaded files. This is fixed.
-UPLOAD_PATH = Path("../data/imports/")
+# Path for saving uploaded files.
+UPLOADS_ROOT = Path(default_uploads_root())
 
 
 # Health check endpoint used for checking system status
@@ -62,47 +67,78 @@ async def check_health():
 
 
 @app.post("/api/import/upload")
-async def upload_file(file: UploadFile = File(...)):
+async def upload_file(
+    session_id: str = Form(...),
+    file: UploadFile = File(...),
+):
     """
         Endpoint for uploading a file to the server
 
-        The endpoint will validate the filetype before saving it, to ensure filetype is legal
-
-        The uploaded file will be saved in data/imports/
+        The endpoint validates filetype and stores files under:
+        data/imports/{session_id}/
 
         Args:
+            session_id str: Session identifier used to scope uploaded sources.
             file UploadFile: The file that is being uploaded.
 
         Returns:
             A dict containing:
                 - Status (str): "success" if upload was succesful
-                - filename (str): The filename
-                - path (str): The path where the file was saved.
-                - e.g ( return {
-                        "status": "success",
-                        "filename": file.filename,
-                        "path": saved_path.as_posix(),
-                        }
-    )
+                - file_upload_id (str): Stable ID used for list/delete/search
+                - session_id (str): Session scope for this file
+                - path (str): Stored file path
+                - searchable (bool): Whether content can be searched as evidence
 
         Raises:
-            - HTTPException 400: If the file is illegal
+            - HTTPException 400: If request validation fails
             - HTTPException 500: If an error occurs while saving
     """
-    # Valdiate the uploaded file
-    isValid = legal_file_upload(file.filename or "")
-    # If the file is not valid retunr error
-    if not isValid:
-        raise HTTPException(status_code=400, detail="Illegal filetype")
-    # If legal, try to save the file to given path
     try:
-        saved_path = save_uploaded_file(file.file, file.filename or "", UPLOAD_PATH)
-    # If failed raise error
+        result = save_session_upload(
+            file_obj=file.file,
+            filename=file.filename or "",
+            session_id=session_id,
+            uploads_root=UPLOADS_ROOT,
+            mime_type=file.content_type,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e)) from e
-    # Return the dict
+    return {"status": "success", **result}
+
+
+@app.get("/api/import/files")
+async def list_uploaded_files(session_id: str = Query(...)):
+    """List all uploaded sources for a session."""
+    try:
+        files = list_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
     return {
         "status": "success",
-        "filename": file.filename,
-        "path": saved_path.as_posix(),
+        "session_id": session_id,
+        "files": files,
     }
+
+
+@app.delete("/api/import/files/{file_upload_id}")
+async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)):
+    """Delete one uploaded source and related parsed artifacts."""
+    try:
+        deleted = delete_session_upload(
+            session_id=session_id,
+            file_upload_id=file_upload_id,
+            uploads_root=UPLOADS_ROOT,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Upload not found")
+    return Response(status_code=204)
