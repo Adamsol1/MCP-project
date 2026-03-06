@@ -387,13 +387,13 @@ class DirectionFlow(BasePhaseFlow):
                 pir = await dialogue_service.generate_pir(self.context, language=language)
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             if orchestrator:
-                retry_count = len(orchestrator.generated_pirs) - 1
+                retry_count = len(orchestrator.attempts) - 1
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
                     phase="direction",
                     model_used=orchestrator.generator_model,
                     dialogue_turns=self.context.dialogue_turns,
-                    generated_content_attempts=orchestrator.generated_pirs,
+                    generated_content_attempts=orchestrator.attempts,
                     review_reasoning=orchestrator.review_results,
                     retry_explanation=orchestrator.retry_explanations,
                     final_approved_content=None,

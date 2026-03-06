@@ -7,8 +7,10 @@ The AI call is made via LLMService — no tool loop needed, review is pure synth
 import json
 import logging
 
+from pydantic import BaseModel
+
 from src.mcp_client.client import MCPClient
-from src.models.dialogue import DialogueContext, ReviewResult
+from src.models.dialogue import ReviewResult
 from src.services.llm_service import LLMService
 
 logger = logging.getLogger("app")
@@ -26,13 +28,13 @@ class ReviewService:
         self.review_mcp_client = review_mcp_client
 
     async def review_pir(
-        self, content, context: DialogueContext, phase: str
+        self, content, context: BaseModel, phase: str
     ) -> ReviewResult:
         """Review generated content against the dialogue context.
 
         Args:
             content: The content to review (str or dict).
-            context: The dialogue context used to generate the content.
+            context: Pydantic BaseModel with phase-specific context fields.
             phase: Intelligence cycle phase. Valid values: "direction", "collection", "processing".
 
         Returns:

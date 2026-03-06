@@ -1,8 +1,9 @@
+import json
 import logging
 from datetime import datetime
 from enum import Enum
 
-from src.models.dialogue import DialogueResponse
+from src.models.dialogue import DialogueContext, DialogueResponse
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
@@ -20,14 +21,55 @@ class CollectionState(str, Enum):
 
 class CollectionFlow(BasePhaseFlow):
 
-    def __init__(self, session_id: str | None = None, pir: str = "", research_logger=None):
+    def __init__(self, session_id: str | None = None, pir: str = "", direction_context=None, research_logger=None):
         super().__init__(session_id, research_logger)
         self.pir = pir
+        self.direction_context = direction_context  # DialogueContext from direction phase — enriches collection review
         self.state = CollectionState.PLANNING
         self.collection_plan: str | None = None
         self.selected_sources: list[str] = []
-        self.collected_data: str | None = None
+        self.raw_data: str | None = None       # raw tool output — used by processing phase
+        self.collected_data: str | None = None  # summary shown to analyst
         self.pending_reasoning_log: ReasoningLog | None = None
+
+    def to_dict(self) -> dict:
+        """Serialize session state to a plain dict for JSON persistence.
+        Note: research_logger is excluded — it is reconstructed on load."""
+        return {
+            "session_id": self.session_id,
+            "state": self.state.value,
+            "pir": self.pir,
+            "collection_plan": self.collection_plan,
+            "selected_sources": self.selected_sources,
+            "raw_data": self.raw_data,
+            "collected_data": self.collected_data,
+            "direction_context": self.direction_context.model_dump() if self.direction_context else None,
+            "pending_reasoning_log": (
+                self.pending_reasoning_log.model_dump() if self.pending_reasoning_log else None
+            ),
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict, research_logger=None) -> "CollectionFlow":
+        """Reconstruct a CollectionFlow from a persisted dict.
+        Called when a session is loaded from disk after a server restart."""
+        flow = cls(
+            session_id=data["session_id"],
+            pir=data["pir"],
+            direction_context=DialogueContext.model_validate(data["direction_context"]) if data.get("direction_context") else None,
+            research_logger=research_logger,
+        )
+        flow.state = CollectionState(data["state"])
+        flow.collection_plan = data["collection_plan"]
+        flow.selected_sources = data["selected_sources"]
+        flow.raw_data = data["raw_data"]
+        flow.collected_data = data["collected_data"]
+        flow.pending_reasoning_log = (
+            ReasoningLog.model_validate(data["pending_reasoning_log"])
+            if data.get("pending_reasoning_log")
+            else None
+        )
+        return flow
 
     async def initialize(self, collection_service) -> DialogueResponse:
         # Generer innsamlingsplan basert på self.pir
@@ -73,14 +115,14 @@ class CollectionFlow(BasePhaseFlow):
             #Log user action
             self._log_user_action(action="approve", phase="handle_plan_confirming", modifications=None, perspectives=None)
 
-            recommended_sources = await collection_service.suggest_sources(self.pir, self.collection_plan)
+            recommended_sources = await collection_service.suggest_sources(self.collection_plan)
 
             #State change PLAN_CONFIRM -> SOURCE_SELECTING
             self.state = CollectionState.SOURCE_SELECTING
 
             #Inform frontend of action
             dialogue_response.action = "show_suggested_sources"
-            dialogue_response.content = recommended_sources
+            dialogue_response.content = json.dumps(recommended_sources)
 
             return dialogue_response
 
@@ -118,7 +160,7 @@ class CollectionFlow(BasePhaseFlow):
         self.state = CollectionState.COLLECTING
 
         #Return response to frontend
-        return DialogueResponse(action="start_collecting", content=selected_sources)
+        return DialogueResponse(action="start_collecting", content=json.dumps(selected_sources))
 
 
 
@@ -134,9 +176,13 @@ class CollectionFlow(BasePhaseFlow):
 
         if orchestrator and reviewer:
             collection_summary = await orchestrator.collect_and_review(
-                self.pir,
-                self.collection_plan,
-                self.selected_sources
+                sources=self.selected_sources,
+                pir=self.pir,
+                plan=self.collection_plan,
+                collection_service=collection_service,
+                reviewer=reviewer,
+                session_id=self.session_id,
+                direction_context=self.direction_context,
             )
         else:
             collection_summary = await collection_service.collect(
@@ -146,13 +192,13 @@ class CollectionFlow(BasePhaseFlow):
             )
 
         if orchestrator:
-                retry_count = len(orchestrator.collection_attempts) - 1
+                retry_count = len(orchestrator.attempts) - 1
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
                     phase="collection",
                     model_used=orchestrator.generator_model,
                     dialogue_turns=[],
-                    generated_content_attempts=orchestrator.collection_attempts,
+                    generated_content_attempts=orchestrator.attempts,
                     review_reasoning=orchestrator.review_results,
                     retry_explanation=orchestrator.retry_explanations,
                     final_approved_content=None,
@@ -162,8 +208,9 @@ class CollectionFlow(BasePhaseFlow):
                 )
 
         self.state = CollectionState.REVIEWING
-        self.collected_data = collection_summary
-        return DialogueResponse(action="show_collection", content=collection_summary)
+        self.raw_data = collection_summary.get("raw_data")
+        self.collected_data = collection_summary.get("summary")
+        return DialogueResponse(action="show_collection", content=self.collected_data)
 
 
 
@@ -187,10 +234,8 @@ class CollectionFlow(BasePhaseFlow):
         elif gather_more:
             self._log_user_action(action="reject", phase="reviewing", modifications=user_message, perspectives=None)
             self.state = CollectionState.SOURCE_SELECTING
-            suggested_sources = await collection_service.suggest_sources(
-                self.pir, self.collection_plan, previously_collected=self.collected_data
-            )
-            return DialogueResponse(action="show_suggested_sources", content=suggested_sources)
+            suggested_sources = await collection_service.suggest_sources(self.collection_plan)
+            return DialogueResponse(action="show_suggested_sources", content=json.dumps(suggested_sources))
 
         else:
             self._log_user_action(action="modify", phase="reviewing", modifications=user_message, perspectives=None)

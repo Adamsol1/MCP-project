@@ -9,7 +9,6 @@ The review server (port 8002) is a separate process for Agent #2.
 
 import json
 import os
-from pathlib import Path
 from sys import stderr
 
 from dotenv import load_dotenv
@@ -17,9 +16,13 @@ from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 from prompts import (
+    build_collection_collect_prompt,
+    build_collection_modify_prompt,
+    build_collection_plan_prompt,
+    build_collection_summarize_prompt,
     build_direction_dialogue_prompt,
+    build_direction_summary_prompt,
     build_pir_generation_prompt,
-    build_summary_prompt,
 )
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
 
@@ -86,6 +89,7 @@ def knowledge_resource(category: str, name: str) -> str:
 
 # ── Knowledge Bank Tools ───────────────────────────────────────────────────────
 
+
 @mcp.tool
 def list_knowledge_base() -> str:
     """List all available knowledge bank resource IDs.
@@ -129,6 +133,7 @@ def read_knowledge_base(resource_id: str) -> str:
 
 
 # ── Direction Prompts ─────────────────────────────────────────────────────────
+
 
 @mcp.prompt
 def direction_gathering(
@@ -178,7 +183,7 @@ def direction_summary(
         modifications: Optional user feedback to incorporate.
         language: BCP-47 language code.
     """
-    return build_summary_prompt(
+    return build_direction_summary_prompt(
         scope=scope,
         timeframe=timeframe,
         target_entities=json.loads(target_entities),
@@ -232,6 +237,89 @@ def direction_pir(
     )
 
 
+# ── Collection Prompts ───────────────────────────────────────────────────────
+
+
+@mcp.prompt
+def collection_plan(
+    pir: str,
+    modifications: str = "",
+    language: str = "en",
+) -> str:
+    """Prompt for generating a collection plan and suggesting relevant sources.
+
+    Args:
+        pir: The approved PIRs from the Direction phase (JSON string).
+        modifications: Optional user feedback to modify an existing plan.
+        language: BCP-47 language code (e.g. "en", "no").
+    """
+    return build_collection_plan_prompt(
+        pir=pir,
+        modifications=modifications or None,
+        language=language,
+    )
+
+
+@mcp.prompt
+def collection_collect(
+    pir: str,
+    selected_sources: str,
+    plan: str,
+) -> str:
+    """Prompt for collecting raw intelligence data via tools in the Collection phase.
+
+    Args:
+        pir: The approved PIRs from the Direction phase (JSON string).
+        selected_sources: JSON array of source names approved by the analyst.
+        plan: The approved collection plan text.
+    """
+    return build_collection_collect_prompt(
+        pir=pir,
+        selected_sources=json.loads(selected_sources),
+        plan=plan,
+    )
+
+
+@mcp.prompt
+def collection_summarize(
+    pir: str,
+    collected_data: str,
+    language: str = "en",
+) -> str:
+    """Prompt for summarizing raw collected data in the Collection phase.
+
+    Args:
+        pir: The approved PIRs from the Direction phase (JSON string).
+        collected_data: Raw data JSON returned by the collection agent.
+        language: BCP-47 language code (e.g. "en", "no").
+    """
+    return build_collection_summarize_prompt(
+        pir=pir,
+        collected_data=collected_data,
+        language=language,
+    )
+
+
+@mcp.prompt
+def collection_modify(
+    collected_data: str,
+    modifications: str,
+    language: str = "en",
+) -> str:
+    """Prompt for applying analyst modifications to an existing collection summary.
+
+    Args:
+        collected_data: The existing collected summary (JSON string).
+        modifications: The analyst's requested changes.
+        language: BCP-47 language code (e.g. "en", "no").
+    """
+    return build_collection_modify_prompt(
+        collected_data=collected_data,
+        modifications=modifications,
+        language=language,
+    )
+
+
 # ── OSINT Tools (Collection phase) ───────────────────────────────────────────
 # TODO: Implement query_otx, search_misp, search_local_data
 
@@ -242,6 +330,7 @@ def direction_pir(
 
 # ── Health check ─────────────────────────────────────────────────────────────
 
+
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
     print("Health check — server is running.", file=stderr, flush=True)
@@ -249,6 +338,7 @@ async def health(request):
 
 
 # ── Test tool ────────────────────────────────────────────────────────────────
+
 
 @mcp.tool
 def greet() -> str:
@@ -259,4 +349,10 @@ def greet() -> str:
 
 if __name__ == "__main__":
     port = int(os.getenv("MCP_SERVER_PORT", "8001"))
-    mcp.run(transport="sse", host="127.0.0.1", port=port, show_banner=False, log_level="INFO")
+    mcp.run(
+        transport="sse",
+        host="127.0.0.1",
+        port=port,
+        show_banner=False,
+        log_level="INFO",
+    )

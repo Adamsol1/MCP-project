@@ -1,6 +1,7 @@
 """Review MCP Server — Prompt builders for AI #2 review in all intelligence phases."""
 
 
+
 def build_direction_review_prompt(content: str, context: str) -> str:
     """Build review prompt for PIRs generated in the Direction phase.
 
@@ -73,84 +74,101 @@ No markdown. No code fences.
 }}
 """
 
-
 def build_collection_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for data collected in the Collection phase.
+    """Build review prompt for collected intelligence in the Collection phase.
 
     Args:
-        content: The collected data summary to review (JSON string).
-        context: The collection plan and PIRs used as basis (JSON string).
+        content: The collected data package to review (JSON string).
+        context: The direction context and PIR plan used for collection (JSON string).
 
     Returns:
         Formatted prompt string ready to send to the AI reviewer.
     """
-    # TODO: Implement full collection review criteria
     return f"""
-You are a strict quality reviewer for collected threat intelligence data.
+You are a strict quality reviewer for collected intelligence in the Collection
+phase of a threat intelligence cycle.
 
-Review the following collected data against the collection plan and PIRs.
+Your role is to verify that collected output is decision-relevant, source-grounded,
+and sufficient to answer approved intelligence requirements. You are NOT a
+style editor. You evaluate analytical usefulness, source quality, and traceability.
 
-CONTEXT (PIRs and collection plan): {context}
-COLLECTED DATA: {content}
+You will receive two JSON payloads:
 
-Evaluate:
-1. Coverage: Does the collected data address the approved PIRs?
-2. Source quality: Are sources credible and relevant?
-3. Confidence levels: Are confidence assessments realistic?
-4. Gaps: Are there significant gaps in coverage?
+<<<CONTEXT>>>
+{context}
+<<<END_CONTEXT>>>
 
-Severity:
-- MAJOR: Collected data does not address PIRs, or sources are unreliable
-- MINOR: Minor gaps or low-confidence findings that could be improved
-- NONE: Data adequately addresses the PIRs with credible sources
+<<<CONTENT>>>
+{content}
+<<<END_CONTENT>>>
 
+Expected structure:
+- CONTEXT includes scope, timeframe, target_entities, threat_actors,
+  priority_focus, perspectives, and pirs (list of PIR objects).
+- CONTENT includes:
+  - summary: factual narrative of what was found
+  - sources_used: list of sources used
+  - gaps: string or null
+
+## Evaluate using these criteria:
+
+### 1. PIR Coverage
+- Review ALL PIRs in context.pirs.
+- For each PIR, decide if collected evidence meaningfully addresses the requirement.
+- Require at least one source-traceable basis for each PIR decision.
+- If a PIR has priority "high" and is not covered, this is MAJOR.
+
+### 2. Source Quality
+- Check relevance: sources must match the PIR and target context.
+- Check credibility: sources should be reasonably trustworthy.
+- Check recency: sources and findings must align with context.timeframe.
+
+### 3. Gaps Realism
+- gaps = null means "no known gaps".
+- If PIR coverage is weak or partial and gaps is null, flag missing gap reporting.
+- If gaps is present, check that it reflects realistic unresolved questions.
+
+### 4. Traceability / Hallucination
+- Enforce strict claim traceability.
+- Material claims in summary must be supportable by sources_used.
+- Unsupported material claims are MAJOR.
+
+### 5. Timeframe Compliance
+- Treat significant out-of-timeframe evidence as MAJOR.
+- If timeframe violations are present, require explicit correction guidance.
+
+## Severity policy
+When in doubt, be strict because weak collection quality propagates errors downstream.
+
+- MAJOR examples:
+  - unsupported material claims
+  - uncovered high-priority PIR
+  - significant out-of-timeframe findings
+  - critical source-quality failures
+- MINOR examples:
+  - partial PIR coverage with recoverable gaps
+  - generally valid findings lacking precision or prioritization
+
+## Output requirements
 Return valid JSON only. No markdown. No code fences.
+The output schema must exactly match:
 
 {{
   "overall_approved": bool,
   "severity": "none" | "minor" | "major",
-  "pir_reviews": [],
+  "pir_reviews": [
+    {{
+      "pir_index": int,
+      "approved": bool,
+      "issue": "string or null"
+    }}
+  ],
   "suggestions": "string or null"
 }}
-"""
 
-
-def build_processing_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for correlations produced in the Processing phase.
-
-    Args:
-        content: The correlation report to review (JSON string).
-        context: The collected data used as input (JSON string).
-
-    Returns:
-        Formatted prompt string ready to send to the AI reviewer.
-    """
-    # TODO: Implement full processing review criteria
-    return f"""
-You are a strict quality reviewer for threat intelligence processing output.
-
-Review the following correlation report against the collected data.
-
-COLLECTED DATA (input): {context}
-CORRELATION REPORT: {content}
-
-Evaluate:
-1. Evidence-based: Are correlations supported by the collected data?
-2. MITRE mapping: Are ATT&CK technique mappings accurate?
-3. No hallucination: Are all claims traceable to collected sources?
-4. Completeness: Are key indicators covered?
-
-Severity:
-- MAJOR: Correlations not supported by data, or hallucinated claims
-- MINOR: Minor inaccuracies or unsupported claims
-- NONE: Correlations are well-supported and accurate
-
-Return valid JSON only. No markdown. No code fences.
-
-{{
-  "overall_approved": bool,
-  "severity": "none" | "minor" | "major",
-  "pir_reviews": [],
-  "suggestions": "string or null"
-}}
+Rules for fields:
+- pir_reviews must include one entry per PIR index in context.pirs.
+- If approved is false, issue must be concrete and collection-specific.
+- suggestions should provide actionable next collection steps
+  (sources, queries, and evidence needed), not generic advice.
 """

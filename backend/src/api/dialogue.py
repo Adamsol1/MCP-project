@@ -10,10 +10,12 @@ from pydantic import BaseModel
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueAction, DialogueResponse
 from src.services.ai_orchestrator import AIOrchestrator
+from src.services.collection_service import CollectionService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
+from src.services.state_machines.collection_flow import CollectionFlow
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
@@ -30,26 +32,52 @@ Sessions are stored in memory in `_sessions`
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
-_sessions: dict[str, DirectionFlow] = {}
 
 _SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
 _SESSIONS_DIR.mkdir(exist_ok=True)
 
 
-def _save_session(flow: DirectionFlow) -> None:
+class IntelligenceSession:
+    """Holds all phase flows for a single research session."""
+
+    def __init__(self, session_id: str, research_logger):
+        self.session_id = session_id
+        self.research_logger = research_logger
+        self.direction_flow = DirectionFlow(session_id=session_id, research_logger=research_logger)
+        self.collection_flow: CollectionFlow | None = None
+
+
+_sessions: dict[str, IntelligenceSession] = {}
+
+
+def _save_session(session: IntelligenceSession) -> None:
     """Persist session state to disk so it survives server restarts."""
-    path = _SESSIONS_DIR / f"{flow.session_id}.json"
-    path.write_text(json.dumps(flow.to_dict()), encoding="utf-8")
+    data = {
+        "session_id": session.session_id,
+        "direction_flow": session.direction_flow.to_dict(),
+        "collection_flow": session.collection_flow.to_dict() if session.collection_flow else None,
+    }
+    path = _SESSIONS_DIR / f"{session.session_id}.json"
+    path.write_text(json.dumps(data), encoding="utf-8")
 
 
-def _load_session(session_id: str, research_logger) -> DirectionFlow | None:
+def _load_session(session_id: str, research_logger) -> IntelligenceSession | None:
     """Load a previously persisted session from disk. Returns None if not found."""
     path = _SESSIONS_DIR / f"{session_id}.json"
     if not path.exists():
         return None
     data = json.loads(path.read_text(encoding="utf-8"))
-    logger.info(f"[Session {session_id}] Restored from disk — state={data['state']}")
-    return DirectionFlow.from_dict(data, research_logger=research_logger)
+    session = IntelligenceSession.__new__(IntelligenceSession)
+    session.session_id = session_id
+    session.research_logger = research_logger
+    session.direction_flow = DirectionFlow.from_dict(data["direction_flow"], research_logger=research_logger)
+    session.collection_flow = (
+        CollectionFlow.from_dict(data["collection_flow"], research_logger=research_logger)
+        if data.get("collection_flow")
+        else None
+    )
+    logger.info(f"[Session {session_id}] Restored from disk")
+    return session
 
 
 # Request model
@@ -69,6 +97,10 @@ class DialogueMessageRequest(BaseModel):
     """Timeframe pre-set by the user in Settings → Parameters (e.g. 'Last 30 days').
     When non-empty and the session context has no timeframe yet, the backend pre-fills
     context.timeframe so the AI skips the timeframe clarifying question."""
+    selected_sources: list[str] = []
+    """Sources selected by the user in the collection phase."""
+    gather_more: bool = False
+    """True when the user wants to gather more data instead of approving the collection."""
 
 
 # Response Model
@@ -144,17 +176,16 @@ def _ensure_dev_tools_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
 
-def _get_or_create_session(session_id: str) -> DirectionFlow:
+def _get_or_create_session(session_id: str) -> IntelligenceSession:
     if session_id not in _sessions:
         research_logger = ResearchLogger(session_id=session_id)
-        _sessions[session_id] = DirectionFlow(
-            session_id=session_id, research_logger=research_logger
-        )
+        loaded = _load_session(session_id, research_logger)
+        _sessions[session_id] = loaded if loaded else IntelligenceSession(session_id, research_logger)
     return _sessions[session_id]
 
 
-def _build_dev_state_response(session_id: str, flow: DirectionFlow) -> DialogueDevStateResponse:
-    state = flow.get_debug_state()
+def _build_dev_state_response(session_id: str, session: IntelligenceSession) -> DialogueDevStateResponse:
+    state = session.direction_flow.get_debug_state()
     return DialogueDevStateResponse(
         session_id=session_id,
         stage=state["stage"],
@@ -189,29 +220,43 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     Raises:
         Any exception given by DirectionFlow or MCPClient
     """
-    # Checks if session_id is in memory. If not, try to restore from disk, else create new.
-    if request.session_id not in _sessions:
-        research_logger = ResearchLogger(session_id=request.session_id)
-        _sessions[request.session_id] = DirectionFlow(
-            session_id=request.session_id, research_logger=research_logger
-        )
-
-    flow = _sessions[request.session_id]
-    logger.info(
-        f"[Session {request.session_id}] Message received — state={flow.state}, perspectives={request.perspectives}, approved={request.approved}"
-    )
+    session = _get_or_create_session(request.session_id)
 
     llm = LLMService(model="gemini-2.5-flash")
     mcp_client = MCPClient()
     review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
-    service = DialogueService(mcp_client, None)
     review_service = ReviewService(llm, review_mcp_client)
     orchestrator = AIOrchestrator(
-        research_logger=flow.research_logger,
+        research_logger=session.research_logger,
         generator_model="gemini-2.5-flash",
         reviewer_model="gemini-2.5-flash",
     )
-    response = await flow.process_user_message(
+
+    # Route to collection phase if already started
+    if session.collection_flow:
+        collection_service = CollectionService(mcp_client)
+        logger.info(
+            f"[Session {request.session_id}] Message received — state={session.collection_flow.state}, approved={request.approved}"
+        )
+        response = await session.collection_flow.process_user_message(
+            user_message=request.message,
+            collection_service=collection_service,
+            approved=request.approved,
+            selected_sources=request.selected_sources,
+            orchestrator=orchestrator,
+            reviewer=review_service,
+            gather_more=request.gather_more,
+        )
+        _save_session(session)
+        return _convert_to_message_response(response, stage=session.collection_flow.state.value)
+
+    # Direction phase
+    direction_flow = session.direction_flow
+    logger.info(
+        f"[Session {request.session_id}] Message received — state={direction_flow.state}, perspectives={request.perspectives}, approved={request.approved}"
+    )
+    service = DialogueService(mcp_client, None)
+    response = await direction_flow.process_user_message(
         request.message,
         service,
         request.perspectives,
@@ -222,37 +267,46 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         settings_timeframe=request.settings_timeframe,
     )
 
+    # Transition: DirectionFlow COMPLETE → start CollectionFlow
+    if direction_flow.state == DirectionState.COMPLETE and session.collection_flow is None and direction_flow.current_pir:
+        collection_service = CollectionService(mcp_client)
+        session.collection_flow = CollectionFlow(
+            session_id=request.session_id,
+            pir=direction_flow.current_pir,
+            direction_context=direction_flow.context,
+            research_logger=session.research_logger,
+        )
+        init_response = await session.collection_flow.initialize(collection_service)
+        _save_session(session)
+        return _convert_to_message_response(init_response, stage=session.collection_flow.state.value)
+
     # Convert internal response to API format and return
     default_sub_state = (
         "awaiting_decision"
-        if flow.state in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
+        if direction_flow.state in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
         else None
     )
-    converted_response = _convert_to_message_response(
+    _save_session(session)
+    return _convert_to_message_response(
         response,
-        stage=flow.state.value,
-        sub_state=flow.sub_state or default_sub_state,
+        stage=direction_flow.state.value,
+        sub_state=direction_flow.sub_state or default_sub_state,
     )
-
-    # Persist updated session state to disk after every message
-    _save_session(flow)
-
-    return converted_response
 
 
 @router.get("/dev/state")
 async def get_dev_state(session_id: str) -> DialogueDevStateResponse:
     """DEV endpoint: read current dialogue state for a session."""
     _ensure_dev_tools_enabled()
-    flow = _get_or_create_session(session_id)
-    return _build_dev_state_response(session_id, flow)
+    session = _get_or_create_session(session_id)
+    return _build_dev_state_response(session_id, session)
 
 
 @router.post("/dev/state")
 async def set_dev_state(request: DialogueDevStateRequest) -> DialogueDevStateResponse:
     """DEV endpoint: force a session into a specific dialogue stage."""
     _ensure_dev_tools_enabled()
-    flow = _get_or_create_session(request.session_id)
+    session = _get_or_create_session(request.session_id)
     try:
         stage = DirectionState(request.stage)
     except ValueError as exc:
@@ -262,19 +316,19 @@ async def set_dev_state(request: DialogueDevStateRequest) -> DialogueDevStateRes
             detail=f"Invalid stage '{request.stage}'. Allowed: {allowed}",
         ) from exc
 
-    flow.force_state(
+    session.direction_flow.force_state(
         stage,
         seed_context=request.seed_context,
         current_pir=request.current_pir,
         sub_state=request.sub_state,
     )
-    return _build_dev_state_response(request.session_id, flow)
+    return _build_dev_state_response(request.session_id, session)
 
 
 @router.post("/dev/reset")
 async def reset_dev_session(session_id: str) -> DialogueDevStateResponse:
     """DEV endpoint: reset a session to INITIAL."""
     _ensure_dev_tools_enabled()
-    flow = _get_or_create_session(session_id)
-    flow.force_state(DirectionState.INITIAL, sub_state=None)
-    return _build_dev_state_response(session_id, flow)
+    session = _get_or_create_session(session_id)
+    session.direction_flow.force_state(DirectionState.INITIAL, sub_state=None)
+    return _build_dev_state_response(session_id, session)
