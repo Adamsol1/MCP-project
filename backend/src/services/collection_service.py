@@ -56,7 +56,7 @@ class CollectionService:
         data = json.loads(plan_json)
         return data.get("suggested_sources", ["Internal Knowledge Bank"])
 
-    async def collect(self, selected_sources: list[str], pir: str, plan: str, language: str = "en") -> dict:
+    async def collect(self, selected_sources: list[str], pir: str, plan: str, language: str = "en", feedback: str | None = None) -> dict:
         # Two-step collection:
         # Step 1: Agent calls tools and returns raw data
         # Step 2: Agent summarizes raw data (no tools needed)
@@ -77,9 +77,12 @@ class CollectionService:
                 },
             )
             agent = GeminiAgent(self.mcp_client)
+            task = "Collect raw intelligence data from the approved sources based on the PIRs."
+            if feedback:
+                task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
             raw_data = await agent.run(
                 system_prompt=collect_prompt,
-                task="Collect raw intelligence data from the approved sources based on the PIRs.",
+                task=task,
             )
 
             #Step 2: Summarize raw data (one-shot, no tools)

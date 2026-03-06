@@ -52,8 +52,9 @@ class AIOrchestrator:
                 + Each attempt is logged via research_logger
 
         Args:
-            generate_fn: Async callable with no arguments. Caller binds all
-                         phase-specific args via lambda before passing in.
+            generate_fn: Async callable that accepts optional feedback (str | None).
+                         First call receives None; retries receive reviewer suggestions.
+                         Caller binds all phase-specific args via lambda before passing in.
             reviewer:    Service with a review_pir(content, context, phase) method.
             context:     Pydantic BaseModel passed through to reviewer unchanged.
             phase:       Intelligence cycle phase (e.g. "direction", "collection").
@@ -70,6 +71,7 @@ class AIOrchestrator:
         self.attempts = []
         self.review_results = []
         self.retry_explanations = []
+        feedback: str | None = None
         # While loop that auto retries the generating and review.
         while current_retries < self.max_retries:
             attempt_timestamp = datetime.now()
@@ -79,13 +81,13 @@ class AIOrchestrator:
             review_duration = 0.0
             result = None
 
-            # ---- STEP 1: Generate content
+            # ---- STEP 1: Generate content (pass reviewer feedback on retries)
             logger.info(
                 f"[Orchestrator] Attempt {current_retries + 1}/{self.max_retries} — generating ({phase})..."
             )
             generation_start = time.time()
             try:
-                generated = await generate_fn()
+                generated = await generate_fn(feedback)
             # If failed, throw error
             except Exception as e:
                 generation_duration = time.time() - generation_start
@@ -180,7 +182,9 @@ class AIOrchestrator:
             if result.severity != "major":
                 logger.info(f"[Orchestrator] Approved on attempt {current_retries}")
                 return generated
-            logger.warning(f"[Orchestrator] Rejected (major) — retrying...")
+            # Pass reviewer suggestions as feedback to next attempt
+            feedback = result.suggestions
+            logger.warning(f"[Orchestrator] Rejected (major) — retrying with feedback...")
         # If max retries are reached return current result. This is to prevent eternal loops
         logger.warning("[Orchestrator] Max retries reached. Returning newest result")
         return generated
@@ -208,7 +212,7 @@ class AIOrchestrator:
             Any exception from generate_pir or review_pir
         """
         return await self._run_with_review(
-            generate_fn=lambda: generator.generate_pir(context),
+            generate_fn=lambda feedback=None: generator.generate_pir(context),
             reviewer=reviewer,
             context=context,
             phase=phase,
@@ -240,7 +244,7 @@ class AIOrchestrator:
             Any exception from collect or review_pir
         """
         return await self._run_with_review(
-            generate_fn=lambda: collection_service.collect(sources, pir, plan),
+            generate_fn=lambda feedback=None: collection_service.collect(sources, pir, plan, feedback=feedback),
             reviewer=reviewer,
             context=CollectionContext(pir=pir, plan=plan, direction_context=direction_context),
             phase="collection",
