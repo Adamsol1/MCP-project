@@ -101,6 +101,8 @@ class MISPEvent(BaseModel):
 
     orgc_id: str | None = Field(default=None, description="Creator organization ID")
 
+    org_name: str | None = Field(default=None, description="Creator organization name")
+
     distribution: int = Field(default=0, ge=0, le=4, description="Distribution level")
 
     published: bool = Field(default=False, description="Whether event is published")
