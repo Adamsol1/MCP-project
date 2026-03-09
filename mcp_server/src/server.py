@@ -1,12 +1,14 @@
-﻿"""MCP Threat Intelligence Server - Generation Server (port 8001)."""
+"""MCP Threat Intelligence Server - Generation Server (port 8001)."""
 
 import csv
 import json
+import logging
 import os
 import re
 from pathlib import Path
 from sys import stderr
 
+import httpx
 from dotenv import load_dotenv
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
@@ -87,7 +89,9 @@ def read_knowledge_base(resource_id: str) -> str:
     """Read a knowledge bank resource by its ID."""
     if resource_id not in KNOWLEDGE_REGISTRY:
         available = list(KNOWLEDGE_REGISTRY.keys())
-        raise ValueError(f"Unknown resource_id: '{resource_id}'. Available: {available}")
+        raise ValueError(
+            f"Unknown resource_id: '{resource_id}'. Available: {available}"
+        )
 
     path = RESOURCES_DIR / f"{resource_id}.md"
     if not path.exists():
@@ -170,7 +174,165 @@ def direction_pir(
 
 
 # OSINT Tools (Collection phase)
-# TODO: Implement query_otx, search_misp
+# TODO: Implement search_misp
+
+logger = logging.getLogger("app")
+
+OTX_BASE_URL = "https://otx.alienvault.com/api/v1"
+
+# OTX indicator type string -> API path segment
+_OTX_INDICATOR_SECTIONS: dict[str, str] = {
+    "ipv4": "IPv4",
+    "ipv6": "IPv6",
+    "domain": "domain",
+    "url": "url",
+    "md5": "file",
+    "sha1": "file",
+    "sha256": "file",
+    "email": "email",
+    "cve": "cve",
+}
+
+
+def _otx_request(path: str, params: dict | None = None) -> dict:
+    """Make an authenticated GET request to the OTX API.
+
+    Args:
+        path: API path (appended to OTX_BASE_URL).
+        params: Query parameters.
+
+    Returns:
+        Parsed JSON response, or empty dict on failure.
+    """
+    api_key = os.getenv("OTX_API_KEY")
+    if not api_key:
+        logger.error("[query_otx] OTX_API_KEY environment variable is not set")
+        return {}
+
+    url = f"{OTX_BASE_URL}/{path.lstrip('/')}"
+    headers = {"X-OTX-API-KEY": api_key}
+
+    try:
+        with httpx.Client(timeout=60.0) as client:
+            response = client.get(url, headers=headers, params=params)
+            response.raise_for_status()
+            return response.json()
+    except httpx.HTTPStatusError as e:
+        logger.error(f"[query_otx] HTTP {e.response.status_code} for {path}")
+        return {}
+    except httpx.HTTPError as e:
+        logger.error(f"[query_otx] Request failed: {e}")
+        return {}
+
+
+def _format_indicator_result(indicator: dict, pulse_name: str, tags: list[str]) -> dict:
+    """Format a single indicator into the standard result shape."""
+    return {
+        "indicator": indicator.get("indicator", ""),
+        "type": indicator.get("type", ""),
+        "pulse_name": pulse_name,
+        "tags": tags,
+        "first_seen": indicator.get("created"),
+        "last_seen": indicator.get("expiration"),
+    }
+
+
+def _search_otx_indicator(indicator_type: str, value: str) -> list[dict]:
+    """Search OTX by indicator value (IP, domain, hash, etc.)."""
+    section = _OTX_INDICATOR_SECTIONS.get(indicator_type.lower())
+    if not section:
+        return []
+
+    data = _otx_request(f"indicators/{section}/{value}/general")
+    if not data:
+        return []
+
+    results: list[dict] = []
+    pulse_info = data.get("pulse_info", {})
+    for pulse in pulse_info.get("pulses", []):
+        pulse_name = pulse.get("name", "")
+        tags = pulse.get("tags", [])
+        # Add the queried indicator itself as a result
+        results.append(
+            {
+                "indicator": value,
+                "type": indicator_type,
+                "pulse_name": pulse_name,
+                "tags": tags,
+                "first_seen": pulse.get("created"),
+                "last_seen": pulse.get("modified"),
+            }
+        )
+
+    return results
+
+
+def _search_otx_pulses(query: str) -> list[dict]:
+    """Search OTX pulses by keyword (adversary, malware, etc.)."""
+    all_results: list[dict] = []
+    limit = 50
+
+    for page in range(1, 6):  # Max 5 pages
+        data = _otx_request(
+            "search/pulses", params={"q": query, "limit": limit, "page": page}
+        )
+        if not data:
+            break
+
+        pulses = data.get("results", [])
+        for pulse in pulses:
+            pulse_name = pulse.get("name", "")
+            tags = pulse.get("tags", [])
+            adversary = pulse.get("adversary")
+            malware_families = pulse.get("malware_families", [])
+
+            all_results.append(
+                {
+                    "indicator": adversary or query,
+                    "type": "pulse",
+                    "pulse_name": pulse_name,
+                    "tags": tags,
+                    "first_seen": pulse.get("created"),
+                    "last_seen": pulse.get("modified"),
+                    "adversary": adversary,
+                    "malware_families": malware_families,
+                    "targeted_countries": pulse.get("targeted_countries", []),
+                }
+            )
+
+        if len(pulses) < limit:
+            break
+
+    return all_results
+
+
+@mcp.tool
+def query_otx(search_term: str, indicator_type: str = "") -> str:
+    """Query AlienVault OTX for threat intelligence on indicators or keywords.
+
+    When indicator_type is provided (ipv4, domain, md5, sha256, etc.),
+    searches for that specific indicator. Otherwise, searches OTX pulses
+    by keyword (e.g., adversary name, malware family, campaign name).
+
+    Returns a JSON list of results with indicator value, type, pulse name,
+    tags, first_seen, and last_seen.
+    """
+    if not search_term.strip():
+        raise ValueError("search_term cannot be empty")
+
+    if indicator_type:
+        results = _search_otx_indicator(indicator_type.strip(), search_term.strip())
+    else:
+        results = _search_otx_pulses(search_term.strip())
+
+    return json.dumps(
+        {
+            "search_term": search_term,
+            "indicator_type": indicator_type or "keyword",
+            "results": results,
+            "total_results": len(results),
+        }
+    )
 
 
 def _split_query_terms(query: str) -> list[str]:
@@ -390,7 +552,9 @@ def search_local_data(session_id: str, query: str, max_results: int = 20) -> str
     skipped: list[str] = []
     for entry in manifest.get("files", []):
         if not entry.get("searchable", True):
-            filename = str(entry.get("filename") or entry.get("original_filename") or "unknown")
+            filename = str(
+                entry.get("filename") or entry.get("original_filename") or "unknown"
+            )
             reason = str(entry.get("search_skip_reason") or "not_searchable")
             skipped.append(f"{filename}:{reason}")
             continue
