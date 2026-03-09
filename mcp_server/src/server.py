@@ -1,5 +1,6 @@
 """MCP Threat Intelligence Server - Generation Server (port 8001)."""
 
+import asyncio
 import csv
 import json
 import logging
@@ -11,6 +12,7 @@ from sys import stderr
 import httpx
 from dotenv import load_dotenv
 from fastmcp import FastMCP
+from pymisp import PyMISP
 from starlette.responses import JSONResponse
 
 from prompts import (
@@ -174,7 +176,230 @@ def direction_pir(
 
 
 # OSINT Tools (Collection phase)
-# TODO: Implement search_misp
+
+
+# ------------------------------------------------------------------
+# MISP helpers
+# ------------------------------------------------------------------
+
+_MISP_TYPE_MAP: dict[str, str] = {
+    "ip-dst": "ipv4",
+    "ip-src": "ipv4",
+    "ip-dst|port": "ipv4",
+    "ip-src|port": "ipv4",
+    "domain": "domain",
+    "hostname": "domain",
+    "url": "url",
+    "md5": "md5",
+    "sha1": "sha1",
+    "sha256": "sha256",
+    "filename|md5": "md5",
+    "filename|sha1": "sha1",
+    "filename|sha256": "sha256",
+    "email-src": "email",
+    "email-dst": "email",
+    "vulnerability": "cve",
+}
+
+_MISP_THREAT_LEVELS: dict[int, str] = {
+    1: "high",
+    2: "medium",
+    3: "low",
+    4: "undefined",
+}
+
+_MISP_ANALYSIS_STATUS: dict[int, str] = {
+    0: "initial",
+    1: "ongoing",
+    2: "complete",
+}
+
+
+def _get_misp_client() -> PyMISP | None:
+    """Create a PyMISP client from environment variables.
+
+    Returns None if MISP_URL or MISP_API_KEY are not set.
+    """
+    misp_url = os.getenv("MISP_URL")
+    misp_key = os.getenv("MISP_API_KEY")
+    if not misp_url or not misp_key:
+        return None
+    verify_ssl = os.getenv("MISP_VERIFY_SSL", "false").lower() == "true"
+    return PyMISP(misp_url, misp_key, ssl=verify_ssl)
+
+
+def _extract_misp_ioc_value(misp_type: str, raw_value: str) -> str:
+    """Extract the IOC value from a MISP composite attribute value."""
+    if "|" in misp_type and "|" in raw_value:
+        parts = raw_value.split("|", 1)
+        if misp_type in ("ip-dst|port", "ip-src|port"):
+            return parts[0]
+        return parts[1]
+    return raw_value
+
+
+def _normalize_misp_type(misp_type: str, value: str) -> str:
+    """Map a MISP attribute type to standardized type string."""
+    ioc_type = _MISP_TYPE_MAP.get(misp_type, misp_type)
+    if ioc_type == "ipv4" and ":" in value:
+        return "ipv6"
+    return ioc_type
+
+
+def _format_misp_indicator(attr: dict) -> dict:
+    """Format a MISP attribute dict into a standardized indicator dict."""
+    misp_type = attr.get("type", "")
+    raw_value = attr.get("value", "")
+    value = _extract_misp_ioc_value(misp_type, raw_value)
+    return {
+        "type": _normalize_misp_type(misp_type, value),
+        "value": value,
+        "category": attr.get("category", ""),
+        "comment": attr.get("comment") or "",
+        "to_ids": attr.get("to_ids", False),
+    }
+
+
+def _format_misp_event(event_data: dict) -> dict:
+    """Format a raw MISP event dict into a standardized event dict."""
+    evt = event_data.get("Event", event_data)
+
+    orgc = evt.get("Orgc", {})
+    org_name = orgc.get("name", "") if isinstance(orgc, dict) else ""
+
+    raw_tags = evt.get("Tag", [])
+    tags = [t["name"] for t in raw_tags if isinstance(t, dict) and "name" in t]
+
+    attributes = evt.get("Attribute", [])
+    indicators = [_format_misp_indicator(a) for a in attributes]
+
+    threat_level_id = int(evt.get("threat_level_id", 4))
+    analysis = int(evt.get("analysis", 0))
+
+    return {
+        "event_id": evt.get("id", ""),
+        "title": evt.get("info", ""),
+        "org_name": org_name,
+        "threat_level": _MISP_THREAT_LEVELS.get(threat_level_id, "undefined"),
+        "analysis_status": _MISP_ANALYSIS_STATUS.get(analysis, "initial"),
+        "date": evt.get("date", ""),
+        "tags": tags,
+        "indicators": indicators,
+    }
+
+
+@mcp.tool
+async def search_misp(
+    search_term: str,
+    search_type: str = "attribute",
+    date_from: str | None = None,
+    date_to: str | None = None,
+    threat_level: int | None = None,
+    distribution: int | None = None,
+    max_results: int = 50,
+) -> str:
+    """Search a MISP instance for threat intelligence events and indicators.
+
+    Supports three search modes via search_type:
+    - "attribute": Search by IOC value (IP, domain, hash, URL, email, CVE).
+    - "tag": Search events by tag name (e.g., "tlp:green", "apt29").
+    - "event_id": Fetch a specific event by its numeric ID.
+
+    Optional filters: date range, threat level (1-4), distribution level (0-4).
+
+    Returns events in standardized format with event metadata and indicators.
+    """
+    if not search_term.strip():
+        raise ValueError("search_term cannot be empty")
+    if search_type not in ("attribute", "tag", "event_id"):
+        raise ValueError(
+            f"search_type must be 'attribute', 'tag', or 'event_id', "
+            f"got '{search_type}'"
+        )
+
+    client = _get_misp_client()
+    if client is None:
+        raise ValueError(
+            "MISP is not configured. Set MISP_URL and MISP_API_KEY "
+            "environment variables."
+        )
+
+    kwargs: dict[str, object] = {}
+    if date_from:
+        kwargs["date_from"] = date_from
+    if date_to:
+        kwargs["date_to"] = date_to
+    if threat_level is not None:
+        kwargs["threat_level_id"] = threat_level
+    if distribution is not None:
+        kwargs["distribution"] = distribution
+
+    events: list[dict] = []
+
+    if search_type == "attribute":
+        kwargs["controller"] = "attributes"
+        kwargs["value"] = search_term.strip()
+
+        response = await asyncio.to_thread(client.search, **kwargs)
+
+        if isinstance(response, dict) and "errors" in response:
+            raise ValueError(f"MISP API error: {response['errors']}")
+
+        # Attribute search returns {"Attribute": [{..., "Event": {...}}, ...]}
+        attr_list = (
+            response.get("Attribute", []) if isinstance(response, dict) else []
+        )
+
+        # Group attributes by event ID to build event-centric results
+        event_map: dict[str, dict] = {}
+        for attr in attr_list[:max_results]:
+            evt_info = attr.get("Event", {})
+            eid = evt_info.get("id", "unknown")
+            if eid not in event_map:
+                orgc = evt_info.get("Orgc", {})
+                org_name = orgc.get("name", "") if isinstance(orgc, dict) else ""
+                tl = int(evt_info.get("threat_level_id", 4))
+                an = int(evt_info.get("analysis", 0))
+                event_map[eid] = {
+                    "event_id": eid,
+                    "title": evt_info.get("info", ""),
+                    "org_name": org_name,
+                    "threat_level": _MISP_THREAT_LEVELS.get(tl, "undefined"),
+                    "analysis_status": _MISP_ANALYSIS_STATUS.get(an, "initial"),
+                    "date": evt_info.get("date", ""),
+                    "tags": [],
+                    "indicators": [],
+                }
+            event_map[eid]["indicators"].append(_format_misp_indicator(attr))
+
+        events = list(event_map.values())
+
+    else:
+        kwargs["controller"] = "events"
+        if search_type == "tag":
+            kwargs["tags"] = [search_term.strip()]
+        elif search_type == "event_id":
+            kwargs["eventid"] = search_term.strip()
+
+        kwargs["limit"] = max_results
+
+        response = await asyncio.to_thread(client.search, **kwargs)
+
+        if isinstance(response, dict) and "errors" in response:
+            raise ValueError(f"MISP API error: {response['errors']}")
+
+        if isinstance(response, list):
+            events = [_format_misp_event(r) for r in response[:max_results]]
+
+    return json.dumps(
+        {
+            "source": "misp",
+            "search_term": search_term,
+            "search_type": search_type,
+            "total_results": len(events),
+            "events": events,
+        }
+    )
 
 logger = logging.getLogger("app")
 
