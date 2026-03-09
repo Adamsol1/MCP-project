@@ -1,34 +1,22 @@
-import { useState } from "react";
+﻿import { useEffect, useState } from "react";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useToast } from "./hooks/useToast";
-import { uploadFile } from "./services/upload";
+import {
+  deleteUploadedFile,
+  listUploadedFiles,
+  uploadFile,
+  type UploadedFileRecord,
+} from "./services/upload";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
 import { WorkspaceProvider } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 
-/**
- * Root application component.
- *
- * Composes the full-screen three-column layout:
- *   Sidebar (left) | ChatWindow (centre, flex-1) | OptionsPanel (right)
- *
- * Also owns the FileUploadModal overlay and wires together the file-upload flow:
- *   1. User opens the modal via the OptionsPanel "Upload Files" button.
- *   2. User selects files and clicks Submit.
- *   3. handleSubmit uploads each file sequentially via the upload service and
- *      fires a success or error toast for each result.
- *   4. The modal closes after all uploads complete (or fail).
- *
- * All conversation and chat state is delegated to useConversation and useChat.
- * App only passes the slices and callbacks that each child component needs,
- * keeping the child components decoupled from the global state shape.
- */
 function App() {
   const { success, error } = useToast();
   const {
@@ -58,48 +46,65 @@ function App() {
     clearDevPrefill,
   } = useChat();
 
-  /** Controls the visibility of the FileUploadModal overlay. */
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
-  /** Controls the visibility of the SettingsModal overlay. */
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
 
-  /**
-   * Tracks files that have been successfully uploaded via the FileUploadModal.
-   * Shown as a collapsible list in the OptionsPanel so the user can see what
-   * data sources are available to the current session.
-   */
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const ensureConversationSession = () => {
+    return activeConversation ?? createNewConversation();
+  };
 
-  /**
-   * Uploads all queued files sequentially, shows a toast for each result, and
-   * appends each successfully uploaded file to the uploadedFiles list so it
-   * appears in the OptionsPanel. Closes the modal once the loop completes.
-   *
-   * @param files - The list of File objects the user submitted.
-   */
+  const refreshUploadedFiles = async (sessionId: string) => {
+    try {
+      const files = await listUploadedFiles(sessionId);
+      setUploadedFiles(files);
+    } catch (loadError) {
+      console.error("Load uploads error:", loadError);
+      error("Failed to load uploaded files");
+    }
+  };
+
+  useEffect(() => {
+    if (!activeConversation?.sessionId) {
+      setUploadedFiles([]);
+      return;
+    }
+    refreshUploadedFiles(activeConversation.sessionId);
+  }, [activeConversation?.sessionId]);
+
   const handleSubmit = async (files: File[]) => {
+    const conversation = ensureConversationSession();
+
     for (const file of files) {
       try {
-        const result = await uploadFile(file);
+        const result = await uploadFile(file, conversation.sessionId);
         console.log("Upload result:", result);
         success(`Successfully uploaded ${file.name}`);
-        setUploadedFiles((prev) => [...prev, file]);
-      } catch (err) {
-        console.error("Upload error:", err);
+      } catch (uploadError) {
+        console.error("Upload error:", uploadError);
         error(`Failed to upload ${file.name}`);
       }
     }
+
+    await refreshUploadedFiles(conversation.sessionId);
     setIsFileUploadOpen(false);
   };
 
-  /**
-   * Removes a file from the uploaded files list shown in the OptionsPanel.
-   * This is a client-side-only operation — the file remains on the backend.
-   *
-   * @param file - The File object to remove from the display list.
-   */
-  const handleFileRemove = (file: File) => {
-    setUploadedFiles((prev) => prev.filter((f) => f !== file));
+  const handleFileRemove = async (file: UploadedFileRecord) => {
+    if (!activeConversation?.sessionId) {
+      return;
+    }
+
+    try {
+      await deleteUploadedFile(activeConversation.sessionId, file.file_upload_id);
+      setUploadedFiles((prev) =>
+        prev.filter((item) => item.file_upload_id !== file.file_upload_id),
+      );
+      success(`Removed ${file.filename}`);
+    } catch (deleteError) {
+      console.error("Delete upload error:", deleteError);
+      error(`Failed to remove ${file.filename}`);
+    }
   };
 
   return (
@@ -115,17 +120,16 @@ function App() {
         onDeleteAllConversations={deleteAllConversations}
         onDevSendMessage={() =>
           triggerDevMessage(
-            "What are the latest cyber threats targeting European critical infrastructure?"
+            "What are the latest cyber threats targeting European critical infrastructure?",
           )
         }
         onDevShowCollectionApproval={debugConfirm}
-        onDevJumpToStage={(stage: DialogueStage) => jumpToDevStage(stage)}
+        onDevJumpToStage={(nextStage: DialogueStage) => jumpToDevStage(nextStage)}
         onDevSyncStage={syncDevStage}
         onDevResetStage={resetDevStage}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      {/* mx-1 creates a slim visible gap between the sidebars and the chat area. */}
       <main className="flex-1 flex flex-col bg-surface-elevated mx-1">
         <ChatWindow
           messages={messages}
