@@ -16,6 +16,7 @@ import {
   saveConversationStore,
   createConversation,
 } from "../../services/conversationStorage";
+import { deleteSessionArtifacts } from "../../services/upload";
 
 /**
  * The value exposed by ConversationContext to any consuming component.
@@ -254,13 +255,21 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SWITCH_CONVERSATION", payload: id });
   }, []);
 
-  const deleteConversation = useCallback((id: string) => {
-    dispatch({ type: "DELETE_CONVERSATION", payload: id });
-  }, []);
+  const deleteConversation = useCallback(
+    (id: string) => {
+      const conversation = state.conversations.find((c) => c.id === id);
+      if (conversation) {
+        void deleteSessionArtifacts(conversation.sessionId);
+      }
+      dispatch({ type: "DELETE_CONVERSATION", payload: id });
+    },
+    [state.conversations],
+  );
 
   const deleteAllConversations = useCallback(() => {
+    state.conversations.forEach((c) => void deleteSessionArtifacts(c.sessionId));
     dispatch({ type: "DELETE_ALL_CONVERSATIONS" });
-  }, []);
+  }, [state.conversations]);
 
   const renameConversation = useCallback((id: string, newTitle: string) => {
     dispatch({ type: "RENAME_CONVERSATION", payload: { id, newTitle } });

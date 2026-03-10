@@ -23,7 +23,7 @@ class ResearchLogger:
             self.log_path = Path(log_path)
         # Use default logpath
         else:
-            self.log_path = Path(f"data/outputs/research_log_{session_id}.jsonl")
+            self.log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"research_log_{session_id}.jsonl"
 
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -45,7 +45,7 @@ class ResearchLogger:
         """
         Writes fulll reasoning log to JSON file.
         """
-        log_path = Path(f"data/outputs/reasoning_log_{reasoning_log.session_id}.json")
+        log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"reasoning_log_{reasoning_log.session_id}.json"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(log_path, "w") as f:

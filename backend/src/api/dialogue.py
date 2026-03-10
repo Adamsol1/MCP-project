@@ -135,6 +135,14 @@ class DialogueDevStateRequest(BaseModel):
     current_pir: str | None = None
 
 
+def evict_session(session_id: str) -> None:
+    """Remove a session from the in-memory cache and delete its state file."""
+    _sessions.pop(session_id, None)
+    state_file = _SESSIONS_DIR / f"{session_id}.json"
+    if state_file.exists():
+        state_file.unlink()
+
+
 def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
     if isinstance(action, DialogueAction):
         return action

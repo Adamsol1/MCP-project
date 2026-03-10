@@ -19,7 +19,7 @@ def setup_logging() -> logging.Logger:
     Returns:
         The configured 'app' logger.
     """
-    log_dir = Path("data/logs")
+    log_dir = Path(__file__).resolve().parents[1] / "data" / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger("app")

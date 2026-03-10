@@ -267,3 +267,5 @@ site/
 *.tar.gz
 *.rar
 *.env
+/backend/data/imports
+/mcp_server/uploads

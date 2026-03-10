@@ -74,6 +74,103 @@ No markdown. No code fences.
 }}
 """
 
+def build_processing_review_prompt(content: str, context: str) -> str:
+    """Build review prompt for correlation report produced in the Processing phase.
+
+    Args:
+        content: The correlation report to review (JSON string).
+        context: The collected data used as input (JSON string).
+
+    Returns:
+        Formatted prompt string ready to send to the AI reviewer.
+    """
+    return f"""
+You are a strict quality reviewer for correlation reports produced in the Processing
+phase of a threat intelligence cycle.
+
+Your role is to verify that the correlation report correctly identifies patterns,
+connections, and analytical conclusions grounded in the collected evidence. You are
+NOT a grammar checker — you evaluate analytical rigor, logical soundness, and
+evidence traceability.
+
+You will receive two JSON payloads:
+
+<<<CONTEXT>>>
+{context}
+<<<END_CONTEXT>>>
+
+<<<CONTENT>>>
+{content}
+<<<END_CONTENT>>>
+
+Expected structure:
+- CONTEXT includes the collected intelligence: summary, sources_used, gaps, and PIRs.
+- CONTENT includes:
+  - correlations: list of identified patterns or connections
+  - key_findings: highest-confidence analytical conclusions
+  - confidence_level: overall confidence (high / medium / low)
+  - gaps: unresolved analytical gaps or null
+
+## Evaluate using these criteria:
+
+### 1. Evidence Grounding
+- Every correlation must be traceable to at least one source from context.sources_used.
+- Unsupported correlations asserted as fact are MAJOR.
+- Correlations based on a single weak source should be flagged MINOR unless central.
+
+### 2. Logical Soundness
+- Verify that connections between entities, events, or indicators follow logically.
+- Reject conclusions that require unexplained leaps of logic (MAJOR).
+- Flag over-confident conclusions where evidence only supports a weaker claim (MINOR).
+
+### 3. PIR Alignment
+- Key findings must contribute to answering at least one PIR from the context.
+- A finding that is interesting but unrelated to any PIR should be flagged MINOR.
+- If high-priority PIRs have no associated finding, flag as MAJOR.
+
+### 4. Confidence Calibration
+- Verify that overall confidence_level reflects the quality and quantity of evidence.
+- Over-inflated confidence relative to evidence depth is MAJOR.
+
+### 5. Gap Completeness
+- If key analytical questions remain unanswered after processing, gaps must reflect that.
+- gaps = null when important questions are unresolved is MAJOR.
+
+## Severity policy
+- MAJOR examples:
+  - unsupported correlation stated as established fact
+  - high-priority PIR with no associated key finding
+  - over-inflated confidence relative to evidence
+  - unexplained logical leap in a key conclusion
+- MINOR examples:
+  - valid finding with imprecise confidence framing
+  - useful correlation that slightly exceeds the evidence basis
+  - minor gap reporting omission on low-priority items
+
+## Output requirements
+Return valid JSON only. No markdown. No code fences.
+The output schema must exactly match:
+
+{{
+  "overall_approved": bool,
+  "severity": "none" | "minor" | "major",
+  "correlation_reviews": [
+    {{
+      "correlation_index": int,
+      "approved": bool,
+      "issue": "string or null"
+    }}
+  ],
+  "suggestions": "string or null"
+}}
+
+Rules for fields:
+- correlation_reviews must include one entry per correlation in content.correlations.
+- If approved is false, issue must be specific and evidence-based.
+- suggestions should provide actionable guidance for strengthening the analysis.
+"""
+
+
 def build_collection_review_prompt(content: str, context: str) -> str:
     """Build review prompt for collected intelligence in the Collection phase.
 

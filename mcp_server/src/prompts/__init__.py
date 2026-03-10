@@ -10,7 +10,7 @@ _LANGUAGE_NAMES: dict[str, str] = {
 SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
-    "MISP": ["search_misp"],
+    # "MISP": ["search_misp"],  # MISP not configured on external server
 }
 
 

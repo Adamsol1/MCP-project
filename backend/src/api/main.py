@@ -8,13 +8,15 @@ from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
-from src.api.dialogue import router as dialogue_router
+from src.api.dialogue import evict_session, router as dialogue_router
 from src.importers.session_uploads import (
     default_uploads_root,
     delete_session_upload,
+    delete_session_uploads,
     list_session_uploads,
     save_session_upload,
 )
+from src.services.reasearch_logger import ResearchLogger
 from src.logging_config import setup_logging
 
 setup_logging()
@@ -141,4 +143,34 @@ async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)
 
     if not deleted:
         raise HTTPException(status_code=404, detail="Upload not found")
+    return Response(status_code=204)
+
+
+@app.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str):
+    """Delete all backend and MCP artifacts for a session.
+
+    Removes:
+    - Session state file (sessions/{session_id}.json)
+    - All uploaded files and parsed artifacts (data/imports/{session_id}/)
+    - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
+    - MCP staged files (mcp_server/uploads/{session_id}/)
+    """
+    try:
+        evict_session(session_id)
+        delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
+
+        outputs_dir = ResearchLogger(session_id=session_id).log_path.parent
+        for log_name in (
+            f"research_log_{session_id}.jsonl",
+            f"reasoning_log_{session_id}.json",
+        ):
+            log_file = outputs_dir / log_name
+            if log_file.exists():
+                log_file.unlink()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
     return Response(status_code=204)
