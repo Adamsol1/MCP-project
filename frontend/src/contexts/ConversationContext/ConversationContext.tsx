@@ -187,8 +187,11 @@ function conversationReducer(
     case "SET_STAGE": {
       const { stage, subState } = action.payload;
       const isConfirming =
-        (stage === "summary_confirming" || stage === "pir_confirming") &&
-        subState !== "awaiting_modifications";
+        (stage === "summary_confirming" ||
+          stage === "pir_confirming" ||
+          stage === "plan_confirming" ||
+          stage === "reviewing") &&
+        subState === "awaiting_decision";
       return {
         ...state,
         conversations: state.conversations.map((conv) =>

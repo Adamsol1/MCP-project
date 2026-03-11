@@ -11,3 +11,42 @@
     transform: translateX(0);
   }
 }
+
+/* ChatGPT-like subtle scrollbars for scrollable panels */
+.scrollbar-chatgpt {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
+  scrollbar-gutter: stable;
+}
+
+.scrollbar-chatgpt::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.scrollbar-chatgpt::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-chatgpt::-webkit-scrollbar-thumb {
+  background-color: rgba(100, 116, 139, 0.45);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+.scrollbar-chatgpt::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(71, 85, 105, 0.7);
+}
+
+.dark .scrollbar-chatgpt {
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.dark .scrollbar-chatgpt::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.45);
+}
+
+.dark .scrollbar-chatgpt::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(203, 213, 225, 0.6);
+}

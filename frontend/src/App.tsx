@@ -34,9 +34,17 @@ function App() {
     sendMessage,
     isConfirming,
     stage,
+    subState,
     isLoading,
+    isSourceSelecting,
+    isCollecting,
+    availableSources,
+    selectedSources,
     approve,
     reject,
+    gatherMore,
+    toggleSourceSelection,
+    submitSourceSelection,
     debugConfirm,
     jumpToDevStage,
     syncDevStage,
@@ -136,9 +144,17 @@ function App() {
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
           stage={stage}
+          subState={subState}
           isLoading={isLoading}
           onApprove={approve}
           onReject={reject}
+          onGatherMore={gatherMore}
+          isSourceSelecting={isSourceSelecting}
+          isCollecting={isCollecting}
+          availableSources={availableSources}
+          selectedSources={selectedSources}
+          onToggleSourceSelection={toggleSourceSelection}
+          onSubmitSourceSelection={submitSourceSelection}
           devPrefill={devPrefill}
           onDevPrefillConsumed={clearDevPrefill}
         />

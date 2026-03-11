@@ -6,10 +6,23 @@ export interface Message {
   id: string;
   /** The text content of the message. */
   text: string;
-  /** Who sent the message — the human user or the AI system. */
+  /** Who sent the message - the human user or the AI system. */
   sender: "user" | "system";
-  type?: "question" | "summary" | "pir" | "complete"; // The type of message, which can be "text", "summary", or "error".
-  data?: SummaryData | PirData; // JSON obj
+  type?:
+    | "question"
+    | "summary"
+    | "pir"
+    | "plan"
+    | "suggested_sources"
+    | "collection"
+    | "error"
+    | "complete";
+  data?:
+    | SummaryData
+    | PirData
+    | CollectionPlanData
+    | SuggestedSourcesData
+    | CollectionSummaryData;
 }
 
 /**
@@ -33,8 +46,8 @@ export interface Conversation {
   sessionId: string;
   /**
    * Whether the conversation is currently awaiting user approval of an
-   * AI-generated summary. When true, the ChatWindow replaces the text input
-   * with Approve / Reject buttons.
+   * AI-generated output. When true, the ChatWindow replaces the text input
+   * with decision controls.
    */
   isConfirming: boolean;
   /** Canonical dialogue stage received from backend. */
@@ -43,7 +56,7 @@ export interface Conversation {
   subState: DialogueSubState;
   /** Unix timestamp (ms) when this conversation was created. */
   createdAt: number;
-  /** Unix timestamp (ms) of the last mutation — used for sidebar sort order. */
+  /** Unix timestamp (ms) of the last mutation - used for sidebar sort order. */
   updatedAt: number;
 }
 
@@ -59,11 +72,24 @@ export interface ConversationStore {
 }
 
 /**
- * Summary text
+ * Direction summary payload.
  */
 export interface SummaryData {
   summary: string;
 }
+
+/**
+ * Collection plan payload generated from approved PIRs.
+ */
+export interface CollectionPlanData {
+  plan: string;
+  suggested_sources: string[];
+}
+
+/**
+ * Source names suggested by the backend for source selection.
+ */
+export type SuggestedSourcesData = string[];
 
 /**
  * Metadata about a source used in the conversation,
@@ -106,14 +132,11 @@ export interface PirItem {
   question: string;
   priority: "high" | "medium" | "low";
   rationale: string;
-  source_ids: string[]; // List of source IDs that informed this PIR
+  source_ids: string[];
 }
 
 /**
- * The Pir generation data, that has:
- * - Reult: What the AI did
- * - PirItem[]: List of pirs generated
- * - Resoning: Reasoning behind AI's desicions
+ * The PIR generation data.
  */
 export interface PirData {
   pir_text: string;
@@ -121,4 +144,13 @@ export interface PirData {
   sources: Source[];
   pirs: PirItem[];
   reasoning: string;
+}
+
+/**
+ * Collection summary payload shown during collection review.
+ */
+export interface CollectionSummaryData {
+  summary: string;
+  sources_used: string[];
+  gaps: string | null;
 }

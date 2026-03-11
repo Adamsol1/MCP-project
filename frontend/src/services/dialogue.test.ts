@@ -36,6 +36,8 @@ describe("dialogue service", () => {
         approved: undefined,
         language: "en",
         settings_timeframe: "",
+        selected_sources: [],
+        gather_more: false,
       }
     );
 

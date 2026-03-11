@@ -126,7 +126,8 @@ describe("useChat", () => {
     });
 
     // Now checks the exact sessionId from the seeded conversation
-    // sendMessage is called with 6 args: message, sessionId, perspectives, approved, language, timeframe
+    // sendMessage is called with 7 args: message, sessionId, perspectives,
+    // approved, language, timeframe, control options.
     expect(sendMessage).toHaveBeenCalledWith(
       "Investigate APT29",
       "test-session-123",
@@ -134,6 +135,7 @@ describe("useChat", () => {
       undefined,
       "en",
       "",
+      { gatherMore: false },
     );
   });
 
@@ -315,6 +317,47 @@ describe("useChat", () => {
     });
 
     expect(result.current.isConfirming).toBe(false);
+  });
+
+  it("hides confirmation immediately while approve request is pending", async () => {
+    let resolveApprove: ((value: { question: string; action: "complete" }) => void) | null = null;
+
+    vi.mocked(sendMessage)
+      .mockResolvedValueOnce({
+        question: "Summary ready.",
+        action: "show_summary",
+      })
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveApprove = resolve as (value: { question: string; action: "complete" }) => void;
+          }),
+      );
+
+    const { result } = renderHook(() => useChat(), {
+      wrapper: createWrapper(),
+    });
+
+    await act(async () => {
+      await result.current.sendMessage("Answer");
+    });
+
+    expect(result.current.isConfirming).toBe(true);
+
+    let pendingApprove: Promise<void> | undefined;
+    act(() => {
+      pendingApprove = result.current.approve();
+    });
+
+    expect(result.current.isConfirming).toBe(false);
+
+    await act(async () => {
+      resolveApprove?.({
+        question: "Proceeding.",
+        action: "complete",
+      });
+      await pendingApprove;
+    });
   });
 
   it("adds a frontend-only feedback message when reject is called", async () => {

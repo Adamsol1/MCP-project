@@ -201,7 +201,7 @@ describe("PirSourcesView — highlight state from context", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    expect(sourceCard).toHaveClass("bg-primary-subtle");
+    expect(sourceCard).toHaveClass("text-primary");
   });
 
   it("only the matching card is highlighted when multiple sources exist", () => {
@@ -220,7 +220,7 @@ describe("PirSourcesView — highlight state from context", () => {
       .getByText(/Energy Sector Threat Landscape/)
       .closest("li")!;
 
-    expect(card1).toHaveClass("bg-primary-subtle");
-    expect(card2).not.toHaveClass("bg-primary-subtle");
+    expect(card1).toHaveClass("text-primary");
+    expect(card2).not.toHaveClass("text-primary");
   });
 });

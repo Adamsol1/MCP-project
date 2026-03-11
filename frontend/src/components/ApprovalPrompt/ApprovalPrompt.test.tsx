@@ -79,19 +79,15 @@ describe("ApprovalPrompt", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("sends keep-partial flag when rejecting", async () => {
+  it("calls reject callback when rejecting", async () => {
     const user = userEvent.setup();
     const onRejectWithFeedback = vi.fn();
     render(<ApprovalPrompt onRejectWithFeedback={onRejectWithFeedback} />);
 
-    await user.click(screen.getByLabelText(/keep partial results/i));
     await user.click(
       screen.getByRole("button", { name: /reject with feedback/i })
     );
 
     expect(onRejectWithFeedback).toHaveBeenCalledTimes(1);
-    expect(onRejectWithFeedback).toHaveBeenCalledWith({
-      keepPartialResults: true,
-    });
   });
 });

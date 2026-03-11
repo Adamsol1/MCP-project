@@ -10,7 +10,7 @@ export default function SourceList({ sources, highlightedRef, onSourceHover }: S
   if (sources.length === 0) return <ul></ul>;   // empty but still a DOM node
 
   return (
-    <ul>
+    <ul className="space-y-0 divide-y divide-border-muted">
       {sources.map((source) => {
         const isHighlighted = highlightedRef === source.ref;
         const citation = source.citation;
@@ -18,19 +18,36 @@ export default function SourceList({ sources, highlightedRef, onSourceHover }: S
         return (
           <li
             key={source.id}
-            className={isHighlighted ? "bg-primary-subtle" : ""}
+            className={[
+              "flex items-baseline gap-2 py-1.5 text-xs transition-colors cursor-default",
+              isHighlighted
+                ? "text-primary"
+                : "text-text-secondary hover:text-text-primary",
+            ].join(" ")}
             onMouseEnter={() => onSourceHover(source.ref)}
             onMouseLeave={() => onSourceHover(null)}
           >
-            <span>{source.ref}</span>
-            {citation ? (
-              <span>
-                {citation.author}. ({citation.year}). <em>{citation.title}</em>. {citation.publisher}.
+            <span
+              className={[
+                "shrink-0 font-semibold tabular-nums",
+                isHighlighted ? "text-primary" : "text-text-muted",
+              ].join(" ")}
+            >
+              {source.ref}
+            </span>
+            <span className="min-w-0">
+              {citation ? (
+                <>
+                  {citation.author}. ({citation.year}). <em>{citation.title}</em>.{" "}
+                  {citation.publisher}.
+                </>
+              ) : (
+                source.id
+              )}
+              <span className="ml-1.5 text-[10px] font-medium uppercase tracking-wider text-text-muted">
+                [{source.source_type}]
               </span>
-            ) : (
-              <span>{source.id}</span>
-            )}
-             <span> [{source.source_type}]</span>
+            </span>
           </li>
         );
       })}
