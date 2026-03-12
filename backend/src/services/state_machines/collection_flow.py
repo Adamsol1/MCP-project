@@ -1,6 +1,7 @@
 import json
 import logging
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 from enum import Enum
 
 from src.models.dialogue import DialogueContext, DialogueResponse
@@ -174,22 +175,29 @@ class CollectionFlow(BasePhaseFlow):
 
     #Collect information
 
-        if orchestrator and reviewer:
-            collection_summary = await orchestrator.collect_and_review(
-                sources=self.selected_sources,
-                pir=self.pir,
-                plan=self.collection_plan,
-                collection_service=collection_service,
-                reviewer=reviewer,
-                session_id=self.session_id,
-                direction_context=self.direction_context,
-            )
-        else:
-            collection_summary = await collection_service.collect(
-                self.selected_sources,
-                self.pir,
-                self.collection_plan
-            )
+        timeframe = self.direction_context.timeframe if self.direction_context else ""
+        try:
+            if orchestrator and reviewer:
+                collection_summary = await orchestrator.collect_and_review(
+                    sources=self.selected_sources,
+                    pir=self.pir,
+                    plan=self.collection_plan,
+                    collection_service=collection_service,
+                    reviewer=reviewer,
+                    session_id=self.session_id,
+                    direction_context=self.direction_context,
+                    timeframe=timeframe,
+                )
+            else:
+                collection_summary = await collection_service.collect(
+                    self.selected_sources,
+                    self.pir,
+                    self.collection_plan,
+                    timeframe=timeframe,
+                )
+        except Exception as e:
+            logger.error(f"[Session {self.session_id}] Collection failed: {e}")
+            return DialogueResponse(action="error", content=f"Collection failed: {e}")
 
         if orchestrator:
                 retry_count = len(orchestrator.attempts) - 1
@@ -208,9 +216,8 @@ class CollectionFlow(BasePhaseFlow):
                 )
 
         self.state = CollectionState.REVIEWING
-        self.raw_data = collection_summary.get("raw_data")
-        self.collected_data = collection_summary.get("summary")
-        return DialogueResponse(action="show_collection", content=self.collected_data)
+        self.raw_data = collection_summary
+        return DialogueResponse(action="show_collection", content=self.raw_data)
 
 
 
@@ -225,7 +232,7 @@ class CollectionFlow(BasePhaseFlow):
         if approved:
             self._log_user_action(action="approve", phase="reviewing", modifications=None, perspectives=None)
             if self.pending_reasoning_log and self.research_logger:
-                self.pending_reasoning_log.final_approved_content = self.collected_data
+                self.pending_reasoning_log.final_approved_content = self.raw_data
                 self.pending_reasoning_log.timestamps["collection_approved"] = datetime.now().isoformat()
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = CollectionState.COMPLETE

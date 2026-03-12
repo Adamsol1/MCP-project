@@ -27,7 +27,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_retries = 3
+        self.max_retries = 1
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -224,9 +224,13 @@ class AIOrchestrator:
     # - collection_service : AI that will collect data via tools
     # - Reviewer           : AI that will review collected data
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None
-    ) -> dict:
+        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = ""
+    ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
+
+        Each retry accumulates data from previous attempts — the agent sees what was
+        already collected and only adds new data. The reviewer always sees the full
+        accumulated dataset.
 
         Args:
             sources:            List of selected source names.
@@ -236,15 +240,32 @@ class AIOrchestrator:
             reviewer:           Service with a review_pir(content, context, phase) method.
             session_id:         Used for logging.
             direction_context:  DialogueContext from the direction phase (optional, enriches review).
+            timeframe:          PIR timeframe string used to filter OTX results by date.
 
         Returns:
-            Dict with "raw_data" and "summary" keys.
+            Accumulated raw data string from all collection attempts.
 
         Raises:
             Any exception from collect or review_pir
         """
+        accumulated = {"raw_data": ""}
+
+        async def collect_fn(feedback=None):
+            new_data = await collection_service.collect(
+                sources, pir, plan,
+                feedback=feedback,
+                session_id=session_id,
+                timeframe=timeframe,
+                existing_raw_data=accumulated["raw_data"] or None,
+            )
+            if accumulated["raw_data"]:
+                accumulated["raw_data"] += "\n\n--- NEW COLLECTION ATTEMPT ---\n\n" + new_data
+            else:
+                accumulated["raw_data"] = new_data
+            return accumulated["raw_data"]
+
         return await self._run_with_review(
-            generate_fn=lambda feedback=None: collection_service.collect(sources, pir, plan, feedback=feedback),
+            generate_fn=collect_fn,
             reviewer=reviewer,
             context=CollectionContext(pir=pir, plan=plan, direction_context=direction_context),
             phase="collection",

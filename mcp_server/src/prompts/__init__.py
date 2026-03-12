@@ -1,5 +1,7 @@
 """MCP Prompts - Workflow templates."""
 
+from datetime import UTC, datetime
+
 # Maps BCP-47 language codes to human-readable names used in language instructions.
 _LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
@@ -11,6 +13,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
+    "Uploaded Documents": ["search_local_data"],
 }
 
 
@@ -392,6 +395,10 @@ def build_collection_plan_prompt(
 The following sources are available: {available_sources_str}
 Only suggest sources that are genuinely relevant to the PIRs.
 
+## Allowed Tools
+You MUST only use list_knowledge_base and read_knowledge_base.
+Do not call any other tools during planning.
+
 ## Instructions
 1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
 2. Based on the PIRs and background knowledge, write a concise step-by-step collection plan
@@ -411,6 +418,9 @@ def build_collection_collect_prompt(
     pir: str,
     selected_sources: list,
     plan: str,
+    session_id: str | None = None,
+    since_date: str | None = None,
+    existing_data: str | None = None,
 ) -> str:
     approved_tools = [
         tool
@@ -425,6 +435,22 @@ def build_collection_collect_prompt(
         f"and will be skipped: {', '.join(unmapped)}"
         if unmapped else ""
     )
+    session_note = (
+        f"\nNote: For search_local_data, use session_id=\"{session_id}\"."
+        if session_id and "search_local_data" in approved_tools else ""
+    )
+    _min_lookback = (datetime.now(UTC).replace(year=datetime.now(UTC).year - 3)).strftime('%Y-%m-%d')
+    since_note = (
+        f"\nNote: Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
+        f"For all query_otx calls, use since_date=\"{_min_lookback}\" (3 years ago) to ensure sufficient historical coverage."
+        if since_date and "query_otx" in approved_tools else ""
+    )
+
+    existing_data_section = (
+        f"\n## Already Collected Data\nThe following data was gathered in a previous attempt. "
+        f"Do NOT re-collect data that is already here. Only collect NEW data not yet covered.\n{existing_data}"
+        if existing_data else ""
+    )
 
     return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
 
@@ -433,16 +459,17 @@ def build_collection_collect_prompt(
 
 ## Collection Plan
 {plan}
-
+{existing_data_section}
 ## Approved Tools
 You MUST only use the following tools: {approved_tools_str}
-Do not query any source or tool not listed above.{unmapped_note}
+Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
 
 ## Instructions
 1. Use the approved tools to collect data relevant to the PIRs only
-2. Query each approved tool once — do not query the same tool twice
-3. Return content verbatim — do not summarize, rephrase, or interpret
-4. If a source returns no relevant data, still include it in output with empty content
+2. For query_otx: only search for threat actors, APT groups, and country names that are explicitly mentioned in the PIRs above (e.g. "APT29", "Russia", "GRU"). Do NOT search for generic terms like "energy sector", "reconnaissance", "network mapping", or "vulnerability identification". One search term per call. query_otx automatically returns full details (IoCs, TTPs, description, targeted countries) for the top results — no follow-up calls needed.
+3. For knowledge base tools: read each relevant resource separately
+4. Return content verbatim — do not summarize, rephrase, or interpret
+5. If a source returns no relevant data, still include it in output with empty content
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.

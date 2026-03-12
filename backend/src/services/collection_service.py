@@ -28,6 +28,17 @@ _SOURCE_ALIASES = {
     "misp": "MISP",
 }
 
+_DEFAULT_SOURCE = "Internal Knowledge Bank"
+_SOURCE_ALIASES = {
+    "internal knowledge bank": "Internal Knowledge Bank",
+    "knowledge bank": "Internal Knowledge Bank",
+    "local knowledge bank": "Internal Knowledge Bank",
+    "otx": "AlienVault OTX",
+    "alienvault": "AlienVault OTX",
+    "alienvault otx": "AlienVault OTX",
+    "misp": "MISP",
+}
+
 
 class CollectionService:
 
@@ -187,19 +198,27 @@ class CollectionService:
         plan: str,
         language: str = "en",
         feedback: str | None = None,
-    ) -> dict:
-        """Two-step collection: raw gathering and then summarization."""
+        session_id: str | None = None,
+        timeframe: str = "",
+        existing_raw_data: str | None = None,
+    ) -> str:
+        """Collect raw data only — no summarization.
+
+        existing_raw_data: data already gathered in previous attempts (passed for context).
+        """
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
 
         async with self.mcp_client.connect():
-            # Step 1: Collect raw data via tools
             collect_prompt = await self.mcp_client.get_prompt(
                 "collection_collect",
                 {
                     "pir": pir,
                     "selected_sources": json.dumps(selected_sources),
                     "plan": plan_text,
+                    "session_id": session_id or "",
+                    "since_date": timeframe,
+                    "existing_data": existing_raw_data or "",
                 },
             )
             agent = GeminiAgent(self.mcp_client)
@@ -211,22 +230,7 @@ class CollectionService:
                 task=task,
             )
 
-            # Step 2: Summarize raw data (one-shot, no tools)
-            summarize_prompt = await self.mcp_client.get_prompt(
-                "collection_summarize",
-                {
-                    "pir": pir,
-                    "collected_data": raw_data,
-                    "language": language,
-                },
-            )
-            agent2 = GeminiAgent(self.mcp_client)
-            summary = await agent2.run(
-                system_prompt=summarize_prompt,
-                task="Summarize the collected intelligence data.",
-            )
-
-        return {"raw_data": raw_data, "summary": summary}
+        return raw_data
 
     async def modify_summary(self, collected_data: str, modifications: str) -> str:
         async with self.mcp_client.connect():

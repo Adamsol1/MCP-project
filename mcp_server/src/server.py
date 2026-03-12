@@ -224,6 +224,9 @@ def collection_collect(
     pir: str,
     selected_sources: str,
     plan: str,
+    session_id: str = "",
+    since_date: str = "",
+    existing_data: str = "",
 ) -> str:
     """Prompt for collecting raw intelligence data via tools in the Collection phase.
 
@@ -231,11 +234,17 @@ def collection_collect(
         pir: The approved PIRs from the Direction phase (JSON string).
         selected_sources: JSON array of source names approved by the analyst.
         plan: The approved collection plan text.
+        session_id: Session ID used for search_local_data (uploaded documents).
+        since_date: ISO date (YYYY-MM-DD) to filter OTX pulses by modification date.
+        existing_data: Raw data already collected in previous attempts (for retry context).
     """
     return build_collection_collect_prompt(
         pir=pir,
         selected_sources=json.loads(selected_sources),
         plan=plan,
+        session_id=session_id or None,
+        since_date=since_date or None,
+        existing_data=existing_data or None,
     )
 
 
@@ -547,6 +556,8 @@ def _otx_request(path: str, params: dict | None = None) -> dict:
             return response.json()
     except httpx.HTTPStatusError as e:
         logger.error(f"[query_otx] HTTP {e.response.status_code} for {path}")
+        if e.response.status_code == 403:
+            raise PermissionError("OTX API key is invalid or not authorized (HTTP 403)") from e
         return {}
     except httpx.HTTPError as e:
         logger.error(f"[query_otx] Request failed: {e}")
@@ -595,14 +606,17 @@ def _search_otx_indicator(indicator_type: str, value: str) -> list[dict]:
     return results
 
 
-def _search_otx_pulses(query: str) -> list[dict]:
+def _search_otx_pulses(query: str, since_date: str = "") -> list[dict]:
     """Search OTX pulses by keyword (adversary, malware, etc.)."""
     all_results: list[dict] = []
-    limit = 50
+    limit = 10
 
-    for page in range(1, 6):  # Max 5 pages
+    for page in range(1, 2):  # Single page — fetch 10 results in one request
+        params: dict = {"q": query, "limit": limit, "page": page}
+        if since_date:
+            params["modified_since"] = since_date
         data = _otx_request(
-            "search/pulses", params={"q": query, "limit": limit, "page": page}
+            "search/pulses", params=params
         )
         if not data:
             break
@@ -616,6 +630,7 @@ def _search_otx_pulses(query: str) -> list[dict]:
 
             all_results.append(
                 {
+                    "pulse_id": pulse.get("id", ""),
                     "indicator": adversary or query,
                     "type": "pulse",
                     "pulse_name": pulse_name,
@@ -634,33 +649,83 @@ def _search_otx_pulses(query: str) -> list[dict]:
     return all_results
 
 
+def _fetch_pulse_details(pulse_id: str) -> dict:
+    """Fetch full details for a single OTX pulse by ID."""
+    data = _otx_request(f"pulses/{pulse_id.strip()}")
+    if not data:
+        return {"pulse_id": pulse_id, "error": "No data returned"}
+    indicators = data.get("indicators", [])
+    return {
+        "pulse_id": pulse_id,
+        "name": data.get("name", ""),
+        "description": data.get("description", ""),
+        "adversary": data.get("adversary", ""),
+        "malware_families": data.get("malware_families", []),
+        "targeted_countries": data.get("targeted_countries", []),
+        "tags": data.get("tags", []),
+        "created": data.get("created", ""),
+        "modified": data.get("modified", ""),
+        "references": data.get("references", []),
+        "indicators": [
+            {
+                "indicator": ind.get("indicator", ""),
+                "type": ind.get("type", ""),
+                "description": ind.get("description", ""),
+            }
+            for ind in indicators[:50]
+        ],
+        "indicator_count": len(indicators),
+    }
+
+
 @mcp.tool
-def query_otx(search_term: str, indicator_type: str = "") -> str:
+def query_otx(search_term: str, indicator_type: str = "", since_date: str = "") -> str:
     """Query AlienVault OTX for threat intelligence on indicators or keywords.
 
     When indicator_type is provided (ipv4, domain, md5, sha256, etc.),
     searches for that specific indicator. Otherwise, searches OTX pulses
-    by keyword (e.g., adversary name, malware family, campaign name).
+    by keyword (e.g., adversary name, malware family, campaign name) and
+    automatically fetches full details (IoCs, TTPs, description, targeted
+    countries, references) for the top 3 matching pulses.
 
-    Returns a JSON list of results with indicator value, type, pulse name,
-    tags, first_seen, and last_seen.
+    Use since_date (YYYY-MM-DD) to filter pulses modified after a given date.
     """
     if not search_term.strip():
         raise ValueError("search_term cannot be empty")
 
-    if indicator_type:
-        results = _search_otx_indicator(indicator_type.strip(), search_term.strip())
-    else:
-        results = _search_otx_pulses(search_term.strip())
+    try:
+        if indicator_type:
+            results = _search_otx_indicator(indicator_type.strip(), search_term.strip())
+            return json.dumps({
+                "search_term": search_term,
+                "indicator_type": indicator_type,
+                "results": results,
+                "total_results": len(results),
+            })
+        else:
+            pulses = _search_otx_pulses(search_term.strip(), since_date=since_date.strip())
+    except PermissionError as e:
+        return json.dumps({"error": str(e), "search_term": search_term, "results": [], "total_results": 0})
 
-    return json.dumps(
-        {
-            "search_term": search_term,
-            "indicator_type": indicator_type or "keyword",
-            "results": results,
-            "total_results": len(results),
-        }
-    )
+    # Enrich top 3 pulses with full details (IoCs, TTPs, description, etc.)
+    enriched = []
+    for pulse in pulses[:3]:
+        pulse_id = pulse.get("pulse_id", "")
+        if pulse_id:
+            details = _fetch_pulse_details(pulse_id)
+            pulse.update(details)
+        enriched.append(pulse)
+
+    # Remaining pulses returned as metadata only
+    remaining = pulses[3:]
+
+    return json.dumps({
+        "search_term": search_term,
+        "indicator_type": "keyword",
+        "total_results": len(pulses),
+        "enriched_pulses": enriched,
+        "additional_pulses": remaining,
+    })
 
 
 def _split_query_terms(query: str) -> list[str]:
