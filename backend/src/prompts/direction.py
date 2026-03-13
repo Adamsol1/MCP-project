@@ -143,6 +143,9 @@ CITATION RULES (apply when BACKGROUND KNOWLEDGE is present):
   "### Source:" headers that directly support that PIR
 - Only cite a source if it genuinely influenced that specific PIR
 - Use an empty list [] if no background knowledge applies to a PIR
+- In the "reasoning" field, cite sources inline using [N] markers (e.g. [1], [2])
+  where N corresponds to the 1-based index of the source in the flat list of all
+  unique sources across all PIRs (ordered by first appearance)
 
 ANALYTICAL PERSPECTIVES define the lens through which PIRs are framed:
 - Single or multiple countries/groups (e.g. "norway", "russia", "nato"):
@@ -163,7 +166,7 @@ Return your response in the following JSON format:
             "sources": ["knowledge_bank/geopolitical/norway_russia.md"]
         }}
     ],
-    "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected"
+    "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected. When background knowledge is present, cite sources inline with [N] markers."
 }}
 Respond ONLY in valid JSON.
 No markdown.

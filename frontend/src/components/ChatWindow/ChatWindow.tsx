@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { ToastContainer } from "../Toast";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
 import type {
-  CollectedItem,
   CollectionDisplayData,
   CollectionPlanData,
   CollectionSourceSummary,
@@ -36,14 +34,6 @@ function Chevron() {
   );
 }
 
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  list_knowledge_base: "Internal Knowledge Bank",
-  read_knowledge_base: "Internal Knowledge Bank",
-  query_otx: "AlienVault OTX",
-  search_local_data: "Uploaded Documents",
-  list_uploads: "Uploaded Documents",
-  read_upload: "Uploaded Documents",
-};
 
 const PRIORITY_LABEL: Record<string, string> = {
   high: "High",
@@ -53,15 +43,9 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 
 
-function renderWithBold(text: string): ReactNode {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
-  );
-}
 
 function PirMessage({ pirData }: { pirData: PirData }) {
-  const { highlightedRef, setHighlightedRef, setPirData } = useWorkspace();
+  const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
 
   useEffect(() => {
     setPirData(pirData);
@@ -81,8 +65,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         <CitationText
           text={pirData.pir_text}
           claims={pirData.claims}
-          highlightedRef={highlightedRef}
-          onRefHover={setHighlightedRef}
+          highlightedRefs={highlightedRefs}
+          onRefHover={setHighlightedRefs}
         />
       )}
       <ol className="space-y-3 mt-1">
@@ -101,8 +85,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
-                  highlightedRef={highlightedRef}
-                  onRefHover={setHighlightedRef}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={setHighlightedRefs}
                 />
               </p>
             </details>
@@ -118,8 +102,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           <div className="mt-1.5">
             <SourceList
               sources={pirData.sources}
-              highlightedRef={highlightedRef}
-              onSourceHover={setHighlightedRef}
+              highlightedRefs={highlightedRefs}
+              onSourceHover={setHighlightedRefs}
             />
           </div>
         </details>
@@ -133,7 +117,12 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
             {reasoningPoints.map((point, i) => (
               <p key={i} className="text-sm text-text-secondary">
-                {renderWithBold(point)}
+                <CitationText
+                  text={point}
+                  claims={pirData.claims}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={setHighlightedRefs}
+                />
               </p>
             ))}
           </div>
@@ -315,48 +304,19 @@ function SourceSummaryTable({
   );
 }
 
-function SourceItemAccordions({ items }: { items: CollectedItem[] }) {
-  // Group items by display name
-  const groups: Record<string, CollectedItem[]> = {};
-  for (const item of items) {
-    const name = TOOL_DISPLAY_NAMES[item.source] ?? item.source;
-    if (!groups[name]) groups[name] = [];
-    groups[name].push(item);
-  }
-
-  return (
-    <div className="space-y-2">
-      {Object.entries(groups).map(([groupName, groupItems]) => (
-        <details key={groupName} open className="group border border-border-muted rounded">
-          <summary className="cursor-pointer list-none flex items-center justify-between px-3 py-2 bg-surface-muted text-sm font-medium text-text-secondary select-none">
-            {groupName}
-            <Chevron />
-          </summary>
-          <div className="divide-y divide-border-muted">
-            {groupItems.map((item, i) => (
-              <div key={i} className="px-3 py-2">
-                {item.resource_id && (
-                  <span className="inline-block text-xs bg-primary-subtle text-info-text rounded px-1.5 py-0.5 mb-1">
-                    {item.resource_id}
-                  </span>
-                )}
-                <pre className="text-xs text-text-secondary whitespace-pre-wrap break-all max-h-40 overflow-auto bg-surface rounded p-1">
-                  {item.content || "(no content)"}
-                </pre>
-              </div>
-            ))}
-          </div>
-        </details>
-      ))}
-    </div>
-  );
-}
 
 function CollectionDisplayMessage({
   data,
 }: {
   data: CollectionDisplayData;
 }) {
+  const { setCollectionData, setActivePhase } = useWorkspace();
+
+  useEffect(() => {
+    setCollectionData(data);
+    setActivePhase("collection");
+  }, [data, setCollectionData, setActivePhase]);
+
   if (data.parse_error) {
     return (
       <div className="space-y-2">
@@ -378,15 +338,6 @@ function CollectionDisplayMessage({
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Results</h3>
       <SourceSummaryTable summaries={data.source_summary} />
-      <SourceItemAccordions items={data.collected_data} />
-      <details className="group border-t border-border pt-2">
-        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
-          Raw JSON <Chevron />
-        </summary>
-        <pre className="mt-1 text-xs text-text-secondary bg-surface-muted rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap break-all">
-          {JSON.stringify(data.collected_data, null, 2)}
-        </pre>
-      </details>
     </div>
   );
 }
@@ -606,7 +557,6 @@ export default function ChatWindow({
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}
-                  onModify={onReject}
                   onGatherMore={onGatherMore}
                 />
               ) : (

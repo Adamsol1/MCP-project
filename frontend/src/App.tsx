@@ -14,8 +14,19 @@ import {
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
-import { WorkspaceProvider } from "./contexts/WorkspaceContext/WorkspaceContext";
+import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
+
+function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
+  const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
+  useEffect(() => {
+    setPirData(null);
+    setActivePhase("direction");
+    setCollectionData(null);
+    setHighlightedRefs([]);
+  }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
 
 function App() {
   const { success, error } = useToast();
@@ -117,6 +128,7 @@ function App() {
 
   return (
     <WorkspaceProvider>
+    <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
     <div className="flex h-screen">
       <Sidebar
         conversations={conversations}

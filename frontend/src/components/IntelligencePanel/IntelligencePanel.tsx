@@ -1,12 +1,12 @@
+import { useState } from "react";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
+import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
+import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
 
-/**
- * Component for displaying the intelligence panel with phase-specific views.
- * @returns 
- */
 export default function IntelligencePanel() {
-  const { activePhase } = useWorkspace();
+  const { activePhase, collectionData } = useWorkspace();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   function renderPhaseView(activePhase: string) {
     switch (activePhase) {
@@ -14,9 +14,10 @@ export default function IntelligencePanel() {
         return <PirSourcesView />;
       case "collection":
         return (
-          <p className="text-sm text-text-secondary">
-            Collection sources and review output will appear here.
-          </p>
+          <CollectionStatsView
+            collectionData={collectionData}
+            onOpenModal={() => setIsModalOpen(true)}
+          />
         );
       case "processing":
         return (
@@ -56,6 +57,12 @@ export default function IntelligencePanel() {
           {renderPhaseView(activePhase)}
         </section>
       </div>
+
+      <CollectionStatsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        collectionData={collectionData}
+      />
     </div>
   );
 }
