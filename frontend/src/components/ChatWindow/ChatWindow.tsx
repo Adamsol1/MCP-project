@@ -5,7 +5,10 @@ import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
 import type {
+  CollectedItem,
+  CollectionDisplayData,
   CollectionPlanData,
+  CollectionSourceSummary,
   CollectionSummaryData,
   Message,
   PirData,
@@ -33,11 +36,22 @@ function Chevron() {
   );
 }
 
+const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  list_knowledge_base: "Internal Knowledge Bank",
+  read_knowledge_base: "Internal Knowledge Bank",
+  query_otx: "AlienVault OTX",
+  search_local_data: "Uploaded Documents",
+  list_uploads: "Uploaded Documents",
+  read_upload: "Uploaded Documents",
+};
+
 const PRIORITY_LABEL: Record<string, string> = {
   high: "High",
   medium: "Medium",
   low: "Low",
 };
+
+
 
 function renderWithBold(text: string): ReactNode {
   const parts = text.split(/\*\*(.*?)\*\*/g);
@@ -201,19 +215,17 @@ function CollectionSummaryMessage({
 function CollectionReviewPrompt({
   isLoading,
   onAccept,
-  onModify,
   onGatherMore,
 }: {
   isLoading: boolean;
   onAccept?: () => void;
-  onModify?: () => void;
   onGatherMore?: () => void;
 }) {
   return (
-    <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-      <h3 className="text-lg font-semibold text-gray-800">Collection Review</h3>
-      <p className="mt-1 text-sm text-gray-600">
-        Accept the collected summary, modify it, or gather more data.
+    <section className="rounded-xl border-2 border-border bg-surface p-4">
+      <h3 className="text-lg font-semibold text-text-primary">Collection Review</h3>
+      <p className="mt-1 text-sm text-text-secondary">
+        Accept the collected data or collect more from additional sources.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -221,27 +233,18 @@ function CollectionReviewPrompt({
           type="button"
           onClick={() => onAccept?.()}
           disabled={isLoading}
-          className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-success px-4 py-2 text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Accept
         </button>
 
         <button
           type="button"
-          onClick={() => onModify?.()}
-          disabled={isLoading}
-          className="rounded-lg bg-amber-600 px-4 py-2 text-white hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Modify
-        </button>
-
-        <button
-          type="button"
           onClick={() => onGatherMore?.()}
           disabled={isLoading}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-lg bg-primary px-4 py-2 text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Gather More
+          Collect More Data
         </button>
       </div>
     </section>
@@ -266,6 +269,126 @@ interface ChatWindowProps {
   onSubmitSourceSelection?: () => void;
   devPrefill?: string | null;
   onDevPrefillConsumed?: () => void;
+}
+
+
+function SourceSummaryTable({
+  summaries,
+}: {
+  summaries: CollectionSourceSummary[];
+}) {
+  if (summaries.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded border border-border-muted">
+      <table className="min-w-full text-sm">
+        <thead className="bg-surface-muted">
+          <tr>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Source</th>
+            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">Items</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Resources</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summaries.map((s) => (
+            <tr key={s.display_name} className="border-t border-border-muted">
+              <td className="px-3 py-1.5 font-medium text-text-primary">{s.display_name}</td>
+              <td className="px-3 py-1.5 text-right text-text-secondary">{s.count}</td>
+              <td className="px-3 py-1.5 text-xs text-text-muted">
+                {s.resource_ids.length > 0 ? s.resource_ids.join(", ") : "—"}
+              </td>
+              <td className="px-3 py-1.5">
+                <span
+                  className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                    s.has_content ? "bg-success" : "bg-warning-dark"
+                  }`}
+                />
+                <span className="text-xs text-text-secondary">
+                  {s.has_content ? "Data found" : "Empty"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SourceItemAccordions({ items }: { items: CollectedItem[] }) {
+  // Group items by display name
+  const groups: Record<string, CollectedItem[]> = {};
+  for (const item of items) {
+    const name = TOOL_DISPLAY_NAMES[item.source] ?? item.source;
+    if (!groups[name]) groups[name] = [];
+    groups[name].push(item);
+  }
+
+  return (
+    <div className="space-y-2">
+      {Object.entries(groups).map(([groupName, groupItems]) => (
+        <details key={groupName} open className="group border border-border-muted rounded">
+          <summary className="cursor-pointer list-none flex items-center justify-between px-3 py-2 bg-surface-muted text-sm font-medium text-text-secondary select-none">
+            {groupName}
+            <Chevron />
+          </summary>
+          <div className="divide-y divide-border-muted">
+            {groupItems.map((item, i) => (
+              <div key={i} className="px-3 py-2">
+                {item.resource_id && (
+                  <span className="inline-block text-xs bg-primary-subtle text-info-text rounded px-1.5 py-0.5 mb-1">
+                    {item.resource_id}
+                  </span>
+                )}
+                <pre className="text-xs text-text-secondary whitespace-pre-wrap break-all max-h-40 overflow-auto bg-surface rounded p-1">
+                  {item.content || "(no content)"}
+                </pre>
+              </div>
+            ))}
+          </div>
+        </details>
+      ))}
+    </div>
+  );
+}
+
+function CollectionDisplayMessage({
+  data,
+}: {
+  data: CollectionDisplayData;
+}) {
+  if (data.parse_error) {
+    return (
+      <div className="space-y-2">
+        <h3 className="font-semibold">Collection Results</h3>
+        <p className="text-sm text-error-text">Could not parse collection output.</p>
+        <details className="group">
+          <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+            Raw output <Chevron />
+          </summary>
+          <pre className="mt-1 text-xs text-text-muted whitespace-pre-wrap break-all">
+            {data.parse_error}
+          </pre>
+        </details>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Collection Results</h3>
+      <SourceSummaryTable summaries={data.source_summary} />
+      <SourceItemAccordions items={data.collected_data} />
+      <details className="group border-t border-border pt-2">
+        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+          Raw JSON <Chevron />
+        </summary>
+        <pre className="mt-1 text-xs text-text-secondary bg-surface-muted rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap break-all">
+          {JSON.stringify(data.collected_data, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
 }
 
 export default function ChatWindow({
@@ -358,6 +481,14 @@ export default function ChatWindow({
       Array.isArray(message.data)
     ) {
       return <SuggestedSourcesMessage sources={message.data as SuggestedSourcesData} />;
+    }
+
+    if (
+      message.type === "collection" &&
+      message.data &&
+      "collected_data" in message.data
+    ) {
+      return <CollectionDisplayMessage data={message.data as CollectionDisplayData} />;
     }
 
     if (

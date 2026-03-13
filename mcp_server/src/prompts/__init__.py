@@ -13,7 +13,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
-    "Uploaded Documents": ["search_local_data"],
+    "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
 }
 
 
@@ -435,9 +435,13 @@ def build_collection_collect_prompt(
         f"and will be skipped: {', '.join(unmapped)}"
         if unmapped else ""
     )
+    _upload_tools_in_use = [t for t in ["list_uploads", "search_local_data", "read_upload"] if t in approved_tools]
     session_note = (
-        f"\nNote: For search_local_data, use session_id=\"{session_id}\"."
-        if session_id and "search_local_data" in approved_tools else ""
+        f"\nNote: For uploaded document tools, always use session_id=\"{session_id}\". "
+        f"Workflow: (1) call list_uploads(session_id) to see available files and their file_ids; "
+        f"(2) call search_local_data(session_id, query) for keyword-relevant snippets; "
+        f"(3) call read_upload(session_id, file_upload_id) to read the full content of relevant files."
+        if session_id and _upload_tools_in_use else ""
     )
     _min_lookback = (datetime.now(UTC).replace(year=datetime.now(UTC).year - 3)).strftime('%Y-%m-%d')
     since_note = (

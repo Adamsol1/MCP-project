@@ -26,17 +26,19 @@ _SOURCE_ALIASES = {
     "alienvault": "AlienVault OTX",
     "alienvault otx": "AlienVault OTX",
     "misp": "MISP",
+    "uploaded documents": "Uploaded Documents",
+    "user uploads": "Uploaded Documents",
+    "uploads": "Uploaded Documents",
+    "local documents": "Uploaded Documents",
 }
 
-_DEFAULT_SOURCE = "Internal Knowledge Bank"
-_SOURCE_ALIASES = {
-    "internal knowledge bank": "Internal Knowledge Bank",
-    "knowledge bank": "Internal Knowledge Bank",
-    "local knowledge bank": "Internal Knowledge Bank",
-    "otx": "AlienVault OTX",
-    "alienvault": "AlienVault OTX",
-    "alienvault otx": "AlienVault OTX",
-    "misp": "MISP",
+TOOL_TO_DISPLAY_NAME: dict[str, str] = {
+    "list_knowledge_base": "Internal Knowledge Bank",
+    "read_knowledge_base": "Internal Knowledge Bank",
+    "query_otx": "AlienVault OTX",
+    "search_local_data": "Uploaded Documents",
+    "list_uploads": "Uploaded Documents",
+    "read_upload": "Uploaded Documents",
 }
 
 
@@ -105,6 +107,8 @@ class CollectionService:
             return "Internal Knowledge Bank"
         if "misp" in key:
             return "MISP"
+        if "upload" in key or "local document" in key:
+            return "Uploaded Documents"
 
         return normalized
 
@@ -119,6 +123,57 @@ class CollectionService:
             if normalized and normalized not in deduped:
                 deduped.append(normalized)
         return deduped
+
+    @staticmethod
+    def parse_collected_data(raw_data: str) -> dict[str, Any]:
+        """Parse raw collected_data JSON into a structured display payload.
+
+        Returns a dict with:
+          - collected_data: the original list of {source, resource_id, content} items
+          - source_summary: per-source aggregates [{display_name, count, resource_ids, has_content}]
+        On parse failure returns {collected_data: [], source_summary: [], parse_error: raw_data}.
+        Never throws.
+        """
+        try:
+            stripped = raw_data.strip() if isinstance(raw_data, str) else ""
+            fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
+            if fence_match:
+                stripped = fence_match.group(1).strip()
+            parsed = json.loads(stripped) if stripped else {}
+            items: list[dict] = parsed.get("collected_data", [])
+            if not isinstance(items, list):
+                raise ValueError("collected_data is not a list")
+
+            # Build per-source aggregates
+            stats: dict[str, dict] = {}
+            for item in items:
+                tool_name = item.get("source", "unknown")
+                display_name = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
+                if display_name not in stats:
+                    stats[display_name] = {"count": 0, "resource_ids": [], "has_content": False}
+                stats[display_name]["count"] += 1
+                rid = item.get("resource_id")
+                if rid and rid not in stats[display_name]["resource_ids"]:
+                    stats[display_name]["resource_ids"].append(rid)
+                content = item.get("content", "")
+                if content and content.strip():
+                    stats[display_name]["has_content"] = True
+
+            source_summary = [
+                {
+                    "display_name": name,
+                    "count": s["count"],
+                    "resource_ids": s["resource_ids"],
+                    "has_content": s["has_content"],
+                }
+                for name, s in sorted(stats.items())
+            ]
+
+            return {"collected_data": items, "source_summary": source_summary}
+
+        except Exception:
+            logger.exception("[CollectionService] Failed to parse collected_data")
+            return {"collected_data": [], "source_summary": [], "parse_error": raw_data}
 
     @classmethod
     def _coerce_plan_payload(cls, raw_plan: str) -> dict[str, Any]:

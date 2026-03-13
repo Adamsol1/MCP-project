@@ -6,6 +6,7 @@ from enum import Enum
 
 from src.models.dialogue import DialogueContext, DialogueResponse
 from src.models.reasoning import ReasoningLog
+from src.services.collection_service import CollectionService
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
@@ -216,8 +217,10 @@ class CollectionFlow(BasePhaseFlow):
                 )
 
         self.state = CollectionState.REVIEWING
-        self.raw_data = collection_summary
-        return DialogueResponse(action="show_collection", content=self.raw_data)
+        self.raw_data = collection_summary  # keep raw string for processing phase
+
+        display_payload = CollectionService.parse_collected_data(collection_summary)
+        return DialogueResponse(action="show_collection", content=json.dumps(display_payload, ensure_ascii=False))
 
 
 
@@ -246,7 +249,7 @@ class CollectionFlow(BasePhaseFlow):
 
         else:
             self._log_user_action(action="modify", phase="reviewing", modifications=user_message, perspectives=None)
-            self.collected_data = await collection_service.modify_summary(self.collected_data, user_message)
+            self.collected_data = await collection_service.modify_summary(self.raw_data, user_message)
             return DialogueResponse(action="show_collection", content=self.collected_data)
 
 

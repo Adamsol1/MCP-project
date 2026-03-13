@@ -22,7 +22,8 @@ export interface Message {
     | PirData
     | CollectionPlanData
     | SuggestedSourcesData
-    | CollectionSummaryData;
+    | CollectionSummaryData
+    | CollectionDisplayData;
 }
 
 /**
@@ -153,4 +154,32 @@ export interface CollectionSummaryData {
   summary: string;
   sources_used: string[];
   gaps: string | null;
+}
+
+/**
+ * The data structure for displaying collected information from various sources during the collection review stage.
+ */
+export interface CollectedItem {
+  source: string;
+  resource_id: string | null;
+  content: string;
+}
+
+/**
+ * Summary of the sources used in the collection, including their display names, counts, resource IDs, and whether they contain content.
+ */
+export interface CollectionSourceSummary {
+  display_name: string;
+  count: number;
+  resource_ids: string[];
+  has_content: boolean;
+}
+
+/**
+ * The data structure for displaying the collected information from various sources during the collection review stage, including the collected data, a summary of the sources used, and any parsing errors encountered.
+ */
+export interface CollectionDisplayData {
+  collected_data: CollectedItem[];
+  source_summary: CollectionSourceSummary[];
+  parse_error?: string;
 }

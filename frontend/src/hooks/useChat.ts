@@ -17,6 +17,7 @@ import { useToast } from "./useToast";
 import type {
   CollectionPlanData,
   CollectionSummaryData,
+  CollectionDisplayData,
   Message,
   PirData,
   SuggestedSourcesData,
@@ -142,7 +143,10 @@ function parsePlanData(raw: string): CollectionPlanData {
 
 function parseSuggestedSources(raw: string): string[] {
   const parsed = tryParseJson<unknown>(raw);
-  if (Array.isArray(parsed) && parsed.every((item) => typeof item === "string")) {
+  if (
+    Array.isArray(parsed) &&
+    parsed.every((item) => typeof item === "string")
+  ) {
     return parseSourcesFromUnknown(parsed);
   }
   const planData = parsePlanData(raw);
@@ -225,12 +229,26 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     return message;
   }
 
-  if (messageType === "summary" || messageType === "pir" || messageType === "collection") {
-    const parsed = tryParseJson<
-      SummaryData | PirData | CollectionSummaryData
-    >(response.question);
+  if (messageType === "summary" || messageType === "pir") {
+    const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
+      response.question,
+    );
     if (parsed) {
       message.data = parsed;
+    }
+  }
+
+  if (messageType === "collection") {
+    const parsed = tryParseJson<unknown>(response.question);
+    if (parsed && typeof parsed === "object" && parsed !== null) {
+      if (
+        "collected_data" in parsed &&
+        Array.isArray((parsed as Record<string, unknown>).collected_data)
+      ) {
+        message.data = parsed as CollectionDisplayData;
+      } else if ("sources_used" in parsed) {
+        message.data = parsed as CollectionSummaryData;
+      }
     }
   }
 
@@ -263,12 +281,8 @@ function getFeedbackPrompt(stage: DialogueStage): string {
 }
 
 export function useChat() {
-  const {
-    activeConversation,
-    createNewConversation,
-    addMessage,
-    setStage,
-  } = useConversation();
+  const { activeConversation, createNewConversation, addMessage, setStage } =
+    useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -331,7 +345,11 @@ export function useChat() {
       setSuggestedSources(sources);
     }
 
-    const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
+    const next = inferStageFromResponse(
+      response,
+      fallbackStage,
+      fallbackSubState,
+    );
     setStage(next.stage, next.subState);
   };
 

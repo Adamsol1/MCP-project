@@ -15,7 +15,6 @@ from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
 # from pymisp import PyMISP  # MISP not configured on external server
-
 from prompts import (
     build_collection_collect_prompt,
     build_collection_modify_prompt,
