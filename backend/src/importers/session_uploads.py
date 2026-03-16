@@ -10,13 +10,15 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from src.services.mcp_staging import stage_to_mcp, unstage_from_mcp, unstage_session_from_mcp
+
 ALLOWED_FILETYPES = {".txt", ".pdf", ".json", ".csv"}
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
 
 
 def default_uploads_root() -> Path:
     """Return default uploads root shared between backend and MCP server."""
-    return Path(__file__).resolve().parents[3] / "data" / "imports"
+    return Path(__file__).resolve().parents[2] / "data" / "imports"
 
 
 def legal_file_upload(filename: str) -> bool:
@@ -169,6 +171,50 @@ def _compose_pdf_markdown(
         lines.append("")
 
     return "\n".join(lines).strip() + "\n"
+
+
+def _convert_to_markdown(
+    *,
+    file_upload_id: str,
+    session_id: str,
+    source_filename: str,
+    extension: str,
+    stored_path: Path,
+    parsed_path: Path,
+) -> str:
+    """Wrap non-PDF file content in a minimal markdown artifact.
+
+    Returns parse_status: "ready" on success, "failed" on read error.
+    The raw file content is preserved unchanged — only front matter and a
+    heading are added so the AI has context about the source.
+    """
+    try:
+        content = stored_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return "failed"
+
+    lines = [
+        "---",
+        f"file_upload_id: {_yaml_quote(file_upload_id)}",
+        f"session_id: {_yaml_quote(session_id)}",
+        f"source_filename: {_yaml_quote(source_filename)}",
+        f"file_type: {_yaml_quote(extension.lstrip('.'))}",
+        f"parsed_at: {_yaml_quote(_now_iso())}",
+        "---",
+        "",
+        f"# {source_filename}",
+        "",
+    ]
+
+    if extension in (".json", ".csv"):
+        lines.extend([f"```{extension.lstrip('.')}", content, "```"])
+    else:
+        lines.append(content)
+
+    markdown = "\n".join(lines).strip() + "\n"
+    parsed_path.parent.mkdir(parents=True, exist_ok=True)
+    parsed_path.write_text(markdown, encoding="utf-8")
+    return "ready"
 
 
 def _parse_pdf_to_markdown(
@@ -329,8 +375,9 @@ def save_session_upload(
         },
     }
 
+    parsed_path = paths["parsed_dir"] / f"{file_upload_id}.md"
+
     if extension == ".pdf":
-        parsed_path = paths["parsed_dir"] / f"{file_upload_id}.md"
         citation, parse_status, searchable, skip_reason, metadata_flags = (
             _parse_pdf_to_markdown(
                 file_upload_id=file_upload_id,
@@ -346,6 +393,21 @@ def save_session_upload(
         entry["citation"] = citation
         entry["parsed_markdown_path"] = parsed_path.as_posix()
         entry["metadata_flags"] = metadata_flags
+        if parse_status in ("ready", "skipped"):
+            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix())
+    else:
+        parse_status = _convert_to_markdown(
+            file_upload_id=file_upload_id,
+            session_id=validated_session_id,
+            source_filename=safe_filename,
+            extension=extension,
+            stored_path=stored_path,
+            parsed_path=parsed_path,
+        )
+        entry["parse_status"] = parse_status
+        entry["parsed_markdown_path"] = parsed_path.as_posix()
+        if parse_status == "ready":
+            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix())
 
     manifest = _load_manifest(paths["manifest_path"], validated_session_id)
     manifest["files"].append(entry)
@@ -393,4 +455,26 @@ def delete_session_upload(
 
     manifest["files"] = kept
     _write_manifest(paths["manifest_path"], manifest)
+    unstage_from_mcp(validated_session_id, file_upload_id)
     return True
+
+
+def delete_session_uploads(*, session_id: str, uploads_root: Path) -> bool:
+    """Delete all upload artifacts for a session and remove the session directory.
+
+    Removes the entire {uploads_root}/{session_id}/ directory tree and
+    clears the MCP staging directory for the session.
+
+    Returns True if the session directory existed and was removed, False otherwise.
+    """
+    import shutil
+
+    validated_session_id = validate_session_id(session_id)
+    session_dir = _session_paths(uploads_root, validated_session_id)["session_dir"]
+
+    existed = session_dir.exists()
+    if existed:
+        shutil.rmtree(session_dir)
+
+    unstage_session_from_mcp(validated_session_id)
+    return existed

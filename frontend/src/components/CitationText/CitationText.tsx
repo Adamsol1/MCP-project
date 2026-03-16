@@ -3,48 +3,80 @@ import type { Claim } from "../../types/conversation";
 interface CitationTextProps {
   text: string;
   claims: Claim[];
-  highlightedRef: string | null;
-  onRefHover: (ref: string | null) => void;
+  highlightedRefs: string[];
+  onRefHover: (refs: string[]) => void;
+}
+
+/**
+ * Build a map from part-index → the full group of consecutive [N] markers that
+ * part belongs to (or is adjacent to). This lets hovering any marker in [1][2]
+ * emit both refs, highlighting both sources.
+ */
+function buildMarkerGroups(parts: string[]): Map<number, string[]> {
+  const groups = new Map<number, string[]>();
+  let i = 0;
+  while (i < parts.length) {
+    if (parts[i] === "") { i++; continue; }
+    if (/^\[\d+\]$/.test(parts[i])) {
+      // Collect the full run of consecutive markers (skipping empty strings)
+      const group: number[] = [i];
+      let j = i + 1;
+      while (j < parts.length) {
+        if (parts[j] === "") { j++; continue; }
+        if (/^\[\d+\]$/.test(parts[j])) { group.push(j); j++; }
+        else break;
+      }
+      const refs = group.map((idx) => parts[idx]);
+      for (const idx of group) groups.set(idx, refs);
+      i = j;
+    } else {
+      i++;
+    }
+  }
+  return groups;
 }
 
 export default function CitationText({
   text,
   claims,
-  highlightedRef,
+  highlightedRefs,
   onRefHover,
 }: CitationTextProps) {
   const parts = text.split(/(\[\d+\])/g);
+  const markerGroups = buildMarkerGroups(parts);
 
   return (
     <span>
       {parts.map((part, i) => {
         if (part === "") return null; // Skip empty segments
 
-        // find markers [1], [2], etc. using regex, and make them hoverable
+        // [N] marker — emit its full group on hover
         if (/^\[\d+\]$/.test(part)) {
+          const group = markerGroups.get(i) ?? [part];
+          const isHighlighted = group.some((r) => highlightedRefs.includes(r));
           return (
             <sup
               key={i}
-              onMouseEnter={() => onRefHover(part)}
-              onMouseLeave={() => onRefHover(null)}
+              className={isHighlighted ? "text-primary" : undefined}
+              onMouseEnter={() => onRefHover(group)}
+              onMouseLeave={() => onRefHover([])}
             >
               {part}
             </sup>
           );
         }
 
-
         // Look for a claim whose .text matches this segment (trim spaces before comparing)
         const claim = claims.find((c) => c.text === part.trim());
 
         if (claim) {
-          const isHighlighted = highlightedRef === claim.source_ref;
+          const isHighlighted = highlightedRefs.includes(claim.source_ref);
           return (
             <span
               key={i}
               className={isHighlighted ? "bg-primary-subtle" : ""}
-              onMouseEnter={() => onRefHover(claim.source_ref)}
-              onMouseLeave={() => onRefHover(null)}
+              onMouseEnter={() => onRefHover([claim.source_ref])}
+              onMouseLeave={() => onRefHover([])}
             >
               {part}
             </span>
@@ -52,9 +84,6 @@ export default function CitationText({
         }
 
         // Fallback: collect ALL consecutive [N] markers immediately after this segment.
-        // "claim[1][2]" splits as ["claim", "[1]", "", "[2]", ...] — we skip empty
-        // segments and gather every marker before the next real text.
-        // This means hovering source [1] OR source [2] both highlight "claim".
         const followingRefs: string[] = [];
         let j = i + 1;
         while (j < parts.length) {
@@ -63,14 +92,13 @@ export default function CitationText({
           else break;
         }
         if (followingRefs.length > 0) {
-          const isHighlighted =
-            highlightedRef !== null && followingRefs.includes(highlightedRef);
+          const isHighlighted = followingRefs.some((r) => highlightedRefs.includes(r));
           return (
             <span
               key={i}
               className={isHighlighted ? "bg-primary-subtle" : ""}
-              onMouseEnter={() => onRefHover(followingRefs[0])}
-              onMouseLeave={() => onRefHover(null)}
+              onMouseEnter={() => onRefHover(followingRefs)}
+              onMouseLeave={() => onRefHover([])}
             >
               {part}
             </span>

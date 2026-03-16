@@ -15,10 +15,18 @@ class Perspective(str, Enum):
 
 
 class DialogueAction(str, Enum):
+    # Direction phase
     ASK_QUESTION = "ask_question"
     SHOW_SUMMARY = "show_summary"
     SHOW_PIR = "show_pir"
     MAX_QUESTIONS = "max_questions"
+    # Collection phase
+    SHOW_PLAN = "show_plan"
+    SHOW_SUGGESTED_SOURCES = "show_suggested_sources"
+    START_COLLECTING = "start_collecting"
+    SHOW_COLLECTION = "show_collection"
+    ERROR = "error"
+    # Shared
     COMPLETE = "complete"
 
 
@@ -43,6 +51,14 @@ class DialogueContext(BaseModel):
     perspectives: list[Perspective] = [Perspective.NEUTRAL]
     modifications: str | None = None
     dialogue_turns: list[dict] = []
+
+
+class CollectionContext(BaseModel):
+    """Context passed to the reviewer during the collection phase."""
+
+    pir: str
+    plan: str
+    direction_context: DialogueContext | None = None
 
 
 class DialogueResponse(BaseModel):

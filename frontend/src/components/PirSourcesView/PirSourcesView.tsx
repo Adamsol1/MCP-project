@@ -6,17 +6,26 @@ import SourceList from "../SourceList/SourceList";
  * @returns JSX.Element
  */
 export default function PirSourcesView() {
-  const { pirData, highlightedRef, setHighlightedRef } = useWorkspace();
+  const { pirData, highlightedRefs, setHighlightedRefs } = useWorkspace();
 
   if (!pirData || pirData.sources.length === 0) {
-    return <div>No sources available.</div>;
+    return (
+      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-secondary">
+        No sources available.
+      </div>
+    );
   }
 
   return (
-    <SourceList
-      sources={pirData.sources}
-      highlightedRef={highlightedRef}
-      onSourceHover={setHighlightedRef}
-    />
+    <div className="space-y-2">
+      <p className="text-xs font-medium uppercase tracking-wider text-text-muted">
+        Sources ({pirData.sources.length})
+      </p>
+      <SourceList
+        sources={pirData.sources}
+        highlightedRefs={highlightedRefs}
+        onSourceHover={setHighlightedRefs}
+      />
+    </div>
   );
 }

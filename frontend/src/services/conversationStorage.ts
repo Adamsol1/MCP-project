@@ -19,6 +19,11 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
     rawStage === "gathering" ||
     rawStage === "summary_confirming" ||
     rawStage === "pir_confirming" ||
+    rawStage === "planning" ||
+    rawStage === "plan_confirming" ||
+    rawStage === "source_selecting" ||
+    rawStage === "collecting" ||
+    rawStage === "reviewing" ||
     rawStage === "complete"
   ) {
     return rawStage;
@@ -29,7 +34,8 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
 function coerceSubState(rawSubState: unknown): DialogueSubState {
   if (
     rawSubState === "awaiting_decision" ||
-    rawSubState === "awaiting_modifications"
+    rawSubState === "awaiting_modifications" ||
+    rawSubState === "awaiting_gather_more"
   ) {
     return rawSubState;
   }
@@ -44,8 +50,11 @@ function normalizeConversation(raw: Conversation): Conversation {
     stage,
     subState,
     isConfirming:
-      (stage === "summary_confirming" || stage === "pir_confirming") &&
-      subState !== "awaiting_modifications",
+      (stage === "summary_confirming" ||
+        stage === "pir_confirming" ||
+        stage === "plan_confirming" ||
+        stage === "reviewing") &&
+      subState === "awaiting_decision",
   };
 }
 

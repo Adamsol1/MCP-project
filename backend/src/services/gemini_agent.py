@@ -40,8 +40,7 @@ def _json_schema_to_gemini(schema: dict) -> types.Schema:
     }
     schema_type = type_map.get(schema.get("type", "string"), types.Type.STRING)
     properties = {
-        k: _json_schema_to_gemini(v)
-        for k, v in schema.get("properties", {}).items()
+        k: _json_schema_to_gemini(v) for k, v in schema.get("properties", {}).items()
     }
     return types.Schema(
         type=schema_type,
@@ -71,7 +70,7 @@ class GeminiAgent:
         self,
         mcp_client,
         model: str = "gemini-2.5-flash",
-        max_tool_rounds: int = 10,
+        max_tool_rounds: int = 25,
     ):
         api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)
@@ -91,7 +90,9 @@ class GeminiAgent:
         """
         # Discover available tools from the MCP server
         available_tools = await self._get_tool_declarations()
-        logger.info(f"[GeminiAgent] Starting run with {len(available_tools)} tools available")
+        logger.info(
+            f"[GeminiAgent] Starting run with {len(available_tools)} tools available"
+        )
 
         # Build initial message history
         contents = [
@@ -118,21 +119,25 @@ class GeminiAgent:
 
             # Check if the model wants to call tools
             tool_calls = [
-                part for part in candidate.content.parts
+                part
+                for part in candidate.content.parts
                 if part.function_call is not None
             ]
 
             if not tool_calls:
                 # No tool calls — agent is done, return final text
                 text = "".join(
-                    part.text for part in candidate.content.parts
+                    part.text
+                    for part in candidate.content.parts
                     if part.text is not None
                 )
                 logger.info(f"[GeminiAgent] Completed in {round_num + 1} round(s)")
                 return text
 
             # Execute all requested tool calls
-            logger.info(f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)")
+            logger.info(
+                f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)"
+            )
             contents.append(candidate.content)
 
             tool_results = []
@@ -141,7 +146,9 @@ class GeminiAgent:
                 logger.info(f"[GeminiAgent] Calling tool: {fc.name}({dict(fc.args)})")
                 try:
                     result = await self.mcp_client.call_tool(fc.name, dict(fc.args))
-                    result_text = result if isinstance(result, str) else json.dumps(result)
+                    result_text = (
+                        result if isinstance(result, str) else json.dumps(result)
+                    )
                 except Exception as e:
                     result_text = f"Tool error: {type(e).__name__}: {e}"
                     logger.error(f"[GeminiAgent] Tool {fc.name} failed: {e}")
@@ -155,15 +162,14 @@ class GeminiAgent:
                     )
                 )
 
-            contents.append(
-                types.Content(role="tool", parts=tool_results)
-            )
+            contents.append(types.Content(role="tool", parts=tool_results))
 
         # Safety: max rounds reached — return whatever the model last said
-        logger.warning(f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached")
+        logger.warning(
+            f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached"
+        )
         last_text = "".join(
-            part.text for part in candidate.content.parts
-            if part.text is not None
+            part.text for part in candidate.content.parts if part.text is not None
         )
         return last_text or "Agent reached maximum tool iterations without completing."
 

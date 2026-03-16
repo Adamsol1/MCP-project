@@ -14,8 +14,19 @@ import {
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
-import { WorkspaceProvider } from "./contexts/WorkspaceContext/WorkspaceContext";
+import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
+
+function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
+  const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
+  useEffect(() => {
+    setPirData(null);
+    setActivePhase("direction");
+    setCollectionData(null);
+    setHighlightedRefs([]);
+  }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
 
 function App() {
   const { success, error } = useToast();
@@ -34,9 +45,17 @@ function App() {
     sendMessage,
     isConfirming,
     stage,
+    subState,
     isLoading,
+    isSourceSelecting,
+    isCollecting,
+    availableSources,
+    selectedSources,
     approve,
     reject,
+    gatherMore,
+    toggleSourceSelection,
+    submitSourceSelection,
     debugConfirm,
     jumpToDevStage,
     syncDevStage,
@@ -109,6 +128,7 @@ function App() {
 
   return (
     <WorkspaceProvider>
+    <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
     <div className="flex h-screen">
       <Sidebar
         conversations={conversations}
@@ -136,9 +156,17 @@ function App() {
           onSendMessage={sendMessage}
           isConfirming={isConfirming}
           stage={stage}
+          subState={subState}
           isLoading={isLoading}
           onApprove={approve}
           onReject={reject}
+          onGatherMore={gatherMore}
+          isSourceSelecting={isSourceSelecting}
+          isCollecting={isCollecting}
+          availableSources={availableSources}
+          selectedSources={selectedSources}
+          onToggleSourceSelection={toggleSourceSelection}
+          onSubmitSourceSelection={submitSourceSelection}
           devPrefill={devPrefill}
           onDevPrefillConsumed={clearDevPrefill}
         />

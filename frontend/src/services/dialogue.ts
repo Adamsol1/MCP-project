@@ -15,6 +15,11 @@ export interface DialogueApiResponse {
   sub_state?: DialogueSubState;
 }
 
+export interface DialogueSendOptions {
+  selectedSources?: string[];
+  gatherMore?: boolean;
+}
+
 export interface DialogueDevStateResponse {
   session_id: string;
   stage: DialogueStage;
@@ -58,6 +63,7 @@ export async function sendMessage(
   approved?: boolean,
   language: string = "en",
   settingsTimeframe: string = "",
+  options: DialogueSendOptions = {},
 ) {
   const httpResonse = await axios.post<DialogueApiResponse>(
     `${API_BACKEND_URL}/api/dialogue/message`,
@@ -68,6 +74,8 @@ export async function sendMessage(
       approved,
       language,
       settings_timeframe: settingsTimeframe,
+      selected_sources: options.selectedSources ?? [],
+      gather_more: options.gatherMore ?? false,
     },
   );
 

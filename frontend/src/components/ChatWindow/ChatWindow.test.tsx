@@ -697,7 +697,7 @@ describe("PirMessage — rationale citation rendering", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    expect(sourceCard).toHaveClass("bg-primary-subtle");
+    expect(sourceCard).toHaveClass("text-primary");
   });
 
   it("renders rationale without [N] markers as plain text with no superscripts", () => {

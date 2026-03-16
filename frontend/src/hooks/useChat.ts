@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   getDevDialogueState,
   resetDevDialogueState,
   sendMessage,
   setDevDialogueState,
   type DialogueApiResponse,
+  type DialogueSendOptions,
 } from "../services/dialogue";
 import type {
   DialogueAction,
@@ -13,8 +14,23 @@ import type {
 } from "../types/dialogue";
 import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
-import type { Message, PirData, SummaryData } from "../types/conversation";
+import type {
+  CollectionPlanData,
+  CollectionSummaryData,
+  CollectionDisplayData,
+  Message,
+  PirData,
+  SuggestedSourcesData,
+  SummaryData,
+} from "../types/conversation";
 import { useSettings } from "../contexts/SettingsContext/SettingsContext";
+
+const DECISION_STAGES: DialogueStage[] = [
+  "summary_confirming",
+  "pir_confirming",
+  "plan_confirming",
+  "reviewing",
+];
 
 const ACTION_TO_MESSAGE_TYPE: Record<
   DialogueAction,
@@ -24,8 +40,121 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   show_summary: "summary",
   show_pir: "pir",
   max_questions: "summary",
+  show_plan: "plan",
+  show_suggested_sources: "suggested_sources",
+  start_collecting: "question",
+  show_collection: "collection",
+  error: "error",
   complete: "complete",
 };
+
+function isDecisionStage(stage: DialogueStage): boolean {
+  return DECISION_STAGES.includes(stage);
+}
+
+function defaultSubStateForStage(stage: DialogueStage): DialogueSubState {
+  return isDecisionStage(stage) ? "awaiting_decision" : null;
+}
+
+function tryParseJson<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
+function extractJsonObject(raw: string): Record<string, unknown> | null {
+  const direct = tryParseJson<unknown>(raw);
+  if (direct && typeof direct === "object" && !Array.isArray(direct)) {
+    return direct as Record<string, unknown>;
+  }
+
+  const codeBlockMatch = raw.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (codeBlockMatch?.[1]) {
+    const fromCodeBlock = tryParseJson<unknown>(codeBlockMatch[1]);
+    if (
+      fromCodeBlock &&
+      typeof fromCodeBlock === "object" &&
+      !Array.isArray(fromCodeBlock)
+    ) {
+      return fromCodeBlock as Record<string, unknown>;
+    }
+  }
+
+  const start = raw.indexOf("{");
+  const end = raw.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const candidate = raw.slice(start, end + 1);
+    const parsed = tryParseJson<unknown>(candidate);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      return parsed as Record<string, unknown>;
+    }
+  }
+
+  return null;
+}
+
+function normalizeSourceLabel(raw: string): string {
+  const value = raw.trim();
+  const lower = value.toLowerCase();
+  if (lower === "otx" || lower.includes("alienvault")) {
+    return "AlienVault OTX";
+  }
+  if (lower.includes("knowledge") && lower.includes("bank")) {
+    return "Internal Knowledge Bank";
+  }
+  if (lower.includes("misp")) {
+    return "MISP";
+  }
+  return value;
+}
+
+function parseSourcesFromUnknown(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const deduped: string[] = [];
+  raw.forEach((item) => {
+    if (typeof item !== "string") return;
+    const normalized = normalizeSourceLabel(item);
+    if (!deduped.includes(normalized)) {
+      deduped.push(normalized);
+    }
+  });
+  return deduped;
+}
+
+function parsePlanData(raw: string): CollectionPlanData {
+  const parsed = extractJsonObject(raw);
+  if (!parsed) {
+    return { plan: raw, suggested_sources: [] };
+  }
+
+  const planValue = parsed.plan;
+  const plan =
+    typeof planValue === "string"
+      ? planValue
+      : JSON.stringify(planValue ?? parsed, null, 2);
+
+  return {
+    plan,
+    suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
+  };
+}
+
+function parseSuggestedSources(raw: string): string[] {
+  const parsed = tryParseJson<unknown>(raw);
+  if (
+    Array.isArray(parsed) &&
+    parsed.every((item) => typeof item === "string")
+  ) {
+    return parseSourcesFromUnknown(parsed);
+  }
+  const planData = parsePlanData(raw);
+  if (planData.suggested_sources.length > 0) {
+    return planData.suggested_sources;
+  }
+  return [];
+}
 
 function resolveMessageType(
   response: DialogueApiResponse,
@@ -33,18 +162,19 @@ function resolveMessageType(
   return ACTION_TO_MESSAGE_TYPE[response.action];
 }
 
-function inferStageFromResponse(response: DialogueApiResponse): {
+function inferStageFromResponse(
+  response: DialogueApiResponse,
+  fallbackStage: DialogueStage,
+  fallbackSubState: DialogueSubState,
+): {
   stage: DialogueStage;
   subState: DialogueSubState;
 } {
   if (response.stage) {
-    const subState =
-      response.sub_state ??
-      (response.stage === "summary_confirming" ||
-      response.stage === "pir_confirming"
-        ? "awaiting_decision"
-        : null);
-    return { stage: response.stage, subState };
+    return {
+      stage: response.stage,
+      subState: response.sub_state ?? defaultSubStateForStage(response.stage),
+    };
   }
 
   if (
@@ -56,13 +186,25 @@ function inferStageFromResponse(response: DialogueApiResponse): {
   if (response.action === "show_pir") {
     return { stage: "pir_confirming", subState: "awaiting_decision" };
   }
+  if (response.action === "show_plan") {
+    return { stage: "plan_confirming", subState: "awaiting_decision" };
+  }
+  if (response.action === "show_suggested_sources") {
+    return { stage: "source_selecting", subState: null };
+  }
+  if (response.action === "start_collecting") {
+    return { stage: "collecting", subState: null };
+  }
+  if (response.action === "show_collection") {
+    return { stage: "reviewing", subState: "awaiting_decision" };
+  }
   if (response.action === "complete") {
     return { stage: "complete", subState: null };
   }
   if (response.action === "ask_question") {
     return { stage: "gathering", subState: null };
   }
-  return { stage: "gathering", subState: null };
+  return { stage: fallbackStage, subState: fallbackSubState };
 }
 
 function buildSystemMessage(response: DialogueApiResponse): Message {
@@ -77,43 +219,178 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     message.type = messageType;
   }
 
+  if (response.action === "start_collecting") {
+    const sources = parseSuggestedSources(response.question);
+    if (sources.length > 0) {
+      message.text = `Collecting from: ${sources.join(", ")}`;
+    } else {
+      message.text = "Collecting from selected sources...";
+    }
+    return message;
+  }
+
   if (messageType === "summary" || messageType === "pir") {
-    try {
-      const parsed = JSON.parse(response.question) as SummaryData | PirData;
+    const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
+      response.question,
+    );
+    if (parsed) {
       message.data = parsed;
-    } catch {
-      // Keep raw text if backend does not return valid JSON.
+    }
+  }
+
+  if (messageType === "collection") {
+    const parsed = tryParseJson<unknown>(response.question);
+    if (parsed && typeof parsed === "object" && parsed !== null) {
+      if (
+        "collected_data" in parsed &&
+        Array.isArray((parsed as Record<string, unknown>).collected_data)
+      ) {
+        message.data = parsed as CollectionDisplayData;
+      } else if ("sources_used" in parsed) {
+        message.data = parsed as CollectionSummaryData;
+      }
+    }
+  }
+
+  if (messageType === "plan") {
+    message.data = parsePlanData(response.question);
+  }
+
+  if (messageType === "suggested_sources") {
+    const sources = parseSuggestedSources(response.question);
+    if (sources.length > 0) {
+      message.data = sources as SuggestedSourcesData;
+      message.text = `Suggested sources: ${sources.join(", ")}`;
     }
   }
 
   return message;
 }
 
+function getFeedbackPrompt(stage: DialogueStage): string {
+  if (stage === "summary_confirming") {
+    return "What would you like to change in the summary?";
+  }
+  if (stage === "pir_confirming") {
+    return "What would you like to change in the PIRs?";
+  }
+  if (stage === "plan_confirming") {
+    return "What should be changed in the collection plan?";
+  }
+  return "What should be modified in the collected summary?";
+}
+
 export function useChat() {
-  const {
-    activeConversation,
-    createNewConversation,
-    addMessage,
-    setIsConfirming,
-    setStage,
-  } = useConversation();
+  const { activeConversation, createNewConversation, addMessage, setStage } =
+    useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [isDecisionPending, setIsDecisionPending] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
+  const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
+  const [selectedSources, setSelectedSources] = useState<string[]>([]);
 
   const messages = activeConversation?.messages ?? [];
   const stage = activeConversation?.stage ?? "initial";
   const subState = activeConversation?.subState ?? null;
   const isConfirming =
-    (stage === "summary_confirming" || stage === "pir_confirming") &&
-    subState !== "awaiting_modifications";
+    isDecisionStage(stage) &&
+    subState === "awaiting_decision" &&
+    !isDecisionPending;
+  const isSourceSelecting = stage === "source_selecting";
+  const isCollecting = stage === "collecting";
+
+  const fallbackSuggestedSources = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const message = messages[i];
+      if (message.type === "suggested_sources" && Array.isArray(message.data)) {
+        return message.data as SuggestedSourcesData;
+      }
+    }
+    return [] as string[];
+  }, [messages]);
+
+  const availableSources =
+    suggestedSources.length > 0 ? suggestedSources : fallbackSuggestedSources;
+
+  useEffect(() => {
+    if (availableSources.length === 0) {
+      setSelectedSources([]);
+      return;
+    }
+    setSelectedSources((previous) => {
+      const stillValid = previous.filter((source) =>
+        availableSources.includes(source),
+      );
+      return stillValid.length > 0 ? stillValid : [...availableSources];
+    });
+  }, [availableSources]);
+
+  useEffect(() => {
+    setSuggestedSources([]);
+    setSelectedSources([]);
+  }, [activeConversation?.id]);
+
+  const applyResponse = (
+    response: DialogueApiResponse,
+    conversationId: string,
+    fallbackStage: DialogueStage,
+    fallbackSubState: DialogueSubState,
+  ) => {
+    addMessage(buildSystemMessage(response), conversationId);
+
+    if (response.action === "show_suggested_sources") {
+      const sources = parseSuggestedSources(response.question);
+      setSuggestedSources(sources);
+    }
+
+    const next = inferStageFromResponse(
+      response,
+      fallbackStage,
+      fallbackSubState,
+    );
+    setStage(next.stage, next.subState);
+  };
+
+  const sendAndHandle = async (
+    conversationId: string,
+    sessionId: string,
+    message: string,
+    approved: boolean | undefined,
+    options: DialogueSendOptions,
+    fallbackStage: DialogueStage,
+    fallbackSubState: DialogueSubState,
+    perspectives: string[],
+  ) => {
+    const response = await sendMessage(
+      message,
+      sessionId,
+      perspectives,
+      approved,
+      settings.language,
+      settings.inputParameters.timeframe,
+      options,
+    );
+
+    applyResponse(response, conversationId, fallbackStage, fallbackSubState);
+
+    if (response.action !== "start_collecting") {
+      return;
+    }
+
+    const collectResponse = await sendMessage(
+      "collect",
+      sessionId,
+      perspectives,
+      undefined,
+      settings.language,
+      settings.inputParameters.timeframe,
+    );
+    applyResponse(collectResponse, conversationId, "collecting", null);
+  };
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    // Auto-create a conversation when none is active (first visit, or after
-    // deleting all conversations). createNewConversation() dispatches to the
-    // reducer and returns the new Conversation synchronously so we have its
-    // sessionId and perspectives before any async work begins.
     const conversation = activeConversation ?? createNewConversation();
 
     addMessage(
@@ -121,19 +398,21 @@ export function useChat() {
       conversation.id,
     );
 
+    const gatherMore =
+      stage === "reviewing" && subState === "awaiting_gather_more";
+
     setIsLoading(true);
     try {
-      const response = await sendMessage(
-        text,
+      await sendAndHandle(
+        conversation.id,
         conversation.sessionId,
-        conversation.perspectives,
+        text,
         approved,
-        settings.language,
-        settings.inputParameters.timeframe,
+        { gatherMore },
+        stage,
+        subState,
+        conversation.perspectives,
       );
-      addMessage(buildSystemMessage(response), conversation.id);
-      const next = inferStageFromResponse(response);
-      setStage(next.stage, next.subState);
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -143,22 +422,97 @@ export function useChat() {
 
   const approve = async () => {
     if (!activeConversation) return;
+    setIsDecisionPending(true);
     setIsLoading(true);
     try {
-      const response = await sendMessage(
-        "approve",
+      await sendAndHandle(
+        activeConversation.id,
         activeConversation.sessionId,
-        activeConversation.perspectives,
+        "approve",
         true,
-        settings.language,
-        settings.inputParameters.timeframe,
+        {},
+        stage,
+        subState,
+        activeConversation.perspectives,
       );
-      addMessage(buildSystemMessage(response), activeConversation.id);
-      const next = inferStageFromResponse(response);
-      setStage(next.stage, next.subState);
       success("Request approved");
     } catch (e) {
       error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+      setIsDecisionPending(false);
+    }
+  };
+
+  const reject = () => {
+    if (!activeConversation || !isDecisionStage(stage)) {
+      return;
+    }
+
+    addMessage(
+      {
+        id: crypto.randomUUID(),
+        text: getFeedbackPrompt(stage),
+        sender: "system",
+      },
+      activeConversation.id,
+    );
+
+    setStage(stage, "awaiting_modifications");
+    info("Add your feedback in chat.");
+  };
+
+  const gatherMore = () => {
+    if (!activeConversation || stage !== "reviewing") {
+      return;
+    }
+
+    addMessage(
+      {
+        id: crypto.randomUUID(),
+        text: "What additional information should I gather?",
+        sender: "system",
+      },
+      activeConversation.id,
+    );
+    setStage("reviewing", "awaiting_gather_more");
+    info("Describe what to gather more on.");
+  };
+
+  const toggleSourceSelection = (source: string) => {
+    setSelectedSources((current) => {
+      if (current.includes(source)) {
+        return current.filter((item) => item !== source);
+      }
+      return [...current, source];
+    });
+  };
+
+  const submitSourceSelection = async () => {
+    if (!activeConversation) return;
+    if (selectedSources.length === 0) {
+      error("Select at least one source to continue.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendAndHandle(
+        activeConversation.id,
+        activeConversation.sessionId,
+        "sources_selected",
+        undefined,
+        { selectedSources },
+        stage,
+        subState,
+        activeConversation.perspectives,
+      );
+    } catch (e) {
+      error(
+        `Failed to start collection: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -173,26 +527,16 @@ export function useChat() {
   };
 
   const debugConfirm = () => {
-    addMessage({
-      id: crypto.randomUUID(),
-      text: "Summary: Investigate APT29 activity targeting EU infrastructure over the last 6 months. Do you approve?",
-      sender: "system",
-    });
+    const conversation = activeConversation ?? createNewConversation();
+    addMessage(
+      {
+        id: crypto.randomUUID(),
+        text: "Summary: Investigate APT29 activity targeting EU infrastructure over the last 6 months. Do you approve?",
+        sender: "system",
+      },
+      conversation.id,
+    );
     setStage("summary_confirming", "awaiting_decision");
-  };
-
-  const reject = () => {
-    addMessage({
-      id: crypto.randomUUID(),
-      text: "What would you like to change?",
-      sender: "system",
-    });
-    if (stage === "summary_confirming" || stage === "pir_confirming") {
-      setStage(stage, "awaiting_modifications");
-    } else {
-      setIsConfirming(false);
-    }
-    info("Request rejected - what would you like to change?");
   };
 
   const jumpToDevStage = async (
@@ -244,8 +588,15 @@ export function useChat() {
     stage,
     subState,
     isLoading,
+    isSourceSelecting,
+    isCollecting,
+    availableSources,
+    selectedSources,
     approve,
     reject,
+    gatherMore,
+    toggleSourceSelection,
+    submitSourceSelection,
     debugConfirm,
     jumpToDevStage,
     syncDevStage,

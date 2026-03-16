@@ -23,7 +23,6 @@ from starlette.responses import JSONResponse
 from prompts import (
     build_collection_review_prompt,
     build_direction_review_prompt,
-    build_processing_review_prompt,
 )
 
 load_dotenv()

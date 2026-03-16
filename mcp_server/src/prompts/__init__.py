@@ -1,9 +1,19 @@
 """MCP Prompts - Workflow templates."""
 
+from datetime import UTC, datetime
+
 # Maps BCP-47 language codes to human-readable names used in language instructions.
 _LANGUAGE_NAMES: dict[str, str] = {
     "en": "English",
     "no": "Norwegian",
+}
+
+# Maps human-readable source names (as shown in the UI) to their MCP tool names.
+SOURCE_TOOL_MAP: dict[str, list[str]] = {
+    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "AlienVault OTX": ["query_otx"],
+    # "MISP": ["search_misp"],  # MISP not configured on external server
+    "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
 }
 
 
@@ -264,87 +274,7 @@ Use the following rules to decide how to respond:
     )
 
 
-# NOTE: Named as a constant for consistency with COLLECTION_ and PROCESSING_ stubs,
-# but this is a function — it takes content and context and returns a prompt string.
-def DIRECTION_REVIEW_PROMPT(
-    content,
-    context,
-) -> str:
-    """Build review prompt for PIRs generated in the Direction phase.
-
-    Args:
-        content: The generated PIRs to review.
-        context: The dialogue context used to generate the PIRs.
-
-    Returns:
-        Formatted prompt string ready to send to the AI model.
-    """
-    return f"""
-You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)
-generated in the Direction phase of a threat intelligence cycle.
-
-Your role is to ensure PIRs meet professional intelligence standards before
-they are presented to the analyst. You are NOT a grammar checker — you
-evaluate substance, relevance, and analytical quality.
-
-You will receive:
-- CONTEXT: The analyst's intelligence problem and dialogue: {context}
-- Content: The generated PIRs to review: {content}
-
-## Review each PIR against these criteria:
-
-### 1. SMART criteria
-- Specific: One clear intelligence need, preferably in a single sentence
-- Measurable: It must be possible to determine when the requirement is fulfilled
-- Realistic: Achievable given realistic collection capabilities
-- Timely: Deadline or time scope must be clearly stated
-
-### 2. Decision support
-Does this PIR directly support a concrete decision stated or implied in the context?
-A PIR that is "interesting" but does not enable a decision must be rejected.
-
-### 3. Knowledge gap
-Does this PIR address a real gap in understanding — not something already
-known or trivially answerable? "Nice to know" is not enough.
-
-### 4. Answers the actual problem
-Compare each PIR against the analyst's original intelligence problem in CONTEXT.
-A technically correct PIR that answers the wrong question must be rejected.
-
-### 5. Number of PIRs
-The set should contain 2-5 PIRs. Flag if:
-- Only 1 PIR: likely too narrow or the problem is underdefined
-- More than 5 PIRs: likely too broad or poorly prioritized
-
-## Severity threshold
-This is the Direction phase — poor PIRs propagate errors through the entire
-intelligence cycle. When in doubt, mark as MAJOR.
-
-- MAJOR: Missing one or more criteria, or PIR answers wrong question
-- MINOR: Correct substance but could be more precise in formulation
-
-## Output
-Return valid JSON only. No explanation outside the JSON.
-No markdown.
-No code fences.
-
-{{
-  "overall_approved": bool,
-  "severity": "none" | "minor" | "major",
-  "pir_reviews": [
-    {{
-      "pir_index": int,
-      "approved": bool,
-      "issue": "string or null"
-    }}
-  ],
-  "suggestions": "string or null"
-}}
-
-"""
-
-
-def build_summary_prompt(
+def build_direction_summary_prompt(
     scope: str,
     timeframe: str,
     target_entities: list,
@@ -409,13 +339,183 @@ MODIFICATIONS: {modifications}
     )
 
 
-# TODO: Implement review prompt for the Collection phase.
-def COLLECTION_REVIEW_PROMPT():
-    """Build review prompt for the Collection phase. Not yet implemented."""
-    return
+
+def build_collection_modify_prompt(
+    collected_data: str,
+    modifications: str,
+    language: str = "en",
+) -> str:
+    lang_note = _language_instruction(language, "the 'summary' and 'gaps' fields")
+
+    return f"""You are a professional threat intelligence analyst. Apply the requested modification to an existing intelligence summary.
+
+## Modification Request
+{modifications}
+
+## Existing Summary
+{collected_data}
+
+## Instructions
+1. Apply only the requested changes — do not re-collect data or add new information
+2. Preserve all content that was not mentioned in the modification request
+3. Keep the same JSON structure as the existing summary
+
+## Output Format
+Return ONLY valid JSON. No preamble, no explanation, no markdown.
+
+{{
+  "summary": "The modified factual narrative",
+  "sources_used": ["source1", "source2"],
+  "gaps": "Updated gaps — or null if no gaps"
+}}
+
+{lang_note}"""
 
 
-# TODO: Implement review prompt for the Processing phase.
-def PROCESSING_REVIEW_PROMPT():
-    """Build review prompt for the Processing phase. Not yet implemented."""
-    return
+def build_collection_plan_prompt(
+    pir: str,
+    modifications: str | None = None,
+    language: str = "en",
+) -> str:
+    available_sources = list(SOURCE_TOOL_MAP.keys())
+    available_sources_str = ", ".join(f'"{s}"' for s in available_sources)
+    lang_note = _language_instruction(language, "the 'plan' field")
+
+    modifications_section = (
+        f"\n## Modification Request\n{modifications}\nIncorporate this change into the plan."
+        if modifications else ""
+    )
+
+    return f"""You are a professional threat intelligence analyst. Your task is to create a collection plan and suggest relevant sources for the given Priority Intelligence Requirements (PIRs).
+
+## Priority Intelligence Requirements
+{pir}
+{modifications_section}
+## Available Sources
+The following sources are available: {available_sources_str}
+Only suggest sources that are genuinely relevant to the PIRs.
+
+## Allowed Tools
+You MUST only use list_knowledge_base and read_knowledge_base.
+Do not call any other tools during planning.
+
+## Instructions
+1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
+2. Based on the PIRs and background knowledge, write a concise step-by-step collection plan
+3. Select which sources are most relevant to answer the PIRs
+
+## Output Format
+Return ONLY valid JSON. No preamble, no explanation, no markdown.
+
+{{
+  "plan": "Step-by-step collection plan describing what to collect, from which sources, and why",
+  "suggested_sources": ["source name as listed in Available Sources"]
+}}
+
+{lang_note}"""
+
+def build_collection_collect_prompt(
+    pir: str,
+    selected_sources: list,
+    plan: str,
+    session_id: str | None = None,
+    since_date: str | None = None,
+    existing_data: str | None = None,
+) -> str:
+    approved_tools = [
+        tool
+        for s in selected_sources if s in SOURCE_TOOL_MAP
+        for tool in SOURCE_TOOL_MAP[s]
+    ]
+    unmapped = [s for s in selected_sources if s not in SOURCE_TOOL_MAP]
+
+    approved_tools_str = ", ".join(approved_tools) if approved_tools else "none"
+    unmapped_note = (
+        f"\nNote: The following selected sources could not be mapped to tools "
+        f"and will be skipped: {', '.join(unmapped)}"
+        if unmapped else ""
+    )
+    _upload_tools_in_use = [t for t in ["list_uploads", "search_local_data", "read_upload"] if t in approved_tools]
+    session_note = (
+        f"\nNote: For uploaded document tools, always use session_id=\"{session_id}\". "
+        f"Workflow: (1) call list_uploads(session_id) to see available files and their file_ids; "
+        f"(2) call search_local_data(session_id, query) for keyword-relevant snippets; "
+        f"(3) call read_upload(session_id, file_upload_id) to read the full content of relevant files."
+        if session_id and _upload_tools_in_use else ""
+    )
+    _min_lookback = (datetime.now(UTC).replace(year=datetime.now(UTC).year - 3)).strftime('%Y-%m-%d')
+    since_note = (
+        f"\nNote: Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
+        f"For all query_otx calls, use since_date=\"{_min_lookback}\" (3 years ago) to ensure sufficient historical coverage."
+        if since_date and "query_otx" in approved_tools else ""
+    )
+
+    existing_data_section = (
+        f"\n## Already Collected Data\nThe following data was gathered in a previous attempt. "
+        f"Do NOT re-collect data that is already here. Only collect NEW data not yet covered.\n{existing_data}"
+        if existing_data else ""
+    )
+
+    return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
+
+## Approved PIRs
+{pir}
+
+## Collection Plan
+{plan}
+{existing_data_section}
+## Approved Tools
+You MUST only use the following tools: {approved_tools_str}
+Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
+
+## Instructions
+1. Use the approved tools to collect data relevant to the PIRs only
+2. For query_otx: only search for threat actors, APT groups, and country names that are explicitly mentioned in the PIRs above (e.g. "APT29", "Russia", "GRU"). Do NOT search for generic terms like "energy sector", "reconnaissance", "network mapping", or "vulnerability identification". One search term per call. query_otx automatically returns full details (IoCs, TTPs, description, targeted countries) for the top results — no follow-up calls needed.
+3. For knowledge base tools: read each relevant resource separately
+4. Return content verbatim — do not summarize, rephrase, or interpret
+5. If a source returns no relevant data, still include it in output with empty content
+
+## Output Format
+Return ONLY valid JSON. No preamble, no explanation, no markdown.
+
+{{
+  "collected_data": [
+    {{
+      "source": "tool_name",
+      "resource_id": "resource identifier if applicable, else null",
+      "content": "verbatim content returned by the tool"
+    }}
+  ]
+}}"""
+
+
+def build_collection_summarize_prompt(
+    pir: str,
+    collected_data: str,
+    language: str = "en"
+) -> str:
+    lang_note = _language_instruction(language)
+
+    return f"""You are a professional threat intelligence analyst. Your task is to produce a factual summary of collected intelligence data. You have no tools — work only from the data provided.
+
+## Approved PIRs
+{pir}
+
+## Collected Data
+{collected_data}
+
+## Instructions
+1. Summarize what was found and which source it came from — factual, no interpretation, no conclusions
+2. Explicitly link findings to the relevant PIRs
+3. Report gaps: what was required by the PIRs but not found in the collected data
+
+## Output Format
+Return ONLY valid JSON. No preamble, no explanation, no markdown.
+
+{{
+  "summary": "Factual narrative of what was found, from which sources, and which PIRs it is relevant to",
+  "sources_used": ["source1", "source2"],
+  "gaps": "What was required by the PIRs but not found — or null if no gaps"
+}}
+
+{lang_note}"""

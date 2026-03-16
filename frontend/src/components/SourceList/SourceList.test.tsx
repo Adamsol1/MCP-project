@@ -188,7 +188,7 @@ describe("SourceList — highlight state", () => {
     );
 
     const card = screen.getByRole("listitem");
-    expect(card).toHaveClass("bg-primary-subtle");
+    expect(card).toHaveClass("text-primary");
   });
 
   it("source card is not highlighted when highlightedRef is null", () => {
@@ -201,7 +201,7 @@ describe("SourceList — highlight state", () => {
     );
 
     const card = screen.getByRole("listitem");
-    expect(card).not.toHaveClass("bg-primary-subtle");
+    expect(card).not.toHaveClass("text-primary");
   });
 
   it("only the matching card is highlighted when multiple sources exist", () => {
@@ -214,7 +214,7 @@ describe("SourceList — highlight state", () => {
     );
 
     const cards = screen.getAllByRole("listitem");
-    expect(cards[0]).toHaveClass("bg-primary-subtle");
-    expect(cards[1]).not.toHaveClass("bg-primary-subtle");
+    expect(cards[0]).toHaveClass("text-primary");
+    expect(cards[1]).not.toHaveClass("text-primary");
   });
 });

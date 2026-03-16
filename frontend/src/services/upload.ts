@@ -87,3 +87,19 @@ export async function deleteUploadedFile(
     params: { session_id: sessionId },
   });
 }
+
+/**
+ * Delete all backend and MCP artifacts for a session.
+ *
+ * Silently succeeds if the session has no artifacts (new session that never
+ * reached the backend). Errors are swallowed so the frontend conversation can
+ * still be removed from localStorage even if the backend is unreachable.
+ */
+export async function deleteSessionArtifacts(sessionId: string): Promise<void> {
+  try {
+    await axios.delete(`${API_BACKEND_URL}/api/sessions/${sessionId}`);
+  } catch {
+    // Best-effort: don't block the frontend deletion if the backend is down
+    // or the session never had any artifacts.
+  }
+}

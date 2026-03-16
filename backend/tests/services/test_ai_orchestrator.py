@@ -38,7 +38,7 @@ async def test_orchestrator_approves_on_first_try():
 
     assert result == "Generated PIR based on context"
     assert reviewer.call_count == 1
-    assert len(orchestrator.generated_pirs) == 1
+    assert len(orchestrator.attempts) == 1
     assert len(orchestrator.review_results) == 1
     assert len(logger.logs) == 1
     assert logger.logs[0].session_id == "test-session-id"
@@ -70,7 +70,7 @@ async def test_orchestrator_retries_and_succeeds():
 
     assert result == "Generated PIR based on context"
     assert reviewer.call_count == 2
-    assert len(orchestrator.generated_pirs) == 2
+    assert len(orchestrator.attempts) == 2
     assert len(orchestrator.review_results) == 2
     assert orchestrator.retry_explanations == ["Be more specific"]
     assert len(logger.logs) == 2
@@ -107,8 +107,8 @@ async def test_orchestrator_fails_after_max_retries():
 
     assert result == "Generated PIR based on context"
     assert reviewer.call_count == 3
-    assert len(orchestrator.generated_pirs) == 3
+    assert len(orchestrator.attempts) == 3
     assert len(orchestrator.review_results) == 3
-    assert orchestrator.generated_pirs[-1] == result
+    assert orchestrator.attempts[-1] == result
     assert len(orchestrator.retry_explanations) == 3
     assert len(logger.logs) == 3

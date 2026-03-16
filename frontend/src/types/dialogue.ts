@@ -3,11 +3,17 @@ export type DialogueStage =
   | "gathering"
   | "summary_confirming"
   | "pir_confirming"
+  | "planning"
+  | "plan_confirming"
+  | "source_selecting"
+  | "collecting"
+  | "reviewing"
   | "complete";
 
 export type DialogueSubState =
   | "awaiting_decision"
   | "awaiting_modifications"
+  | "awaiting_gather_more"
   | null;
 
 export type DialogueAction =
@@ -15,4 +21,9 @@ export type DialogueAction =
   | "show_summary"
   | "show_pir"
   | "max_questions"
+  | "show_plan"
+  | "show_suggested_sources"
+  | "start_collecting"
+  | "show_collection"
+  | "error"
   | "complete";

@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { ToastContainer } from "../Toast";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
-import type { Message, PirData } from "../../types/conversation";
-import type { DialogueStage } from "../../types/dialogue";
+import type {
+  CollectionDisplayData,
+  CollectionPlanData,
+  CollectionSourceSummary,
+  CollectionSummaryData,
+  Message,
+  PirData,
+  SuggestedSourcesData,
+} from "../../types/conversation";
+import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
 function Chevron() {
@@ -27,21 +34,18 @@ function Chevron() {
   );
 }
 
+
 const PRIORITY_LABEL: Record<string, string> = {
   high: "High",
   medium: "Medium",
   low: "Low",
 };
 
-function renderWithBold(text: string): ReactNode {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
-  );
-}
+
+
 
 function PirMessage({ pirData }: { pirData: PirData }) {
-  const { highlightedRef, setHighlightedRef, setPirData } = useWorkspace();
+  const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
 
   useEffect(() => {
     setPirData(pirData);
@@ -61,8 +65,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         <CitationText
           text={pirData.pir_text}
           claims={pirData.claims}
-          highlightedRef={highlightedRef}
-          onRefHover={setHighlightedRef}
+          highlightedRefs={highlightedRefs}
+          onRefHover={setHighlightedRefs}
         />
       )}
       <ol className="space-y-3 mt-1">
@@ -81,8 +85,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
-                  highlightedRef={highlightedRef}
-                  onRefHover={setHighlightedRef}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={setHighlightedRefs}
                 />
               </p>
             </details>
@@ -90,16 +94,19 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         ))}
       </ol>
       {pirData.sources && pirData.sources.length > 0 && (
-        <div className="mt-3 border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary mb-2">
-            Sources
-          </p>
-          <SourceList
-            sources={pirData.sources}
-            highlightedRef={highlightedRef}
-            onSourceHover={setHighlightedRef}
-          />
-        </div>
+        <details className="group mt-3 border-t border-border pt-2" open>
+          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+            Sources ({pirData.sources.length})
+            <Chevron />
+          </summary>
+          <div className="mt-1.5">
+            <SourceList
+              sources={pirData.sources}
+              highlightedRefs={highlightedRefs}
+              onSourceHover={setHighlightedRefs}
+            />
+          </div>
+        </details>
       )}
       {reasoningPoints.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2">
@@ -110,7 +117,12 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
             {reasoningPoints.map((point, i) => (
               <p key={i} className="text-sm text-text-secondary">
-                {renderWithBold(point)}
+                <CitationText
+                  text={point}
+                  claims={pirData.claims}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={setHighlightedRefs}
+                />
               </p>
             ))}
           </div>
@@ -120,16 +132,214 @@ function PirMessage({ pirData }: { pirData: PirData }) {
   );
 }
 
+function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold">Collection Plan</h3>
+      <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+      {planData.suggested_sources.length > 0 && (
+        <div className="border-t border-border pt-2">
+          <p className="text-sm font-medium text-text-secondary">Suggested sources</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
+            {planData.suggested_sources.map((source) => (
+              <li key={source}>{source}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SuggestedSourcesMessage({
+  sources,
+}: {
+  sources: SuggestedSourcesData;
+}) {
+  if (sources.length === 0) {
+    return <p>No source suggestions were returned.</p>;
+  }
+
+  return (
+    <div className="space-y-2">
+      <h3 className="font-semibold">Suggested Sources</h3>
+      <ul className="list-disc pl-5 text-sm text-text-secondary">
+        {sources.map((source) => (
+          <li key={source}>{source}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function CollectionSummaryMessage({
+  data,
+}: {
+  data: CollectionSummaryData;
+}) {
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Collection Summary</h3>
+      <p className="whitespace-pre-wrap text-sm text-text-primary">{data.summary}</p>
+      {data.sources_used.length > 0 && (
+        <div className="border-t border-border pt-2">
+          <p className="text-sm font-medium text-text-secondary">Sources used</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
+            {data.sources_used.map((source) => (
+              <li key={source}>{source}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      <div className="border-t border-border pt-2">
+        <p className="text-sm font-medium text-text-secondary">Gaps</p>
+        <p className="mt-1 text-sm text-text-secondary">
+          {data.gaps ?? "No gaps identified."}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function CollectionReviewPrompt({
+  isLoading,
+  onAccept,
+  onGatherMore,
+}: {
+  isLoading: boolean;
+  onAccept?: () => void;
+  onGatherMore?: () => void;
+}) {
+  return (
+    <section className="rounded-xl border-2 border-border bg-surface p-4">
+      <h3 className="text-lg font-semibold text-text-primary">Collection Review</h3>
+      <p className="mt-1 text-sm text-text-secondary">
+        Accept the collected data or collect more from additional sources.
+      </p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={() => onAccept?.()}
+          disabled={isLoading}
+          className="rounded-lg bg-success px-4 py-2 text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Accept
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onGatherMore?.()}
+          disabled={isLoading}
+          className="rounded-lg bg-primary px-4 py-2 text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Collect More Data
+        </button>
+      </div>
+    </section>
+  );
+}
+
 interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
   messages?: Message[];
   isConfirming?: boolean;
   isLoading?: boolean;
   stage?: DialogueStage;
+  subState?: DialogueSubState;
   onApprove?: () => void;
   onReject?: () => void;
+  onGatherMore?: () => void;
+  isSourceSelecting?: boolean;
+  isCollecting?: boolean;
+  availableSources?: string[];
+  selectedSources?: string[];
+  onToggleSourceSelection?: (source: string) => void;
+  onSubmitSourceSelection?: () => void;
   devPrefill?: string | null;
   onDevPrefillConsumed?: () => void;
+}
+
+
+function SourceSummaryTable({
+  summaries,
+}: {
+  summaries: CollectionSourceSummary[];
+}) {
+  if (summaries.length === 0) return null;
+  return (
+    <div className="overflow-x-auto rounded border border-border-muted">
+      <table className="min-w-full text-sm">
+        <thead className="bg-surface-muted">
+          <tr>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Source</th>
+            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">Items</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Resources</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {summaries.map((s) => (
+            <tr key={s.display_name} className="border-t border-border-muted">
+              <td className="px-3 py-1.5 font-medium text-text-primary">{s.display_name}</td>
+              <td className="px-3 py-1.5 text-right text-text-secondary">{s.count}</td>
+              <td className="px-3 py-1.5 text-xs text-text-muted">
+                {s.resource_ids.length > 0 ? s.resource_ids.join(", ") : "—"}
+              </td>
+              <td className="px-3 py-1.5">
+                <span
+                  className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
+                    s.has_content ? "bg-success" : "bg-warning-dark"
+                  }`}
+                />
+                <span className="text-xs text-text-secondary">
+                  {s.has_content ? "Data found" : "Empty"}
+                </span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+
+function CollectionDisplayMessage({
+  data,
+}: {
+  data: CollectionDisplayData;
+}) {
+  const { setCollectionData, setActivePhase } = useWorkspace();
+
+  useEffect(() => {
+    setCollectionData(data);
+    setActivePhase("collection");
+  }, [data, setCollectionData, setActivePhase]);
+
+  if (data.parse_error) {
+    return (
+      <div className="space-y-2">
+        <h3 className="font-semibold">Collection Results</h3>
+        <p className="text-sm text-error-text">Could not parse collection output.</p>
+        <details className="group">
+          <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+            Raw output <Chevron />
+          </summary>
+          <pre className="mt-1 text-xs text-text-muted whitespace-pre-wrap break-all">
+            {data.parse_error}
+          </pre>
+        </details>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Collection Results</h3>
+      <SourceSummaryTable summaries={data.source_summary} />
+    </div>
+  );
 }
 
 export default function ChatWindow({
@@ -138,8 +348,16 @@ export default function ChatWindow({
   isConfirming = false,
   isLoading = false,
   stage,
+  subState,
   onApprove,
   onReject,
+  onGatherMore,
+  isSourceSelecting = false,
+  isCollecting = false,
+  availableSources = [],
+  selectedSources = [],
+  onToggleSourceSelection,
+  onSubmitSourceSelection,
   devPrefill,
   onDevPrefillConsumed,
 }: ChatWindowProps) {
@@ -182,10 +400,20 @@ export default function ChatWindow({
 
   const hasMessages = messages.length > 0;
 
+  const inputPlaceholder =
+    stage === "plan_confirming" && subState === "awaiting_modifications"
+      ? "Describe the changes you want in the collection plan..."
+      : stage === "reviewing" && subState === "awaiting_modifications"
+      ? "Describe how to modify the collection summary..."
+      : stage === "reviewing" && subState === "awaiting_gather_more"
+      ? "Describe what to gather more information about..."
+      : "Ask anything...";
+
   function renderMessageContent(message: Message) {
     if (
       message.type === "summary" &&
       message.data &&
+      typeof message.data === "object" &&
       "summary" in message.data
     ) {
       return <p>{message.data.summary}</p>;
@@ -193,6 +421,36 @@ export default function ChatWindow({
 
     if (message.type === "pir" && message.data && "pir_text" in message.data) {
       return <PirMessage pirData={message.data as PirData} />;
+    }
+
+    if (message.type === "plan" && message.data && "plan" in message.data) {
+      return <CollectionPlanMessage planData={message.data as CollectionPlanData} />;
+    }
+
+    if (
+      message.type === "suggested_sources" &&
+      Array.isArray(message.data)
+    ) {
+      return <SuggestedSourcesMessage sources={message.data as SuggestedSourcesData} />;
+    }
+
+    if (
+      message.type === "collection" &&
+      message.data &&
+      "collected_data" in message.data
+    ) {
+      return <CollectionDisplayMessage data={message.data as CollectionDisplayData} />;
+    }
+
+    if (
+      message.type === "collection" &&
+      message.data &&
+      typeof message.data === "object" &&
+      "sources_used" in message.data
+    ) {
+      return (
+        <CollectionSummaryMessage data={message.data as CollectionSummaryData} />
+      );
     }
 
     return <p>{message.text}</p>;
@@ -244,13 +502,71 @@ export default function ChatWindow({
         <div className="w-full max-w-3xl px-6">
           <div className="relative">
             <ToastContainer position="above-input" />
-            {isConfirming ? (
-              <ApprovalPrompt
-                isLoading={isLoading}
-                stage={stage}
-                onApproveContinue={onApprove}
-                onRejectWithFeedback={() => onReject?.()}
-              />
+            {isSourceSelecting ? (
+              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                <h3 className="text-lg font-semibold text-gray-800">Select Sources</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  Choose one or more data sources before collection starts.
+                </p>
+
+                {availableSources.length === 0 ? (
+                  <p className="mt-4 text-sm text-gray-600">
+                    No source suggestions available.
+                  </p>
+                ) : (
+                  <div className="mt-4 space-y-2">
+                    {availableSources.map((source) => (
+                      <label
+                        key={source}
+                        className="flex items-center gap-2 text-sm text-gray-700"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedSources.includes(source)}
+                          onChange={() => onToggleSourceSelection?.(source)}
+                          disabled={isLoading}
+                        />
+                        {source}
+                      </label>
+                    ))}
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onSubmitSourceSelection?.()}
+                  disabled={
+                    isLoading ||
+                    availableSources.length === 0 ||
+                    selectedSources.length === 0
+                  }
+                  className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Start Collecting
+                </button>
+              </section>
+            ) : isCollecting ? (
+              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                <h3 className="text-lg font-semibold text-gray-800">Collecting Data</h3>
+                <p className="mt-1 text-sm text-gray-600">
+                  The system is collecting and reviewing data from the selected sources.
+                </p>
+              </section>
+            ) : isConfirming ? (
+              stage === "reviewing" ? (
+                <CollectionReviewPrompt
+                  isLoading={isLoading}
+                  onAccept={onApprove}
+                  onGatherMore={onGatherMore}
+                />
+              ) : (
+                <ApprovalPrompt
+                  isLoading={isLoading}
+                  stage={stage}
+                  onApproveContinue={onApprove}
+                  onRejectWithFeedback={() => onReject?.()}
+                />
+              )
             ) : (
               <form
                 onSubmit={handleSubmit}
@@ -259,7 +575,7 @@ export default function ChatWindow({
                 <textarea
                   ref={textareaRef}
                   rows={1}
-                  placeholder="Ask anything..."
+                  placeholder={inputPlaceholder}
                   value={inputValue}
                   onChange={(event) => setInputValue(event.target.value)}
                   onKeyDown={(e) => {

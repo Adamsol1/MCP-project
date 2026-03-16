@@ -23,7 +23,7 @@ class ResearchLogger:
             self.log_path = Path(log_path)
         # Use default logpath
         else:
-            self.log_path = Path(f"data/outputs/research_log_{session_id}.jsonl")
+            self.log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"research_log_{session_id}.jsonl"
 
         self.log_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -35,7 +35,7 @@ class ResearchLogger:
         converted_log = json.dumps(log_entry)
         # Attempt to write to disk
         try:
-            with open(self.log_path, "a") as f:
+            with open(self.log_path, "a", encoding="utf-8") as f:
                 f.write(converted_log + "\n")
         # Cast error if unsuccesfull.
         except OSError as e:
@@ -45,10 +45,10 @@ class ResearchLogger:
         """
         Writes fulll reasoning log to JSON file.
         """
-        log_path = Path(f"data/outputs/reasoning_log_{reasoning_log.session_id}.json")
+        log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"reasoning_log_{reasoning_log.session_id}.json"
         log_path.parent.mkdir(parents=True, exist_ok=True)
         try:
-            with open(log_path, "w") as f:
+            with open(log_path, "w", encoding="utf-8") as f:
                 f.write(reasoning_log.model_dump_json(indent=2))
         except OSError as e:
             logger.error(f"[ResearchLogger] Failed to write reasoning log: {e}")
