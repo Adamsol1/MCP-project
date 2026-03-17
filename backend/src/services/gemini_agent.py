@@ -61,8 +61,8 @@ class GeminiAgent:
       5. Repeat until Gemini returns a final text response (no more tool calls)
 
     Args:
-        model: Gemini model ID to use.
-        mcp_client: Connected MCPClient instance for tool execution.
+        model:           Gemini model ID to use.
+        mcp_client:      Connected MCPClient instance for tool execution.
         max_tool_rounds: Safety limit on tool-call iterations (prevents infinite loops).
     """
 
@@ -78,23 +78,27 @@ class GeminiAgent:
         self.mcp_client = mcp_client
         self.max_tool_rounds = max_tool_rounds
 
-    async def run(self, system_prompt: str, task: str) -> str:
+    async def run(
+        self,
+        system_prompt: str,
+        task: str,
+        allowed_tool_names: set[str] | None = None,
+    ) -> str:
         """Run the agent on a task, autonomously calling MCP tools as needed.
 
         Args:
-            system_prompt: Instructions that define the agent's role and behaviour.
-            task: The specific task to complete (e.g. "Collect data for these PIRs: ...").
+            system_prompt:      Instructions that define the agent's role and behaviour.
+            task:               The specific task to complete.
+            allowed_tool_names: When provided, only tools in this set are exposed to
+                                the model. Enforces source selection at the API level
+                                rather than relying on prompt instructions alone.
 
         Returns:
             The agent's final text response after all tool calls are complete.
         """
-        # Discover available tools from the MCP server
-        available_tools = await self._get_tool_declarations()
-        logger.info(
-            f"[GeminiAgent] Starting run with {len(available_tools)} tools available"
-        )
+        available_tools = await self._get_tool_declarations(allowed_tool_names)
+        logger.info(f"[GeminiAgent] Starting run with {len(available_tools)} tools available")
 
-        # Build initial message history
         contents = [
             types.Content(
                 role="user",
@@ -107,7 +111,6 @@ class GeminiAgent:
             tools=available_tools,
         )
 
-        # Tool-use loop
         for round_num in range(self.max_tool_rounds):
             response = await self.client.aio.models.generate_content(
                 model=self.model,
@@ -116,8 +119,6 @@ class GeminiAgent:
             )
 
             candidate = response.candidates[0]
-
-            # Check if the model wants to call tools
             tool_calls = [
                 part
                 for part in candidate.content.parts
@@ -125,7 +126,6 @@ class GeminiAgent:
             ]
 
             if not tool_calls:
-                # No tool calls — agent is done, return final text
                 text = "".join(
                     part.text
                     for part in candidate.content.parts
@@ -134,10 +134,7 @@ class GeminiAgent:
                 logger.info(f"[GeminiAgent] Completed in {round_num + 1} round(s)")
                 return text
 
-            # Execute all requested tool calls
-            logger.info(
-                f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)"
-            )
+            logger.info(f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)")
             contents.append(candidate.content)
 
             tool_results = []
@@ -164,24 +161,23 @@ class GeminiAgent:
 
             contents.append(types.Content(role="tool", parts=tool_results))
 
-        # Safety: max rounds reached — return whatever the model last said
-        logger.warning(
-            f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached"
-        )
+        logger.warning(f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached")
         last_text = "".join(
             part.text for part in candidate.content.parts if part.text is not None
         )
         return last_text or "Agent reached maximum tool iterations without completing."
 
-    async def _get_tool_declarations(self) -> list:
+    async def _get_tool_declarations(self, allowed_tool_names: set[str] | None = None) -> list:
         """Fetch available tools from the MCP server and convert to Gemini format.
 
-        Converts each tool's inputSchema to a Gemini Schema so Gemini knows
-        what arguments to pass when calling the tool.
+        When allowed_tool_names is provided, only tools in that set are returned,
+        enforcing source selection at the function-declaration level.
         """
         raw_tools = await self.mcp_client.list_tools()
         declarations = []
         for tool in raw_tools:
+            if allowed_tool_names is not None and tool["name"] not in allowed_tool_names:
+                continue
             input_schema = tool.get("inputSchema", {})
             parameters = (
                 _json_schema_to_gemini(input_schema)

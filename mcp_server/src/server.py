@@ -25,8 +25,8 @@ from prompts import (
     build_pir_generation_prompt,
 )
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
+from tools.google_search import register_google_search_tools
 from tools.upload_tools import register_upload_tools
-from tools.web_search import register_web_search_tools
 
 load_dotenv()
 
@@ -42,7 +42,7 @@ mcp = FastMCP(
 
 # Register tools
 register_upload_tools(mcp)
-register_web_search_tools(mcp)
+register_google_search_tools(mcp)
 
 
 UPLOADS_ROOT = Path(

@@ -10,6 +10,8 @@ For each collection phase we:
 import json
 import logging
 import re
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from src.mcp_client.client import MCPClient
@@ -18,6 +20,19 @@ from src.services.gemini_agent import GeminiAgent
 logger = logging.getLogger("app")
 
 _DEFAULT_SOURCE = "Internal Knowledge Bank"
+_WEB_SEARCH_DIR = Path(__file__).parent.parent.parent / "data" / "web_search"
+_WEB_SOURCE_NAMES = {"google_search", "google_news_search", "fetch_page"}
+
+# Maps UI source names to the MCP tool names they are allowed to call.
+# Must stay in sync with SOURCE_TOOL_MAP in mcp_server/src/prompts/__init__.py.
+_SOURCE_TO_TOOLS: dict[str, list[str]] = {
+    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "AlienVault OTX": ["query_otx"],
+    "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
+    "Web Search": ["google_search", "google_news_search", "fetch_page"],
+}
+
+
 # Substring rules for noisy model outputs: all tokens in a tuple must appear
 # in the lowercased source string for the rule to fire (AND within a tuple,
 # first match wins across the list).
@@ -29,8 +44,7 @@ _SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
     (("upload",),            "Uploaded Documents"),
     (("local document",),    "Uploaded Documents"),
     (("web",),               "Web Search"),
-    (("duckduckgo",),        "Web Search"),
-    (("fetch",),             "Web Search"),
+    (("google", "search"),   "Web Search"),
 ]
 
 _SOURCE_ALIASES = {
@@ -46,10 +60,7 @@ _SOURCE_ALIASES = {
     "uploads": "Uploaded Documents",
     "local documents": "Uploaded Documents",
     "web search": "Web Search",
-    "web_search": "Web Search",
-    "web fetch": "Web Search",
-    "web_fetch": "Web Search",
-    "duckduckgo": "Web Search",
+    "google search": "Web Search",
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
@@ -59,8 +70,9 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
     "search_local_data": "Uploaded Documents",
     "list_uploads": "Uploaded Documents",
     "read_upload": "Uploaded Documents",
-    "web_search": "Web Search",
-    "fetch_page": "Web Search",
+    "google_search": "Web Search",
+    "google_news_search": "Web News",
+    "fetch_page": "Web Fetch",
 }
 
 
@@ -166,15 +178,56 @@ class CollectionService:
         """
         try:
             stripped = raw_data.strip() if isinstance(raw_data, str) else ""
-            fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
-            if fence_match:
-                stripped = fence_match.group(1).strip()
-            parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
-            if parsed is None:
-                raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
-            items: list[dict] = parsed.get("collected_data", [])
+
+            # Multi-attempt accumulation: orchestrator joins attempts with this separator.
+            # Split, parse each segment independently, then merge all collected_data lists.
+            _SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
+            if _SEPARATOR in stripped:
+                segments = [s.strip() for s in stripped.split(_SEPARATOR) if s.strip()]
+                items = []
+                for seg in segments:
+                    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
+                    seg = fence.group(1).strip() if fence else seg
+                    seg_parsed = CollectionService._try_parse_json_lenient(seg) if seg else None
+                    if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
+                        items.extend(seg_parsed["collected_data"])
+            else:
+                fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
+                if fence_match:
+                    stripped = fence_match.group(1).strip()
+                parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
+                if parsed is None:
+                    # Last resort: extract largest {...} block
+                    start, end = stripped.find("{"), stripped.rfind("}")
+                    if 0 <= start < end:
+                        parsed = CollectionService._try_parse_json_lenient(stripped[start:end + 1])
+                if not parsed:
+                    raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
+                items = parsed.get("collected_data", [])
+
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
+            if not isinstance(items, list):
+                raise ValueError("collected_data is not a list")
+
+            # Unwrap MCP response wrappers the model occasionally embeds in content.
+            # Pattern: {"result": "text"} or {"tool_response": {"result": "text"}}
+            for item in items:
+                raw_content = item.get("content", "")
+                if isinstance(raw_content, str) and raw_content.startswith("{"):
+                    try:
+                        inner = json.loads(raw_content)
+                        if isinstance(inner, dict):
+                            if "result" in inner and isinstance(inner["result"], str):
+                                item["content"] = inner["result"]
+                            elif len(inner) == 1:
+                                val = next(iter(inner.values()))
+                                if isinstance(val, dict) and isinstance(val.get("result"), str):
+                                    item["content"] = val["result"]
+                                elif isinstance(val, str):
+                                    item["content"] = val
+                    except Exception:
+                        pass
 
             # Build per-source aggregates
             stats: dict[str, dict] = {}
@@ -310,16 +363,93 @@ class CollectionService:
                     "perspectives": json.dumps(perspectives or []),
                 },
             )
+            allowed_tool_names = {
+                tool
+                for source in selected_sources
+                for tool in _SOURCE_TO_TOOLS.get(source, [])
+            }
+
             agent = GeminiAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
                 task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
+
             raw_data = await agent.run(
                 system_prompt=collect_prompt,
                 task=task,
+                allowed_tool_names=allowed_tool_names,
             )
 
+        if session_id and any(s in selected_sources for s in ("Web Search",)):
+            self._save_web_results(session_id, raw_data, pir)
+
         return raw_data
+
+    @staticmethod
+    def _save_web_results(session_id: str, raw_data: str, pir: str) -> None:
+        """Persist web search/news/fetch results for this session to disk.
+
+        Merges with any existing file so retries accumulate rather than overwrite.
+        Only items from web tools (google_search, google_news_search, fetch_page) are saved.
+        """
+        try:
+            _SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
+            segments = [raw_data] if _SEPARATOR not in raw_data else [
+                s.strip() for s in raw_data.split(_SEPARATOR) if s.strip()
+            ]
+            new_items: list[dict] = []
+            for seg in segments:
+                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
+                seg = fence.group(1).strip() if fence else seg
+                try:
+                    parsed = json.loads(seg)
+                except json.JSONDecodeError:
+                    repaired = re.sub(r",\s*([}\]])", r"\1", seg)
+                    try:
+                        parsed = json.loads(repaired)
+                    except json.JSONDecodeError:
+                        continue
+                for item in parsed.get("collected_data", []):
+                    if item.get("source") in _WEB_SOURCE_NAMES:
+                        new_items.append(item)
+
+            if not new_items:
+                return
+
+            _WEB_SEARCH_DIR.mkdir(parents=True, exist_ok=True)
+            doc_path = _WEB_SEARCH_DIR / f"{session_id}.json"
+            now = datetime.now(UTC).isoformat()
+
+            if doc_path.exists():
+                try:
+                    existing = json.loads(doc_path.read_text(encoding="utf-8"))
+                except Exception:
+                    existing = {"items": []}
+                existing_contents = {i.get("content", "") for i in existing.get("items", [])}
+                merged = existing.get("items", []) + [
+                    i for i in new_items if i.get("content", "") not in existing_contents
+                ]
+                existing["items"] = merged
+                existing["updated_at"] = now
+                doc_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+            else:
+                doc_path.write_text(json.dumps({
+                    "session_id": session_id,
+                    "pir": pir,
+                    "created_at": now,
+                    "updated_at": now,
+                    "items": new_items,
+                }, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        except Exception:
+            logger.exception(f"[CollectionService] Failed to save web results for session {session_id}")
+
+    @staticmethod
+    def delete_web_results(session_id: str) -> None:
+        """Remove the web search results document for a session."""
+        doc_path = _WEB_SEARCH_DIR / f"{session_id}.json"
+        if doc_path.exists():
+            doc_path.unlink()
 
     async def modify_summary(self, collected_data: str, modifications: str) -> str:
         async with self.mcp_client.connect():

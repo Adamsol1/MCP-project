@@ -7,8 +7,9 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   search_local_data: "Uploaded Documents",
   list_uploads: "Uploaded Documents",
   read_upload: "Uploaded Documents",
-  web_search: "Web Search",
-  fetch_page: "Web Search",
+  google_search: "Web Search",
+  google_news_search: "Web News",
+  fetch_page: "Web Fetch",
 };
 
 interface CollectionStatsModalProps {

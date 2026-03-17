@@ -16,6 +16,7 @@ from src.importers.session_uploads import (
     list_session_uploads,
     save_session_upload,
 )
+from src.services.collection_service import CollectionService
 from src.services.reasearch_logger import ResearchLogger
 from src.logging_config import setup_logging
 
@@ -168,6 +169,7 @@ async def delete_session(session_id: str):
             log_file = outputs_dir / log_name
             if log_file.exists():
                 log_file.unlink()
+        CollectionService.delete_web_results(session_id)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
