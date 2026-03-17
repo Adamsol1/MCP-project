@@ -224,7 +224,7 @@ class AIOrchestrator:
     # - collection_service : AI that will collect data via tools
     # - Reviewer           : AI that will review collected data
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = ""
+        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -257,6 +257,7 @@ class AIOrchestrator:
                 session_id=session_id,
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,
+                perspectives=perspectives,
             )
             if accumulated["raw_data"]:
                 accumulated["raw_data"] += "\n\n--- NEW COLLECTION ATTEMPT ---\n\n" + new_data

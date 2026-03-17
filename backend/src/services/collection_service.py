@@ -18,6 +18,21 @@ from src.services.gemini_agent import GeminiAgent
 logger = logging.getLogger("app")
 
 _DEFAULT_SOURCE = "Internal Knowledge Bank"
+# Substring rules for noisy model outputs: all tokens in a tuple must appear
+# in the lowercased source string for the rule to fire (AND within a tuple,
+# first match wins across the list).
+_SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
+    (("otx",),               "AlienVault OTX"),
+    (("alienvault",),        "AlienVault OTX"),
+    (("knowledge", "bank"),  "Internal Knowledge Bank"),
+    (("misp",),              "MISP"),
+    (("upload",),            "Uploaded Documents"),
+    (("local document",),    "Uploaded Documents"),
+    (("web",),               "Web Search"),
+    (("duckduckgo",),        "Web Search"),
+    (("fetch",),             "Web Search"),
+]
+
 _SOURCE_ALIASES = {
     "internal knowledge bank": "Internal Knowledge Bank",
     "knowledge bank": "Internal Knowledge Bank",
@@ -30,6 +45,11 @@ _SOURCE_ALIASES = {
     "user uploads": "Uploaded Documents",
     "uploads": "Uploaded Documents",
     "local documents": "Uploaded Documents",
+    "web search": "Web Search",
+    "web_search": "Web Search",
+    "web fetch": "Web Search",
+    "web_fetch": "Web Search",
+    "duckduckgo": "Web Search",
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
@@ -39,6 +59,8 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
     "search_local_data": "Uploaded Documents",
     "list_uploads": "Uploaded Documents",
     "read_upload": "Uploaded Documents",
+    "web_search": "Web Search",
+    "fetch_page": "Web Search",
 }
 
 
@@ -101,14 +123,9 @@ class CollectionService:
             return _SOURCE_ALIASES[key]
 
         # Alias-by-substring to catch noisy model outputs
-        if "otx" in key or "alienvault" in key:
-            return "AlienVault OTX"
-        if "knowledge" in key and "bank" in key:
-            return "Internal Knowledge Bank"
-        if "misp" in key:
-            return "MISP"
-        if "upload" in key or "local document" in key:
-            return "Uploaded Documents"
+        for tokens, canonical in _SUBSTRING_RULES:
+            if all(token in key for token in tokens):
+                return canonical
 
         return normalized
 
@@ -125,6 +142,19 @@ class CollectionService:
         return deduped
 
     @staticmethod
+    def _try_parse_json_lenient(s: str) -> dict | None:
+        """Try json.loads; on failure strip trailing commas and retry once."""
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            pass
+        try:
+            repaired = re.sub(r",\s*([}\]])", r"\1", s)
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            return None
+
+    @staticmethod
     def parse_collected_data(raw_data: str) -> dict[str, Any]:
         """Parse raw collected_data JSON into a structured display payload.
 
@@ -139,7 +169,9 @@ class CollectionService:
             fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
             if fence_match:
                 stripped = fence_match.group(1).strip()
-            parsed = json.loads(stripped) if stripped else {}
+            parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
+            if parsed is None:
+                raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
             items: list[dict] = parsed.get("collected_data", [])
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
@@ -147,8 +179,8 @@ class CollectionService:
             # Build per-source aggregates
             stats: dict[str, dict] = {}
             for item in items:
-                tool_name = item.get("source", "unknown")
-                display_name = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
+                tool_name: str = str(item.get("source") or "unknown")
+                display_name: str = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
                 if display_name not in stats:
                     stats[display_name] = {"count": 0, "resource_ids": [], "has_content": False}
                 stats[display_name]["count"] += 1
@@ -256,6 +288,7 @@ class CollectionService:
         session_id: str | None = None,
         timeframe: str = "",
         existing_raw_data: str | None = None,
+        perspectives: list[str] | None = None,
     ) -> str:
         """Collect raw data only — no summarization.
 
@@ -274,6 +307,7 @@ class CollectionService:
                     "session_id": session_id or "",
                     "since_date": timeframe,
                     "existing_data": existing_raw_data or "",
+                    "perspectives": json.dumps(perspectives or []),
                 },
             )
             agent = GeminiAgent(self.mcp_client)

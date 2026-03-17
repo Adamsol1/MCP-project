@@ -70,7 +70,7 @@ class GeminiAgent:
         self,
         mcp_client,
         model: str = "gemini-2.5-flash",
-        max_tool_rounds: int = 25,
+        max_tool_rounds: int = 50,
     ):
         api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)

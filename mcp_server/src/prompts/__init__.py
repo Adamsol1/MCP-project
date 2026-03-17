@@ -14,6 +14,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
+    "Web Search": ["web_search", "fetch_page"],
 }
 
 
@@ -421,6 +422,7 @@ def build_collection_collect_prompt(
     session_id: str | None = None,
     since_date: str | None = None,
     existing_data: str | None = None,
+    perspectives: list[str] | None = None,
 ) -> str:
     approved_tools = [
         tool
@@ -456,6 +458,36 @@ def build_collection_collect_prompt(
         if existing_data else ""
     )
 
+    _active = [p for p in (perspectives or []) if p != "neutral"]
+    if not _active:
+        _active = ["neutral"]
+    if "web_search" in approved_tools:
+        _persp_str = ", ".join(perspectives) if perspectives else "neutral"
+        _timelimit_hint = since_date or "unspecified"
+        _per_persp_lines = "\n".join(
+            f"  web_search(query=\"<topic> {p} perspective\", region=\"wt-wt\", timelimit=\"<timelimit>\", max_results=3)"
+            for p in _active
+        )
+        web_search_note = (
+            f"\n## Web Search Guidance"
+            f"\nPerspectives selected: {_persp_str}"
+            f"\nALWAYS use region=\"wt-wt\" (worldwide English) for ALL web_search calls."
+            f"\nDo NOT change the region parameter — DDG region changes result language, not geopolitical perspective."
+            f"\nInstead, encode the perspective directly in the query text:"
+            f"\n  BAD:  web_search(query=\"GPS jamming\", region=\"ru-ru\")"
+            f"\n  GOOD: web_search(query=\"GPS jamming Russia perspective\", region=\"wt-wt\")"
+            f"\nFor EACH non-neutral perspective, call web_search() separately with the perspective embedded in the query."
+            f"\nSTRICT LIMIT: Maximum 5 distinct search queries per perspective ({len(_active)} perspective(s) = max {len(_active) * 5} web_search calls total). Choose the most important queries only."
+            f"\nExample calls for the selected perspectives:"
+            f"\n{_per_persp_lines}"
+            f"\nTimeframe: \"{_timelimit_hint}\" → timelimit codes: \"d\"=day \"w\"=week \"m\"=month \"y\"=year; omit for longer/unspecified periods."
+            f"\nSource authority: web_search/fetch_page carry LOWER authority than OTX. Always prefer OTX."
+            f"\nUse web_search only when OTX is sparse or the topic is very recent."
+            f"\nUse fetch_page only when a snippet is insufficient to assess relevance."
+        )
+    else:
+        web_search_note = ""
+
     return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
 
 ## Approved PIRs
@@ -466,7 +498,7 @@ def build_collection_collect_prompt(
 {existing_data_section}
 ## Approved Tools
 You MUST only use the following tools: {approved_tools_str}
-Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
+Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}{web_search_note}
 
 ## Instructions
 1. Use the approved tools to collect data relevant to the PIRs only

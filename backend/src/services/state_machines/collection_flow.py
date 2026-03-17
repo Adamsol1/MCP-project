@@ -177,6 +177,10 @@ class CollectionFlow(BasePhaseFlow):
     #Collect information
 
         timeframe = self.direction_context.timeframe if self.direction_context else ""
+        perspectives = (
+            [p.value for p in self.direction_context.perspectives]
+            if self.direction_context else []
+        )
         try:
             if orchestrator and reviewer:
                 collection_summary = await orchestrator.collect_and_review(
@@ -188,6 +192,7 @@ class CollectionFlow(BasePhaseFlow):
                     session_id=self.session_id,
                     direction_context=self.direction_context,
                     timeframe=timeframe,
+                    perspectives=perspectives,
                 )
             else:
                 collection_summary = await collection_service.collect(
@@ -195,6 +200,7 @@ class CollectionFlow(BasePhaseFlow):
                     self.pir,
                     self.collection_plan,
                     timeframe=timeframe,
+                    perspectives=perspectives,
                 )
         except Exception as e:
             logger.error(f"[Session {self.session_id}] Collection failed: {e}")
