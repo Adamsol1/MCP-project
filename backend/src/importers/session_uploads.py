@@ -394,7 +394,7 @@ def save_session_upload(
         entry["parsed_markdown_path"] = parsed_path.as_posix()
         entry["metadata_flags"] = metadata_flags
         if parse_status in ("ready", "skipped"):
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix())
+            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
     else:
         parse_status = _convert_to_markdown(
             file_upload_id=file_upload_id,
@@ -407,7 +407,7 @@ def save_session_upload(
         entry["parse_status"] = parse_status
         entry["parsed_markdown_path"] = parsed_path.as_posix()
         if parse_status == "ready":
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix())
+            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
 
     manifest = _load_manifest(paths["manifest_path"], validated_session_id)
     manifest["files"].append(entry)
@@ -455,7 +455,7 @@ def delete_session_upload(
 
     manifest["files"] = kept
     _write_manifest(paths["manifest_path"], manifest)
-    unstage_from_mcp(validated_session_id, file_upload_id)
+    unstage_from_mcp(validated_session_id, file_upload_id, removed_entry.get("filename", ""))
     return True
 
 

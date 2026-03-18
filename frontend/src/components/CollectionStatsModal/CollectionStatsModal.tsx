@@ -1,5 +1,65 @@
 import type { CollectionDisplayData, CollectedItem } from "../../types/conversation";
 
+// ── Article type classification ──────────────────────────────────────────────
+
+const NEWS_DOMAINS = new Set([
+  "reuters.com", "bloomberg.com", "bbc.com", "bbc.co.uk", "nytimes.com",
+  "theguardian.com", "washingtonpost.com", "apnews.com", "cnn.com",
+  "aljazeera.com", "cbsnews.com", "pbs.org", "foxbusiness.com", "rte.ie",
+  "time.com", "thehill.com", "wsj.com", "ft.com", "thetimes.com",
+  "independent.co.uk", "euobserver.com", "iranintl.com", "moderndiplomacy.eu",
+]);
+
+const ANALYSIS_DOMAINS = new Set([
+  "chathamhouse.org", "csis.org", "rand.org", "brookings.edu", "cfr.org",
+  "atlanticcouncil.org", "carnegieendowment.org", "iiss.org", "rusi.org",
+  "hstoday.us", "orfonline.org", "isdglobal.org", "fpri.org", "sldinfo.com",
+  "foreignaffairs.com", "foreignpolicy.com", "thediplomat.com",
+  "energypolicy.columbia.edu", "crisisgroup.org", "pacforum.org",
+  "instituteofgeoeconomics.org", "nextcenturyfoundation.org",
+]);
+
+type ArticleLabel = "News" | "Analysis" | "Report" | "Official" | "Article";
+
+function classifyArticle(url: string, source: string): ArticleLabel {
+  if (source === "google_news_search") return "News";
+  let hostname = "";
+  try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch { /* invalid url */ }
+
+  if (NEWS_DOMAINS.has(hostname)) return "News";
+  if (ANALYSIS_DOMAINS.has(hostname)) return "Analysis";
+  if (/\.(gov|mil)$/.test(hostname)) return "Official";
+
+  const path = url.toLowerCase();
+  if (/\/(news|breaking|latest|article)\//.test(path)) return "News";
+  if (/\/(research|report|paper|publication|brief|working-paper)\//.test(path)) return "Report";
+  if (/\/(analysis|insight|commentary|opinion|perspective|dispatch)\//.test(path)) return "Analysis";
+
+  return "Article";
+}
+
+const LABEL_STYLES: Record<ArticleLabel, string> = {
+  News:     "bg-info-subtle text-info-text",
+  Analysis: "bg-warning-subtle text-warning-text",
+  Report:   "bg-primary-subtle text-primary",
+  Official: "bg-success-subtle text-success-text",
+  Article:  "bg-surface-elevated text-text-secondary",
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function cleanTitle(title: string): string {
+  // Strip trailing "| Publisher", "- Publisher", "— Publisher" suffixes from page <title> tags
+  return title.replace(/\s*[|–—]\s*[^|–—]+$/, "").replace(/\s+-\s+[^-]+$/, "").trim();
+}
+
+function displayLabel(item: CollectedItem): string | null {
+  if (!item.resource_id) return null;
+  if (item.source === "fetch_page") return classifyArticle(item.resource_id, item.source);
+  if (item.source === "google_news_search") return "News";
+  return null;
+}
+
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   list_knowledge_base: "Internal Knowledge Bank",
   read_knowledge_base: "Internal Knowledge Bank",
@@ -134,18 +194,37 @@ export default function CollectionStatsModal({
                     <span className="text-xs text-text-muted">{items.length} items</span>
                   </summary>
                   <div className="divide-y divide-border-muted">
-                    {items.map((item, i) => (
-                      <div key={i} className="px-4 py-3">
-                        {item.resource_id && (
-                          <span className="mb-1.5 inline-block rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text">
-                            {item.resource_id}
-                          </span>
-                        )}
-                        <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
-                          {item.content || "(no content)"}
-                        </pre>
-                      </div>
-                    ))}
+                    {items.map((item, i) => {
+                      const label = displayLabel(item) as ArticleLabel | null;
+                      const displayTitle = item.source === "fetch_page"
+                        ? (item.title ? cleanTitle(item.title) : item.resource_id)
+                        : item.resource_id;
+                      return (
+                        <div key={i} className="px-4 py-3">
+                          {item.resource_id && (
+                            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+                              {label && (
+                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${LABEL_STYLES[label]}`}>
+                                  {label}
+                                </span>
+                              )}
+                              <a
+                                href={item.resource_id}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text hover:underline max-w-[60ch] truncate inline-block"
+                                title={item.resource_id}
+                              >
+                                {displayTitle}
+                              </a>
+                            </div>
+                          )}
+                          <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
+                            {item.content || "(no content)"}
+                          </pre>
+                        </div>
+                      );
+                    })}
                   </div>
                 </details>
               ))}

@@ -14,7 +14,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
-    "Web Search": ["google_search", "google_news_search", "fetch_page"],
+    "Web Search": ["google_search", "google_news_search"],
 }
 
 
@@ -519,10 +519,6 @@ def build_collection_collect_prompt(
             f"\nTimeframe hint: \"{_timelimit_hint}\""
             f"\ndate_restrict codes: \"d1\"=day, \"w1\"=week, \"m1\"=month, \"m3\"=3 months, \"m6\"=6 months, \"y1\"=year. Omit for no restriction."
             f"\nSTRICT LIMITS: max {_max_web} google_search calls + max {_max_news} google_news_search calls ({len(_active)} perspective(s) × 5 each)."
-            f"\n"
-            f"\nfetch_page: Use on the 2-3 most relevant URLs from search results to get full article content."
-            f"\n  fetch_page(url=\"https://...\", max_chars=5000)"
-            f"\n  Only fetch when a snippet is insufficient. Do NOT fetch every URL."
             f"\nSource authority: web search results carry LOWER authority than OTX. Always prefer OTX."
         )
     else:

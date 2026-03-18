@@ -163,6 +163,12 @@ export interface CollectedItem {
   source: string;
   resource_id: string | null;
   content: string;
+  // Optional fields populated by the url_context second pass (fetch_page items only)
+  title?: string;
+  apa_citation?: string;
+  author?: string;
+  date?: string;
+  publisher?: string;
 }
 
 /**

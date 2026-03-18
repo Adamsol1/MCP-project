@@ -192,56 +192,6 @@ def google_news_search(
         return f"[google_news_search] {err or e}"
 
 
-def fetch_page(url: str, max_chars: int = 5000) -> str:
-    """Fetch and extract readable text content from a web page URL.
-
-    Use after google_search or google_news_search to get the full content of
-    the most relevant articles. Only call on 2-3 highest-value URLs per
-    perspective — do not fetch every result, only where the snippet is
-    insufficient to assess relevance or extract key facts.
-
-    Parameters:
-    - url: The full URL to fetch.
-    - max_chars: Maximum characters to return (default 5000, max 10000).
-    """
-    from bs4 import BeautifulSoup
-
-    max_chars = min(max(500, max_chars), 10000)
-
-    try:
-        with httpx.Client(
-            timeout=15.0,
-            follow_redirects=True,
-            headers={"User-Agent": "Mozilla/5.0 (compatible; ThreatIntelBot/1.0)"},
-        ) as client:
-            response = client.get(url)
-            response.raise_for_status()
-            html = response.text
-
-        soup = BeautifulSoup(html, "lxml")
-        for tag in soup(["script", "style", "nav", "footer", "header",
-                          "aside", "form", "iframe", "noscript"]):
-            tag.decompose()
-
-        text = soup.get_text(separator="\n", strip=True)
-        lines = [line.strip() for line in text.splitlines() if line.strip()]
-        text = "\n".join(lines)
-
-        truncated = len(text) > max_chars
-        text = text[:max_chars]
-
-        suffix = "\n[content truncated]" if truncated else ""
-        return f"[fetch_page] Content from: {url}\n\n{text}{suffix}"
-
-    except httpx.HTTPStatusError as e:
-        return f"[fetch_page] HTTP {e.response.status_code}: {url}"
-    except httpx.TimeoutException:
-        return f"[fetch_page] Timeout fetching: {url}"
-    except Exception as e:
-        return f"[fetch_page] Error: {e}"
-
-
 def register_google_search_tools(mcp) -> None:
     mcp.tool(google_search)
     mcp.tool(google_news_search)
-    mcp.tool(fetch_page)

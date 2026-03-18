@@ -29,7 +29,7 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
-    "Web Search": ["google_search", "google_news_search", "fetch_page"],
+    "Web Search": ["google_search", "google_news_search"],
 }
 
 
@@ -74,6 +74,32 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
     "google_news_search": "Web News",
     "fetch_page": "Web Fetch",
 }
+
+
+def _extract_search_urls(raw_data: str) -> list[str]:
+    """Extract unique URLs from google_search and google_news_search tool results."""
+    found = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in found:
+        url = url.rstrip(".,)")
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
+
+
+def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
+    """Insert additional items into the collected_data list in raw_data JSON."""
+    try:
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+        json_str = fence.group(1).strip() if fence else raw_data.strip()
+        parsed = json.loads(json_str)
+        parsed["collected_data"] = parsed.get("collected_data", []) + extra_items
+        return json.dumps(parsed, ensure_ascii=False)
+    except Exception:
+        # Fallback: append as a separate JSON block the AI can still read
+        return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
 
 
 class CollectionService:
@@ -380,7 +406,27 @@ class CollectionService:
                 allowed_tool_names=allowed_tool_names,
             )
 
-        if session_id and any(s in selected_sources for s in ("Web Search",)):
+        # Second pass: summarize full page content via Gemini url_context (no scraping).
+        # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        if "Web Search" in selected_sources:
+            urls = _extract_search_urls(raw_data)
+            if urls:
+                url_agent = GeminiAgent(self.mcp_client)
+                logger.info(
+                    f"[CollectionService] url_context: fetching {min(len(urls), 15)} of {len(urls)} URLs"
+                )
+                summaries = await url_agent.fetch_url_summaries(
+                    urls=urls[:15],
+                    pir=pir,
+                    perspectives=perspectives or [],
+                )
+                if summaries:
+                    raw_data = _append_to_collected_data(raw_data, summaries)
+                    logger.info(
+                        f"[CollectionService] url_context: added {len(summaries)} page summaries"
+                    )
+
+        if session_id and "Web Search" in selected_sources:
             self._save_web_results(session_id, raw_data, pir)
 
         return raw_data

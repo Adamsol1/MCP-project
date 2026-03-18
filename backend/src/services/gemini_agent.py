@@ -12,6 +12,7 @@ which tools to call and when are made by the agent itself.
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from google import genai
@@ -166,6 +167,96 @@ class GeminiAgent:
             part.text for part in candidate.content.parts if part.text is not None
         )
         return last_text or "Agent reached maximum tool iterations without completing."
+
+    async def fetch_url_summaries(
+        self,
+        urls: list[str],
+        pir: str,
+        perspectives: list[str],
+        batch_size: int = 15,
+    ) -> list[dict]:
+        """Second-pass: fetch and summarise web pages using Gemini url_context.
+
+        Makes a separate Gemini call with the url_context built-in tool — no MCP
+        tools, no scraping. Gemini fetches each URL server-side through Google's
+        infrastructure.
+
+        Returns a list of collected_data-compatible dicts with source="fetch_page".
+        """
+        if not urls:
+            return []
+
+        results: list[dict] = []
+        perspectives_str = ", ".join(perspectives) if perspectives else "neutral"
+
+        for i in range(0, len(urls), batch_size):
+            batch = urls[i : i + batch_size]
+            url_list = "\n".join(f"- {url}" for url in batch)
+
+            prompt = (
+                f"PIR (Priority Intelligence Requirement): {pir}\n"
+                f"Analysis perspectives: {perspectives_str}\n\n"
+                f"Fetch and read each URL listed below. For each accessible page:\n"
+                f"1. Extract the article title, author name(s), publication date, and publisher/website name.\n"
+                f"2. Write a concise intelligence-focused summary (3-5 sentences) highlighting facts "
+                f"and analysis directly relevant to the PIR.\n"
+                f"3. Construct a correctly formatted APA 7th edition citation.\n\n"
+                f"APA format: Author, A. A. (Year, Month Day). Title of article. Publisher. URL\n"
+                f"- If author is unknown use the publisher/website name as author.\n"
+                f"- If date is unknown omit it.\n"
+                f"- Dates must use the format: YYYY, Month DD (e.g. 2026, March 15).\n\n"
+                f"URLs to fetch:\n{url_list}\n\n"
+                f"Respond ONLY with valid JSON — no markdown fences, no explanation:\n"
+                f'{{"page_summaries": ['
+                f'{{"url": "...", "title": "...", "author": "Last, F. M. or null", '
+                f'"date": "YYYY-MM-DD or null", "publisher": "...", '
+                f'"apa_citation": "...", "summary": "..."}}'
+                f']}}'
+            )
+
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"url_context": {}}],
+                    ),
+                )
+                text = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if part.text is not None
+                )
+                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+                text = fence.group(1).strip() if fence else text.strip()
+                parsed = json.loads(text)
+                for item in parsed.get("page_summaries", []):
+                    if item.get("url") and item.get("summary"):
+                        citation = item.get("apa_citation", "")
+                        content = (
+                            f"[{item.get('title', 'Article')}]\n"
+                            f"{item['summary']}"
+                        )
+                        if citation:
+                            content += f"\n\nCitation: {citation}"
+                        results.append({
+                            "source": "fetch_page",
+                            "resource_id": item["url"],
+                            "content": content,
+                            "apa_citation": citation,
+                            "author": item.get("author"),
+                            "date": item.get("date"),
+                            "publisher": item.get("publisher"),
+                            "title": item.get("title"),
+                        })
+                logger.info(
+                    f"[GeminiAgent] url_context batch {i // batch_size + 1}: "
+                    f"{len(parsed.get('page_summaries', []))} pages summarised"
+                )
+            except Exception as e:
+                logger.error(f"[GeminiAgent] url_context batch failed: {e}")
+
+        return results
 
     async def _get_tool_declarations(self, allowed_tool_names: set[str] | None = None) -> list:
         """Fetch available tools from the MCP server and convert to Gemini format.
