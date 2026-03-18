@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp_client.client import MCPClient
+from src.services.collection_status import CollectionStatusTracker
 from src.services.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
@@ -375,6 +376,7 @@ class CollectionService:
         """
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
+        tracker = None
 
         async with self.mcp_client.connect():
             collect_prompt = await self.mcp_client.get_prompt(
@@ -395,6 +397,9 @@ class CollectionService:
                 for tool in _SOURCE_TO_TOOLS.get(source, [])
             }
 
+            if session_id:
+                tracker = CollectionStatusTracker(session_id, selected_sources)
+
             agent = GeminiAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
@@ -404,7 +409,11 @@ class CollectionService:
                 system_prompt=collect_prompt,
                 task=task,
                 allowed_tool_names=allowed_tool_names,
+                status_tracker=tracker,
             )
+
+        if tracker:
+            tracker.mark_complete()
 
         # Second pass: summarize full page content via Gemini url_context (no scraping).
         # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.

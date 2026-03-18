@@ -84,6 +84,7 @@ class GeminiAgent:
         system_prompt: str,
         task: str,
         allowed_tool_names: set[str] | None = None,
+        status_tracker=None,
     ) -> str:
         """Run the agent on a task, autonomously calling MCP tools as needed.
 
@@ -142,6 +143,8 @@ class GeminiAgent:
             for part in tool_calls:
                 fc = part.function_call
                 logger.info(f"[GeminiAgent] Calling tool: {fc.name}({dict(fc.args)})")
+                if status_tracker is not None:
+                    status_tracker.record_tool_call(fc.name, dict(fc.args))
                 try:
                     result = await self.mcp_client.call_tool(fc.name, dict(fc.args))
                     result_text = (

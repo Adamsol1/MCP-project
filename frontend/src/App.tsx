@@ -1,7 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
-import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useToast } from "./hooks/useToast";
@@ -11,6 +10,10 @@ import {
   uploadFile,
   type UploadedFileRecord,
 } from "./services/upload";
+import {
+  getCollectionStatus,
+  type CollectionStatus,
+} from "./services/dialogue";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
@@ -25,6 +28,14 @@ function WorkspaceResetWatcher({ conversationId }: { conversationId: string | nu
     setCollectionData(null);
     setHighlightedRefs([]);
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
+function WorkspacePhaseWatcher({ isSourceSelecting }: { isSourceSelecting: boolean }) {
+  const { setActivePhase } = useWorkspace();
+  useEffect(() => {
+    if (isSourceSelecting) setActivePhase("collection");
+  }, [isSourceSelecting]); // eslint-disable-line react-hooks/exhaustive-deps
   return null;
 }
 
@@ -68,6 +79,7 @@ function App() {
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
+  const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
 
   const ensureConversationSession = () => {
     return activeConversation ?? createNewConversation();
@@ -90,6 +102,25 @@ function App() {
     }
     refreshUploadedFiles(activeConversation.sessionId);
   }, [activeConversation?.sessionId]);
+
+  useEffect(() => {
+    if (!isCollecting || !activeConversation?.sessionId) {
+      if (!isCollecting) setCollectionStatus(null);
+      return;
+    }
+    const sessionId = activeConversation.sessionId;
+    let active = true;
+    const poll = async () => {
+      const status = await getCollectionStatus(sessionId);
+      if (active) setCollectionStatus(status);
+    };
+    poll();
+    const interval = setInterval(poll, 1500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isCollecting, activeConversation?.sessionId]);
 
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
@@ -129,6 +160,7 @@ function App() {
   return (
     <WorkspaceProvider>
     <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
+    <WorkspacePhaseWatcher isSourceSelecting={isSourceSelecting} />
     <div className="flex h-screen">
       <Sidebar
         conversations={conversations}
@@ -163,6 +195,7 @@ function App() {
           onGatherMore={gatherMore}
           isSourceSelecting={isSourceSelecting}
           isCollecting={isCollecting}
+          collectionStatus={collectionStatus}
           availableSources={availableSources}
           selectedSources={selectedSources}
           onToggleSourceSelection={toggleSourceSelection}
@@ -172,17 +205,17 @@ function App() {
         />
       </main>
 
-      <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
-        <IntelligencePanel />
+      <div className="w-56 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+        <IntelligencePanel
+          selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
+          onPerspectiveChange={updatePerspectives}
+          onOpenFileUpload={() => setIsFileUploadOpen(true)}
+          uploadedFiles={uploadedFiles}
+          onFileRemove={handleFileRemove}
+          isCollecting={isCollecting}
+          collectionStatus={collectionStatus}
+        />
       </div>
-
-      <OptionsPanel
-        selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
-        onPerspectiveChange={updatePerspectives}
-        onOpenFileUpload={() => setIsFileUploadOpen(true)}
-        uploadedFiles={uploadedFiles}
-        onFileRemove={handleFileRemove}
-      />
 
       <FileUploadModal
         isOpen={isFileUploadOpen}

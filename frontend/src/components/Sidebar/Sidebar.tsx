@@ -117,7 +117,7 @@ export function Sidebar({
      */
     <aside
       className={`${
-        isCollapsed ? "w-14" : "w-64"
+        isCollapsed ? "w-12" : "w-48"
       } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden`}
     >
       {/* Toggle button — SVG chevron, clearer than a Unicode character.
@@ -153,12 +153,12 @@ export function Sidebar({
       <button
         onClick={onNewChat}
         aria-label="New Chat"
-        className={`mx-2 mb-2 p-2 bg-primary-dark text-white rounded flex items-center justify-center gap-2 shrink-0 ${
+        className={`mx-2 mb-2 py-1.5 px-2 bg-primary-dark text-white rounded flex items-center justify-center gap-1.5 shrink-0 ${
           isCollapsed ? "" : "w-[calc(100%-1rem)]"
         }`}
       >
-        <span className="text-lg leading-none">+</span>
-        {!isCollapsed && <span>New Chat</span>}
+        <span className="text-sm leading-none">+</span>
+        {!isCollapsed && <span className="text-xs">New Chat</span>}
       </button>
 
       {/* Conversation list — hidden entirely when collapsed to keep the rail clean. */}
@@ -204,7 +204,7 @@ export function Sidebar({
                       data-active={
                         conv.id === activeConversationId ? "true" : "false"
                       }
-                      className="flex-1 text-left p-2"
+                      className="flex-1 text-left p-2 text-sm"
                     >
                       {conv.title}
                     </button>

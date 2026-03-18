@@ -33,12 +33,12 @@ export default function PerspectiveSelector({
    * value string used in the selected array and sent to the backend.
    */
   const perspectives = [
-    { label: "United States", value: "US" },
+    { label: "Neutral", value: "NEUTRAL" },
+    { label: "China", value: "CHINA" },
     { label: "European Union", value: "EU" },
     { label: "Norway", value: "NORWAY" },
-    { label: "China", value: "CHINA" },
     { label: "Russia", value: "RUSSIA" },
-    { label: "Neutral", value: "NEUTRAL" },
+    { label: "United States", value: "US" },
   ];
 
   /**
@@ -74,26 +74,26 @@ export default function PerspectiveSelector({
         Perspectives
       </p>
 
-      {/*
-        .map() transforms the perspectives array into an array of button elements.
-        React renders the returned array as a sequence of sibling nodes.
-        key={perspective.value} lets React identify each button across re-renders.
-      */}
-      {perspectives.map((perspective) => (
-        <button
-          key={perspective.value}
-          onClick={() => togglePerspective(perspective.value)}
-          aria-pressed={selected.includes(perspective.value)}
-          data-selected={selected.includes(perspective.value).toString()}
-          className={`px-4 py-2 rounded border font-medium transition-colors ${
-            selected.includes(perspective.value)
-              ? "bg-primary text-text-inverse border-primary-dark"
-              : "bg-surface text-text-primary border-border hover:bg-surface-muted"
-          }`}
-        >
-          {perspective.label}
-        </button>
-      ))}
+      <div className="flex flex-wrap gap-1.5">
+        {perspectives.map((perspective) => {
+          const isActive = selected.includes(perspective.value);
+          return (
+            <button
+              key={perspective.value}
+              onClick={() => togglePerspective(perspective.value)}
+              aria-pressed={isActive}
+              data-selected={isActive.toString()}
+              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                isActive
+                  ? "bg-primary border-primary-dark text-text-inverse"
+                  : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
+              }`}
+            >
+              {perspective.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

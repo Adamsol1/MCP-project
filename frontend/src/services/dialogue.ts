@@ -82,6 +82,30 @@ export async function sendMessage(
   return httpResonse.data;
 }
 
+export interface CollectionSourceStatus {
+  call_count: number;
+  last_called_at: string | null;
+}
+
+export interface CollectionStatus {
+  session_id: string;
+  status: "collecting" | "complete";
+  current_source: string | null;
+  current_activity: string | null;
+  sources: Record<string, CollectionSourceStatus>;
+}
+
+export async function getCollectionStatus(sessionId: string): Promise<CollectionStatus | null> {
+  try {
+    const res = await axios.get<CollectionStatus>(
+      `${API_BACKEND_URL}/api/dialogue/collection-status/${sessionId}`,
+    );
+    return res.data;
+  } catch {
+    return null;
+  }
+}
+
 export async function getDevDialogueState(sessionId: string) {
   const httpResponse = await axios.get<DialogueDevStateResponse>(
     `${API_BACKEND_URL}/api/dialogue/dev/state`,

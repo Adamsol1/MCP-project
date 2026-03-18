@@ -14,6 +14,7 @@ import type {
 } from "../../types/conversation";
 import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import type { CollectionStatus } from "../../services/dialogue";
 
 function Chevron() {
   return (
@@ -211,18 +212,20 @@ function CollectionReviewPrompt({
   onGatherMore?: () => void;
 }) {
   return (
-    <section className="rounded-xl border-2 border-border bg-surface p-4">
-      <h3 className="text-lg font-semibold text-text-primary">Collection Review</h3>
-      <p className="mt-1 text-sm text-text-secondary">
-        Accept the collected data or collect more from additional sources.
-      </p>
+    <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-semibold text-text-primary">Collection Review</h3>
+        <p className="text-sm text-text-secondary">
+          Accept the collected data or collect more from additional sources.
+        </p>
+      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="shrink-0 flex items-center gap-2">
         <button
           type="button"
           onClick={() => onAccept?.()}
           disabled={isLoading}
-          className="rounded-lg bg-success px-4 py-2 text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Accept
         </button>
@@ -231,7 +234,7 @@ function CollectionReviewPrompt({
           type="button"
           onClick={() => onGatherMore?.()}
           disabled={isLoading}
-          className="rounded-lg bg-primary px-4 py-2 text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Collect More Data
         </button>
@@ -252,6 +255,7 @@ interface ChatWindowProps {
   onGatherMore?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
+  collectionStatus?: CollectionStatus | null;
   availableSources?: string[];
   selectedSources?: string[];
   onToggleSourceSelection?: (source: string) => void;
@@ -354,6 +358,7 @@ export default function ChatWindow({
   onGatherMore,
   isSourceSelecting = false,
   isCollecting = false,
+  collectionStatus = null,
   availableSources = [],
   selectedSources = [],
   onToggleSourceSelection,
@@ -503,35 +508,38 @@ export default function ChatWindow({
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
-              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-                <h3 className="text-lg font-semibold text-gray-800">Select Sources</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Choose one or more data sources before collection starts.
-                </p>
-
-                {availableSources.length === 0 ? (
-                  <p className="mt-4 text-sm text-gray-600">
-                    No source suggestions available.
+              <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-text-primary">Select Sources</h3>
+                  <p className="text-sm text-text-secondary">
+                    Choose one or more data sources before collection starts.
                   </p>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    {availableSources.map((source) => (
-                      <label
-                        key={source}
-                        className="flex items-center gap-2 text-sm text-gray-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSources.includes(source)}
-                          onChange={() => onToggleSourceSelection?.(source)}
-                          disabled={isLoading}
-                        />
-                        {source}
-                      </label>
-                    ))}
-                  </div>
-                )}
-
+                  {availableSources.length === 0 ? (
+                    <p className="mt-2 text-xs text-text-secondary">No source suggestions available.</p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {[...availableSources].sort((a, b) => a.localeCompare(b)).map((source) => {
+                        const isActive = selectedSources.includes(source);
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => onToggleSourceSelection?.(source)}
+                            disabled={isLoading}
+                            aria-pressed={isActive}
+                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                              isActive
+                                ? "bg-primary border-primary-dark text-text-inverse"
+                                : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
+                            }`}
+                          >
+                            {source}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => onSubmitSourceSelection?.()}
@@ -540,17 +548,67 @@ export default function ChatWindow({
                     availableSources.length === 0 ||
                     selectedSources.length === 0
                   }
-                  className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Start Collecting
                 </button>
               </section>
             ) : isCollecting ? (
-              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-                <h3 className="text-lg font-semibold text-gray-800">Collecting Data</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  The system is collecting and reviewing data from the selected sources.
+              <section className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">
+                  Collecting
                 </p>
+                {collectionStatus ? (
+                  <ul className="flex flex-col gap-2">
+                    {Object.entries(collectionStatus.sources).map(([source, info]) => {
+                      const isActive = collectionStatus.current_source === source;
+                      const isDone = info.call_count > 0 && !isActive;
+                      const showActivity = isActive && collectionStatus.current_activity;
+                      return (
+                        <li key={source} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className={`shrink-0 w-4 text-center font-medium ${
+                              isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
+                            }`}>
+                              {isDone ? "✓" : isActive ? "→" : "○"}
+                            </span>
+                            <span className={
+                              isDone ? "text-text-secondary" :
+                              isActive ? "text-text-primary font-medium" :
+                              "text-text-muted"
+                            }>
+                              {source}
+                            </span>
+                            <span className="ml-auto text-xs text-text-muted tabular-nums">
+                              {info.call_count > 0
+                                ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
+                                : "—"}
+                            </span>
+                            {isActive && !showActivity && (
+                              <span className="flex gap-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                              </span>
+                            )}
+                          </div>
+                          {showActivity && (
+                            <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
+                              <span>{collectionStatus.current_activity}</span>
+                              <span className="flex gap-0.5">
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                              </span>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-text-secondary">Starting collection…</p>
+                )}
               </section>
             ) : isConfirming ? (
               stage === "reviewing" ? (

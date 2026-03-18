@@ -50,16 +50,18 @@ export default function ApprovalPrompt({
   const canReject = !isLoading;
 
   return (
-    <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-      <h3 className="text-lg font-semibold text-gray-800">{promptCopy.title}</h3>
-      <p className="mt-1 text-sm text-gray-600">{promptCopy.subtitle}</p>
+    <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-semibold text-text-primary">{promptCopy.title}</h3>
+        <p className="text-sm text-text-secondary">{promptCopy.subtitle}</p>
+      </div>
 
-      <div className="mt-4 flex items-center gap-3">
+      <div className="shrink-0 flex items-center gap-2">
         <button
           type="button"
           onClick={() => onApproveContinue?.()}
           disabled={!canApprove}
-          className="rounded-lg bg-green-600 px-4 py-2 text-white hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Approve & Continue
         </button>
@@ -68,7 +70,7 @@ export default function ApprovalPrompt({
           type="button"
           onClick={() => onRejectWithFeedback?.()}
           disabled={!canReject}
-          className="rounded-lg bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-error px-4 py-2 text-sm font-medium text-text-inverse hover:bg-error-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Reject with Feedback
         </button>
