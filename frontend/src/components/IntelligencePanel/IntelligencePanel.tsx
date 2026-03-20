@@ -3,6 +3,7 @@ import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
+import AnalysisPrototypeView from "../AnalysisPrototypeView/AnalysisPrototypeView";
 
 export default function IntelligencePanel() {
   const { activePhase, collectionData } = useWorkspace();
@@ -26,11 +27,7 @@ export default function IntelligencePanel() {
           </p>
         );
       case "analysis":
-        return (
-          <p className="text-sm text-text-secondary">
-            Analysis outputs will appear here.
-          </p>
-        );
+        return <AnalysisPrototypeView />;
       default:
         return null;
     }

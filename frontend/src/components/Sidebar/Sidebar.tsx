@@ -22,6 +22,8 @@ interface SidebarProps {
   onDevSendMessage: () => void;
   /** DEV: Forces chat into confirmation mode to preview approval UI. */
   onDevShowCollectionApproval?: () => void;
+  /** DEV: Open the analysis prototype directly using the demo-backed flow. */
+  onDevOpenAnalysis?: () => void;
   /** DEV: Force the backend/session to a specific stage. */
   onDevJumpToStage?: (stage: DialogueStage) => void;
   /** DEV: Pull latest stage snapshot from backend. */
@@ -70,6 +72,7 @@ export function Sidebar({
   onDeleteAllConversations,
   onDevSendMessage,
   onDevShowCollectionApproval,
+  onDevOpenAnalysis,
   onDevJumpToStage,
   onDevSyncStage,
   onDevResetStage,
@@ -325,6 +328,14 @@ export function Sidebar({
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   Show collection approval
+                </button>
+              )}
+              {onDevOpenAnalysis && (
+                <button
+                  onClick={onDevOpenAnalysis}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
+                >
+                  Open analysis demo
                 </button>
               )}
               {onDevJumpToStage && (

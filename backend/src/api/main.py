@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-load_dotenv()
-
-from src.api.dialogue import evict_session, router as dialogue_router
+from src.api.analysis import router as analysis_router
+from src.api.dialogue import evict_session
+from src.api.dialogue import router as dialogue_router
 from src.importers.session_uploads import (
     default_uploads_root,
     delete_session_upload,
@@ -16,8 +16,10 @@ from src.importers.session_uploads import (
     list_session_uploads,
     save_session_upload,
 )
-from src.services.reasearch_logger import ResearchLogger
 from src.logging_config import setup_logging
+from src.services.reasearch_logger import ResearchLogger
+
+load_dotenv()
 
 setup_logging()
 
@@ -51,6 +53,7 @@ app.add_middleware(
 )
 
 # Includes
+app.include_router(analysis_router)
 app.include_router(dialogue_router)
 
 # Path for saving uploaded files.
@@ -168,6 +171,14 @@ async def delete_session(session_id: str):
             log_file = outputs_dir / log_name
             if log_file.exists():
                 log_file.unlink()
+
+        analysis_state_file = (
+            Path(__file__).resolve().parents[2]
+            / "sessions"
+            / f"{session_id}.analysis.json"
+        )
+        if analysis_state_file.exists():
+            analysis_state_file.unlink()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

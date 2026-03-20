@@ -16,6 +16,8 @@ import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
+import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
+import AnalysisPrototypeView from "./components/AnalysisPrototypeView/AnalysisPrototypeView";
 
 function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
   const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
@@ -28,8 +30,19 @@ function WorkspaceResetWatcher({ conversationId }: { conversationId: string | nu
   return null;
 }
 
-function App() {
+function WorkspaceStageSync({ stage }: { stage: DialogueStage }) {
+  const { setActivePhase } = useWorkspace();
+
+  useEffect(() => {
+    setActivePhase(getWorkspacePhaseForDialogueStage(stage));
+  }, [stage, setActivePhase]);
+
+  return null;
+}
+
+function AppShell() {
   const { success, error } = useToast();
+  const { activePhase } = useWorkspace();
   const {
     conversations,
     activeConversation,
@@ -39,6 +52,7 @@ function App() {
     deleteAllConversations,
     renameConversation,
     updatePerspectives,
+    setStage,
   } = useConversation();
   const {
     messages,
@@ -126,77 +140,108 @@ function App() {
     }
   };
 
+  const openAnalysisDemo = () => {
+    const conversation = activeConversation ?? createNewConversation();
+
+    if (activeConversation?.id !== conversation.id) {
+      switchConversation(conversation.id);
+    }
+
+    setStage("complete", null);
+  };
+
+  const isAnalysisPhase = activePhase === "analysis";
+
   return (
-    <WorkspaceProvider>
-    <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
-    <div className="flex h-screen">
-      <Sidebar
-        conversations={conversations}
-        activeConversationId={activeConversation?.id ?? null}
-        onNewChat={createNewConversation}
-        onSwitchConversation={switchConversation}
-        onDeleteConversation={deleteConversation}
-        onRenameConversation={renameConversation}
-        onDeleteAllConversations={deleteAllConversations}
-        onDevSendMessage={() =>
-          triggerDevMessage(
-            "What are the latest cyber threats targeting European critical infrastructure?",
-          )
-        }
-        onDevShowCollectionApproval={debugConfirm}
-        onDevJumpToStage={(nextStage: DialogueStage) => jumpToDevStage(nextStage)}
-        onDevSyncStage={syncDevStage}
-        onDevResetStage={resetDevStage}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
-
-      <main className="flex-1 flex flex-col bg-surface-elevated mx-1">
-        <ChatWindow
-          messages={messages}
-          onSendMessage={sendMessage}
-          isConfirming={isConfirming}
-          stage={stage}
-          subState={subState}
-          isLoading={isLoading}
-          onApprove={approve}
-          onReject={reject}
-          onGatherMore={gatherMore}
-          isSourceSelecting={isSourceSelecting}
-          isCollecting={isCollecting}
-          availableSources={availableSources}
-          selectedSources={selectedSources}
-          onToggleSourceSelection={toggleSourceSelection}
-          onSubmitSourceSelection={submitSourceSelection}
-          devPrefill={devPrefill}
-          onDevPrefillConsumed={clearDevPrefill}
+    <>
+      <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
+      <WorkspaceStageSync stage={stage} />
+      <div className="flex h-screen">
+        <Sidebar
+          conversations={conversations}
+          activeConversationId={activeConversation?.id ?? null}
+          onNewChat={createNewConversation}
+          onSwitchConversation={switchConversation}
+          onDeleteConversation={deleteConversation}
+          onRenameConversation={renameConversation}
+          onDeleteAllConversations={deleteAllConversations}
+          onDevSendMessage={() =>
+            triggerDevMessage(
+              "What are the latest cyber threats targeting European critical infrastructure?",
+            )
+          }
+          onDevShowCollectionApproval={debugConfirm}
+          onDevOpenAnalysis={openAnalysisDemo}
+          onDevJumpToStage={(nextStage: DialogueStage) => jumpToDevStage(nextStage)}
+          onDevSyncStage={syncDevStage}
+          onDevResetStage={resetDevStage}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
-      </main>
 
-      <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
-        <IntelligencePanel />
+        <main className="flex-1 flex flex-col bg-surface-elevated mx-1 overflow-hidden">
+          {isAnalysisPhase ? (
+            <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-chatgpt">
+              <section className="rounded-xl border border-border-muted bg-surface p-4 shadow-sm">
+                <AnalysisPrototypeView />
+              </section>
+            </div>
+          ) : (
+            <ChatWindow
+              messages={messages}
+              onSendMessage={sendMessage}
+              isConfirming={isConfirming}
+              stage={stage}
+              subState={subState}
+              isLoading={isLoading}
+              onApprove={approve}
+              onReject={reject}
+              onGatherMore={gatherMore}
+              isSourceSelecting={isSourceSelecting}
+              isCollecting={isCollecting}
+              availableSources={availableSources}
+              selectedSources={selectedSources}
+              onToggleSourceSelection={toggleSourceSelection}
+              onSubmitSourceSelection={submitSourceSelection}
+              devPrefill={devPrefill}
+              onDevPrefillConsumed={clearDevPrefill}
+            />
+          )}
+        </main>
+
+        {!isAnalysisPhase && (
+          <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+            <IntelligencePanel />
+          </div>
+        )}
+
+        <OptionsPanel
+          selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
+          onPerspectiveChange={updatePerspectives}
+          onOpenFileUpload={() => setIsFileUploadOpen(true)}
+          uploadedFiles={uploadedFiles}
+          onFileRemove={handleFileRemove}
+        />
+
+        <FileUploadModal
+          isOpen={isFileUploadOpen}
+          onClose={() => setIsFileUploadOpen(false)}
+          onSubmit={handleSubmit}
+        />
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
+        />
       </div>
-
-      <OptionsPanel
-        selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
-        onPerspectiveChange={updatePerspectives}
-        onOpenFileUpload={() => setIsFileUploadOpen(true)}
-        uploadedFiles={uploadedFiles}
-        onFileRemove={handleFileRemove}
-      />
-
-      <FileUploadModal
-        isOpen={isFileUploadOpen}
-        onClose={() => setIsFileUploadOpen(false)}
-        onSubmit={handleSubmit}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
-    </div>
-    </WorkspaceProvider>
+    </>
   );
 }
 
+function App() {
+  return (
+    <WorkspaceProvider>
+      <AppShell />
+    </WorkspaceProvider>
+  );
+}
 export default App;

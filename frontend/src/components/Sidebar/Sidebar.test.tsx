@@ -134,6 +134,30 @@ describe("Sidebar", () => {
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
   });
 
+  it("renders the analysis demo dev button when callback is provided", async () => {
+    const user = userEvent.setup();
+    renderSidebar({ onDevOpenAnalysis: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+
+    expect(
+      screen.getByRole("button", { name: /open analysis demo/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onDevOpenAnalysis when clicked", async () => {
+    const user = userEvent.setup();
+    const onDevOpenAnalysis = vi.fn();
+
+    renderSidebar({ onDevOpenAnalysis });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(
+      screen.getByRole("button", { name: /open analysis demo/i }),
+    );
+
+    expect(onDevOpenAnalysis).toHaveBeenCalledOnce();
+  });
+
   it("starts with direction phase minimized", async () => {
     const user = userEvent.setup();
     renderSidebar({ onDevJumpToStage: vi.fn() });
