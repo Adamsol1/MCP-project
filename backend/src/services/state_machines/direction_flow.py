@@ -253,7 +253,8 @@ class DirectionFlow(BasePhaseFlow):
         if extracted_context.get("threat_actors"):
             self.context.threat_actors = extracted_context["threat_actors"]
         if extracted_context.get("priority_focus"):
-            self.context.priority_focus = extracted_context["priority_focus"]
+            pf = extracted_context["priority_focus"]
+            self.context.priority_focus = ", ".join(pf) if isinstance(pf, list) else pf
 
     async def handle_initial_input(
         self, user_message, dialogue_service, language: str = "en"

@@ -182,7 +182,7 @@ function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
-      <main className="flex-1 flex flex-col bg-surface-elevated mx-1">
+      <main className="flex-1 flex flex-col bg-surface mx-1">
         <ChatWindow
           messages={messages}
           onSendMessage={sendMessage}

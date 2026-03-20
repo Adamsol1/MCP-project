@@ -35,15 +35,11 @@ function Chevron() {
   );
 }
 
-
 const PRIORITY_LABEL: Record<string, string> = {
   high: "High",
   medium: "Medium",
   low: "Low",
 };
-
-
-
 
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
@@ -137,10 +133,14 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
   return (
     <div className="space-y-2">
       <h3 className="font-semibold">Collection Plan</h3>
-      <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+      <p className="whitespace-pre-wrap text-sm text-text-primary">
+        {planData.plan}
+      </p>
       {planData.suggested_sources.length > 0 && (
         <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">Suggested sources</p>
+          <p className="text-sm font-medium text-text-secondary">
+            Suggested sources
+          </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {planData.suggested_sources.map((source) => (
               <li key={source}>{source}</li>
@@ -173,18 +173,18 @@ function SuggestedSourcesMessage({
   );
 }
 
-function CollectionSummaryMessage({
-  data,
-}: {
-  data: CollectionSummaryData;
-}) {
+function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Summary</h3>
-      <p className="whitespace-pre-wrap text-sm text-text-primary">{data.summary}</p>
+      <p className="whitespace-pre-wrap text-sm text-text-primary">
+        {data.summary}
+      </p>
       {data.sources_used.length > 0 && (
         <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">Sources used</p>
+          <p className="text-sm font-medium text-text-secondary">
+            Sources used
+          </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {data.sources_used.map((source) => (
               <li key={source}>{source}</li>
@@ -214,7 +214,9 @@ function CollectionReviewPrompt({
   return (
     <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-semibold text-text-primary">Collection Review</h3>
+        <h3 className="text-sm font-semibold text-text-primary">
+          Collection Review
+        </h3>
         <p className="text-sm text-text-secondary">
           Accept the collected data or collect more from additional sources.
         </p>
@@ -264,7 +266,6 @@ interface ChatWindowProps {
   onDevPrefillConsumed?: () => void;
 }
 
-
 function SourceSummaryTable({
   summaries,
 }: {
@@ -276,17 +277,29 @@ function SourceSummaryTable({
       <table className="min-w-full text-sm">
         <thead className="bg-surface-muted">
           <tr>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Source</th>
-            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">Items</th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Resources</th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Status</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
+              Source
+            </th>
+            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">
+              Items
+            </th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
+              Resources
+            </th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
+              Status
+            </th>
           </tr>
         </thead>
         <tbody>
           {summaries.map((s) => (
             <tr key={s.display_name} className="border-t border-border-muted">
-              <td className="px-3 py-1.5 font-medium text-text-primary">{s.display_name}</td>
-              <td className="px-3 py-1.5 text-right text-text-secondary">{s.count}</td>
+              <td className="px-3 py-1.5 font-medium text-text-primary">
+                {s.display_name}
+              </td>
+              <td className="px-3 py-1.5 text-right text-text-secondary">
+                {s.count}
+              </td>
               <td className="px-3 py-1.5 text-xs text-text-muted">
                 {s.resource_ids.length > 0 ? s.resource_ids.join(", ") : "—"}
               </td>
@@ -308,12 +321,7 @@ function SourceSummaryTable({
   );
 }
 
-
-function CollectionDisplayMessage({
-  data,
-}: {
-  data: CollectionDisplayData;
-}) {
+function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   const { setCollectionData, setActivePhase } = useWorkspace();
 
   useEffect(() => {
@@ -325,7 +333,9 @@ function CollectionDisplayMessage({
     return (
       <div className="space-y-2">
         <h3 className="font-semibold">Collection Results</h3>
-        <p className="text-sm text-error-text">Could not parse collection output.</p>
+        <p className="text-sm text-error-text">
+          Could not parse collection output.
+        </p>
         <details className="group">
           <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
             Raw output <Chevron />
@@ -409,10 +419,10 @@ export default function ChatWindow({
     stage === "plan_confirming" && subState === "awaiting_modifications"
       ? "Describe the changes you want in the collection plan..."
       : stage === "reviewing" && subState === "awaiting_modifications"
-      ? "Describe how to modify the collection summary..."
-      : stage === "reviewing" && subState === "awaiting_gather_more"
-      ? "Describe what to gather more information about..."
-      : "Ask anything...";
+        ? "Describe how to modify the collection summary..."
+        : stage === "reviewing" && subState === "awaiting_gather_more"
+          ? "Describe what to gather more information about..."
+          : "Type anything...";
 
   function renderMessageContent(message: Message) {
     if (
@@ -429,14 +439,17 @@ export default function ChatWindow({
     }
 
     if (message.type === "plan" && message.data && "plan" in message.data) {
-      return <CollectionPlanMessage planData={message.data as CollectionPlanData} />;
+      return (
+        <CollectionPlanMessage planData={message.data as CollectionPlanData} />
+      );
     }
 
-    if (
-      message.type === "suggested_sources" &&
-      Array.isArray(message.data)
-    ) {
-      return <SuggestedSourcesMessage sources={message.data as SuggestedSourcesData} />;
+    if (message.type === "suggested_sources" && Array.isArray(message.data)) {
+      return (
+        <SuggestedSourcesMessage
+          sources={message.data as SuggestedSourcesData}
+        />
+      );
     }
 
     if (
@@ -444,7 +457,11 @@ export default function ChatWindow({
       message.data &&
       "collected_data" in message.data
     ) {
-      return <CollectionDisplayMessage data={message.data as CollectionDisplayData} />;
+      return (
+        <CollectionDisplayMessage
+          data={message.data as CollectionDisplayData}
+        />
+      );
     }
 
     if (
@@ -454,7 +471,9 @@ export default function ChatWindow({
       "sources_used" in message.data
     ) {
       return (
-        <CollectionSummaryMessage data={message.data as CollectionSummaryData} />
+        <CollectionSummaryMessage
+          data={message.data as CollectionSummaryData}
+        />
       );
     }
 
@@ -472,9 +491,17 @@ export default function ChatWindow({
                 data-sender={message.sender}
                 className={`max-w-[75%] p-3 rounded-lg mb-2 ${
                   message.sender === "user"
-                    ? "self-end bg-primary text-text-inverse"
+                    ? "self-end"
                     : "self-start bg-surface-muted text-text-primary"
                 }`}
+                style={
+                  message.sender === "user"
+                    ? {
+                        background: "var(--color-user-bubble)",
+                        color: "var(--color-user-bubble-text)",
+                      }
+                    : undefined
+                }
               >
                 {renderMessageContent(message)}
               </div>
@@ -510,33 +537,39 @@ export default function ChatWindow({
             {isSourceSelecting ? (
               <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-text-primary">Select Sources</h3>
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    Select Sources
+                  </h3>
                   <p className="text-sm text-text-secondary">
                     Choose one or more data sources before collection starts.
                   </p>
                   {availableSources.length === 0 ? (
-                    <p className="mt-2 text-xs text-text-secondary">No source suggestions available.</p>
+                    <p className="mt-2 text-xs text-text-secondary">
+                      No source suggestions available.
+                    </p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-1.5">
-                      {[...availableSources].sort((a, b) => a.localeCompare(b)).map((source) => {
-                        const isActive = selectedSources.includes(source);
-                        return (
-                          <button
-                            key={source}
-                            type="button"
-                            onClick={() => onToggleSourceSelection?.(source)}
-                            disabled={isLoading}
-                            aria-pressed={isActive}
-                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                              isActive
-                                ? "bg-primary border-primary-dark text-text-inverse"
-                                : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
-                            }`}
-                          >
-                            {source}
-                          </button>
-                        );
-                      })}
+                      {[...availableSources]
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((source) => {
+                          const isActive = selectedSources.includes(source);
+                          return (
+                            <button
+                              key={source}
+                              type="button"
+                              onClick={() => onToggleSourceSelection?.(source)}
+                              disabled={isLoading}
+                              aria-pressed={isActive}
+                              className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                                isActive
+                                  ? "bg-primary border-primary-dark text-text-inverse"
+                                  : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
+                              }`}
+                            >
+                              {source}
+                            </button>
+                          );
+                        })}
                     </div>
                   )}
                 </div>
@@ -560,54 +593,70 @@ export default function ChatWindow({
                 </p>
                 {collectionStatus ? (
                   <ul className="flex flex-col gap-2">
-                    {Object.entries(collectionStatus.sources).map(([source, info]) => {
-                      const isActive = collectionStatus.current_source === source;
-                      const isDone = info.call_count > 0 && !isActive;
-                      const showActivity = isActive && collectionStatus.current_activity;
-                      return (
-                        <li key={source} className="flex flex-col gap-1">
-                          <div className="flex items-center gap-3 text-sm">
-                            <span className={`shrink-0 w-4 text-center font-medium ${
-                              isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
-                            }`}>
-                              {isDone ? "✓" : isActive ? "→" : "○"}
-                            </span>
-                            <span className={
-                              isDone ? "text-text-secondary" :
-                              isActive ? "text-text-primary font-medium" :
-                              "text-text-muted"
-                            }>
-                              {source}
-                            </span>
-                            <span className="ml-auto text-xs text-text-muted tabular-nums">
-                              {info.call_count > 0
-                                ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
-                                : "—"}
-                            </span>
-                            {isActive && !showActivity && (
-                              <span className="flex gap-0.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                    {Object.entries(collectionStatus.sources).map(
+                      ([source, info]) => {
+                        const isActive =
+                          collectionStatus.current_source === source;
+                        const isDone = info.call_count > 0 && !isActive;
+                        const showActivity =
+                          isActive && collectionStatus.current_activity;
+                        return (
+                          <li key={source} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-3 text-sm">
+                              <span
+                                className={`shrink-0 w-4 text-center font-medium ${
+                                  isDone
+                                    ? "text-success"
+                                    : isActive
+                                      ? "text-primary"
+                                      : "text-text-muted"
+                                }`}
+                              >
+                                {isDone ? "✓" : isActive ? "→" : "○"}
                               </span>
-                            )}
-                          </div>
-                          {showActivity && (
-                            <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
-                              <span>{collectionStatus.current_activity}</span>
-                              <span className="flex gap-0.5">
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                              <span
+                                className={
+                                  isDone
+                                    ? "text-text-secondary"
+                                    : isActive
+                                      ? "text-text-primary font-medium"
+                                      : "text-text-muted"
+                                }
+                              >
+                                {source}
                               </span>
+                              <span className="ml-auto text-xs text-text-muted tabular-nums">
+                                {info.call_count > 0
+                                  ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
+                                  : "—"}
+                              </span>
+                              {isActive && !showActivity && (
+                                <span className="flex gap-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </li>
-                      );
-                    })}
+                            {showActivity && (
+                              <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
+                                <span>{collectionStatus.current_activity}</span>
+                                <span className="flex gap-0.5">
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                                </span>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      },
+                    )}
                   </ul>
                 ) : (
-                  <p className="text-sm text-text-secondary">Starting collection…</p>
+                  <p className="text-sm text-text-secondary">
+                    Starting collection…
+                  </p>
                 )}
               </section>
             ) : isConfirming ? (

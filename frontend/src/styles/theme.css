@@ -1,85 +1,101 @@
 @theme {
-  /* ─── Primary ─────────────────────────────────────────────── */
-  /* Used for: user message bubbles, primary CTA buttons, focus rings */
-  --color-primary:        #3b82f6;  /* blue-500 */
-  --color-primary-dark:   #2563eb;  /* blue-600 */
-  --color-primary-hover:  #1d4ed8;  /* blue-700 */
-  --color-primary-subtle: #eff6ff;  /* blue-50  */
+  /* ─── Primary — Void violet (shared across both modes) ──────── */
+  --color-primary:        #7C3AED;  /* violet-600  */
+  --color-primary-dark:   #6D28D9;  /* violet-700  */
+  --color-primary-hover:  #5B21B6;  /* violet-800  */
+  --color-primary-subtle: #F5F3FF;  /* violet-50   */
 
-  /* ─── Surfaces ─────────────────────────────────────────────── */
-  /* Used for: page backgrounds, cards, sidebars, modals */
-  --color-surface:               #ffffff;  /* white    — main content bg           */
-  --color-surface-muted:         #f9fafb;  /* gray-50  — assistant messages        */
-  --color-surface-elevated:      #f3f4f6;  /* gray-100 — hover/elevated areas      */
-  --color-surface-inverse:       #374151;  /* gray-700 — sidebar bg                */
-  --color-surface-inverse-hover: #4b5563;  /* gray-600 — sidebar hover/active rows */
-  --color-surface-deep:          #1f2937;  /* gray-800 — settings modal            */
+  /* User chat bubbles */
+  --color-user-bubble:      #7C3AED;
+  --color-user-bubble-text: #FAFAFA;
 
-  /* ─── Text ──────────────────────────────────────────────────── */
-  --color-text-primary:   #374151;  /* gray-700 — main body text    */
-  --color-text-secondary: #6b7280;  /* gray-500 — secondary text    */
-  --color-text-muted:     #9ca3af;  /* gray-400 — placeholder/hint  */
-  --color-text-inverse:    #ffffff;  /* white    — text on dark bg                 */
-  --color-text-on-inverse: #d1d5db;  /* gray-300 — secondary text on dark surfaces */
+  /* ─── Surfaces — Light mode defaults ───────────────────────── */
+  --color-surface:               #FAFAFA;  /* near-white — main content bg  */
+  --color-surface-muted:         #F4F4F5;  /* zinc-100 — panels             */
+  --color-surface-elevated:      #E4E4E7;  /* zinc-200 — modals, cards      */
+  --color-surface-inverse:       #18181B;  /* zinc-900 — sidebar            */
+  --color-surface-inverse-hover: #27272A;  /* zinc-800 — sidebar hover      */
+  --color-surface-deep:          #09090B;  /* zinc-950 — deepest bg         */
 
-  /* ─── Borders ───────────────────────────────────────────────── */
-  --color-border:         #d1d5db;  /* gray-300 — standard borders           */
-  --color-border-muted:   #e5e7eb;  /* gray-200 — subtle borders             */
-  --color-border-inverse: #4b5563;  /* gray-600 — borders on dark surfaces   */
+  /* ─── Text — Light mode ─────────────────────────────────────── */
+  --color-text-primary:    #09090B;  /* zinc-950 — main body text          */
+  --color-text-secondary:  #52525B;  /* zinc-600 — secondary text          */
+  --color-text-muted:      #A1A1AA;  /* zinc-400 — placeholder/hint        */
+  --color-text-inverse:    #FAFAFA;  /* near-white — text on dark bg       */
+  --color-text-on-inverse: #71717A;  /* zinc-500 — secondary on sidebar    */
+
+  /* ─── Borders — Light mode ──────────────────────────────────── */
+  --color-border:         #E4E4E7;  /* zinc-200 */
+  --color-border-muted:   #F4F4F5;  /* zinc-100 */
+  --color-border-inverse: #3F3F46;  /* zinc-700 */
 
   /* ─── Status: Success ───────────────────────────────────────── */
-  --color-success:        #22c55e;  /* green-500 */
-  --color-success-dark:   #16a34a;  /* green-600 */
-  --color-success-subtle: #f0fdf4;  /* green-50  */
-  --color-success-text:   #166534;  /* green-800 */
+  --color-success:        #10B981;
+  --color-success-dark:   #059669;
+  --color-success-subtle: #ECFDF5;
+  --color-success-text:   #059669;
 
   /* ─── Status: Error ─────────────────────────────────────────── */
-  --color-error:        #ef4444;  /* red-500 */
-  --color-error-dark:   #dc2626;  /* red-600 */
-  --color-error-subtle: #fef2f2;  /* red-50  */
-  --color-error-text:   #991b1b;  /* red-800 */
+  --color-error:        #EF4444;
+  --color-error-dark:   #DC2626;
+  --color-error-subtle: #FEF2F2;
+  --color-error-text:   #DC2626;
 
   /* ─── Status: Warning ───────────────────────────────────────── */
-  --color-warning:        #eab308;  /* yellow-500 */
-  --color-warning-subtle: #fefce8;  /* yellow-50  */
-  --color-warning-text:   #92400e;  /* yellow-800 */
+  --color-warning:        #F59E0B;
+  --color-warning-subtle: #FFFBEB;
+  --color-warning-text:   #D97706;
 
   /* ─── Status: Info ──────────────────────────────────────────── */
-  --color-info:        #3b82f6;  /* blue-500 */
-  --color-info-subtle: #eff6ff;  /* blue-50  */
-  --color-info-text:   #1e40af;  /* blue-800 */
+  --color-info:        #7C3AED;
+  --color-info-subtle: #F5F3FF;
+  --color-info-text:   #6D28D9;
 
   /* ─── Dev Tools ─────────────────────────────────────────────── */
-  --color-dev: #fbbf24;  /* amber-400 — dev tools label accent */
+  --color-dev: #D97706;
 
   /* ─── Typography ────────────────────────────────────────────── */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
-    "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  --font-sans: 'Lato', ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* ─── Dark mode ─────────────────────────────────────────────────── */
-/* Applied when SettingsContext sets <html class="dark">             */
+/* ─── Dark mode — Void palette ───────────────────────────────────── */
 .dark {
-  /* Primary — lighter blue for better contrast on dark backgrounds */
-  --color-primary:        #60a5fa;  /* blue-400 */
-  --color-primary-dark:   #3b82f6;  /* blue-500 */
-  --color-primary-hover:  #2563eb;  /* blue-600 */
-  --color-primary-subtle: #172554;  /* blue-950 */
+  --color-primary:        #8B5CF6;  /* violet-500 — slightly lighter on dark */
+  --color-primary-dark:   #7C3AED;
+  --color-primary-hover:  #6D28D9;
+  --color-primary-subtle: #150C28;
 
-  /* Surfaces */
-  --color-surface:               #1f2937;  /* gray-800 — modals, form cards          */
-  --color-surface-muted:         #374151;  /* gray-700 — bubbles, panels, file items */
-  --color-surface-elevated:      #1f2937;  /* gray-800 — main content area           */
-  --color-surface-inverse:       #111827;  /* gray-900 — sidebar (darkest)           */
-  --color-surface-inverse-hover: #1f2937;  /* gray-800 — sidebar hover/active        */
-  --color-surface-deep:          #111827;  /* gray-900 — settings modal              */
+  --color-user-bubble:      #7C3AED;
+  --color-user-bubble-text: #FAFAFA;
 
-  /* Text */
-  --color-text-primary:   #f3f4f6;  /* gray-100 */
-  --color-text-secondary: #9ca3af;  /* gray-400 */
-  --color-text-muted:     #6b7280;  /* gray-500 */
+  --color-surface:               #0A0A0A;
+  --color-surface-muted:         #111111;
+  --color-surface-elevated:      #1A1A1A;
+  --color-surface-inverse:       #040404;
+  --color-surface-inverse-hover: #0A0A0A;
+  --color-surface-deep:          #040404;
 
-  /* Borders */
-  --color-border:       #4b5563;  /* gray-600 */
-  --color-border-muted: #4b5563;  /* gray-600 */
+  --color-text-primary:    #FAFAFA;
+  --color-text-secondary:  #888888;
+  --color-text-muted:      #3D3D3D;
+  --color-text-inverse:    #0A0A0A;
+  --color-text-on-inverse: #5A5A5A;
+
+  --color-border:         #1E1E1E;
+  --color-border-muted:   #161616;
+  --color-border-inverse: #111111;
+
+  --color-success-subtle: #022C22;
+  --color-success-text:   #34D399;
+
+  --color-error-subtle: #2C0A0A;
+  --color-error-text:   #F87171;
+
+  --color-warning-subtle: #2C1800;
+  --color-warning-text:   #FCD34D;
+
+  --color-info-subtle: #150C28;
+  --color-info-text:   #A78BFA;
+
+  --color-dev: #FCD34D;
 }

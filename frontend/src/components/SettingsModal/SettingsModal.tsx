@@ -137,12 +137,12 @@ function SettingRow({
   htmlFor?: string;
 }) {
   return (
-    <div className="flex items-center justify-between border-b border-border py-4">
+    <div className="flex items-start justify-between border-b border-border py-4">
       <div className="mr-8">
         {htmlFor ? (
           <label
             htmlFor={htmlFor}
-            className="text-sm font-medium text-text-primary"
+            className="block text-sm font-medium text-text-primary"
           >
             {label}
           </label>
@@ -154,7 +154,7 @@ function SettingRow({
         )}
       </div>
       {/* shrink-0 prevents the control from being squeezed by long label text. */}
-      <div className="shrink-0">{control}</div>
+      <div className="shrink-0 pt-0.5">{control}</div>
     </div>
   );
 }

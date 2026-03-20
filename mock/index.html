@@ -6,7 +6,7 @@
   <title>SIGINT — Theme &amp; Font Mock</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700;900&family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Serif:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;700&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet" />
   <style>
     /* ── Reset ─────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -94,44 +94,140 @@
     }
 
     /* ══════════════════════════════════════════════════════════
-       PALETTE C — Deep Signal
+       PALETTE C — TERMINAL
+       Phosphor green on near-black. Monospace throughout.
+       Zero border-radius. Transparent/outlined elements.
+       Every surface stripped back — just function and light.
     ══════════════════════════════════════════════════════════ */
     html.palette-c {
-      --surface:               #F8F7FA;
-      --surface-muted:         #F2F0F7;
-      --surface-elevated:      #E8E6F0;
-      --surface-inverse:       #18151F;
-      --surface-inverse-hover: #231F30;
-      --surface-deep:          #100E18;
-      --primary:               #6558B8;
-      --primary-dark:          #5548A8;
-      --primary-hover:         #453898;
-      --primary-subtle:        #F0EEFA;
-      --text-primary:          #18151F;
-      --text-secondary:        #847E92;
-      --text-muted:            #B0AABC;
-      --text-inverse:          #FFFFFF;
-      --text-on-inverse:       #A098B8;
-      --border:                #D2D0DA;
-      --border-muted:          #E8E6F0;
-      --border-inverse:        #3E3860;
-      --success:               #56C4B0;
-      --success-dark:          #40A898;
-      --success-subtle:        #EAFBF8;
-      --success-text:          #2A7A6A;
-      --error:                 #e05555;
-      --error-dark:            #c84040;
-      --error-subtle:          #fef0f0;
-      --error-text:            #8B1A1A;
-      --warning:               #d4a017;
-      --warning-subtle:        #fef9e8;
-      --warning-text:          #7B5800;
-      --info:                  #9B8FE0;
-      --info-subtle:           #F5F3FC;
-      --info-text:             #4A3A9A;
-      --user-bubble-bg:        #6558B8;
-      --user-bubble-text:      #FFFFFF;
+      --surface:               #080D08;
+      --surface-muted:         #0C130C;
+      --surface-elevated:      #101A10;
+      --surface-inverse:       #040804;
+      --surface-inverse-hover: #0C130C;
+      --surface-deep:          #020402;
+      --primary:               #22D84A;
+      --primary-dark:          #1CBF40;
+      --primary-hover:         #16A034;
+      --primary-subtle:        #081808;
+      --text-primary:          #BCFFC0;
+      --text-secondary:        #60B060;
+      --text-muted:            #2E522E;
+      --text-inverse:          #080D08;
+      --text-on-inverse:       #22D84A;
+      --border:                #163618;
+      --border-muted:          #0C2010;
+      --border-inverse:        #1A3C1A;
+      --success:               #22D84A;
+      --success-dark:          #1CBF40;
+      --success-subtle:        #06120A;
+      --success-text:          #22D84A;
+      --error:                 #FF4444;
+      --error-dark:            #DD2222;
+      --error-subtle:          #180606;
+      --error-text:            #FF7070;
+      --warning:               #FFBB00;
+      --warning-subtle:        #181000;
+      --warning-text:          #FFD860;
+      --info:                  #44AAFF;
+      --info-subtle:           #040C18;
+      --info-text:             #66CCFF;
+      --user-bubble-bg:        #0C1A0C;
+      --user-bubble-text:      #22D84A;
+      --font-ui:               'IBM Plex Mono', 'Courier New', monospace;
+      --font-body:             'IBM Plex Mono', 'Courier New', monospace;
     }
+    /* ── Terminal: strip all radius ── */
+    html.palette-c .msg-bubble, html.palette-c .chat-input,
+    html.palette-c .send-btn, html.palette-c .new-chat-btn,
+    html.palette-c .approval-prompt, html.palette-c .btn-approve,
+    html.palette-c .btn-reject, html.palette-c .btn-primary,
+    html.palette-c .btn-secondary, html.palette-c .source-pill-btn,
+    html.palette-c .source-pill, html.palette-c .pir-item,
+    html.palette-c .pir-priority, html.palette-c .summary-card,
+    html.palette-c .plan-card, html.palette-c .collecting-wrap,
+    html.palette-c .source-select-wrap, html.palette-c .ip-section,
+    html.palette-c .review-prompt, html.palette-c .perspective-btn,
+    html.palette-c .conv-item, html.palette-c .collection-table,
+    html.palette-c .complete-icon { border-radius: 0 !important; }
+    /* ── User bubble: terminal command prompt ── */
+    html.palette-c .msg-bubble.user-bubble {
+      background: transparent !important; color: #22D84A !important;
+      border: 1px solid #22D84A40 !important;
+      padding-left: 22px !important; position: relative;
+    }
+    html.palette-c .msg-bubble.user-bubble::before {
+      content: '>'; position: absolute; left: 8px;
+      color: #22D84A; opacity: 0.5;
+    }
+    /* ── System bubble: plain output, left rule ── */
+    html.palette-c .msg-bubble.system-bubble {
+      background: transparent !important; border: none !important;
+      border-left: 2px solid #163618 !important;
+      padding: 4px 14px !important; color: #BCFFC0 !important;
+    }
+    /* ── Input: borderless, just a bottom line ── */
+    html.palette-c .chat-input {
+      border: none !important; border-bottom: 1px solid #22D84A30 !important;
+      background: transparent !important; color: #22D84A !important;
+    }
+    html.palette-c .chat-input:focus { border-bottom-color: #22D84A !important; box-shadow: none !important; }
+    html.palette-c .chat-input::placeholder { color: #2E522E !important; }
+    /* ── Send button: outlined ── */
+    html.palette-c .send-btn {
+      background: transparent !important; border: 1px solid #22D84A !important;
+      color: #22D84A !important; letter-spacing: 0.08em !important; font-size: 12px !important;
+    }
+    html.palette-c .send-btn:hover { background: #22D84A !important; color: #080D08 !important; }
+    /* ── Cards: transparent bordered boxes ── */
+    html.palette-c .summary-card, html.palette-c .plan-card,
+    html.palette-c .collecting-wrap, html.palette-c .source-select-wrap,
+    html.palette-c .approval-prompt, html.palette-c .review-prompt {
+      background: transparent !important; border: 1px solid #163618 !important;
+    }
+    html.palette-c .pir-item { background: transparent !important; border-color: #163618 !important; }
+    html.palette-c .pir-details-block { background: transparent !important; border-top-color: #163618 !important; }
+    /* ── Chat window ── */
+    html.palette-c #chat-window {
+      margin: 0 !important; border-left: 1px solid #163618; border-right: 1px solid #163618;
+    }
+    html.palette-c .chat-bottom { background: transparent !important; border-top: 1px solid #163618 !important; }
+    /* ── Sidebar ── */
+    html.palette-c #sidebar { border-right: 1px solid #22D84A15 !important; }
+    html.palette-c .sidebar-header { border-bottom-color: #163618 !important; }
+    html.palette-c .sidebar-footer { border-top-color: #163618 !important; }
+    html.palette-c .sidebar-brand { color: #22D84A !important; letter-spacing: 0.18em !important; }
+    html.palette-c .new-chat-btn {
+      background: transparent !important; border: 1px solid #22D84A30 !important; color: #22D84A !important;
+    }
+    html.palette-c .new-chat-btn:hover { background: #22D84A12 !important; }
+    html.palette-c .conv-item { color: #60B060 !important; }
+    html.palette-c .conv-item.active { color: #22D84A !important; background: #22D84A12 !important; }
+    /* ── Labels ── */
+    html.palette-c .card-label { color: #22D84A !important; }
+    html.palette-c .ip-phase, html.palette-c .ip-section-label,
+    html.palette-c .approval-label, html.palette-c .plan-sources-label,
+    html.palette-c .pir-details-label { color: #22D84A70 !important; }
+    /* ── IP panel ── */
+    html.palette-c #intelligence-panel { border-left: 1px solid #163618 !important; background: transparent !important; }
+    html.palette-c .ip-header { border-bottom-color: #163618 !important; }
+    html.palette-c .ip-section { background: transparent !important; border-color: #163618 !important; }
+    /* ── Interactive elements ── */
+    html.palette-c .source-pill-btn { background: transparent !important; border-color: #163618 !important; color: #60B060 !important; }
+    html.palette-c .source-pill-btn.selected { background: #22D84A !important; color: #080D08 !important; border-color: #22D84A !important; }
+    html.palette-c .source-pill { background: transparent !important; color: #22D84A !important; border-color: #22D84A40 !important; }
+    html.palette-c .perspective-btn { background: transparent !important; border-color: #163618 !important; color: #60B060 !important; }
+    html.palette-c .perspective-btn.active { background: #22D84A !important; color: #080D08 !important; }
+    html.palette-c .btn-approve { background: transparent !important; border: 1px solid #22D84A !important; color: #22D84A !important; }
+    html.palette-c .btn-reject { background: transparent !important; color: #FF7070 !important; border-color: #FF4444 !important; }
+    html.palette-c .btn-primary { background: transparent !important; border: 1px solid #22D84A !important; color: #22D84A !important; }
+    html.palette-c .btn-secondary { background: transparent !important; border-color: #163618 !important; color: #60B060 !important; }
+    /* ── Table ── */
+    html.palette-c .collection-table th { background: #0C130C !important; color: #60B060 !important; }
+    html.palette-c .collection-table td { color: #BCFFC0 !important; }
+    html.palette-c .collection-table tr:hover td { background: #22D84A08 !important; }
+    /* ── Complete card ── */
+    html.palette-c .complete-icon { border-color: #22D84A !important; background: transparent !important; }
 
     /* ══════════════════════════════════════════════════════════
        DARK MODE — Palette A (default teal)
@@ -198,247 +294,414 @@
       --user-bubble-bg:        #363D50;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       DARK MODE — Palette C (Deep signal)
-    ══════════════════════════════════════════════════════════ */
-    html.palette-c.dark {
-      --surface:               #18151F;
-      --surface-muted:         #1E1A2A;
-      --surface-elevated:      #2E2940;
-      --surface-inverse:       #0E0C16;
-      --surface-inverse-hover: #18151F;
-      --primary:               #9B8FE0;
-      --primary-dark:          #8878D0;
-      --primary-hover:         #7868C0;
-      --primary-subtle:        #1A1438;
-      --text-primary:          #E8E6F4;
-      --text-secondary:        #A098C0;
-      --text-muted:            #5A5270;
-      --text-on-inverse:       #8070A8;
-      --border:                #3A3458;
-      --border-muted:          #282440;
-      --border-inverse:        #1E1838;
-      --success:               #56C4B0;
-      --success-dark:          #40A898;
-      --success-subtle:        #08201C;
-      --success-text:          #70D8C4;
-      --error-subtle:          #2A0A10;
-      --error-text:            #F07070;
-      --warning-subtle:        #281800;
-      --warning-text:          #D4A040;
-      --info-subtle:           #1A1438;
-      --info-text:             #9B8FE0;
-      --user-bubble-bg:        #5548A8;
-    }
+    /* Terminal dark is the same — it's already dark-first */
+    html.palette-c.dark { /* inherits palette-c — no overrides needed */ }
 
     /* ══════════════════════════════════════════════════════════
-       PALETTE D — Cognac
-       Warm amber sidebar, cognac primary, cream surfaces.
-       Feels like a high-end print briefing or aged leather.
+       PALETTE D — BLUEPRINT
+       Everything in navy and white. Dashed borders. Dot grid.
+       No border-radius. Feels like reading a technical schematic
+       or CAD drawing — precise, annotated, functional.
     ══════════════════════════════════════════════════════════ */
     html.palette-d {
-      --surface:               #FDFAF4;
-      --surface-muted:         #F5EFE2;
-      --surface-elevated:      #EDE4D0;
-      --surface-inverse:       #2B1A08;
-      --surface-inverse-hover: #3A2410;
-      --surface-deep:          #1A0E04;
-      --primary:               #B86A10;
-      --primary-dark:          #9A5608;
-      --primary-hover:         #804604;
-      --primary-subtle:        #FDF1DF;
-      --text-primary:          #1E1408;
-      --text-secondary:        #7A6040;
-      --text-muted:            #B09870;
-      --text-inverse:          #FDF5E6;
-      --text-on-inverse:       #C8A060;
-      --border:                #CDB898;
-      --border-muted:          #E4D8C0;
-      --border-inverse:        #50340E;
-      --success:               #5A9E52;
-      --success-dark:          #468040;
-      --success-subtle:        #F0FAF0;
-      --success-text:          #2A5C24;
-      --error:                 #C84040;
-      --error-dark:            #A83030;
-      --error-subtle:          #FDF2F0;
-      --error-text:            #7C1C1C;
-      --warning:               #B86A10;
-      --warning-subtle:        #FDF1DF;
-      --warning-text:          #7A3C08;
-      --info:                  #5870B8;
-      --info-subtle:           #EEF0FA;
-      --info-text:             #304090;
-      --user-bubble-bg:        #B86A10;
-      --user-bubble-text:      #FDF5E6;
+      --surface:               #FBFCFF;
+      --surface-muted:         #EEF3FF;
+      --surface-elevated:      #E0ECFF;
+      --surface-inverse:       #0C1A3E;
+      --surface-inverse-hover: #132450;
+      --surface-deep:          #060E22;
+      --primary:               #0B52CC;
+      --primary-dark:          #0840A8;
+      --primary-hover:         #062E86;
+      --primary-subtle:        #E0ECFF;
+      --text-primary:          #0C1A3E;
+      --text-secondary:        #3A5888;
+      --text-muted:            #7898C8;
+      --text-inverse:          #FFFFFF;
+      --text-on-inverse:       #5A88CC;
+      --border:                #A8C0E0;
+      --border-muted:          #C8D8F0;
+      --border-inverse:        #1E3870;
+      --success:               #0A7840;
+      --success-dark:          #086030;
+      --success-subtle:        #E0F4EC;
+      --success-text:          #064828;
+      --error:                 #C02828;
+      --error-dark:            #A01818;
+      --error-subtle:          #FCEAEA;
+      --error-text:            #780E0E;
+      --warning:               #8A5A00;
+      --warning-subtle:        #FFF4CC;
+      --warning-text:          #5A3A00;
+      --info:                  #0B52CC;
+      --info-subtle:           #E0ECFF;
+      --info-text:             #062E86;
+      --user-bubble-bg:        #0C1A3E;
+      --user-bubble-text:      #FFFFFF;
+      --font-ui:               'IBM Plex Sans', sans-serif;
+      --font-body:             'IBM Plex Sans', sans-serif;
     }
+    /* ── Blueprint: strip all radius ── */
+    html.palette-d .msg-bubble, html.palette-d .chat-input,
+    html.palette-d .send-btn, html.palette-d .new-chat-btn,
+    html.palette-d .approval-prompt, html.palette-d .btn-approve,
+    html.palette-d .btn-reject, html.palette-d .btn-primary,
+    html.palette-d .btn-secondary, html.palette-d .source-pill-btn,
+    html.palette-d .source-pill, html.palette-d .pir-item,
+    html.palette-d .pir-priority, html.palette-d .summary-card,
+    html.palette-d .plan-card, html.palette-d .collecting-wrap,
+    html.palette-d .source-select-wrap, html.palette-d .ip-section,
+    html.palette-d .review-prompt, html.palette-d .perspective-btn,
+    html.palette-d .conv-item, html.palette-d .collection-table,
+    html.palette-d .complete-icon { border-radius: 0 !important; }
+    /* ── Dot grid on chat area ── */
+    html.palette-d .chat-messages {
+      background-image: radial-gradient(circle, #A8C0E070 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+    }
+    /* ── Dashed borders on cards ── */
+    html.palette-d .summary-card, html.palette-d .plan-card,
+    html.palette-d .approval-prompt, html.palette-d .review-prompt,
+    html.palette-d .collecting-wrap, html.palette-d .source-select-wrap {
+      border-style: dashed !important; border-color: #A8C0E0 !important;
+      background: #FBFCFF !important;
+    }
+    html.palette-d .ip-section { border-style: dashed !important; border-color: #A8C0E0 !important; }
+    /* ── PIR: top accent ── */
+    html.palette-d .pir-item {
+      border: 1px solid #A8C0E0 !important;
+      border-top: 3px solid #0B52CC !important; background: #FBFCFF !important;
+    }
+    /* ── System bubble: annotation style ── */
+    html.palette-d .msg-bubble.system-bubble {
+      border: 1px dashed #A8C0E0 !important; background: #F0F5FF !important;
+    }
+    /* ── Chat window ── */
+    html.palette-d #chat-window {
+      background: #EEF3FF !important; margin: 0 !important;
+      border-left: 2px solid #0B52CC20; border-right: 2px solid #0B52CC20;
+    }
+    html.palette-d .chat-bottom { background: #FBFCFF !important; border-top: 1px solid #A8C0E0 !important; }
+    /* ── Labels: technical annotation style ── */
+    html.palette-d .card-label, html.palette-d .ip-phase,
+    html.palette-d .ip-section-label, html.palette-d .approval-label,
+    html.palette-d .plan-sources-label, html.palette-d .pir-details-label {
+      letter-spacing: 0.18em !important; font-size: 9.5px !important; color: #0B52CC !important;
+    }
+    /* ── Table: navy header ── */
+    html.palette-d .collection-table th {
+      background: #0C1A3E !important; color: #7898C8 !important; letter-spacing: 0.12em !important;
+    }
+    /* ── Source pills ── */
+    html.palette-d .source-pill-btn.selected { background: #0C1A3E !important; }
+    html.palette-d .source-pill { border-color: #0B52CC !important; }
+    /* ── Perspective buttons ── */
+    html.palette-d .perspective-btn.active { background: #0C1A3E !important; }
+    /* ── Complete icon ── */
+    html.palette-d .complete-icon { border-color: #0B52CC !important; background: #E0ECFF !important; }
+    /* Blueprint dark */
     html.palette-d.dark {
-      --surface:               #1E1408;
-      --surface-muted:         #281C0C;
-      --surface-elevated:      #342414;
-      --surface-inverse:       #120C04;
-      --surface-inverse-hover: #1E1408;
-      --primary:               #E08830;
-      --primary-dark:          #C87020;
-      --primary-hover:         #B06010;
-      --primary-subtle:        #301C08;
-      --text-primary:          #F0E4CC;
-      --text-secondary:        #B09060;
-      --text-muted:            #6A4C28;
-      --text-on-inverse:       #907040;
-      --border:                #503414;
-      --border-muted:          #3A2410;
-      --border-inverse:        #281808;
-      --success-subtle:        #0C2010;
-      --success-text:          #70C060;
-      --error-subtle:          #280A0A;
-      --error-text:            #E06060;
-      --warning-subtle:        #2A1408;
-      --warning-text:          #E08830;
-      --info-subtle:           #0C1030;
-      --info-text:             #8898D8;
-      --user-bubble-bg:        #B86A10;
-      --user-bubble-text:      #FDF5E6;
+      --surface:               #0A1A3C; --surface-muted: #0F2250; --surface-elevated: #163068;
+      --surface-inverse:       #060E20; --surface-inverse-hover: #0A1A3C;
+      --primary:               #4A88E8; --primary-dark: #3A70D0; --primary-hover: #2A58B8;
+      --primary-subtle:        #0A1A3C;
+      --text-primary:          #B8D0F8; --text-secondary: #6888B8; --text-muted: #2A4880;
+      --text-on-inverse:       #2A5080;
+      --border:                #1E3870; --border-muted: #142860; --border-inverse: #0C1A40;
+      --success-subtle:        #041C14; --success-text: #40C870;
+      --error-subtle:          #180608; --error-text: #E06060;
+      --warning-subtle:        #180E00; --warning-text: #C09040;
+      --info-subtle:           #0A1A3C; --info-text: #6898E8;
+      --user-bubble-bg:        #0F2250;
     }
+    html.palette-d.dark .chat-messages {
+      background-image: radial-gradient(circle, #1E387080 1.5px, transparent 1.5px);
+      background-size: 22px 22px;
+    }
+    html.palette-d.dark #chat-window { background: #0A1A3C !important; border-color: #1E387040 !important; }
+    html.palette-d.dark .chat-bottom { background: #0A1A3C !important; border-top-color: #1E3870 !important; }
+    html.palette-d.dark .summary-card, html.palette-d.dark .plan-card,
+    html.palette-d.dark .approval-prompt, html.palette-d.dark .review-prompt,
+    html.palette-d.dark .collecting-wrap, html.palette-d.dark .source-select-wrap {
+      background: #0A1A3C !important; border-color: #1E3870 !important;
+    }
+    html.palette-d.dark .msg-bubble.system-bubble { background: #102268 !important; border-color: #1E3870 !important; }
+    html.palette-d.dark .pir-item { background: #0A1A3C !important; border-color: #1E3870 !important; border-top-color: #4A88E8 !important; }
+    html.palette-d.dark .pir-details-block { background: #0F2250 !important; border-top-color: #1E3870 !important; }
+    html.palette-d.dark .ip-section { background: transparent !important; border-color: #1E3870 !important; }
+    html.palette-d.dark .collection-table th { background: #060E20 !important; color: #4A88E8 !important; }
 
     /* ══════════════════════════════════════════════════════════
-       PALETTE E — Midnight Navy
-       Deep navy sidebar, crisp blue primary, cool-white surfaces.
-       Classic enterprise intelligence — authoritative, precise.
+       PALETTE E — EDITORIAL
+       Black and white with a single deep crimson accent.
+       Serif body. Huge whitespace. Minimal chrome.
+       System bubbles are pure indented text — no bubbles at all.
+       User messages are stark black blocks. Print magazine DNA.
     ══════════════════════════════════════════════════════════ */
     html.palette-e {
-      --surface:               #F5F8FC;
-      --surface-muted:         #EBF0F8;
-      --surface-elevated:      #DDE6F2;
-      --surface-inverse:       #0B1835;
-      --surface-inverse-hover: #142244;
-      --surface-deep:          #060E22;
-      --primary:               #1D56D8;
-      --primary-dark:          #1644BE;
-      --primary-hover:         #1034A4;
-      --primary-subtle:        #EBF1FF;
-      --text-primary:          #0A1628;
-      --text-secondary:        #445570;
-      --text-muted:            #8898B4;
+      --surface:               #FFFFFF;
+      --surface-muted:         #F8F8F8;
+      --surface-elevated:      #FFFFFF;
+      --surface-inverse:       #111111;
+      --surface-inverse-hover: #1E1E1E;
+      --surface-deep:          #000000;
+      --primary:               #B81E16;
+      --primary-dark:          #981410;
+      --primary-hover:         #7C0E08;
+      --primary-subtle:        #FBF0EE;
+      --text-primary:          #111111;
+      --text-secondary:        #555555;
+      --text-muted:            #AAAAAA;
       --text-inverse:          #FFFFFF;
-      --text-on-inverse:       #7BA4D8;
-      --border:                #C0CEDF;
-      --border-muted:          #DAE4F0;
-      --border-inverse:        #1C3464;
-      --success:               #1A9E60;
-      --success-dark:          #148048;
-      --success-subtle:        #E8FAF2;
-      --success-text:          #0A5830;
-      --error:                 #D83030;
-      --error-dark:            #B82020;
-      --error-subtle:          #FEF0F0;
-      --error-text:            #801010;
-      --warning:               #C48010;
+      --text-on-inverse:       #888888;
+      --border:                #E0E0E0;
+      --border-muted:          #EEEEEE;
+      --border-inverse:        #2A2A2A;
+      --success:               #1A7A3A;
+      --success-dark:          #145E2C;
+      --success-subtle:        #EEF8F2;
+      --success-text:          #0A4820;
+      --error:                 #B81E16;
+      --error-dark:            #981410;
+      --error-subtle:          #FBF0EE;
+      --error-text:            #7C0E08;
+      --warning:               #8A5A00;
       --warning-subtle:        #FEF8E8;
-      --warning-text:          #784C08;
-      --info:                  #1D56D8;
-      --info-subtle:           #EBF1FF;
-      --info-text:             #0E3490;
-      --user-bubble-bg:        #1D56D8;
+      --warning-text:          #5A3800;
+      --info:                  #1A4A8A;
+      --info-subtle:           #EEF4FF;
+      --info-text:             #0E3070;
+      --user-bubble-bg:        #111111;
       --user-bubble-text:      #FFFFFF;
+      --font-ui:               'IBM Plex Sans', sans-serif;
+      --font-body:             'IBM Plex Serif', Georgia, serif;
     }
+    /* ── Editorial: minimal radius everywhere ── */
+    html.palette-e .msg-bubble, html.palette-e .chat-input,
+    html.palette-e .send-btn, html.palette-e .new-chat-btn,
+    html.palette-e .approval-prompt, html.palette-e .btn-approve,
+    html.palette-e .btn-reject, html.palette-e .btn-primary,
+    html.palette-e .btn-secondary, html.palette-e .source-pill-btn,
+    html.palette-e .source-pill, html.palette-e .pir-item,
+    html.palette-e .pir-priority, html.palette-e .summary-card,
+    html.palette-e .plan-card, html.palette-e .collecting-wrap,
+    html.palette-e .source-select-wrap, html.palette-e .ip-section,
+    html.palette-e .review-prompt, html.palette-e .perspective-btn,
+    html.palette-e .conv-item, html.palette-e .collection-table,
+    html.palette-e .complete-icon { border-radius: 0 !important; }
+    /* ── System bubble: pure indented text, no bubble ── */
+    html.palette-e .msg-bubble.system-bubble {
+      background: transparent !important; border: none !important;
+      border-left: 3px solid #E0E0E0 !important;
+      padding: 4px 18px !important; color: #111111 !important;
+      font-size: 15px !important; line-height: 1.85 !important; max-width: 90% !important;
+    }
+    /* ── User bubble: stark black block ── */
+    html.palette-e .msg-bubble.user-bubble {
+      background: #111111 !important; color: #FFFFFF !important;
+      font-size: 14px !important;
+    }
+    /* ── Chat window: pure white, barely any chrome ── */
+    html.palette-e #chat-window {
+      background: #FFFFFF !important; margin: 0 !important;
+      border-left: 1px solid #E0E0E0; border-right: 1px solid #E0E0E0;
+    }
+    html.palette-e .chat-bottom { background: #FFFFFF !important; border-top: 1px solid #EEEEEE !important; }
+    /* ── Cards: top rule only, maximum whitespace ── */
+    html.palette-e .summary-card {
+      background: #FFFFFF !important; border: none !important;
+      border-top: 2px solid #B81E16 !important; border-bottom: 1px solid #EEEEEE !important;
+      padding: 18px 0 !important; margin-bottom: 20px !important;
+    }
+    html.palette-e .plan-card {
+      background: #FFFFFF !important; border: none !important;
+      border-top: 1px solid #E0E0E0 !important; padding: 16px 0 !important;
+    }
+    html.palette-e .approval-prompt, html.palette-e .review-prompt, html.palette-e .collecting-wrap,
+    html.palette-e .source-select-wrap {
+      background: #FFFFFF !important; border: 1px solid #E0E0E0 !important;
+    }
+    html.palette-e .pir-item { border: none !important; border-bottom: 1px solid #E0E0E0 !important; background: transparent !important; }
+    html.palette-e .pir-details-block { background: #F8F8F8 !important; border-top-color: #E0E0E0 !important; }
+    /* ── Labels: editorial running-head style ── */
+    html.palette-e .card-label { color: #B81E16 !important; font-size: 9px !important; letter-spacing: 0.22em !important; }
+    html.palette-e .ip-phase, html.palette-e .ip-section-label,
+    html.palette-e .approval-label, html.palette-e .plan-sources-label,
+    html.palette-e .pir-details-label { color: #AAAAAA !important; letter-spacing: 0.18em !important; font-size: 9px !important; }
+    /* ── PIR priorities: outlined, not filled ── */
+    html.palette-e .pir-priority.high { background: transparent !important; color: #B81E16 !important; border: 1px solid #B81E16 !important; font-size: 9px !important; }
+    html.palette-e .pir-priority.medium { background: transparent !important; color: #8A5A00 !important; border: 1px solid #8A5A00 !important; font-size: 9px !important; }
+    /* ── Sidebar: true black ── */
+    html.palette-e #sidebar { border-right: 1px solid #1E1E1E !important; }
+    html.palette-e .sidebar-header { border-bottom-color: #1E1E1E !important; }
+    html.palette-e .sidebar-footer { border-top-color: #1E1E1E !important; }
+    html.palette-e .sidebar-brand { color: #FFFFFF !important; letter-spacing: 0.22em !important; }
+    html.palette-e .new-chat-btn { background: #1E1E1E !important; color: #FFFFFF !important; }
+    html.palette-e .new-chat-btn:hover { background: #2E2E2E !important; }
+    html.palette-e .conv-item { color: #888888 !important; }
+    html.palette-e .conv-item.active { color: #FFFFFF !important; background: #1E1E1E !important; }
+    /* ── IP panel ── */
+    html.palette-e #intelligence-panel { border-left-color: #E0E0E0 !important; }
+    html.palette-e .ip-header { border-bottom-color: #E0E0E0 !important; }
+    html.palette-e .ip-section { background: #F8F8F8 !important; border: none !important; border-top: 1px solid #E0E0E0 !important; }
+    /* ── Source pills ── */
+    html.palette-e .source-pill { background: #F8F8F8 !important; border-color: #E0E0E0 !important; color: #555555 !important; }
+    html.palette-e .source-pill-btn:hover { border-color: #B81E16 !important; color: #B81E16 !important; background: #FBF0EE !important; }
+    html.palette-e .source-pill-btn.selected { background: #111111 !important; border-color: #111111 !important; }
+    html.palette-e .perspective-btn.active { background: #111111 !important; border-color: #111111 !important; }
+    /* ── Buttons ── */
+    html.palette-e .btn-approve { background: #111111 !important; color: #FFFFFF !important; }
+    html.palette-e .btn-approve:hover { background: #1E1E1E !important; }
+    html.palette-e .btn-reject { background: transparent !important; border-color: #B81E16 !important; color: #B81E16 !important; }
+    html.palette-e .btn-primary { background: #111111 !important; color: #FFFFFF !important; }
+    /* ── Table ── */
+    html.palette-e .collection-table th { background: #111111 !important; color: #888888 !important; border-bottom: none !important; }
+    /* ── Complete icon ── */
+    html.palette-e .complete-icon { background: #F8F8F8 !important; border-color: #111111 !important; }
+    /* Editorial dark */
     html.palette-e.dark {
-      --surface:               #0A1628;
-      --surface-muted:         #101E38;
-      --surface-elevated:      #182848;
-      --surface-inverse:       #060E20;
-      --surface-inverse-hover: #0A1628;
-      --primary:               #5A8EF0;
-      --primary-dark:          #3A70E0;
-      --primary-hover:         #2858C8;
-      --primary-subtle:        #0C1A40;
-      --text-primary:          #DCE8F8;
-      --text-secondary:        #7898C0;
-      --text-muted:            #3A5070;
-      --text-on-inverse:       #3A6090;
-      --border:                #1C3464;
-      --border-muted:          #142040;
-      --border-inverse:        #0C1830;
-      --success-subtle:        #061C14;
-      --success-text:          #50D890;
-      --error-subtle:          #200808;
-      --error-text:            #E06060;
-      --warning-subtle:        #201008;
-      --warning-text:          #D09040;
-      --info-subtle:           #0C1A40;
-      --info-text:             #7AA4F0;
-      --user-bubble-bg:        #1644BE;
+      --surface:               #111111; --surface-muted: #1A1A1A; --surface-elevated: #222222;
+      --surface-inverse:       #080808; --surface-inverse-hover: #141414;
+      --primary:               #E83228; --primary-dark: #D02018; --primary-hover: #B81810;
+      --primary-subtle:        #1E0A08;
+      --text-primary:          #F0F0F0; --text-secondary: #888888; --text-muted: #3D3D3D;
+      --text-on-inverse:       #555555;
+      --border:                #2A2A2A; --border-muted: #222222; --border-inverse: #1E1E1E;
+      --success-subtle:        #081808; --success-text: #60C870;
+      --error-subtle:          #1E0808; --error-text: #E06060;
+      --warning-subtle:        #1A1000; --warning-text: #C09040;
+      --info-subtle:           #081020; --info-text: #7898D0;
+      --user-bubble-bg:        #E83228;
+    }
+    html.palette-e.dark .msg-bubble.system-bubble { border-left-color: #2A2A2A !important; color: #F0F0F0 !important; }
+    html.palette-e.dark #chat-window { background: #111111 !important; border-color: #1E1E1E !important; }
+    html.palette-e.dark .chat-bottom { background: #111111 !important; border-top-color: #1E1E1E !important; }
+    html.palette-e.dark .summary-card { background: #111111 !important; border-bottom-color: #2A2A2A !important; }
+    html.palette-e.dark .plan-card { border-top-color: #2A2A2A !important; background: transparent !important; }
+    html.palette-e.dark .pir-item { border-bottom-color: #2A2A2A !important; }
+    html.palette-e.dark .pir-details-block { background: #1A1A1A !important; border-top-color: #2A2A2A !important; }
+    html.palette-e.dark .ip-section { background: #1A1A1A !important; border-top-color: #2A2A2A !important; }
+    html.palette-e.dark .source-pill { background: #1A1A1A !important; border-color: #2A2A2A !important; color: #888888 !important; }
+    html.palette-e.dark .collection-table th { background: #080808 !important; color: #3D3D3D !important; }
+    html.palette-e.dark .complete-icon { background: #1A1A1A !important; border-color: #F0F0F0 !important; }
+    html.palette-e.dark .approval-prompt, html.palette-e.dark .review-prompt,
+    html.palette-e.dark .collecting-wrap, html.palette-e.dark .source-select-wrap {
+      background: #111111 !important; border-color: #2A2A2A !important;
     }
 
     /* ══════════════════════════════════════════════════════════
-       PALETTE F — Warm Stone
-       Dark espresso sidebar, brown-clay primary, linen surfaces.
-       Calm, archival — good for long reading sessions.
+       PALETTE F — VOID
+       Pure black. Vivid violet. Highly rounded. Zero noise.
+       Premium dark-mode-first product — Linear/Raycast DNA.
+       Light mode is clean. Dark mode is the real design.
     ══════════════════════════════════════════════════════════ */
     html.palette-f {
-      --surface:               #FAF9F6;
-      --surface-muted:         #F2EDE4;
-      --surface-elevated:      #E8E0D2;
-      --surface-inverse:       #241810;
-      --surface-inverse-hover: #302010;
-      --surface-deep:          #140E08;
-      --primary:               #7A5438;
-      --primary-dark:          #644428;
-      --primary-hover:         #50361C;
-      --primary-subtle:        #F5EDE4;
-      --text-primary:          #1C1610;
-      --text-secondary:        #6C5840;
-      --text-muted:            #A8948C;
-      --text-inverse:          #FAF5EE;
-      --text-on-inverse:       #C0A880;
-      --border:                #C4B09C;
-      --border-muted:          #DDD2C0;
-      --border-inverse:        #4A3420;
-      --success:               #4E8C54;
-      --success-dark:          #3A7040;
-      --success-subtle:        #EEF8EE;
-      --success-text:          #235028;
-      --error:                 #B84040;
-      --error-dark:            #983030;
-      --error-subtle:          #FDF2F0;
-      --error-text:            #6C1818;
-      --warning:               #A07028;
-      --warning-subtle:        #FDF6E8;
-      --warning-text:          #5C3C10;
-      --info:                  #4870A8;
-      --info-subtle:           #EEF2FA;
-      --info-text:             #28446A;
-      --user-bubble-bg:        #7A5438;
-      --user-bubble-text:      #FAF5EE;
+      --surface:               #FAFAFA;
+      --surface-muted:         #F4F4F4;
+      --surface-elevated:      #EEEEEE;
+      --surface-inverse:       #0A0A0A;
+      --surface-inverse-hover: #141414;
+      --surface-deep:          #040404;
+      --primary:               #7C3AED;
+      --primary-dark:          #6D28D9;
+      --primary-hover:         #5B21B6;
+      --primary-subtle:        #F5F3FF;
+      --text-primary:          #0A0A0A;
+      --text-secondary:        #6B6B6B;
+      --text-muted:            #ADADAD;
+      --text-inverse:          #FAFAFA;
+      --text-on-inverse:       #5A5A5A;
+      --border:                #E2E2E2;
+      --border-muted:          #EEEEEE;
+      --border-inverse:        #1E1E1E;
+      --success:               #10B981;
+      --success-dark:          #059669;
+      --success-subtle:        #ECFDF5;
+      --success-text:          #065F46;
+      --error:                 #EF4444;
+      --error-dark:            #DC2626;
+      --error-subtle:          #FEF2F2;
+      --error-text:            #991B1B;
+      --warning:               #F59E0B;
+      --warning-subtle:        #FFFBEB;
+      --warning-text:          #92400E;
+      --info:                  #7C3AED;
+      --info-subtle:           #F5F3FF;
+      --info-text:             #4C1D95;
+      --user-bubble-bg:        #7C3AED;
+      --user-bubble-text:      #FFFFFF;
+      --font-ui:               'Inter', sans-serif;
+      --font-body:             'Inter', sans-serif;
     }
+    /* ── Void: very rounded everywhere ── */
+    html.palette-f .msg-bubble { border-radius: 16px !important; }
+    html.palette-f .msg-bubble.user-bubble { border-radius: 16px 16px 4px 16px !important; }
+    html.palette-f .msg-bubble.system-bubble { border-radius: 16px 16px 16px 4px !important; }
+    html.palette-f .chat-input { border-radius: 12px !important; }
+    html.palette-f .send-btn { border-radius: 12px !important; }
+    html.palette-f .new-chat-btn { border-radius: 8px !important; }
+    html.palette-f .approval-prompt, html.palette-f .summary-card, html.palette-f .plan-card,
+    html.palette-f .collecting-wrap, html.palette-f .source-select-wrap,
+    html.palette-f .review-prompt { border-radius: 14px !important; }
+    html.palette-f .pir-item { border-radius: 12px !important; }
+    html.palette-f .ip-section { border-radius: 12px !important; }
+    html.palette-f .perspective-btn { border-radius: 8px !important; }
+    html.palette-f .source-pill-btn { border-radius: 24px !important; }
+    html.palette-f .source-pill { border-radius: 24px !important; }
+    html.palette-f .pir-priority { border-radius: 20px !important; }
+    html.palette-f .btn-approve, html.palette-f .btn-reject,
+    html.palette-f .btn-primary, html.palette-f .btn-secondary { border-radius: 8px !important; }
+    html.palette-f .complete-icon { border-radius: 50% !important; }
+    html.palette-f .conv-item { border-radius: 8px !important; }
+    html.palette-f .collection-table { border-radius: 12px !important; }
+    /* ── Focus ring: glowing violet ── */
+    html.palette-f .chat-input:focus { box-shadow: 0 0 0 3px #7C3AED28 !important; border-color: #7C3AED !important; }
+    html.palette-f .send-btn:hover { box-shadow: 0 4px 14px #7C3AED40 !important; }
+    /* Void dark */
     html.palette-f.dark {
-      --surface:               #1C1610;
-      --surface-muted:         #241C14;
-      --surface-elevated:      #302418;
-      --surface-inverse:       #100C08;
-      --surface-inverse-hover: #1C1610;
-      --primary:               #C08860;
-      --primary-dark:          #A87048;
-      --primary-hover:         #905838;
-      --primary-subtle:        #2C1C10;
-      --text-primary:          #EEE4D4;
-      --text-secondary:        #A08060;
-      --text-muted:            #604830;
-      --text-on-inverse:       #806040;
-      --border:                #4A3420;
-      --border-muted:          #342418;
-      --border-inverse:        #241810;
-      --success-subtle:        #0C1E0E;
-      --success-text:          #70C078;
-      --error-subtle:          #200808;
-      --error-text:            #E07070;
-      --warning-subtle:        #221408;
-      --warning-text:          #D09040;
-      --info-subtle:           #0C1428;
-      --info-text:             #8098C8;
-      --user-bubble-bg:        #7A5438;
-      --user-bubble-text:      #FAF5EE;
+      --surface:               #0A0A0A; --surface-muted: #111111; --surface-elevated: #1A1A1A;
+      --surface-inverse:       #040404; --surface-inverse-hover: #0A0A0A;
+      --primary:               #8B5CF6; --primary-dark: #7C3AED; --primary-hover: #6D28D9;
+      --primary-subtle:        #150C28;
+      --text-primary:          #FAFAFA; --text-secondary: #888888; --text-muted: #3D3D3D;
+      --text-on-inverse:       #3D3D3D;
+      --border:                #1E1E1E; --border-muted: #161616; --border-inverse: #111111;
+      --success-subtle:        #022C22; --success-text: #34D399;
+      --error-subtle:          #2C0A0A; --error-text: #F87171;
+      --warning-subtle:        #2C1800; --warning-text: #FCD34D;
+      --info-subtle:           #150C28; --info-text: #A78BFA;
+      --user-bubble-bg:        #7C3AED;
     }
+    html.palette-f.dark #sidebar { background: #040404 !important; border-right: 1px solid #111111 !important; }
+    html.palette-f.dark .sidebar-header { border-bottom-color: #111111 !important; }
+    html.palette-f.dark .sidebar-footer { border-top-color: #111111 !important; }
+    html.palette-f.dark .sidebar-brand { color: #FAFAFA !important; }
+    html.palette-f.dark .new-chat-btn { background: #1A1A1A !important; color: #FAFAFA !important; }
+    html.palette-f.dark .conv-item { color: #888888 !important; }
+    html.palette-f.dark .conv-item.active { background: #1A1A1A !important; color: #FAFAFA !important; }
+    html.palette-f.dark #chat-window {
+      background: #0A0A0A !important; margin: 0 !important;
+      border-left: 1px solid #111111; border-right: 1px solid #111111;
+    }
+    html.palette-f.dark .chat-bottom { background: #0A0A0A !important; border-top-color: #111111 !important; }
+    html.palette-f.dark .chat-input { background: #111111 !important; border-color: #1E1E1E !important; color: #FAFAFA !important; }
+    html.palette-f.dark .chat-input:focus { border-color: #8B5CF6 !important; box-shadow: 0 0 0 3px #8B5CF630 !important; }
+    html.palette-f.dark .msg-bubble.system-bubble { background: #1A1A1A !important; border-color: #1E1E1E !important; }
+    html.palette-f.dark .summary-card, html.palette-f.dark .plan-card,
+    html.palette-f.dark .collecting-wrap, html.palette-f.dark .source-select-wrap,
+    html.palette-f.dark .approval-prompt, html.palette-f.dark .review-prompt {
+      background: #111111 !important; border-color: #1E1E1E !important;
+    }
+    html.palette-f.dark .pir-item { background: #111111 !important; border-color: #1E1E1E !important; }
+    html.palette-f.dark .pir-details-block { background: #161616 !important; border-top-color: #1E1E1E !important; }
+    html.palette-f.dark #intelligence-panel { border-left-color: #111111 !important; background: #0A0A0A !important; }
+    html.palette-f.dark .ip-section { background: #111111 !important; border-color: #1E1E1E !important; }
+    html.palette-f.dark .collection-table th { background: #040404 !important; color: #3D3D3D !important; }
+    html.palette-f.dark .source-pill-btn { background: #111111 !important; border-color: #1E1E1E !important; color: #888888 !important; }
+    html.palette-f.dark .source-pill-btn.selected { background: #7C3AED !important; border-color: #6D28D9 !important; color: #FFFFFF !important; }
+    html.palette-f.dark .perspective-btn { background: #111111 !important; border-color: #1E1E1E !important; color: #888888 !important; }
+    html.palette-f.dark .perspective-btn.active { background: #7C3AED !important; border-color: #6D28D9 !important; color: #FFFFFF !important; }
+    html.palette-f.dark .btn-secondary { background: #111111 !important; border-color: #1E1E1E !important; }
 
     /* ══════════════════════════════════════════════════════════
        FONT OPTIONS
@@ -916,10 +1179,10 @@
     .ctrl-btn.active   { background: #3A5A90; border-color: #2E4870; color: #FFFFFF; }
     .ctrl-btn.active-a { background: #1A6A74; border-color: #147080; color: #FFFFFF; }
     .ctrl-btn.active-b { background: #1A7A62; border-color: #157060; color: #FFFFFF; }
-    .ctrl-btn.active-c { background: #5048A8; border-color: #4038A0; color: #FFFFFF; }
-    .ctrl-btn.active-d { background: #8A4C0C; border-color: #703C08; color: #FDF5E6; }
-    .ctrl-btn.active-e { background: #1440A8; border-color: #0E3090; color: #FFFFFF; }
-    .ctrl-btn.active-f { background: #624030; border-color: #503020; color: #FAF5EE; }
+    .ctrl-btn.active-c { background: #0C1A0C; border-color: #22D84A50; color: #22D84A; font-family: 'IBM Plex Mono', monospace; }
+    .ctrl-btn.active-d { background: #0C1A3E; border-color: #1E3870; color: #7898C8; }
+    .ctrl-btn.active-e { background: #111111; border-color: #B81E16; color: #FFFFFF; }
+    .ctrl-btn.active-f { background: #150C28; border-color: #7C3AED; color: #A78BFA; }
     .ctrl-step-label {
       font-family: 'Lato', sans-serif; font-size: 11px; color: #9DA5B4;
       flex: 1; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -944,10 +1207,10 @@
   <span class="ctrl-label">Theme</span>
   <button class="ctrl-btn active-a" id="btn-a" onclick="setPalette('a')">A · Teal</button>
   <button class="ctrl-btn" id="btn-b" onclick="setPalette('b')">B · Nordic</button>
-  <button class="ctrl-btn" id="btn-c" onclick="setPalette('c')">C · Signal</button>
-  <button class="ctrl-btn" id="btn-d" onclick="setPalette('d')">D · Cognac</button>
-  <button class="ctrl-btn" id="btn-e" onclick="setPalette('e')">E · Navy</button>
-  <button class="ctrl-btn" id="btn-f" onclick="setPalette('f')">F · Stone</button>
+  <button class="ctrl-btn" id="btn-c" onclick="setPalette('c')">C · Terminal</button>
+  <button class="ctrl-btn" id="btn-d" onclick="setPalette('d')">D · Blueprint</button>
+  <button class="ctrl-btn" id="btn-e" onclick="setPalette('e')">E · Editorial</button>
+  <button class="ctrl-btn" id="btn-f" onclick="setPalette('f')">F · Void</button>
   <div class="ctrl-divider"></div>
   <span class="ctrl-label">Font</span>
   <button class="ctrl-btn active" id="btn-fl"  onclick="setFont('lato')">Lato</button>
