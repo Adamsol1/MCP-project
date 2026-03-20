@@ -432,6 +432,36 @@ class TestGeminiAdapter:
 
     @pytest.mark.asyncio
     @patch("adapters.base.asyncio.create_subprocess_exec")
+    async def test_invoke_streams_prompt_via_stdin(self, mock_subprocess):
+        """Test Gemini sends prompt content over stdin to avoid Windows CLI limits."""
+        mock_process = Mock()
+        mock_process.communicate = AsyncMock(
+            return_value=(b"This is the gemini model response.", b"")
+        )
+        mock_process.returncode = 0
+        mock_subprocess.return_value = mock_process
+
+        adapter = GeminiAdapter(args=["-m", "{model}", "-p", "{prompt}"])
+        prompt = "Large council dossier prompt"
+
+        result = await adapter.invoke(prompt=prompt, model="gemini-2.5-flash")
+
+        assert result == "This is the gemini model response."
+        mock_subprocess.assert_called_once()
+        call_kwargs = mock_subprocess.call_args[1]
+        assert call_kwargs["stdin"] == asyncio.subprocess.PIPE
+
+        mock_process.communicate.assert_awaited_once_with(
+            input=prompt.encode("utf-8")
+        )
+
+        call_args = list(mock_subprocess.call_args[0])
+        assert "-p" in call_args
+        prompt_index = call_args.index("-p")
+        assert call_args[prompt_index + 1] == ""
+
+    @pytest.mark.asyncio
+    @patch("adapters.base.asyncio.create_subprocess_exec")
     async def test_invoke_timeout(self, mock_subprocess):
         """Test timeout handling."""
         mock_process = Mock()

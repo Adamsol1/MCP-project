@@ -199,6 +199,32 @@ class DeliberationEngine:
                 return f"{persona_prompt}\n\n{shared_prompt}"
         return shared_prompt
 
+    def _compose_request_prompt(self, question: str, context: Optional[str]) -> str:
+        """Compose the base deliberation prompt from shared context and question."""
+        if not context:
+            return question
+
+        cleaned_context = context.strip()
+        if not cleaned_context:
+            return question
+
+        return "\n".join(
+            [
+                "## Shared Context",
+                cleaned_context,
+                "",
+                "## Debate Question",
+                question,
+                "",
+                "The debate question above is the issue you must assess.",
+                "Use the shared context above as the primary evidence base.",
+                "Answer the debate question directly from your assigned perspective.",
+                "Do not ask the user to restate the issue or provide more context.",
+                "If uncertainty remains, state the uncertainty explicitly and still provide your best assessment.",
+                "You already have enough material to begin analysis.",
+            ]
+        )
+
     async def execute_round(
         self,
         round_num: int,
@@ -689,22 +715,23 @@ The following files are available in the working directory:
         Returns:
             Prompt asking for explicit vote
         """
-        return f"""Your previous response provided good analysis but did not include a formal vote.
+        return f"""Your previous response did not include the required formal vote.
 
 ## Your Previous Analysis
 {original_response[:2000]}{"..." if len(original_response) > 2000 else ""}
 
 ## Please Cast Your Vote
 
-Based on your analysis above, please now provide your formal vote using exactly this format:
+Based on your analysis above, provide exactly one vote line using this format:
 
-VOTE: {{"option": "Your choice", "confidence": 0.85, "rationale": "Brief explanation"}}
+VOTE: {{"option": "Your bottom-line assessment", "confidence": 0.85, "rationale": "Brief explanation"}}
 
 Where:
-- option: Your chosen option based on your analysis
+- option: Your own short bottom-line conclusion about the debate question
 - confidence: Your confidence level from 0.0 to 1.0
 - rationale: Brief explanation (1-2 sentences)
 
+Do not ask for more context or for predefined options.
 Reply with ONLY the VOTE line. Do not repeat your analysis."""
 
     def _aggregate_votes(
@@ -906,17 +933,19 @@ Reply with ONLY the VOTE line. Do not repeat your analysis."""
         return """
 ## Voting Instructions
 
-After your analysis, please cast your vote using the following format:
+After your analysis, you MUST end your response with exactly one vote line using the following format:
 
 VOTE: {"option": "Your choice", "confidence": 0.85, "rationale": "Brief explanation"}
 
 Where:
-- option: Your chosen option (e.g., "Option A", "Yes", "Approve")
+- option: Your bottom-line assessment in a short phrase (e.g., "Coordinated access development", "State-linked collection with unclear disruption intent")
 - confidence: Your confidence level from 0.0 (no confidence) to 1.0 (absolute certainty)
 - rationale: Brief explanation for your vote
 
 Example:
-VOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Lower risk and better architectural fit"}
+VOTE: {"option": "Coordinated access development", "confidence": 0.9, "rationale": "Credential access, phishing staging, and infrastructure overlap point to a deliberate campaign."}
+
+Do not ask for voting options. Create your own bottom-line assessment from the debate question.
 """.strip()
 
     def _enhance_prompt_with_voting(self, prompt: str) -> str:
@@ -1097,6 +1126,11 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
         converged = False
         model_controlled_stop = False
 
+        request_prompt = self._compose_request_prompt(
+            request.question,
+            request.context,
+        )
+
         for round_num in range(1, rounds_to_execute + 1):
             round_start = datetime.now()
             progress_logger.info(f"ROUND {round_num}/{rounds_to_execute} START")
@@ -1107,7 +1141,7 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
                 round_responses = await asyncio.wait_for(
                     self.execute_round(
                         round_num=round_num,
-                        prompt=request.question,
+                        prompt=request_prompt,
                         participants=request.participants,
                         previous_responses=all_responses,
                         graph_context=graph_context,

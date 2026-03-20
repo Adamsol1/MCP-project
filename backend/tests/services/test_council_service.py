@@ -125,7 +125,9 @@ class TestCouncilService:
         processing_result = ProcessingPrototypeService().get_processing_result(
             "session-council"
         )
-        analysis_draft = AnalysisPrototypeService().generate_draft(processing_result)
+        analysis_draft = await AnalysisPrototypeService().generate_draft(
+            processing_result
+        )
 
         monkeypatch.setattr(service, "_build_engine", lambda: _FakeEngine())
 
@@ -154,7 +156,9 @@ class TestCouncilService:
         processing_result = ProcessingPrototypeService().get_processing_result(
             "session-council"
         )
-        analysis_draft = AnalysisPrototypeService().generate_draft(processing_result)
+        analysis_draft = await AnalysisPrototypeService().generate_draft(
+            processing_result
+        )
 
         monkeypatch.setattr(service, "_build_engine", lambda: _ErrorEngine())
 

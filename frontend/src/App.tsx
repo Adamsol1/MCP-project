@@ -141,12 +141,7 @@ function AppShell() {
   };
 
   const openAnalysisDemo = () => {
-    const conversation = activeConversation ?? createNewConversation();
-
-    if (activeConversation?.id !== conversation.id) {
-      switchConversation(conversation.id);
-    }
-
+    createNewConversation();
     setStage("complete", null);
   };
 

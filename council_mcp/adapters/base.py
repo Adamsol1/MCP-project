@@ -56,6 +56,25 @@ class BaseCLIAdapter(ABC):
         self.max_retries = max_retries
         self.default_reasoning_effort = default_reasoning_effort
 
+    def _format_prompt_for_args(self, full_prompt: str) -> str:
+        """
+        Format prompt text for CLI arguments.
+
+        Subclasses can override this when the full prompt should not be placed
+        directly on the command line, for example when a CLI supports reading
+        the main prompt from stdin.
+        """
+        return full_prompt
+
+    def _build_stdin_input(self, full_prompt: str) -> bytes | None:
+        """
+        Build optional stdin payload for the subprocess.
+
+        Default behavior sends no stdin. Subclasses can override this to stream
+        large prompts via stdin instead of embedding them in command arguments.
+        """
+        return None
+
     async def invoke(
         self,
         prompt: str,
@@ -108,11 +127,15 @@ class BaseCLIAdapter(ABC):
         # Determine effective reasoning effort: runtime > config > empty string
         effective_reasoning_effort = reasoning_effort or self.default_reasoning_effort or ""
 
+        # Allow adapters to move prompt content off the command line when needed
+        prompt_for_args = self._format_prompt_for_args(full_prompt)
+        stdin_input = self._build_stdin_input(full_prompt)
+
         # Format arguments with {model}, {prompt}, {working_directory}, and {reasoning_effort} placeholders
         formatted_args = [
             arg.format(
                 model=model,
-                prompt=full_prompt,
+                prompt=prompt_for_args,
                 working_directory=cwd,
                 reasoning_effort=effective_reasoning_effort,
             )
@@ -124,7 +147,8 @@ class BaseCLIAdapter(ABC):
             f"Executing CLI adapter: command={self.command}, "
             f"model={model}, cwd={cwd}, "
             f"reasoning_effort={effective_reasoning_effort or '(none)'}, "
-            f"prompt_length={len(full_prompt)} chars"
+            f"prompt_length={len(full_prompt)} chars, "
+            f"stdin_prompt={'yes' if stdin_input is not None else 'no'}"
         )
         logger.debug(f"Full command: {self.command} {' '.join(formatted_args[:3])}... (args truncated)")
 
@@ -140,7 +164,11 @@ class BaseCLIAdapter(ABC):
                 process = await asyncio.create_subprocess_exec(
                     self.command,
                     *formatted_args,
-                    stdin=asyncio.subprocess.DEVNULL,
+                    stdin=(
+                        asyncio.subprocess.PIPE
+                        if stdin_input is not None
+                        else asyncio.subprocess.DEVNULL
+                    ),
                     stdout=asyncio.subprocess.PIPE,
                     stderr=asyncio.subprocess.PIPE,
                     cwd=cwd,
@@ -148,7 +176,7 @@ class BaseCLIAdapter(ABC):
                 )
 
                 stdout, stderr = await asyncio.wait_for(
-                    process.communicate(), timeout=self.timeout
+                    process.communicate(input=stdin_input), timeout=self.timeout
                 )
 
                 if process.returncode != 0:

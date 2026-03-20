@@ -51,6 +51,23 @@ class GeminiAdapter(BaseCLIAdapter):
         """
         return len(prompt) <= self.MAX_PROMPT_CHARS
 
+    def _format_prompt_for_args(self, full_prompt: str) -> str:
+        """
+        Keep Gemini in headless prompt mode while moving large prompt content
+        off the Windows command line.
+
+        The Gemini CLI appends stdin content to the `-p/--prompt` value, so a
+        minimal placeholder is sufficient here.
+        """
+        return ""
+
+    def _build_stdin_input(self, full_prompt: str) -> bytes | None:
+        """
+        Send the actual prompt over stdin to avoid Windows command-line length
+        limits for large deliberation dossiers.
+        """
+        return full_prompt.encode("utf-8")
+
     def parse_output(self, raw_output: str) -> str:
         """
         Parse gemini output.

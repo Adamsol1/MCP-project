@@ -4,8 +4,31 @@ from fastapi.testclient import TestClient
 
 from src.api import analysis as analysis_api
 from src.api.main import app
-from src.models.analysis import CouncilNote
+from src.models.analysis import AnalysisDraft, CouncilNote
 from src.services.analysis_session_store import AnalysisSessionStore
+
+
+class _FakeAnalysisPrototypeService:
+    async def generate_draft(self, processing_result, selected_perspectives=None):
+        del selected_perspectives
+        return AnalysisDraft(
+            summary="Live-style analysis summary grounded in the demo processing result.",
+            key_judgments=[
+                "Credential access and phishing staging indicate a coordinated access-development pattern."
+            ],
+            per_perspective_implications={
+                "us": ["US implication A", "US implication B"],
+                "norway": ["Norway implication A", "Norway implication B"],
+                "china": ["China implication A", "China implication B"],
+                "eu": ["EU implication A", "EU implication B"],
+                "russia": ["Russia implication A", "Russia implication B"],
+                "neutral": ["Neutral implication A", "Neutral implication B"],
+            },
+            recommended_actions=[
+                "Validate affected identities and track related infrastructure."
+            ],
+            information_gaps=list(processing_result.gaps),
+        )
 
 
 class _FakeCouncilService:
@@ -70,6 +93,11 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
         return logger
 
     monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda: store)
+    monkeypatch.setattr(
+        analysis_api,
+        "AnalysisPrototypeService",
+        lambda: _FakeAnalysisPrototypeService(),
+    )
     monkeypatch.setattr(analysis_api, "CouncilService", lambda: _FakeCouncilService())
     monkeypatch.setattr(analysis_api, "ResearchLogger", logger_factory)
 

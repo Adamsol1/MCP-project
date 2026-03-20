@@ -419,6 +419,41 @@ class TestDeliberationEngineMultiRound:
         assert second_call[0][2] is not None  # context should be present
 
     @pytest.mark.asyncio
+    async def test_execute_includes_request_context_in_round_prompt(
+        self, mock_adapters
+    ):
+        """Shared request context should be injected into the deliberation prompt."""
+        from models.schema import DeliberateRequest
+
+        engine = DeliberationEngine(mock_adapters)
+
+        request = DeliberateRequest(
+            question="Assess whether the findings indicate coordinated access development.",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=1,
+            mode="conference",
+            context="Finding F-001 shows credential access activity. Finding F-002 shows phishing staging.",
+            working_directory="/tmp",
+        )
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute(request)
+
+        first_prompt = mock_adapters["claude"].invoke_mock.call_args_list[0][0][0]
+        assert "## Shared Context" in first_prompt
+        assert "Finding F-001 shows credential access activity." in first_prompt
+        assert "## Debate Question" in first_prompt
+        assert (
+            "Assess whether the findings indicate coordinated access development."
+            in first_prompt
+        )
+
+    @pytest.mark.asyncio
     async def test_quick_mode_overrides_rounds(self, mock_adapters):
         """Test that quick mode forces single round regardless of request.rounds."""
         from models.schema import DeliberateRequest

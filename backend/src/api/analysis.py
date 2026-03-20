@@ -19,6 +19,7 @@ class AnalysisDraftRequest(BaseModel):
     """Request body for generating a prototype analysis draft."""
 
     session_id: str = Field(..., min_length=1)
+    force_refresh: bool = False
 
 
 class AnalysisDraftResponse(BaseModel):
@@ -79,9 +80,10 @@ class AnalysisCouncilRequest(BaseModel):
         return self
 
 
-def _build_draft(
+async def _build_draft(
     session_id: str,
     store: AnalysisSessionStore,
+    force_refresh: bool = False,
     processing_service: ProcessingPrototypeService | None = None,
     analysis_service: AnalysisPrototypeService | None = None,
 ) -> AnalysisDraftResponse:
@@ -89,10 +91,17 @@ def _build_draft(
     analysis_service = analysis_service or AnalysisPrototypeService()
 
     state = store.get_or_create(session_id)
-    if state.processing_result is None or state.analysis_draft is None:
+    if force_refresh or state.processing_result is None or state.analysis_draft is None:
         processing_result = processing_service.get_processing_result(session_id)
-        analysis_draft = analysis_service.generate_draft(processing_result)
-        state = store.save_draft(session_id, processing_result, analysis_draft)
+        analysis_draft = await analysis_service.generate_draft(processing_result)
+        if force_refresh:
+            state.session_id = session_id
+            state.processing_result = processing_result
+            state.analysis_draft = analysis_draft
+            state.latest_council_note = None
+            state = store.save(state)
+        else:
+            state = store.save_draft(session_id, processing_result, analysis_draft)
 
     return AnalysisDraftResponse(
         processing_result=state.processing_result,
@@ -109,7 +118,11 @@ async def create_analysis_draft(
     store = AnalysisSessionStore()
 
     try:
-        return _build_draft(request.session_id, store)
+        return await _build_draft(
+            request.session_id,
+            store,
+            force_refresh=request.force_refresh,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
@@ -124,7 +137,7 @@ async def create_analysis_council(
     research_logger = ResearchLogger(session_id=request.session_id)
 
     try:
-        draft_response = _build_draft(request.session_id, store)
+        draft_response = await _build_draft(request.session_id, store)
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

@@ -192,18 +192,31 @@ class CouncilService:
                     max_depth=0,
                     max_files=0,
                 ),
-                tool_security=SimpleNamespace(exclude_patterns=[]),
+                tool_security=SimpleNamespace(
+                    exclude_patterns=[],
+                    max_file_size_bytes=1_048_576,
+                ),
+                vote_retry=SimpleNamespace(
+                    enabled=True,
+                    max_retries=1,
+                    min_response_length=100,
+                ),
             ),
             decision_graph=SimpleNamespace(
                 enabled=self.runtime_profile.decision_graph_enabled
             ),
         )
         transcript_manager = TranscriptManager(output_dir=str(self.transcript_dir))
-        return DeliberationEngine(
+        engine = DeliberationEngine(
             adapters=adapters,
             transcript_manager=transcript_manager,
             config=config,
         )
+        # App analysis-stage councils should debate from the prepared dossier only.
+        # Disabling tool access avoids prompt contamination from transcript/output files.
+        engine.tool_executor = None
+        engine.tool_execution_history = []
+        return engine
 
     def _resolve_gemini_command(self) -> str:
         candidates = ["gemini.cmd", "gemini.exe", "gemini"]
