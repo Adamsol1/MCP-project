@@ -22,6 +22,8 @@ interface SidebarProps {
   onDevSendMessage: () => void;
   /** DEV: Forces chat into confirmation mode to preview approval UI. */
   onDevShowCollectionApproval?: () => void;
+  /** DEV: Open the analysis prototype directly using the demo-backed flow. */
+  onDevOpenAnalysis?: () => void;
   /** DEV: Force the backend/session to a specific stage. */
   onDevJumpToStage?: (stage: DialogueStage) => void;
   /** DEV: Pull latest stage snapshot from backend. */
@@ -40,13 +42,16 @@ const DEV_STAGE_ACTIONS: Array<{ label: string; stage: DialogueStage }> = [
   { label: "Jump to Complete", stage: "complete" },
 ];
 
+const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
+
 /**
  * Left-hand navigation sidebar showing all conversations.
  *
  * Features:
  *   - Collapsible: toggles between a full w-64 panel and a slim w-14 icon rail.
- *     Width snaps instantly (no CSS transition) to avoid text squishing during
- *     the resize animation.
+ *     Width animates between the two states for a smoother open/close motion,
+ *     while expanded-only content is delayed until the panel is wide enough to
+ *     avoid text wrapping during the transition.
  *   - Sorted by updatedAt descending so the most recently active conversation
  *     is always at the top.
  *   - Per-conversation options menu (⋯ button) with Rename and Delete actions,
@@ -70,6 +75,7 @@ export function Sidebar({
   onDeleteAllConversations,
   onDevSendMessage,
   onDevShowCollectionApproval,
+  onDevOpenAnalysis,
   onDevJumpToStage,
   onDevSyncStage,
   onDevResetStage,
@@ -84,6 +90,7 @@ export function Sidebar({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showExpandedContent, setShowExpandedContent] = useState(true);
   const [isDevToolsMinimized, setIsDevToolsMinimized] = useState(true);
   const [isCollectionPhaseMinimized, setIsCollectionPhaseMinimized] =
     useState(true);
@@ -109,16 +116,24 @@ export function Sidebar({
     return () => document.removeEventListener("mousedown", closeMenu);
   }, [openMenuId]);
 
+  useEffect(() => {
+    if (isCollapsed) {
+      setShowExpandedContent(false);
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setShowExpandedContent(true);
+    }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isCollapsed]);
+
   return (
-    /*
-     * No CSS transition on width — both the width and the content snap instantly.
-     * A transition caused text to squish as the container narrowed; snapping
-     * avoids that visual artifact entirely.
-     */
     <aside
       className={`${
-        isCollapsed ? "w-12" : "w-48"
-      } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden`}
+        isCollapsed ? "w-14" : "w-64"
+      } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden transition-[width] duration-300 ease-in-out motion-reduce:transition-none`}
     >
       {/* Toggle button — SVG chevron, clearer than a Unicode character.
           Points right (›) when collapsed to signal "expand",
@@ -138,6 +153,9 @@ export function Sidebar({
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
+          className={`transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
+            isCollapsed ? "rotate-180" : "rotate-0"
+          }`}
         >
           {isCollapsed
             ? <path d="M9 18l6-6-6-6" />   /* › chevron-right = expand */
@@ -157,12 +175,12 @@ export function Sidebar({
           isCollapsed ? "" : "w-[calc(100%-1rem)]"
         }`}
       >
-        <span className="text-sm leading-none">+</span>
-        {!isCollapsed && <span className="text-xs">New Chat</span>}
+        <span className="text-lg leading-none">+</span>
+        {showExpandedContent && <span className="whitespace-nowrap">New Chat</span>}
       </button>
 
       {/* Conversation list — hidden entirely when collapsed to keep the rail clean. */}
-      {!isCollapsed && (
+      {showExpandedContent && (
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="flex items-center justify-center text-text-secondary h-full">
@@ -204,7 +222,7 @@ export function Sidebar({
                       data-active={
                         conv.id === activeConversationId ? "true" : "false"
                       }
-                      className="flex-1 text-left p-2 text-sm"
+                      className="flex-1 text-left p-2 truncate whitespace-nowrap"
                     >
                       {conv.title}
                     </button>
@@ -294,7 +312,7 @@ export function Sidebar({
         </button>
       </div>
       {/* DEV TOOLS — only visible when the sidebar is expanded. */}
-      {!isCollapsed && (
+      {showExpandedContent && (
         <div className="shrink-0 border-t border-border p-2">
           <div className="mb-1 flex items-center justify-between">
             <p className="px-1 text-xs font-semibold uppercase tracking-widest text-warning">
@@ -325,6 +343,14 @@ export function Sidebar({
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   Show collection approval
+                </button>
+              )}
+              {onDevOpenAnalysis && (
+                <button
+                  onClick={onDevOpenAnalysis}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
+                >
+                  Open analysis demo
                 </button>
               )}
               {onDevJumpToStage && (

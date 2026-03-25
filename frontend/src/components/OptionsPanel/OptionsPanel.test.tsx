@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OptionsPanel } from "./OptionsPanel";
 
@@ -102,6 +102,8 @@ describe("OptionsPanel", () => {
     await user.click(toggle);
     await user.click(toggle);
 
-    expect(screen.getByText("United States")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("United States")).toBeInTheDocument();
+    });
   });
 });

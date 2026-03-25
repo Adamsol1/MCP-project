@@ -1,0 +1,1627 @@
+"""Unit tests for deliberation engine."""
+from datetime import datetime
+from pathlib import Path
+
+import pytest
+
+from deliberation.engine import DeliberationEngine
+from deliberation.tools import (
+    ToolExecutor,
+    ReadFileTool,
+    SearchCodeTool,
+    ListFilesTool,
+    RunCommandTool,
+)
+from models.schema import Participant, RoundResponse, Vote
+
+
+class TestDeliberationEngine:
+    """Tests for DeliberationEngine single-round execution."""
+
+    def test_engine_initialization(self, mock_adapters):
+        """Test engine initializes with adapters."""
+        engine = DeliberationEngine(mock_adapters)
+        assert engine.adapters == mock_adapters
+        assert len(engine.adapters) == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_round_single_participant(self, mock_adapters):
+        """Test executing single round with one participant."""
+        # Add claude-code adapter for this test
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "This is Claude's response"
+
+        responses = await engine.execute_round(
+            round_num=1,
+            prompt="What is 2+2?",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        assert len(responses) == 1
+        assert isinstance(responses[0], RoundResponse)
+        assert responses[0].round == 1
+        assert responses[0].participant == "claude-3-5-sonnet@claude"
+        assert responses[0].response == "This is Claude's response"
+        assert responses[0].timestamp is not None
+
+    @pytest.mark.asyncio
+    async def test_execute_round_applies_persona_prompt_per_participant(self, mock_adapters):
+        """Persona prompt should be prepended only for the participant that defines it."""
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(
+                cli="claude",
+                model="claude-3-5-sonnet",
+                persona_prompt="You are a Norway-focused intelligence analyst.",
+            ),
+            Participant(cli="codex", model="gpt-4"),
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute_round(
+            round_num=1,
+            prompt="Assess the telecom findings.",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        claude_prompt = mock_adapters["claude"].invoke_mock.call_args[0][0]
+        codex_prompt = mock_adapters["codex"].invoke_mock.call_args[0][0]
+
+        assert claude_prompt.startswith(
+            "You are a Norway-focused intelligence analyst."
+        )
+        assert "Assess the telecom findings." in claude_prompt
+        assert "You are a Norway-focused intelligence analyst." not in codex_prompt
+
+    @pytest.mark.asyncio
+    async def test_display_name_replaces_raw_identifier_in_outputs(self, mock_adapters, tmp_path):
+        """Display name should replace raw model identifiers in visible outputs."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        request = DeliberateRequest(
+            question="Should we escalate this finding to council debate?",
+            participants=[
+                Participant(
+                    cli="claude",
+                    model="claude-3-5-sonnet",
+                    display_name="Norway Analyst",
+                ),
+                Participant(
+                    cli="codex",
+                    model="gpt-4",
+                    display_name="US Analyst",
+                ),
+            ],
+            rounds=1,
+            mode="quick",
+            working_directory="/tmp",
+        )
+
+        mock_adapters["claude"].invoke_mock.return_value = "Norway view"
+        mock_adapters["codex"].invoke_mock.return_value = "US view"
+
+        result = await engine.execute(request)
+        transcript = Path(result.transcript_path).read_text(encoding="utf-8")
+
+        assert result.participants == ["Norway Analyst", "US Analyst"]
+        assert result.full_debate[0].participant == "Norway Analyst"
+        assert result.full_debate[1].participant == "US Analyst"
+        assert "Norway Analyst" in transcript
+        assert "US Analyst" in transcript
+        assert "claude-3-5-sonnet@claude" not in transcript
+        assert "gpt-4@codex" not in transcript
+
+    @pytest.mark.asyncio
+    async def test_execute_round_multiple_participants(self, mock_adapters):
+        """Test executing single round with multiple participants."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet"),
+            Participant(cli="codex", model="gpt-4"),
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude says yes"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex says no"
+
+        responses = await engine.execute_round(
+            round_num=1,
+            prompt="Should we use TDD?",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        assert len(responses) == 2
+        assert responses[0].participant == "claude-3-5-sonnet@claude"
+        assert responses[0].response == "Claude says yes"
+        assert responses[1].participant == "gpt-4@codex"
+        assert responses[1].response == "Codex says no"
+
+    @pytest.mark.asyncio
+    async def test_execute_round_includes_previous_context(self, mock_adapters):
+        """Test that previous responses are included in context."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        previous = [
+            RoundResponse(
+                round=1,
+                participant="codex",
+                response="Previous response",
+                timestamp=datetime.now().isoformat(),
+            )
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "New response"
+
+        await engine.execute_round(
+            round_num=2,
+            prompt="Continue discussion",
+            participants=participants,
+            previous_responses=previous,
+        )
+
+        # Verify invoke was called with context
+        mock_adapters["claude"].invoke_mock.assert_called_once()
+        call_args = mock_adapters["claude"].invoke_mock.call_args
+        # Args are: (prompt, model, context)
+        assert call_args[0][2] is not None  # context is 3rd positional arg
+        assert "Previous response" in call_args[0][2]
+
+    @pytest.mark.asyncio
+    async def test_execute_round_adapter_error_handling(self, mock_adapters):
+        """Test graceful error handling when adapter fails."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        mock_adapters["claude"].invoke_mock.side_effect = RuntimeError("API Error")
+
+        # Should not raise, but return response with error message
+        responses = await engine.execute_round(
+            round_num=1,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        assert len(responses) == 1
+        assert "[ERROR: RuntimeError: API Error]" in responses[0].response
+
+    @pytest.mark.asyncio
+    async def test_execute_round_error_has_valid_roundresponse_schema(self, mock_adapters):
+        """Regression test: Ensure error handlers create valid RoundResponse objects.
+
+        This test prevents regression of the bug where error handlers used incorrect
+        field names (cli, model) instead of the required 'participant' field, and
+        missing 'timestamp' field, causing Pydantic validation errors.
+
+        See commit 64cfb293 for the original fix.
+        """
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        mock_adapters["claude"].invoke_mock.side_effect = RuntimeError("Test error")
+
+        responses = await engine.execute_round(
+            round_num=1,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        # Should have exactly 1 response
+        assert len(responses) == 1
+
+        # Response must be valid RoundResponse (Pydantic validation)
+        assert isinstance(responses[0], RoundResponse)
+
+        # CRITICAL: Must have 'participant' field (not 'cli' or 'model')
+        assert responses[0].participant == "claude-3-5-sonnet@claude"
+
+        # CRITICAL: Must have 'timestamp' field in ISO format
+        assert responses[0].timestamp is not None
+        assert isinstance(responses[0].timestamp, str)
+        # Verify it's a valid ISO timestamp by parsing it
+        datetime.fromisoformat(responses[0].timestamp)
+
+        # Must have correct round number
+        assert responses[0].round == 1
+
+        # Must have error message in response
+        assert "[ERROR: RuntimeError: Test error]" in responses[0].response
+
+    @pytest.mark.asyncio
+    async def test_execute_round_timeout_has_valid_roundresponse_schema(self, mock_adapters):
+        """Regression test: Ensure timeout handler creates valid RoundResponse objects.
+
+        This test prevents regression of the bug where the timeout handler used
+        incorrect field names (cli, model) instead of 'participant', and was missing
+        the 'timestamp' field, causing Pydantic validation errors.
+
+        See commit 64cfb293 for the original fix.
+        """
+        import asyncio
+
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet"),
+            Participant(cli="codex", model="gpt-4"),
+        ]
+
+        # Simulate timeout by raising TimeoutError
+        mock_adapters["claude"].invoke_mock.side_effect = asyncio.TimeoutError()
+        mock_adapters["codex"].invoke_mock.side_effect = asyncio.TimeoutError()
+
+        # Set a very short timeout to trigger the timeout path
+        responses = await engine.execute_round(
+            round_num=2,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+            round_timeout=1,  # 1 second timeout
+        )
+
+        # Should have responses for all participants
+        assert len(responses) == 2
+
+        # Verify both responses are valid RoundResponse objects
+        for i, response in enumerate(responses):
+            # Must be valid RoundResponse (Pydantic validation)
+            assert isinstance(response, RoundResponse)
+
+            # CRITICAL: Must have 'participant' field with correct format
+            expected_participant = f"{participants[i].model}@{participants[i].cli}"
+            assert response.participant == expected_participant
+
+            # CRITICAL: Must have 'timestamp' field in ISO format
+            assert response.timestamp is not None
+            assert isinstance(response.timestamp, str)
+            # Verify it's a valid ISO timestamp by parsing it
+            datetime.fromisoformat(response.timestamp)
+
+            # Must have correct round number
+            assert response.round == 2
+
+            # Must have timeout error message
+            assert "[ERROR: Round timed out" in response.response
+
+    @pytest.mark.asyncio
+    async def test_execute_round_passes_correct_model(self, mock_adapters):
+        """Test that correct model is passed to adapter."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-opus")
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "Response"
+
+        await engine.execute_round(
+            round_num=1, prompt="Test", participants=participants, previous_responses=[]
+        )
+
+        call_args = mock_adapters["claude"].invoke_mock.call_args
+        # Args are: (prompt, model, context)
+        assert call_args[0][1] == "claude-3-opus"  # model is 2nd positional arg
+
+    @pytest.mark.asyncio
+    async def test_execute_round_timestamp_format(self, mock_adapters):
+        """Test that timestamp is in ISO format."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        mock_adapters["claude"].invoke_mock.return_value = "Response"
+
+        responses = await engine.execute_round(
+            round_num=1, prompt="Test", participants=participants, previous_responses=[]
+        )
+
+        timestamp = responses[0].timestamp
+        # Verify it's a valid ISO format timestamp
+        datetime.fromisoformat(timestamp)
+
+
+class TestDeliberationEngineMultiRound:
+    """Tests for DeliberationEngine multi-round execution."""
+
+    @pytest.mark.asyncio
+    async def test_execute_multiple_rounds(self, mock_adapters):
+        """Test executing multiple rounds of deliberation."""
+        from models.schema import DeliberateRequest
+
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        request = DeliberateRequest(
+            question="What is the best programming language?",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=3,
+            mode="conference",
+            working_directory="/tmp",)
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        result = await engine.execute(request)
+
+        # Verify result structure
+        assert result.status == "complete"
+        assert result.rounds_completed == 3
+        assert len(result.full_debate) == 6  # 3 rounds * 2 participants
+        assert len(result.participants) == 2
+
+    @pytest.mark.asyncio
+    async def test_execute_context_builds_across_rounds(self, mock_adapters):
+        """Test that context accumulates across rounds."""
+        from models.schema import DeliberateRequest
+
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        request = DeliberateRequest(
+            question="Test question",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=2,
+            mode="conference",
+            working_directory="/tmp",)
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute(request)
+
+        # Claude is used for: round 1, round 2, and summary generation
+        # So should have at least 2 calls (for the 2 rounds)
+        assert mock_adapters["claude"].invoke_mock.call_count >= 2
+        second_call = mock_adapters["claude"].invoke_mock.call_args_list[1]
+        # Check that context is passed in second deliberation round call
+        assert second_call[0][2] is not None  # context should be present
+
+    @pytest.mark.asyncio
+    async def test_execute_includes_request_context_in_round_prompt(
+        self, mock_adapters
+    ):
+        """Shared request context should be injected into the deliberation prompt."""
+        from models.schema import DeliberateRequest
+
+        engine = DeliberationEngine(mock_adapters)
+
+        request = DeliberateRequest(
+            question="Assess whether the findings indicate coordinated access development.",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=1,
+            mode="conference",
+            context="Finding F-001 shows credential access activity. Finding F-002 shows phishing staging.",
+            working_directory="/tmp",
+        )
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute(request)
+
+        first_prompt = mock_adapters["claude"].invoke_mock.call_args_list[0][0][0]
+        assert "## Shared Context" in first_prompt
+        assert "Finding F-001 shows credential access activity." in first_prompt
+        assert "## Debate Question" in first_prompt
+        assert (
+            "Assess whether the findings indicate coordinated access development."
+            in first_prompt
+        )
+
+    @pytest.mark.asyncio
+    async def test_quick_mode_overrides_rounds(self, mock_adapters):
+        """Test that quick mode forces single round regardless of request.rounds."""
+        from models.schema import DeliberateRequest
+
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        request = DeliberateRequest(
+            question="Test question",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=5,  # Request 5 rounds
+            mode="quick",  # But quick mode should override to 1,
+            working_directory="/tmp",)
+
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        result = await engine.execute(request)
+
+        # Quick mode should force 1 round, not 5
+        assert result.rounds_completed == 1
+        assert len(result.full_debate) == 2  # 1 round * 2 participants
+
+    @pytest.mark.asyncio
+    async def test_engine_saves_transcript(self, mock_adapters, tmp_path):
+        """Test that engine saves transcript after execution."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+
+        request = DeliberateRequest(
+            question="Should we use TypeScript?",
+            participants=[
+                Participant(
+                    cli="claude", model="claude-3-5-sonnet-20241022"
+                ),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=1,
+            working_directory="/tmp",)
+
+        mock_adapters["claude"] = mock_adapters["claude"]
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+        result = await engine.execute(request)
+
+        # Verify transcript was saved
+        assert result.transcript_path
+        assert Path(result.transcript_path).exists()
+
+        # Verify content
+        content = Path(result.transcript_path).read_text()
+        assert "Should we use TypeScript?" in content
+
+
+class TestEngineReasoningEffort:
+    """Tests for reasoning_effort passing from Participant to adapter in engine."""
+
+    @pytest.mark.asyncio
+    async def test_reasoning_effort_passed_to_adapter(self, mock_adapters):
+        """Test reasoning_effort from Participant is passed to adapter.invoke()."""
+        mock_adapters["codex"] = mock_adapters["codex"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="codex", model="gpt-4", reasoning_effort="high")
+        ]
+
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute_round(
+            round_num=1,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        # Verify invoke was called with reasoning_effort
+        mock_adapters["codex"].invoke_mock.assert_called_once()
+        call_kwargs = mock_adapters["codex"].invoke_mock.call_args[1]
+        assert call_kwargs.get("reasoning_effort") == "high"
+
+    @pytest.mark.asyncio
+    async def test_reasoning_effort_none_passed_when_not_set(self, mock_adapters):
+        """Test None reasoning_effort is passed when not set on Participant."""
+        mock_adapters["codex"] = mock_adapters["codex"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="codex", model="gpt-4")  # No reasoning_effort
+        ]
+
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        await engine.execute_round(
+            round_num=1,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        # Verify invoke was called with reasoning_effort=None
+        mock_adapters["codex"].invoke_mock.assert_called_once()
+        call_kwargs = mock_adapters["codex"].invoke_mock.call_args[1]
+        assert call_kwargs.get("reasoning_effort") is None
+
+    @pytest.mark.asyncio
+    async def test_different_participants_different_reasoning_efforts(self, mock_adapters):
+        """Test each participant's reasoning_effort is passed to their respective adapter."""
+        mock_adapters["codex"] = mock_adapters["codex"]
+        engine = DeliberationEngine(mock_adapters)
+
+        # Create mock for both adapters with tracking
+        codex_calls = []
+        claude_calls = []
+
+        async def codex_invoke(*args, **kwargs):
+            codex_calls.append(kwargs)
+            return "Codex response"
+
+        async def claude_invoke(*args, **kwargs):
+            claude_calls.append(kwargs)
+            return "Claude response"
+
+        mock_adapters["codex"].invoke_mock.side_effect = codex_invoke
+        mock_adapters["claude"].invoke_mock.side_effect = claude_invoke
+
+        participants = [
+            Participant(cli="codex", model="gpt-4", reasoning_effort="high"),
+            Participant(cli="claude", model="sonnet", reasoning_effort=None),
+        ]
+
+        await engine.execute_round(
+            round_num=1,
+            prompt="Test prompt",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        # Verify each adapter received correct reasoning_effort
+        assert len(codex_calls) == 1
+        assert codex_calls[0].get("reasoning_effort") == "high"
+
+        assert len(claude_calls) == 1
+        assert claude_calls[0].get("reasoning_effort") is None
+
+    @pytest.mark.asyncio
+    async def test_reasoning_effort_in_full_deliberation(self, mock_adapters, tmp_path):
+        """Test reasoning_effort is passed correctly during full deliberation execute()."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        request = DeliberateRequest(
+            question="Test question with reasoning effort",
+            participants=[
+                Participant(cli="codex", model="gpt-4", reasoning_effort="high"),
+                Participant(cli="claude", model="sonnet"),
+            ],
+            rounds=2,
+            mode="conference",
+            working_directory="/tmp",
+        )
+
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+        mock_adapters["claude"].invoke_mock.return_value = "Claude response"
+
+        result = await engine.execute(request)
+
+        assert result.status == "complete"
+        assert result.rounds_completed == 2
+
+        # Verify codex was called with reasoning_effort="high" in each round
+        codex_calls = mock_adapters["codex"].invoke_mock.call_args_list
+        for call in codex_calls:
+            call_kwargs = call[1]
+            assert call_kwargs.get("reasoning_effort") == "high"
+
+    @pytest.mark.asyncio
+    async def test_reasoning_effort_logged(self, mock_adapters, caplog):
+        """Test reasoning_effort is included in log messages."""
+        import logging
+
+        mock_adapters["codex"] = mock_adapters["codex"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="codex", model="gpt-4", reasoning_effort="high")
+        ]
+
+        mock_adapters["codex"].invoke_mock.return_value = "Codex response"
+
+        with caplog.at_level(logging.INFO):
+            await engine.execute_round(
+                round_num=1,
+                prompt="Test prompt",
+                participants=participants,
+                previous_responses=[],
+            )
+
+        # Verify reasoning_effort appears in log output
+        log_text = caplog.text
+        assert "reasoning_effort=high" in log_text
+
+
+class TestVoteParsing:
+    """Tests for vote parsing from model responses."""
+
+    def test_parse_vote_from_response_valid_json(self):
+        """Test parsing valid vote from response text."""
+        response_text = """
+        I think Option A is better because it has lower risk.
+
+        VOTE: {"option": "Option A", "confidence": 0.85, "rationale": "Lower risk and better fit"}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is not None
+        assert isinstance(vote, Vote)
+        assert vote.option == "Option A"
+        assert vote.confidence == 0.85
+        assert vote.rationale == "Lower risk and better fit"
+        assert failure_reason == ""
+
+    def test_parse_vote_from_response_no_vote(self):
+        """Test parsing when no vote marker present but response is long enough."""
+        # Response must be >= 500 chars to get "no_vote_marker" instead of "response_too_short"
+        response_text = "This is just a regular response without a vote. " * 15  # ~750 chars
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "no_vote_marker"
+
+    def test_parse_vote_from_response_invalid_json(self):
+        """Test parsing when vote JSON is malformed."""
+        response_text = """
+        My analysis here.
+
+        VOTE: {invalid json}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "invalid_json"
+
+    def test_parse_vote_from_response_missing_fields(self):
+        """Test parsing when vote JSON missing required fields."""
+        response_text = """
+        My analysis.
+
+        VOTE: {"option": "Option A"}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "validation_error"
+
+    def test_parse_vote_confidence_out_of_range(self):
+        """Test parsing when confidence is out of valid range."""
+        response_text = """
+        Analysis here.
+
+        VOTE: {"option": "Yes", "confidence": 1.5, "rationale": "Test"}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "validation_error"
+
+    def test_parse_vote_with_multiple_vote_markers(self):
+        """Test parsing when response contains multiple VOTE markers (template + actual)."""
+        response_text = """
+        ## Voting Instructions
+
+        After your analysis, please cast your vote using the following format:
+
+        VOTE: {"option": "Your choice", "confidence": 0.85, "rationale": "Brief explanation"}
+
+        Example:
+        VOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Example rationale"}
+
+        ## My Analysis
+
+        After considering the options, I recommend Option B.
+
+        ## Step 5: Casting the Vote
+        VOTE: {"option": "Option B", "confidence": 0.75, "rationale": "Better long-term fit"}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        # Should capture the LAST vote marker (the actual vote), not the template or example
+        assert vote is not None
+        assert isinstance(vote, Vote)
+        assert vote.option == "Option B"
+        assert vote.confidence == 0.75
+        assert vote.rationale == "Better long-term fit"
+        assert failure_reason == ""
+
+    def test_parse_vote_prefers_last_marker_over_first(self):
+        """Test that parser takes last VOTE marker when multiple exist."""
+        response_text = """
+        First attempt (wrong):
+        VOTE: {"option": "Wrong", "confidence": 0.5, "rationale": "First try"}
+
+        After more thought, my final vote:
+        VOTE: {"option": "Correct", "confidence": 0.9, "rationale": "Final decision"}
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is not None
+        assert vote.option == "Correct"
+        assert vote.confidence == 0.9
+        assert vote.rationale == "Final decision"
+        assert failure_reason == ""
+
+    def test_parse_vote_handles_latex_wrapper(self):
+        """Test parsing vote wrapped in LaTeX notation like $\\boxed{...}$."""
+        response_text = """
+        ## Step 5: Conclusion
+        Based on analysis, Option B is superior.
+
+        The final answer is: $\\boxed{VOTE: {"option": "Option B", "confidence": 0.88, "rationale": "Better scalability"}}$
+        """
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is not None
+        assert isinstance(vote, Vote)
+        assert vote.option == "Option B"
+        assert vote.confidence == 0.88
+        assert vote.rationale == "Better scalability"
+        assert failure_reason == ""
+
+    @pytest.mark.asyncio
+    async def test_execute_round_collects_votes(self, mock_adapters):
+        """Test that votes are collected when present in responses."""
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(mock_adapters)
+
+        participants = [
+            Participant(cli="claude", model="claude-3-5-sonnet")
+        ]
+
+        # Response includes a vote
+        response_with_vote = """
+        I recommend Option A because it has lower risk.
+
+        VOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Lower risk"}
+        """
+        mock_adapters["claude"].invoke_mock.return_value = response_with_vote
+
+        responses = await engine.execute_round(
+            round_num=1,
+            prompt="Which option?",
+            participants=participants,
+            previous_responses=[],
+        )
+
+        # Verify the response includes the full text
+        assert len(responses) == 1
+        assert "Option A" in responses[0].response
+
+    @pytest.mark.asyncio
+    async def test_execute_aggregates_voting_results(self, mock_adapters, tmp_path):
+        """Test that votes are aggregated into VotingResult during execution."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        mock_adapters["claude"] = mock_adapters["claude"]
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        request = DeliberateRequest(
+            question="Should we implement Option A or Option B?",
+            participants=[
+                Participant(cli="claude", model="claude-3-5-sonnet"),
+                Participant(cli="codex", model="gpt-4"),
+            ],
+            rounds=2,
+            mode="conference",
+            working_directory="/tmp",)
+
+        # Both vote for Option A in round 1
+        mock_adapters["claude"].invoke_mock.side_effect = [
+            'Analysis: Option A is better\n\nVOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Lower risk"}',
+            'After review, still Option A\n\nVOTE: {"option": "Option A", "confidence": 0.95, "rationale": "Confirmed"}',
+        ]
+        mock_adapters["codex"].invoke_mock.side_effect = [
+            'I agree with Option A\n\nVOTE: {"option": "Option A", "confidence": 0.85, "rationale": "Better performance"}',
+            'Final vote: Option A\n\nVOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Final decision"}',
+        ]
+
+        result = await engine.execute(request)
+
+        # Verify voting_result is present
+        assert result.voting_result is not None
+        assert result.voting_result.consensus_reached is True
+        assert result.voting_result.winning_option == "Option A"
+        assert (
+            result.voting_result.final_tally["Option A"] == 4
+        )  # 2 participants x 2 rounds
+        assert len(result.voting_result.votes_by_round) == 4
+
+
+class TestVoteAbstainFallback:
+    """Tests for vote abstain fallback functionality."""
+
+    def test_parse_vote_failure_reason_response_too_short(self):
+        """Test that short responses get 'response_too_short' failure reason."""
+        # Response < 500 chars without vote
+        response_text = "Short response without vote"  # ~25 chars
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "response_too_short"
+
+    def test_parse_vote_failure_reason_tool_focus_no_vote(self):
+        """Test that tool-focused responses without votes get correct failure reason."""
+        # Response has TOOL_REQUEST but no VOTE marker
+        response_text = """
+        I need to examine the codebase first.
+
+        TOOL_REQUEST: {"name": "read_file", "arguments": {"path": "/src/main.py"}}
+
+        Let me analyze this file before making a decision.
+        """ + " " * 500  # Pad to be >= 500 chars
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "tool_focus_no_vote"
+
+    def test_parse_vote_failure_reason_no_vote_marker(self):
+        """Test that long responses without vote marker get 'no_vote_marker'."""
+        # Long response (>= 500 chars) without VOTE marker
+        response_text = "This is a detailed analysis. " * 30  # ~900 chars
+
+        engine = DeliberationEngine({})
+        vote, failure_reason = engine._parse_vote(response_text)
+
+        assert vote is None
+        assert failure_reason == "no_vote_marker"
+
+    def test_create_abstain_vote_response_too_short(self):
+        """Test abstain vote creation for response_too_short reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("claude@test", "response_too_short")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Response was too short" in vote.rationale
+        assert "[Auto-generated]" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_tool_focus_no_vote(self):
+        """Test abstain vote creation for tool_focus_no_vote reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("codex@test", "tool_focus_no_vote")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Focused on tool requests" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_no_vote_marker(self):
+        """Test abstain vote creation for no_vote_marker reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("gemini@test", "no_vote_marker")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Did not include a VOTE section" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_invalid_json(self):
+        """Test abstain vote creation for invalid_json reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("droid@test", "invalid_json")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Vote JSON was malformed" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_validation_error(self):
+        """Test abstain vote creation for validation_error reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("test@model", "validation_error")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Vote data failed validation" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_type_error(self):
+        """Test abstain vote creation for type_error reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("test@model", "type_error")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Vote data had incorrect types" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_create_abstain_vote_unknown_reason(self):
+        """Test abstain vote creation for unknown/custom reason."""
+        engine = DeliberationEngine({})
+
+        vote = engine._create_abstain_vote("test@model", "some_custom_reason")
+
+        assert vote.option == "ABSTAIN"
+        assert vote.confidence == 0.0
+        assert "Failed to vote: some_custom_reason" in vote.rationale
+        assert vote.continue_debate is True
+
+    def test_aggregate_votes_creates_abstains_for_failed_votes(self):
+        """Test that _aggregate_votes creates abstain votes for failed responses."""
+        engine = DeliberationEngine({})
+
+        # Create responses - one with valid vote, one without
+        responses = [
+            RoundResponse(
+                round=1,
+                participant="claude@test",
+                response='Analysis here.\n\nVOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Best choice"}',
+                timestamp="2025-01-01T00:00:00",
+            ),
+            RoundResponse(
+                round=1,
+                participant="codex@test",
+                response="Short response without vote",  # Will fail with response_too_short
+                timestamp="2025-01-01T00:00:01",
+            ),
+        ]
+
+        result = engine._aggregate_votes(responses, include_abstains=True)
+
+        assert result is not None
+        # Should have 2 votes - one real, one abstain
+        assert len(result.votes_by_round) == 2
+
+        # Find the abstain vote
+        abstain_votes = [v for v in result.votes_by_round if v.vote.option == "ABSTAIN"]
+        assert len(abstain_votes) == 1
+        assert abstain_votes[0].participant == "codex@test"
+        assert "[Auto-generated]" in abstain_votes[0].vote.rationale
+
+    def test_aggregate_votes_excludes_abstains_when_disabled(self):
+        """Test that _aggregate_votes excludes abstains when include_abstains=False."""
+        engine = DeliberationEngine({})
+
+        # Create responses - one with valid vote, one without
+        responses = [
+            RoundResponse(
+                round=1,
+                participant="claude@test",
+                response='Analysis here.\n\nVOTE: {"option": "Option A", "confidence": 0.9, "rationale": "Best choice"}',
+                timestamp="2025-01-01T00:00:00",
+            ),
+            RoundResponse(
+                round=1,
+                participant="codex@test",
+                response="Short response without vote",  # Will fail
+                timestamp="2025-01-01T00:00:01",
+            ),
+        ]
+
+        result = engine._aggregate_votes(responses, include_abstains=False)
+
+        assert result is not None
+        # Should only have 1 vote (the real one)
+        assert len(result.votes_by_round) == 1
+        assert result.votes_by_round[0].participant == "claude@test"
+        assert result.votes_by_round[0].vote.option == "Option A"
+
+
+class TestEngineWithTools:
+    """Tests for DeliberationEngine with tool execution integration."""
+
+    @pytest.mark.asyncio
+    async def test_tool_execution_timeout(self, mock_adapters):
+        """Test tool execution times out after 30s to prevent hanging.
+
+        This is a P0 CRITICAL issue: Tools can hang indefinitely without timeout,
+        blocking entire deliberation and causing resource leaks.
+
+        Fix: Wrap tool execution in asyncio.wait_for(timeout=30.0)
+        """
+        import asyncio
+        import time
+        from models.tool_schema import ToolResult
+
+        # Create a tool that hangs (use registered tool name to pass schema validation)
+        class SlowReadFileTool(ReadFileTool):
+            async def execute(self, arguments: dict) -> ToolResult:
+                # Simulate a hanging tool (60s sleep)
+                await asyncio.sleep(60)
+                return ToolResult(
+                    tool_name=self.name,
+                    success=True,
+                    output="Should timeout before this",
+                    error=None
+                )
+
+        # Setup engine with custom tool executor that has the slow tool
+        engine = DeliberationEngine(mock_adapters)
+        engine.tool_executor = ToolExecutor()
+        engine.tool_executor.register_tool(SlowReadFileTool())  # Override read_file with slow version
+        engine.tool_execution_history = []
+
+        participants = [Participant(cli="claude", model="sonnet", stance="neutral")]
+
+        # Mock response with tool request (use read_file which is a valid tool name)
+        # Include VOTE marker to avoid triggering vote retry logic
+        mock_adapters["claude"].invoke_mock.return_value = """
+        I need to check something.
+        TOOL_REQUEST: {"name": "read_file", "arguments": {"path": "/test.txt"}}
+        VOTE: {"option": "Check file", "confidence": 0.8, "rationale": "Need to verify content"}
+        """
+
+        # Execute round with hanging tool
+        start = time.time()
+        responses = await engine.execute_round(1, "Test", participants, [])
+        duration = time.time() - start
+
+        # Should timeout in ~30s, NOT 60s
+        assert duration < 35, f"Tool execution should timeout at 30s, but took {duration:.1f}s"
+
+        # Should have tool execution result with timeout error
+        assert hasattr(engine, 'tool_execution_history'), "Engine should track tool execution history"
+        assert len(engine.tool_execution_history) > 0, "Should have recorded tool execution"
+
+        tool_record = engine.tool_execution_history[0]
+        assert not tool_record.result.success, "Timeout should result in failure"
+        assert "timeout" in tool_record.result.error.lower(), f"Error should mention timeout: {tool_record.result.error}"
+
+    @pytest.mark.asyncio
+    async def test_tool_history_cleared_between_deliberations(self, mock_adapters, tmp_path):
+        """Test tool execution history is cleared between deliberations.
+
+        CRITICAL MEMORY LEAK: tool_execution_history grows unbounded across deliberations
+        in long-running MCP servers, causing OOM.
+
+        Expected: History cleared at start of each deliberation.
+        Actual (BUG): History accumulates indefinitely.
+        """
+        engine = DeliberationEngine(mock_adapters)
+        # Note: Engine's __init__ already creates tool_executor with all tools registered
+        # We only need to clear the history for a clean test state
+        engine.tool_execution_history = []
+
+        # First deliberation with tool request
+        test_file1 = tmp_path / "file1.txt"
+        test_file1.write_text("data1")
+        # Use forward slashes for cross-platform JSON compatibility
+        test_file1_str = str(test_file1).replace("\\", "/")
+
+        mock_adapters["claude"].invoke_mock.return_value = f"""
+        I need to read file1.
+        TOOL_REQUEST: {{"name": "read_file", "arguments": {{"path": "{test_file1_str}"}}}}
+        VOTE: {{"option": "Read file1", "confidence": 0.8, "rationale": "Need to check content"}}
+        """
+
+        participants = [
+            Participant(cli="claude", model="sonnet", stance="neutral"),
+            Participant(cli="codex", model="gpt-4", stance="neutral")
+        ]
+
+        # Execute first deliberation
+        from models.schema import DeliberateRequest
+        request1 = DeliberateRequest(
+            question="Test question for deliberation 1",
+            participants=participants,
+            rounds=1,
+            mode="quick",
+            working_directory="/tmp",)
+        result1 = await engine.execute(request1)
+
+        # Verify tool was executed
+        assert len(engine.tool_execution_history) > 0, "First deliberation should have tool execution"
+        first_deliberation_count = len(engine.tool_execution_history)
+
+        # Second deliberation with different tool request
+        test_file2 = tmp_path / "file2.txt"
+        test_file2.write_text("data2")
+        # Use forward slashes for cross-platform JSON compatibility
+        test_file2_str = str(test_file2).replace("\\", "/")
+
+        mock_adapters["claude"].invoke_mock.return_value = f"""
+        I need to read file2.
+        TOOL_REQUEST: {{"name": "read_file", "arguments": {{"path": "{test_file2_str}"}}}}
+        VOTE: {{"option": "Read file2", "confidence": 0.8, "rationale": "Need to check content"}}
+        """
+
+        request2 = DeliberateRequest(
+            question="Test question for deliberation 2",
+            participants=participants,
+            rounds=1,
+            mode="quick",
+            working_directory="/tmp",)
+        result2 = await engine.execute(request2)
+
+        # CRITICAL: History should NOT contain both deliberations
+        # It should only contain the second deliberation's tools
+        assert len(engine.tool_execution_history) <= first_deliberation_count, \
+            f"MEMORY LEAK: Tool history should be cleared between deliberations. " \
+            f"Found {len(engine.tool_execution_history)} records (expected <= {first_deliberation_count})"
+
+        # Verify the history contains only the second deliberation
+        assert any("file2.txt" in str(record.request.arguments)
+                   for record in engine.tool_execution_history), \
+            "Should contain second deliberation's tool"
+
+        assert not any("file1.txt" in str(record.request.arguments)
+                       for record in engine.tool_execution_history), \
+            "Should NOT contain first deliberation's tool (indicates memory leak)"
+
+    @pytest.mark.asyncio
+    async def test_tool_history_memory_bounded(self, mock_adapters, tmp_path):
+        """Test tool history doesn't grow unbounded in long-running server.
+
+        Simulates 10 deliberations to verify memory doesn't accumulate.
+        In production: ~1-3MB per deliberation × unlimited = OOM crash.
+        """
+        engine = DeliberationEngine(mock_adapters)
+        # Note: Engine's __init__ already creates tool_executor with all tools registered
+        # We only need to clear the history for a clean test state
+        engine.tool_execution_history = []
+
+        participants = [
+            Participant(cli="claude", model="sonnet", stance="neutral"),
+            Participant(cli="codex", model="gpt-4", stance="neutral")
+        ]
+
+        # Simulate 10 deliberations (simulating long-running MCP server)
+        for i in range(10):
+            test_file = tmp_path / f"file{i}.txt"
+            test_file.write_text(f"data{i}")
+            # Use forward slashes for cross-platform JSON compatibility
+            test_file_str = str(test_file).replace("\\", "/")
+
+            mock_adapters["claude"].invoke_mock.return_value = f"""
+            Reading file {i}.
+            TOOL_REQUEST: {{"name": "read_file", "arguments": {{"path": "{test_file_str}"}}}}
+            VOTE: {{"option": "Read file", "confidence": 0.8, "rationale": "Need content"}}
+            """
+
+            from models.schema import DeliberateRequest
+            request = DeliberateRequest(
+                question=f"Test question for deliberation number {i}",
+                participants=participants,
+                rounds=1,
+                mode="quick",
+            working_directory="/tmp",)
+
+            await engine.execute(request)
+
+        # Memory should be bounded (not 10x the first deliberation)
+        # With fix (clear at start): should be ~1x (only last deliberation)
+        # Without fix (BUG): should be ~10x (all deliberations accumulated)
+        assert len(engine.tool_execution_history) < 5, \
+            f"MEMORY LEAK: History has {len(engine.tool_execution_history)} records after 10 deliberations. " \
+            f"Expected < 5 (with cleanup), but unbounded growth detected!"
+
+
+class TestVotingPrompts:
+    """Tests for voting instruction prompts."""
+
+    def test_build_voting_instructions(self):
+        """Test that voting instructions are properly formatted."""
+        engine = DeliberationEngine({})
+
+        instructions = engine._build_voting_instructions()
+
+        # Verify voting instructions contain key elements
+        assert "VOTE:" in instructions
+        assert "option" in instructions
+        assert "confidence" in instructions
+        assert "rationale" in instructions
+        assert (
+            "0.0" in instructions
+            or "0-1" in instructions
+            or "between 0 and 1" in instructions.lower()
+        )
+
+    def test_enhance_prompt_with_voting(self):
+        """Test that prompt enhancement adds voting instructions."""
+        engine = DeliberationEngine({})
+
+        base_question = "Should we use TypeScript?"
+        enhanced = engine._enhance_prompt_with_voting(base_question)
+
+        # Verify enhanced prompt contains original question
+        assert base_question in enhanced
+
+        # Verify voting instructions are included
+        assert "VOTE:" in enhanced
+        assert "option" in enhanced.lower()
+        assert "confidence" in enhanced.lower()
+
+
+class TestVoteGrouping:
+    """Tests for vote option grouping and similarity detection."""
+
+    def test_group_similar_vote_options_exact_match(self):
+        """Test that identical vote options are grouped together."""
+        engine = DeliberationEngine({})
+
+        all_options = ["Option A", "Option A", "Option B"]
+        raw_tally = {"Option A": 2, "Option B": 1}
+
+        result = engine._group_similar_vote_options(all_options, raw_tally)
+
+        # Exact matches should stay as-is with exact matching
+        assert result["Option A"] == 2
+        assert result["Option B"] == 1
+
+    def test_group_similar_vote_options_no_grouping_without_backend(self):
+        """Test that grouping requires similarity backend (returns raw tally without it)."""
+        engine = DeliberationEngine({})
+        # Engine has no convergence detector, so no backend
+        assert engine.convergence_detector is None
+
+        all_options = ["Option A", "Option B"]
+        raw_tally = {"Option A": 2, "Option B": 1}
+
+        result = engine._group_similar_vote_options(all_options, raw_tally)
+
+        # Without backend, should return raw tally unchanged
+        assert result == raw_tally
+
+    def test_group_similar_vote_options_single_option(self):
+        """Test that single option always returns as-is."""
+        engine = DeliberationEngine({})
+
+        all_options = ["Option A"]
+        raw_tally = {"Option A": 3}
+
+        result = engine._group_similar_vote_options(all_options, raw_tally)
+
+        # Single option should return unchanged
+        assert result == {"Option A": 3}
+
+    @pytest.mark.asyncio
+    async def test_aggregate_votes_different_options_not_merged(self, mock_adapters):
+        """Test that semantically different vote options (A vs D) are NOT merged.
+
+        This is a regression test for bug where Option A and Option D (0.729 similarity)
+        were incorrectly merged due to 0.70 threshold being too aggressive.
+        """
+        import tempfile
+
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            manager = TranscriptManager(output_dir=tmp_dir)
+            engine = DeliberationEngine(
+                adapters=mock_adapters, transcript_manager=manager
+            )
+
+            request = DeliberateRequest(
+                question="Docker compose approach?",
+                participants=[
+                    Participant(cli="claude", model="sonnet"),
+                    Participant(cli="codex", model="gpt-5-codex"),
+                ],
+                rounds=1,
+                mode="quick",
+            working_directory="/tmp",)
+
+            # Simulate the actual votes from docker-compose deliberation:
+            # Claude and Codex vote for Option A
+            # Gemini votes for Option D (but we use 2 adapters in fixture)
+            # So we'll test with Claude voting A, Codex voting D instead
+            mock_adapters["claude"].invoke_mock.side_effect = [
+                'Analysis...\n\nVOTE: {"option": "Option A", "confidence": 0.94, "rationale": "Single file"}',
+            ]
+            mock_adapters["codex"].invoke_mock.side_effect = [
+                'Analysis...\n\nVOTE: {"option": "Option D", "confidence": 0.95, "rationale": "Dual file"}',
+            ]
+
+            result = await engine.execute(request)
+
+            # Verify voting result
+            assert result.voting_result is not None
+
+            # KEY ASSERTION: Verify that A and D are NOT merged
+            # Expected: 1 vote for Option A, 1 vote for Option D (tie)
+            # Buggy behavior: 2 votes for Option A (D merged with A)
+
+            if len(result.voting_result.final_tally) == 2:
+                # If threshold is correct (0.85+), A and D should NOT merge
+                assert "Option A" in result.voting_result.final_tally
+                assert "Option D" in result.voting_result.final_tally
+                assert result.voting_result.final_tally["Option A"] == 1
+                assert result.voting_result.final_tally["Option D"] == 1
+                assert result.voting_result.consensus_reached is False  # 1-1 is tie
+                assert result.voting_result.winning_option is None
+            elif len(result.voting_result.final_tally) == 1:
+                # If threshold is still aggressive (0.70), A and D would merge
+                # This test documents the bug
+                assert (
+                    result.voting_result.final_tally["Option A"] == 2
+                ), "Bug confirmed: Option D was merged into Option A due to aggressive 0.70 threshold"
+                pytest.fail(
+                    "BUG CONFIRMED: Option A and Option D were incorrectly merged (threshold too aggressive)"
+                )
+
+    @pytest.mark.asyncio
+    async def test_aggregate_votes_respects_intent(self, mock_adapters):
+        """Test that different options remain separate even if semantically similar."""
+        import tempfile
+
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            manager = TranscriptManager(output_dir=tmp_dir)
+            mock_adapters["claude"] = mock_adapters["claude"]
+            engine = DeliberationEngine(
+                adapters=mock_adapters, transcript_manager=manager
+            )
+
+            request = DeliberateRequest(
+                question="Test question",
+                participants=[
+                    Participant(cli="claude", model="model1"),
+                    Participant(cli="codex", model="model2"),
+                ],
+                rounds=1,
+                mode="quick",
+            working_directory="/tmp",)
+
+            # Two very different votes that shouldn't be merged
+            mock_adapters[
+                "claude"
+            ].invoke_mock.return_value = 'Analysis\n\nVOTE: {"option": "Yes", "confidence": 0.9, "rationale": "Good idea"}'
+            mock_adapters[
+                "codex"
+            ].invoke_mock.return_value = 'Analysis\n\nVOTE: {"option": "No", "confidence": 0.9, "rationale": "Bad idea"}'
+
+            result = await engine.execute(request)
+
+            # Verify that "Yes" and "No" are never merged
+            assert result.voting_result is not None
+            assert len(result.voting_result.final_tally) == 2
+            assert result.voting_result.consensus_reached is False  # 1-1 tie
+            assert result.voting_result.winning_option is None  # No winner in tie
+
+
+class TestEngineContextEfficiency:
+    """Tests for context building efficiency and token optimization."""
+
+    @pytest.mark.asyncio
+    async def test_context_truncates_large_tool_outputs(self, mock_adapters, tmp_path):
+        """Test large tool outputs are truncated to prevent bloat."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        # Create large file
+        large_file = tmp_path / "large.txt"
+        large_content = "x" * 5000  # 5KB file
+        large_file.write_text(large_content)
+
+        request = DeliberateRequest(
+            question="What's in this file?",
+            participants=[
+                Participant(cli="claude", model="sonnet", stance="neutral"),
+                Participant(cli="codex", model="gpt-4", stance="neutral")
+            ],
+            rounds=2,
+            mode="conference",
+            working_directory="/tmp",)
+
+        # Round 1: Read large file (simulated tool result with large output)
+        # Round 2: Check context size
+        mock_adapters["claude"].invoke_mock.side_effect = [
+            f"File contains: {large_content}",  # Round 1 - large output
+            "Response based on context",  # Round 2
+        ]
+        mock_adapters["codex"].invoke_mock.side_effect = [
+            "Codex response 1",
+            "Codex response 2",
+        ]
+
+        result = await engine.execute(request)
+
+        # Context for round 2 should be truncated (not include full 5KB)
+        # We can test indirectly by checking that round 2 prompt doesn't have massive content
+        # In production, _build_context would truncate tool results
+        # For now, we verify structure is correct
+        assert result.status == "complete"
+        assert result.rounds_completed == 2
+
+    @pytest.mark.asyncio
+    async def test_context_includes_only_recent_rounds(self, mock_adapters, tmp_path):
+        """Test context only includes tool results from recent N rounds."""
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        participants = [
+            Participant(cli="claude", model="sonnet", stance="neutral"),
+            Participant(cli="codex", model="gpt-4", stance="neutral")
+        ]
+
+        request = DeliberateRequest(
+            question="Test multi-round context",
+            participants=participants,
+            rounds=5,
+            mode="conference",
+            working_directory="/tmp",)
+
+        # Simulate 5 rounds with distinct responses
+        mock_adapters["claude"].invoke_mock.side_effect = [
+            f"Response from round {i}" for i in range(1, 6)
+        ]
+        mock_adapters["codex"].invoke_mock.side_effect = [
+            f"Codex round {i}" for i in range(1, 6)
+        ]
+
+        result = await engine.execute(request)
+
+        # Check that context was built for each round
+        # In round 5, context should only include recent 2 rounds (3-4)
+        # We can't directly test _build_context here, but we can verify
+        # that all rounds completed successfully
+        assert result.status == "complete"
+        assert result.rounds_completed == 5
+        assert len(result.full_debate) == 10  # 5 rounds * 2 participants
+
+    @pytest.mark.asyncio
+    async def test_context_size_bounded_across_rounds(self, mock_adapters, tmp_path):
+        """Test context size remains bounded even in long deliberations.
+
+        Note: This test verifies that _build_context accepts current_round_num parameter.
+        The actual tool result truncation logic will be tested when tool execution is added.
+        For now, we verify that the parameter is accepted and context builds correctly.
+        """
+        from deliberation.transcript import TranscriptManager
+        from models.schema import DeliberateRequest
+
+        manager = TranscriptManager(output_dir=str(tmp_path))
+        engine = DeliberationEngine(adapters=mock_adapters, transcript_manager=manager)
+
+        participants = [
+            Participant(cli="claude", model="sonnet", stance="neutral"),
+            Participant(cli="codex", model="gpt-4", stance="neutral")
+        ]
+
+        request = DeliberateRequest(
+            question="Test long deliberation",
+            participants=participants,
+            rounds=5,  # Max 5 rounds
+            mode="conference",
+            working_directory="/tmp",)
+
+        # Simulate 5 rounds, each with 2KB response
+        large_response = "x" * 2000
+        mock_adapters["claude"].invoke_mock.side_effect = [
+            f"Round {i}: {large_response}" for i in range(1, 6)
+        ] + ["Summary"]  # Add summary response
+        mock_adapters["codex"].invoke_mock.side_effect = [
+            f"Codex {i}: {large_response}" for i in range(1, 6)
+        ]
+
+        result = await engine.execute(request)
+
+        # Verify all rounds completed
+        assert result.status == "complete"
+        assert result.rounds_completed == 5
+
+        # Test that _build_context accepts current_round_num parameter
+        # This parameter will be used for tool result filtering in Task 7
+        context = engine._build_context(
+            result.full_debate, current_round_num=6
+        )
+
+        # Verify context was built successfully
+        # Note: Response context is NOT truncated (only tool outputs will be)
+        # This test just verifies the parameter works
+        assert "Round 1" in context
+        assert "Round 5" in context
+        assert len(context) > 0
+
+    def test_truncate_output_short_text(self):
+        """Test that short outputs are not truncated."""
+        engine = DeliberationEngine({})
+
+        short_text = "Short output"
+        result = engine._truncate_output(short_text, max_chars=1000)
+
+        assert result == short_text
+        assert "truncated" not in result.lower()
+
+    def test_truncate_output_long_text(self):
+        """Test that long outputs are truncated with indicator."""
+        engine = DeliberationEngine({})
+
+        long_text = "x" * 2000  # 2KB
+        result = engine._truncate_output(long_text, max_chars=1000)
+
+        # Should be truncated to 1000 chars
+        assert len(result) <= 1100  # Allow for truncation message
+        assert "truncated" in result.lower()
+        assert "1000 chars" in result.lower() or "1000" in result
+
+    def test_truncate_output_none(self):
+        """Test that None/empty inputs are handled gracefully."""
+        engine = DeliberationEngine({})
+
+        assert engine._truncate_output(None, max_chars=1000) is None
+        assert engine._truncate_output("", max_chars=1000) == ""
+
+    def test_build_context_with_current_round_num(self):
+        """Test that _build_context accepts current_round_num parameter."""
+        engine = DeliberationEngine({})
+
+        previous = [
+            RoundResponse(
+                round=1,
+                participant="model@cli",
+                stance="neutral",
+                response="Round 1 response",
+                timestamp=datetime.now().isoformat(),
+            )
+        ]
+
+        # Should accept current_round_num parameter
+        context = engine._build_context(previous, current_round_num=2)
+
+        assert "Round 1" in context
+        assert "Round 1 response" in context

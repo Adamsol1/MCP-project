@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ai-counsel": {
+      "type": "stdio",
+      "command": "python",
+      "args": [
+        "c:\\Users\\herma\\Documents\\Webapplikasjoner\\MCP-project\\council_mcp\\server.py"
+      ]
+    }
+  }
+}

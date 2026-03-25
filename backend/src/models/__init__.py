@@ -7,6 +7,15 @@ Usage:
     from src.models.sources import OTXPulse, MISPEvent
 """
 
+from src.models.analysis import (
+    AnalysisDraft,
+    CouncilNote,
+    CouncilRunSettings,
+    CouncilRuntimeProfile,
+    CouncilTranscriptEntry,
+    FindingModel,
+    ProcessingResult,
+)
 from src.models.enums import (
     DataSource,
     ExtractionMethod,
@@ -27,6 +36,14 @@ from src.models.reasoning import ReasoningLogEntry
 from src.models.reports import ThreatReport
 
 __all__ = [
+    # Analysis
+    "FindingModel",
+    "ProcessingResult",
+    "AnalysisDraft",
+    "CouncilTranscriptEntry",
+    "CouncilRunSettings",
+    "CouncilRuntimeProfile",
+    "CouncilNote",
     # Enums
     "IOCType",
     "ThreatLevel",

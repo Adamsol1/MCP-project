@@ -3,6 +3,7 @@ import { ToastContainer } from "../Toast";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
+import AnalysisPrototypeView from "../AnalysisPrototypeView/AnalysisPrototypeView";
 import type {
   CollectionDisplayData,
   CollectionPlanData,
@@ -385,6 +386,7 @@ export default function ChatWindow({
   devPrefill,
   onDevPrefillConsumed,
 }: ChatWindowProps) {
+  const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -423,6 +425,8 @@ export default function ChatWindow({
   };
 
   const hasMessages = messages.length > 0;
+  const isAnalysisComplete = stage === "complete";
+  const hasConversationContent = hasMessages || isAnalysisComplete;
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
@@ -482,9 +486,9 @@ export default function ChatWindow({
 
   return (
     <div className="h-full w-full flex flex-col">
-      {hasMessages && (
+      {hasConversationContent && (
         <div className="flex-1 min-h-0 overflow-y-auto py-4">
-          <div className="w-full max-w-3xl mx-auto px-6 flex flex-col">
+          <div className={`${contentWidthClass} flex flex-col`}>
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -507,21 +511,29 @@ export default function ChatWindow({
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
+          {isAnalysisComplete && (
+            <div className={`${contentWidthClass} mt-4`}>
+              <section className="rounded-xl border border-border-muted bg-surface p-4 shadow-sm">
+                <AnalysisPrototypeView />
+              </section>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
       )}
 
-      <div
-        className={`flex flex-col items-center gap-4 pb-6 ${
-          hasMessages ? "pt-2" : "flex-1 justify-center"
-        }`}
-      >
-        {!hasMessages && (
-          <p className="text-2xl font-normal text-text-secondary text-center">
-            Ready to start?
-          </p>
-        )}
+      {!isAnalysisComplete && (
+        <div
+          className={`flex flex-col items-center gap-4 pb-6 ${
+            hasConversationContent ? "pt-2" : "flex-1 justify-center"
+          }`}
+        >
+          {!hasConversationContent && (
+            <p className="text-2xl font-normal text-text-secondary text-center">
+              Ready to start?
+            </p>
+          )}
 
         <div className="w-full max-w-3xl px-6">
           <div className="relative">
@@ -660,38 +672,82 @@ export default function ChatWindow({
                       e.preventDefault();
                       submitMessage();
                     }
-                  }}
-                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
-                />
-                <button
-                  type="submit"
-                  disabled={inputValue.trim() === ""}
-                  aria-label="Send message"
-                  className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
-                    inputValue.trim() === ""
-                      ? "bg-surface-elevated text-text-muted cursor-not-allowed"
-                      : "bg-primary text-text-inverse hover:bg-primary-dark"
-                  }`}
-                >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                    className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                </button>
-              </form>
-            )}
+                    Start Collecting
+                  </button>
+                </section>
+              ) : isCollecting ? (
+                <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Collecting Data</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    The system is collecting and reviewing data from the selected sources.
+                  </p>
+                </section>
+              ) : isConfirming ? (
+                stage === "reviewing" ? (
+                  <CollectionReviewPrompt
+                    isLoading={isLoading}
+                    onAccept={onApprove}
+                    onGatherMore={onGatherMore}
+                  />
+                ) : (
+                  <ApprovalPrompt
+                    isLoading={isLoading}
+                    stage={stage}
+                    onApproveContinue={onApprove}
+                    onRejectWithFeedback={() => onReject?.()}
+                  />
+                )
+              ) : (
+                <form
+                  onSubmit={handleSubmit}
+                  className="relative border-2 border-border rounded-xl p-3 pb-12"
+                >
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    placeholder={inputPlaceholder}
+                    value={inputValue}
+                    onChange={(event) => setInputValue(event.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        submitMessage();
+                      }
+                    }}
+                    className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                  />
+                  <button
+                    type="submit"
+                    disabled={inputValue.trim() === ""}
+                    aria-label="Send message"
+                    className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                      inputValue.trim() === ""
+                        ? "bg-surface-elevated text-text-muted cursor-not-allowed"
+                        : "bg-primary text-text-inverse hover:bg-primary-dark"
+                    }`}
+                  >
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

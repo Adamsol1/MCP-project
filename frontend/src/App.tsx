@@ -19,6 +19,7 @@ import { useConversation } from "./hooks/useConversation";
 import type { DialogueStage } from "./types/dialogue";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
+import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
 
 function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
   const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
@@ -41,6 +42,7 @@ function WorkspacePhaseWatcher({ isSourceSelecting }: { isSourceSelecting: boole
 
 function App() {
   const { success, error } = useToast();
+  const { activePhase } = useWorkspace();
   const {
     conversations,
     activeConversation,
@@ -50,6 +52,7 @@ function App() {
     deleteAllConversations,
     renameConversation,
     updatePerspectives,
+    setStage,
   } = useConversation();
   const {
     messages,
@@ -157,6 +160,13 @@ function App() {
     }
   };
 
+  const openAnalysisDemo = () => {
+    createNewConversation();
+    setStage("complete", null);
+  };
+
+  const isAnalysisPhase = activePhase === "analysis";
+
   return (
     <WorkspaceProvider>
     <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
@@ -203,33 +213,63 @@ function App() {
           devPrefill={devPrefill}
           onDevPrefillConsumed={clearDevPrefill}
         />
-      </main>
 
-      <div className="w-56 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
-        <IntelligencePanel
+        <main className="flex-1 flex flex-col bg-surface-elevated mx-1 overflow-hidden">
+          <ChatWindow
+            messages={messages}
+            onSendMessage={sendMessage}
+            isConfirming={isConfirming}
+            stage={stage}
+            subState={subState}
+            isLoading={isLoading}
+            onApprove={approve}
+            onReject={reject}
+            onGatherMore={gatherMore}
+            isSourceSelecting={isSourceSelecting}
+            isCollecting={isCollecting}
+            availableSources={availableSources}
+            selectedSources={selectedSources}
+            onToggleSourceSelection={toggleSourceSelection}
+            onSubmitSourceSelection={submitSourceSelection}
+            devPrefill={devPrefill}
+            onDevPrefillConsumed={clearDevPrefill}
+          />
+        </main>
+
+        {!isAnalysisPhase && (
+          <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+            <IntelligencePanel />
+          </div>
+        )}
+
+        <OptionsPanel
           selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
           onPerspectiveChange={updatePerspectives}
           onOpenFileUpload={() => setIsFileUploadOpen(true)}
           uploadedFiles={uploadedFiles}
           onFileRemove={handleFileRemove}
-          isCollecting={isCollecting}
-          collectionStatus={collectionStatus}
+        />
+
+        <FileUploadModal
+          isOpen={isFileUploadOpen}
+          onClose={() => setIsFileUploadOpen(false)}
+          onSubmit={handleSubmit}
+        />
+
+        <SettingsModal
+          isOpen={isSettingsOpen}
+          onClose={() => setIsSettingsOpen(false)}
         />
       </div>
-
-      <FileUploadModal
-        isOpen={isFileUploadOpen}
-        onClose={() => setIsFileUploadOpen(false)}
-        onSubmit={handleSubmit}
-      />
-
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
-    </div>
-    </WorkspaceProvider>
+    </>
   );
 }
 
+function App() {
+  return (
+    <WorkspaceProvider>
+      <AppShell />
+    </WorkspaceProvider>
+  );
+}
 export default App;
