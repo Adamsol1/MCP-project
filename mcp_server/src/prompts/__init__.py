@@ -14,6 +14,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
+    "Web Search": ["google_search", "google_news_search"],
 }
 
 
@@ -401,14 +402,21 @@ Do not call any other tools during planning.
 
 ## Instructions
 1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
-2. Based on the PIRs and background knowledge, write a concise step-by-step collection plan
+2. Based on the PIRs and background knowledge, write one step per PIR — each step explains what to collect for that specific requirement, from which source, and why
 3. Select which sources are most relevant to answer the PIRs
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.
+You MUST include all three fields: "plan", "steps", and "suggested_sources".
 
 {{
-  "plan": "Step-by-step collection plan describing what to collect, from which sources, and why",
+  "plan": "Full collection plan as a single text string (used internally)",
+  "steps": [
+    {{
+      "title": "Short title describing this PIR's collection goal (max 8 words)",
+      "description": "Detailed explanation of what to collect, from which source, and why"
+    }}
+  ],
   "suggested_sources": ["source name as listed in Available Sources"]
 }}
 
@@ -421,6 +429,7 @@ def build_collection_collect_prompt(
     session_id: str | None = None,
     since_date: str | None = None,
     existing_data: str | None = None,
+    perspectives: list[str] | None = None,
 ) -> str:
     approved_tools = [
         tool
@@ -456,6 +465,72 @@ def build_collection_collect_prompt(
         if existing_data else ""
     )
 
+    _PERSP_REGION_LANG: dict[str, tuple[str, str]] = {
+        "us":      ("us",   "en"),
+        "eu":      ("gb",   "en"),
+        "norway":  ("no",   "no"),
+        "china":   ("cn",   "zh-cn"),
+        "russia":  ("ru",   "ru"),
+        "neutral": ("",     ""),
+    }
+    _active = [p for p in (perspectives or []) if p != "neutral"]
+    if not _active:
+        _active = ["neutral"]
+    _has_web_tools = "google_search" in approved_tools or "google_news_search" in approved_tools
+    if _has_web_tools:
+        _persp_str = ", ".join(perspectives) if perspectives else "neutral"
+        _timelimit_hint = since_date or "unspecified"
+        _mapping_lines = "\n".join(
+            f"  {p:<8} → region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0] or 'omit'}\", language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1] or 'omit'}\""
+            for p in _active
+        )
+        _web_examples = "\n".join(
+            (
+                f"  google_search(query=\"<topic> {p} perspective\", num_results=5, "
+                f"region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0]}\", "
+                f"language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1]}\", date_restrict=\"<code>\")"
+            )
+            for p in _active
+        )
+        _news_examples = "\n".join(
+            (
+                f"  google_news_search(query=\"<topic> {p} latest\", num_results=5, "
+                f"region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0]}\", "
+                f"language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1]}\", date_restrict=\"<code>\")"
+            )
+            for p in _active
+        )
+        _max_web = len(_active) * 5
+        _max_news = len(_active) * 5
+        web_search_note = (
+            f"\n## Web Search Guidance"
+            f"\nPerspectives selected: {_persp_str}"
+            f"\nPerspective → region + language mapping:"
+            f"\n{_mapping_lines}"
+            f"\nAlways pass region and language when calling either tool."
+            f"\n"
+            f"\nFor EACH perspective call BOTH tools separately:"
+            f"\n  1. google_search  — background reports, analysis, deep web"
+            f"\n  2. google_news_search — recent/breaking news, press releases"
+            f"\n"
+            f"\nInclude the perspective in every query string:"
+            f"\n  BAD:  google_search(query=\"GPS jamming\")"
+            f"\n  GOOD: google_search(query=\"GPS jamming Russia perspective\", region=\"ru\", language=\"ru\")"
+            f"\n"
+            f"\ngoogle_search examples:"
+            f"\n{_web_examples}"
+            f"\n"
+            f"\ngoogle_news_search examples:"
+            f"\n{_news_examples}"
+            f"\n"
+            f"\nTimeframe hint: \"{_timelimit_hint}\""
+            f"\ndate_restrict codes: \"d1\"=day, \"w1\"=week, \"m1\"=month, \"m3\"=3 months, \"m6\"=6 months, \"y1\"=year. Omit for no restriction."
+            f"\nSTRICT LIMITS: max {_max_web} google_search calls + max {_max_news} google_news_search calls ({len(_active)} perspective(s) × 5 each)."
+            f"\nSource authority: web search results carry LOWER authority than OTX. Always prefer OTX."
+        )
+    else:
+        web_search_note = ""
+
     return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
 
 ## Approved PIRs
@@ -467,6 +542,7 @@ def build_collection_collect_prompt(
 ## Approved Tools
 You MUST only use the following tools: {approved_tools_str}
 Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
+{web_search_note}
 
 ## Instructions
 1. Use the approved tools to collect data relevant to the PIRs only
@@ -478,12 +554,15 @@ Do not query any source or tool not listed above.{unmapped_note}{session_note}{s
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.
 
+IMPORTANT: The "content" field must be a plain text string — never a JSON object or nested structure.
+Copy only the text string the tool returned. Do not wrap it in {{"result": ...}} or any other object.
+
 {{
   "collected_data": [
     {{
       "source": "tool_name",
       "resource_id": "resource identifier if applicable, else null",
-      "content": "verbatim content returned by the tool"
+      "content": "plain text string returned by the tool — no JSON wrapping"
     }}
   ]
 }}"""

@@ -5,23 +5,25 @@ from pathlib import Path
 
 def _default_uploads_dir() -> Path:
     # mcp_server/src/tools/upload_tools.py → parents[2] = mcp_server root
-    return Path(__file__).resolve().parents[2] / "uploads"
+    return Path(__file__).resolve().parents[1] / "resources" / "uploads"
 
 
 # Module-level staging directory. Tests can monkeypatch this attribute directly.
-# Uses MCP_UPLOADS_DIR env var when set, otherwise the default mcp_server/uploads/.
+# Uses MCP_UPLOADS_DIR env var when set, otherwise the default mcp_server/src/resources/uploads/.
 UPLOADS_DIR: Path = Path(os.getenv("MCP_UPLOADS_DIR", str(_default_uploads_dir())))
 
 
 def upload_file(
     session_id: str, file_upload_id: str, content: str, filename: str = ""
 ) -> str:
-    """Stage markdown content into the MCP uploads directory.
+    """Stage markdown content into the MCP resources/uploads directory.
 
-    Creates {UPLOADS_DIR}/{session_id}/{file_upload_id}.md.
+    Creates {UPLOADS_DIR}/{session_id}/{filename_stem}.md, using the original
+    filename stem when provided, otherwise falling back to file_upload_id.
     Returns "ok" on success.
     """
-    stages_path = UPLOADS_DIR / session_id / f"{file_upload_id}.md"
+    stem = Path(filename).stem if filename else file_upload_id
+    stages_path = UPLOADS_DIR / session_id / f"{stem}.md"
     stages_path.parent.mkdir(parents=True, exist_ok=True)
     stages_path.write_text(content, encoding="utf-8")
     return "ok"

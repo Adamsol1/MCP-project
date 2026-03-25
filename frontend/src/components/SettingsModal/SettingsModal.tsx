@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
-import type { Language, Theme } from "../../types/settings";
+import type { CouncilSettings, Language, Theme } from "../../types/settings";
 
 /** Props for the SettingsModal component. */
 interface SettingsModalProps {
@@ -11,7 +11,7 @@ interface SettingsModalProps {
 }
 
 /** The three navigable sections in the settings left-nav. */
-type NavSection = "language" | "appearance" | "parameters";
+type NavSection = "language" | "appearance" | "parameters" | "council";
 
 /**
  * Full-screen settings modal with an Obsidian-inspired two-panel layout.
@@ -29,7 +29,13 @@ type NavSection = "language" | "appearance" | "parameters";
  *   All settings values come from SettingsContext via useSettings().
  */
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { settings, updateLanguage, updateTheme, updateInputParameters } =
+  const {
+    settings,
+    updateLanguage,
+    updateTheme,
+    updateInputParameters,
+    updateCouncilSettings,
+  } =
     useSettings();
 
   // Tracks which settings category is displayed in the right panel.
@@ -54,7 +60,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
             Options
           </p>
-          {(["language", "appearance", "parameters"] as const).map(
+          {(["language", "appearance", "parameters", "council"] as const).map(
             (section) => (
               <button
                 key={section}
@@ -105,6 +111,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <ParametersSection
                 timeframe={settings.inputParameters.timeframe}
                 onChange={(v) => updateInputParameters({ timeframe: v })}
+              />
+            )}
+            {activeSection === "council" && (
+              <CouncilSection
+                settings={settings.councilSettings}
+                onChange={updateCouncilSettings}
               />
             )}
           </main>
@@ -274,5 +286,131 @@ function ParametersSection({
         />
       }
     />
+  );
+}
+
+function CouncilSection({
+  settings,
+  onChange,
+}: {
+  settings: CouncilSettings;
+  onChange: (params: Partial<CouncilSettings>) => void;
+}) {
+  return (
+    <div>
+      <SettingRow
+        label="Mode"
+        htmlFor="council-mode"
+        description="Conference runs the full debate. Quick runs a single round."
+        control={
+          <select
+            id="council-mode"
+            value={settings.mode}
+            onChange={(e) =>
+              onChange({ mode: e.target.value as CouncilSettings["mode"] })
+            }
+            className={selectClass}
+          >
+            <option value="conference">Conference</option>
+            <option value="quick">Quick</option>
+          </select>
+        }
+      />
+      <SettingRow
+        label="Rounds"
+        htmlFor="council-rounds"
+        description="How many deliberation rounds the council should run."
+        control={
+          <select
+            id="council-rounds"
+            value={settings.rounds}
+            onChange={(e) =>
+              onChange({
+                rounds: Number.parseInt(e.target.value, 10),
+              })
+            }
+            className={selectClass}
+          >
+            {[1, 2, 3, 4, 5].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        }
+      />
+      <SettingRow
+        label="Round Timeout"
+        htmlFor="council-timeout"
+        description="Maximum seconds to allow each round before timing out."
+        control={
+          <select
+            id="council-timeout"
+            value={settings.timeoutSeconds}
+            onChange={(e) =>
+              onChange({
+                timeoutSeconds: Number.parseInt(e.target.value, 10),
+              })
+            }
+            className={selectClass}
+          >
+            {[60, 120, 180, 240, 300, 420, 600, 900].map((value) => (
+              <option key={value} value={value}>
+                {value} seconds
+              </option>
+            ))}
+          </select>
+        }
+      />
+      <SettingRow
+        label="Vote Retry"
+        description="Retry once or more if a participant omits the required VOTE line."
+        control={
+          <div className="flex gap-2">
+            {[
+              { label: "On", value: true },
+              { label: "Off", value: false },
+            ].map((option) => (
+              <button
+                key={option.label}
+                type="button"
+                aria-pressed={settings.voteRetryEnabled === option.value}
+                onClick={() => onChange({ voteRetryEnabled: option.value })}
+                className={`rounded border px-4 py-1.5 text-sm transition-colors ${
+                  settings.voteRetryEnabled === option.value
+                    ? "border-primary bg-primary-dark text-text-inverse"
+                    : "border-border bg-surface text-text-primary hover:bg-surface-elevated"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        }
+      />
+      <SettingRow
+        label="Vote Retry Attempts"
+        htmlFor="council-vote-retries"
+        description="How many retry prompts to send when vote formatting is missing."
+        control={
+          <select
+            id="council-vote-retries"
+            value={settings.voteRetryAttempts}
+            onChange={(e) =>
+              onChange({
+                voteRetryAttempts: Number.parseInt(e.target.value, 10),
+              })
+            }
+            className={selectClass}
+          >
+            {[0, 1, 2, 3].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        }
+      />
+    </div>
   );
 }

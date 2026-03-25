@@ -27,7 +27,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_retries = 1
+        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -35,25 +35,20 @@ class AIOrchestrator:
         self.review_results: list[dict] = []
         self.retry_explanations: list[str] = []
 
-    # Generic retry-and-review core used by all phase-specific methods below.
-    # Arguments:
-    # - generate_fn : async callable with no args — caller binds phase-specific args via lambda
-    # - Reviewer    : AI that will review the generated content
-    # - context     : Pydantic BaseModel passed through to reviewer unchanged
     async def _run_with_review(
         self, generate_fn: Callable, reviewer, context, phase: str, session_id: str
     ) -> Any:
-        """Generic generate-and-review loop with automatic retry on major issues.
+        """Generate content and review it, retrying once if the reviewer flags a major issue.
 
-            Each generate and review attempt goes as following:
-                1. Calls generate_fn() to produce content
-                2. Calls reviewer.review_pir(content, context, phase)
-                3. Returns content if severity != "major", otherwise retries
-                + Each attempt is logged via research_logger
+        Flow per attempt:
+            1. Call generate_fn(feedback) — feedback is None on the first attempt,
+               then the reviewer's suggestions on any retry.
+            2. Call reviewer.review_pir(content, context, phase).
+            3. If severity != "major", return the content.
+               Otherwise pass suggestions as feedback and retry.
 
         Args:
             generate_fn: Async callable that accepts optional feedback (str | None).
-                         First call receives None; retries receive reviewer suggestions.
                          Caller binds all phase-specific args via lambda before passing in.
             reviewer:    Service with a review_pir(content, context, phase) method.
             context:     Pydantic BaseModel passed through to reviewer unchanged.
@@ -61,44 +56,35 @@ class AIOrchestrator:
             session_id:  Used for logging.
 
         Returns:
-            The generated content (str or dict) from the last approved attempt.
+            The generated content (str or dict) from the last attempt.
 
         Raises:
-            Any exception from generate_fn or review_pir
-
+            Any exception from generate_fn or review_pir.
         """
-        current_retries = 0
         self.attempts = []
         self.review_results = []
         self.retry_explanations = []
         feedback: str | None = None
-        # While loop that auto retries the generating and review.
-        while current_retries < self.max_retries:
+        generated = None
+
+        for attempt in range(1, self.max_attempts + 1):
             attempt_timestamp = datetime.now()
             error_type: str | None = None
-            generated = None
             generation_duration = 0.0
             review_duration = 0.0
             result = None
 
-            # ---- STEP 1: Generate content (pass reviewer feedback on retries)
-            logger.info(
-                f"[Orchestrator] Attempt {current_retries + 1}/{self.max_retries} — generating ({phase})..."
-            )
+            # Step 1: Generate
+            logger.info(f"[Orchestrator] Attempt {attempt}/{self.max_attempts} — generating ({phase})...")
             generation_start = time.time()
             try:
                 generated = await generate_fn(feedback)
-            # If failed, throw error
             except Exception as e:
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
-                logger.error(
-                    f"[Orchestrator] Generation failed on attempt {current_retries + 1}: {error_type}: {e}"
-                )
-                current_retries += 1
-                # Log the attempt
-                log_entry = ReasoningLogEntry(
-                    attempt_number=current_retries,
+                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}")
+                self._log_attempt(ReasoningLogEntry(
+                    attempt_number=attempt,
                     timestamp=attempt_timestamp,
                     phase=phase,
                     generated_content="",
@@ -108,27 +94,22 @@ class AIOrchestrator:
                     session_id=session_id,
                     model_used=self.generator_model,
                     error_type=error_type,
-                )
-                if self.research_logger is not None:
-                    self.research_logger.create_log(log_entry)
+                ))
                 raise
             self.attempts.append(generated)
             generation_duration = time.time() - generation_start
             logger.info(f"[Orchestrator] Generated in {generation_duration:.2f}s")
 
-            # --- Step 2 : Reviews and returns a boolean value
+            # Step 2: Review
             review_start = time.time()
             try:
                 result = await reviewer.review_pir(generated, context, phase)
             except Exception as e:
                 review_duration = time.time() - review_start
                 error_type = type(e).__name__
-                logger.error(
-                    f"[Orchestrator] Review failed on attempt {current_retries + 1}: {error_type}: {e}"
-                )
-                current_retries += 1
-                log_entry = ReasoningLogEntry(
-                    attempt_number=current_retries,
+                logger.error(f"[Orchestrator] Review failed on attempt {attempt}: {error_type}: {e}")
+                self._log_attempt(ReasoningLogEntry(
+                    attempt_number=attempt,
                     timestamp=attempt_timestamp,
                     phase=phase,
                     generated_content=json.dumps(generated) if isinstance(generated, dict) else generated,
@@ -138,32 +119,24 @@ class AIOrchestrator:
                     session_id=session_id,
                     model_used=self.generator_model,
                     error_type=error_type,
-                )
-                # Check if logger exist. If yes, log the entry
-                if self.research_logger is not None:
-                    self.research_logger.create_log(log_entry)
+                ))
                 raise
             review_duration = time.time() - review_start
-            self.review_results.append(
-                {
-                    "approved": result.overall_approved,
-                    "severity": result.severity,
-                    "suggestions": result.suggestions,
-                }
-            )
-            # Log retry explanation if the severity indicates a retry
-            if result.suggestions and result.severity == "major":
-                self.retry_explanations.append(result.suggestions)
-            logger.info(
-                f"[Orchestrator] Review done in {review_duration:.2f}s — approved={result.overall_approved}, severity={result.severity}"
-            )
-            current_retries += 1
 
-            # Log attempt regardless of outcome
+            self.review_results.append({
+                "approved": result.overall_approved,
+                "severity": result.severity,
+                "suggestions": result.suggestions,
+            })
+            logger.info(
+                f"[Orchestrator] Review done in {review_duration:.2f}s — "
+                f"approved={result.overall_approved}, severity={result.severity}"
+            )
             if result.suggestions:
                 logger.debug(f"[Orchestrator] Suggestions: {result.suggestions}")
-            log_entry = ReasoningLogEntry(
-                attempt_number=current_retries,
+
+            self._log_attempt(ReasoningLogEntry(
+                attempt_number=attempt,
                 timestamp=attempt_timestamp,
                 phase=phase,
                 generated_content=json.dumps(generated) if isinstance(generated, dict) else generated,
@@ -173,26 +146,24 @@ class AIOrchestrator:
                 session_id=session_id,
                 model_used=self.generator_model,
                 error_type=error_type,
-            )
-            # Check if logger exist. If yes, log the entry
-            if self.research_logger is not None:
-                self.research_logger.create_log(log_entry)
-            # --- Step 3: If approved return content.
-            #            If not approved -> retry
+            ))
+
+            # Step 3: Accept or retry
             if result.severity != "major":
-                logger.info(f"[Orchestrator] Approved on attempt {current_retries}")
+                logger.info(f"[Orchestrator] Accepted on attempt {attempt}")
                 return generated
-            # Pass reviewer suggestions as feedback to next attempt
+
             feedback = result.suggestions
-            logger.warning(f"[Orchestrator] Rejected (major) — retrying with feedback...")
-        # If max retries are reached return current result. This is to prevent eternal loops
-        logger.warning("[Orchestrator] Max retries reached. Returning newest result")
+            self.retry_explanations.append(result.suggestions)
+            logger.warning(f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback...")
+
+        logger.warning(f"[Orchestrator] All {self.max_attempts} attempts exhausted. Returning last result.")
         return generated
 
-    # Method for generating and reviewing PIR — Direction phase
-    # Arguments:
-    # - Generator : AI that will generate PIR
-    # - Reviewer : AI that will review PIR
+    def _log_attempt(self, entry: ReasoningLogEntry) -> None:
+        if self.research_logger is not None:
+            self.research_logger.create_log(entry)
+
     async def generate_and_review_pir(
         self, context, generator, reviewer, phase: str, session_id: str
     ):
@@ -219,12 +190,8 @@ class AIOrchestrator:
             session_id=session_id,
         )
 
-    # Method for collecting and reviewing intelligence data — Collection phase
-    # Arguments:
-    # - collection_service : AI that will collect data via tools
-    # - Reviewer           : AI that will review collected data
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = ""
+        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -257,6 +224,7 @@ class AIOrchestrator:
                 session_id=session_id,
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,
+                perspectives=perspectives,
             )
             if accumulated["raw_data"]:
                 accumulated["raw_data"] += "\n\n--- NEW COLLECTION ATTEMPT ---\n\n" + new_data

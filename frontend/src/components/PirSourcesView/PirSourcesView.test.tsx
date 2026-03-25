@@ -21,13 +21,13 @@ import type { PirData } from "../../types/conversation";
 
 function PirDataSeeder({ pirData }: { pirData: PirData }) {
   const { setPirData } = useWorkspace();
-  useEffect(() => { setPirData(pirData); }, []);
+  useEffect(() => { setPirData(pirData); }, [pirData, setPirData]);
   return null;
 }
 
 function HighlightSeeder({ ref }: { ref: string }) {
   const { setHighlightedRef } = useWorkspace();
-  useEffect(() => { setHighlightedRef(ref); }, []);
+  useEffect(() => { setHighlightedRef(ref); }, [ref, setHighlightedRef]);
   return null;
 }
 

@@ -10,14 +10,42 @@ For each collection phase we:
 import json
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 from src.mcp_client.client import MCPClient
+from src.services.collection_status import CollectionStatusTracker
 from src.services.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
 
 _DEFAULT_SOURCE = "Internal Knowledge Bank"
+_SESSIONS_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "sessions"
+
+# Maps UI source names to the MCP tool names they are allowed to call.
+# Must stay in sync with SOURCE_TOOL_MAP in mcp_server/src/prompts/__init__.py.
+_SOURCE_TO_TOOLS: dict[str, list[str]] = {
+    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "AlienVault OTX": ["query_otx"],
+    "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
+    "Web Search": ["google_search", "google_news_search"],
+}
+
+
+# Substring rules for noisy model outputs: all tokens in a tuple must appear
+# in the lowercased source string for the rule to fire (AND within a tuple,
+# first match wins across the list).
+_SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
+    (("otx",),               "AlienVault OTX"),
+    (("alienvault",),        "AlienVault OTX"),
+    (("knowledge", "bank"),  "Internal Knowledge Bank"),
+    (("misp",),              "MISP"),
+    (("upload",),            "Uploaded Documents"),
+    (("local document",),    "Uploaded Documents"),
+    (("web",),               "Web Search"),
+    (("google", "search"),   "Web Search"),
+]
+
 _SOURCE_ALIASES = {
     "internal knowledge bank": "Internal Knowledge Bank",
     "knowledge bank": "Internal Knowledge Bank",
@@ -30,6 +58,8 @@ _SOURCE_ALIASES = {
     "user uploads": "Uploaded Documents",
     "uploads": "Uploaded Documents",
     "local documents": "Uploaded Documents",
+    "web search": "Web Search",
+    "google search": "Web Search",
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
@@ -39,7 +69,36 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
     "search_local_data": "Uploaded Documents",
     "list_uploads": "Uploaded Documents",
     "read_upload": "Uploaded Documents",
+    "google_search": "Web Search",
+    "google_news_search": "Web News",
+    "fetch_page": "Web Fetch",
 }
+
+
+def _extract_search_urls(raw_data: str) -> list[str]:
+    """Extract unique URLs from google_search and google_news_search tool results."""
+    found = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    seen: set[str] = set()
+    unique: list[str] = []
+    for url in found:
+        url = url.rstrip(".,)")
+        if url not in seen:
+            seen.add(url)
+            unique.append(url)
+    return unique
+
+
+def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
+    """Insert additional items into the collected_data list in raw_data JSON."""
+    try:
+        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+        json_str = fence.group(1).strip() if fence else raw_data.strip()
+        parsed = json.loads(json_str)
+        parsed["collected_data"] = parsed.get("collected_data", []) + extra_items
+        return json.dumps(parsed, ensure_ascii=False)
+    except Exception:
+        # Fallback: append as a separate JSON block the AI can still read
+        return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
 
 
 class CollectionService:
@@ -101,14 +160,9 @@ class CollectionService:
             return _SOURCE_ALIASES[key]
 
         # Alias-by-substring to catch noisy model outputs
-        if "otx" in key or "alienvault" in key:
-            return "AlienVault OTX"
-        if "knowledge" in key and "bank" in key:
-            return "Internal Knowledge Bank"
-        if "misp" in key:
-            return "MISP"
-        if "upload" in key or "local document" in key:
-            return "Uploaded Documents"
+        for tokens, canonical in _SUBSTRING_RULES:
+            if all(token in key for token in tokens):
+                return canonical
 
         return normalized
 
@@ -125,6 +179,19 @@ class CollectionService:
         return deduped
 
     @staticmethod
+    def _try_parse_json_lenient(s: str) -> dict | None:
+        """Try json.loads; on failure strip trailing commas and retry once."""
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            pass
+        try:
+            repaired = re.sub(r",\s*([}\]])", r"\1", s)
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            return None
+
+    @staticmethod
     def parse_collected_data(raw_data: str) -> dict[str, Any]:
         """Parse raw collected_data JSON into a structured display payload.
 
@@ -136,19 +203,62 @@ class CollectionService:
         """
         try:
             stripped = raw_data.strip() if isinstance(raw_data, str) else ""
-            fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
-            if fence_match:
-                stripped = fence_match.group(1).strip()
-            parsed = json.loads(stripped) if stripped else {}
-            items: list[dict] = parsed.get("collected_data", [])
+
+            # Multi-attempt accumulation: orchestrator joins attempts with this separator.
+            # Split, parse each segment independently, then merge all collected_data lists.
+            _SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
+            if _SEPARATOR in stripped:
+                segments = [s.strip() for s in stripped.split(_SEPARATOR) if s.strip()]
+                items = []
+                for seg in segments:
+                    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
+                    seg = fence.group(1).strip() if fence else seg
+                    seg_parsed = CollectionService._try_parse_json_lenient(seg) if seg else None
+                    if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
+                        items.extend(seg_parsed["collected_data"])
+            else:
+                fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
+                if fence_match:
+                    stripped = fence_match.group(1).strip()
+                parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
+                if parsed is None:
+                    # Last resort: extract largest {...} block
+                    start, end = stripped.find("{"), stripped.rfind("}")
+                    if 0 <= start < end:
+                        parsed = CollectionService._try_parse_json_lenient(stripped[start:end + 1])
+                if not parsed:
+                    raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
+                items = parsed.get("collected_data", [])
+
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
+            if not isinstance(items, list):
+                raise ValueError("collected_data is not a list")
+
+            # Unwrap MCP response wrappers the model occasionally embeds in content.
+            # Pattern: {"result": "text"} or {"tool_response": {"result": "text"}}
+            for item in items:
+                raw_content = item.get("content", "")
+                if isinstance(raw_content, str) and raw_content.startswith("{"):
+                    try:
+                        inner = json.loads(raw_content)
+                        if isinstance(inner, dict):
+                            if "result" in inner and isinstance(inner["result"], str):
+                                item["content"] = inner["result"]
+                            elif len(inner) == 1:
+                                val = next(iter(inner.values()))
+                                if isinstance(val, dict) and isinstance(val.get("result"), str):
+                                    item["content"] = val["result"]
+                                elif isinstance(val, str):
+                                    item["content"] = val
+                    except Exception:
+                        pass
 
             # Build per-source aggregates
             stats: dict[str, dict] = {}
             for item in items:
-                tool_name = item.get("source", "unknown")
-                display_name = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
+                tool_name: str = str(item.get("source") or "unknown")
+                display_name: str = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
                 if display_name not in stats:
                     stats[display_name] = {"count": 0, "resource_ids": [], "has_content": False}
                 stats[display_name]["count"] += 1
@@ -187,10 +297,13 @@ class CollectionService:
                 normalized_plan = json.dumps(plan_text if plan_text is not None else parsed, ensure_ascii=False, indent=2)
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
-            return {
+            result: dict[str, Any] = {
                 "plan": normalized_plan,
                 "suggested_sources": suggested_sources,
             }
+            if isinstance(parsed.get("steps"), list):
+                result["steps"] = parsed["steps"]
+            return result
 
         return {
             "plan": raw_plan.strip(),
@@ -256,6 +369,7 @@ class CollectionService:
         session_id: str | None = None,
         timeframe: str = "",
         existing_raw_data: str | None = None,
+        perspectives: list[str] | None = None,
     ) -> str:
         """Collect raw data only — no summarization.
 
@@ -263,6 +377,7 @@ class CollectionService:
         """
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
+        tracker = None
 
         async with self.mcp_client.connect():
             collect_prompt = await self.mcp_client.get_prompt(
@@ -274,18 +389,61 @@ class CollectionService:
                     "session_id": session_id or "",
                     "since_date": timeframe,
                     "existing_data": existing_raw_data or "",
+                    "perspectives": json.dumps(perspectives or []),
                 },
             )
+            allowed_tool_names = {
+                tool
+                for source in selected_sources
+                for tool in _SOURCE_TO_TOOLS.get(source, [])
+            }
+
+            if session_id:
+                tracker = CollectionStatusTracker(session_id, selected_sources)
+
             agent = GeminiAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
                 task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
+
             raw_data = await agent.run(
                 system_prompt=collect_prompt,
                 task=task,
+                allowed_tool_names=allowed_tool_names,
+                status_tracker=tracker,
             )
 
+        if tracker:
+            tracker.mark_complete()
+
+        # Second pass: summarize full page content via Gemini url_context (no scraping).
+        # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        if "Web Search" in selected_sources:
+            urls = _extract_search_urls(raw_data)
+            if urls:
+                url_agent = GeminiAgent(self.mcp_client)
+                logger.info(
+                    f"[CollectionService] url_context: fetching {min(len(urls), 15)} of {len(urls)} URLs"
+                )
+                summaries = await url_agent.fetch_url_summaries(
+                    urls=urls[:15],
+                    pir=pir,
+                    perspectives=perspectives or [],
+                )
+                if summaries:
+                    raw_data = _append_to_collected_data(raw_data, summaries)
+                    logger.info(
+                        f"[CollectionService] url_context: added {len(summaries)} page summaries"
+                    )
+
         return raw_data
+
+    @staticmethod
+    def delete_web_results(session_id: str) -> None:
+        """Remove the collected data file for a session."""
+        doc_path = _SESSIONS_DATA_DIR / session_id / "collected.json"
+        if doc_path.exists():
+            doc_path.unlink()
 
     async def modify_summary(self, collected_data: str, modifications: str) -> str:
         async with self.mcp_client.connect():

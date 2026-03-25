@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
@@ -132,6 +132,30 @@ describe("Sidebar", () => {
     );
 
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
+  });
+
+  it("renders the analysis demo dev button when callback is provided", async () => {
+    const user = userEvent.setup();
+    renderSidebar({ onDevOpenAnalysis: vi.fn() });
+
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+
+    expect(
+      screen.getByRole("button", { name: /open analysis demo/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls onDevOpenAnalysis when clicked", async () => {
+    const user = userEvent.setup();
+    const onDevOpenAnalysis = vi.fn();
+
+    renderSidebar({ onDevOpenAnalysis });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(
+      screen.getByRole("button", { name: /open analysis demo/i }),
+    );
+
+    expect(onDevOpenAnalysis).toHaveBeenCalledOnce();
   });
 
   it("starts with direction phase minimized", async () => {
@@ -443,7 +467,9 @@ describe("Sidebar", () => {
     await user.click(toggle);
     await user.click(toggle);
 
-    expect(screen.getByText("My chat")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("My chat")).toBeInTheDocument();
+    });
   });
 
   it("keeps the New Chat button accessible when the sidebar is collapsed", async () => {

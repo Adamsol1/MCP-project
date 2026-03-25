@@ -26,6 +26,8 @@ class DialogueAction(str, Enum):
     START_COLLECTING = "start_collecting"
     SHOW_COLLECTION = "show_collection"
     ERROR = "error"
+    # Processing phase
+    SHOW_PROCESSING = "show_processing"
     # Shared
     COMPLETE = "complete"
 

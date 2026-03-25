@@ -14,6 +14,7 @@ import {
   type Language,
   type Theme,
   type InputParameters,
+  type CouncilSettings,
 } from "../../types/settings";
 
 /** localStorage key under which the settings object is stored as JSON. */
@@ -40,6 +41,8 @@ export interface SettingsContextValue {
    * when more fields are added in the future.
    */
   updateInputParameters: (params: Partial<InputParameters>) => void;
+  /** Merge partial council runtime settings into the current values. */
+  updateCouncilSettings: (params: Partial<CouncilSettings>) => void;
 }
 
 /**
@@ -60,7 +63,19 @@ function loadSettings(): Settings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_SETTINGS;
-    return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw) as Partial<Settings>;
+    return {
+      ...DEFAULT_SETTINGS,
+      ...parsed,
+      inputParameters: {
+        ...DEFAULT_SETTINGS.inputParameters,
+        ...parsed.inputParameters,
+      },
+      councilSettings: {
+        ...DEFAULT_SETTINGS.councilSettings,
+        ...parsed.councilSettings,
+      },
+    };
   } catch {
     return DEFAULT_SETTINGS;
   }
@@ -125,11 +140,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateCouncilSettings = useCallback(
+    (params: Partial<CouncilSettings>) => {
+      setSettings((prev) => ({
+        ...prev,
+        councilSettings: { ...prev.councilSettings, ...params },
+      }));
+    },
+    [],
+  );
+
   const value: SettingsContextValue = {
     settings,
     updateLanguage,
     updateTheme,
     updateInputParameters,
+    updateCouncilSettings,
   };
 
   return (

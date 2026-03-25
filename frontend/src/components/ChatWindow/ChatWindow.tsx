@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import type { ReactNode } from "react";
 import { ToastContainer } from "../Toast";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
+import AnalysisPrototypeView from "../AnalysisPrototypeView/AnalysisPrototypeView";
 import type {
-  CollectedItem,
   CollectionDisplayData,
   CollectionPlanData,
+  CollectionPlanStep,
   CollectionSourceSummary,
   CollectionSummaryData,
   Message,
@@ -16,6 +16,7 @@ import type {
 } from "../../types/conversation";
 import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import type { CollectionStatus } from "../../services/dialogue";
 
 function Chevron() {
   return (
@@ -36,14 +37,6 @@ function Chevron() {
   );
 }
 
-const TOOL_DISPLAY_NAMES: Record<string, string> = {
-  list_knowledge_base: "Internal Knowledge Bank",
-  read_knowledge_base: "Internal Knowledge Bank",
-  query_otx: "AlienVault OTX",
-  search_local_data: "Uploaded Documents",
-  list_uploads: "Uploaded Documents",
-  read_upload: "Uploaded Documents",
-};
 
 const PRIORITY_LABEL: Record<string, string> = {
   high: "High",
@@ -53,19 +46,17 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 
 
-function renderWithBold(text: string): ReactNode {
-  const parts = text.split(/\*\*(.*?)\*\*/g);
-  return parts.map((part, i) =>
-    i % 2 === 1 ? <strong key={i}>{part}</strong> : part,
-  );
-}
 
 function PirMessage({ pirData }: { pirData: PirData }) {
-  const { highlightedRef, setHighlightedRef, setPirData } = useWorkspace();
+  const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
 
   useEffect(() => {
     setPirData(pirData);
   }, [pirData, setPirData]);
+
+  const handleHoveredRefs = (value: string[] | string | null) => {
+    setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
+  };
 
   const reasoningPoints = (pirData.reasoning ?? "")
     .split(/(?=\d+\.\s)/)
@@ -81,8 +72,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         <CitationText
           text={pirData.pir_text}
           claims={pirData.claims}
-          highlightedRef={highlightedRef}
-          onRefHover={setHighlightedRef}
+          highlightedRefs={highlightedRefs}
+          onRefHover={handleHoveredRefs}
         />
       )}
       <ol className="space-y-3 mt-1">
@@ -101,8 +92,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
-                  highlightedRef={highlightedRef}
-                  onRefHover={setHighlightedRef}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={handleHoveredRefs}
                 />
               </p>
             </details>
@@ -118,8 +109,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           <div className="mt-1.5">
             <SourceList
               sources={pirData.sources}
-              highlightedRef={highlightedRef}
-              onSourceHover={setHighlightedRef}
+              highlightedRefs={highlightedRefs}
+              onSourceHover={handleHoveredRefs}
             />
           </div>
         </details>
@@ -133,7 +124,12 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
             {reasoningPoints.map((point, i) => (
               <p key={i} className="text-sm text-text-secondary">
-                {renderWithBold(point)}
+                <CitationText
+                  text={point}
+                  claims={pirData.claims}
+                  highlightedRefs={highlightedRefs}
+                  onRefHover={handleHoveredRefs}
+                />
               </p>
             ))}
           </div>
@@ -145,9 +141,27 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
-      <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+
+      {/* Structured steps — shown when the AI returns step breakdown */}
+      {planData.steps && planData.steps.length > 0 ? (
+        <div className="space-y-2">
+          {planData.steps.map((step: CollectionPlanStep, index: number) => (
+            <div
+              key={index}
+              className="rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-0.5"
+            >
+              <p className="text-xs font-semibold text-text-primary">{step.title}</p>
+              <p className="text-xs text-text-secondary">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Fallback to plain text if no steps */
+        <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+      )}
+
       {planData.suggested_sources.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Suggested sources</p>
@@ -222,18 +236,20 @@ function CollectionReviewPrompt({
   onGatherMore?: () => void;
 }) {
   return (
-    <section className="rounded-xl border-2 border-border bg-surface p-4">
-      <h3 className="text-lg font-semibold text-text-primary">Collection Review</h3>
-      <p className="mt-1 text-sm text-text-secondary">
-        Accept the collected data or collect more from additional sources.
-      </p>
+    <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+      <div className="flex-1 min-w-0">
+        <h3 className="text-sm font-semibold text-text-primary">Collection Review</h3>
+        <p className="text-sm text-text-secondary">
+          Accept the collected data or collect more from additional sources.
+        </p>
+      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-3">
+      <div className="shrink-0 flex items-center gap-2">
         <button
           type="button"
           onClick={() => onAccept?.()}
           disabled={isLoading}
-          className="rounded-lg bg-success px-4 py-2 text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Accept
         </button>
@@ -242,7 +258,7 @@ function CollectionReviewPrompt({
           type="button"
           onClick={() => onGatherMore?.()}
           disabled={isLoading}
-          className="rounded-lg bg-primary px-4 py-2 text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
           Collect More Data
         </button>
@@ -263,6 +279,7 @@ interface ChatWindowProps {
   onGatherMore?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
+  collectionStatus?: CollectionStatus | null;
   availableSources?: string[];
   selectedSources?: string[];
   onToggleSourceSelection?: (source: string) => void;
@@ -315,48 +332,19 @@ function SourceSummaryTable({
   );
 }
 
-function SourceItemAccordions({ items }: { items: CollectedItem[] }) {
-  // Group items by display name
-  const groups: Record<string, CollectedItem[]> = {};
-  for (const item of items) {
-    const name = TOOL_DISPLAY_NAMES[item.source] ?? item.source;
-    if (!groups[name]) groups[name] = [];
-    groups[name].push(item);
-  }
-
-  return (
-    <div className="space-y-2">
-      {Object.entries(groups).map(([groupName, groupItems]) => (
-        <details key={groupName} open className="group border border-border-muted rounded">
-          <summary className="cursor-pointer list-none flex items-center justify-between px-3 py-2 bg-surface-muted text-sm font-medium text-text-secondary select-none">
-            {groupName}
-            <Chevron />
-          </summary>
-          <div className="divide-y divide-border-muted">
-            {groupItems.map((item, i) => (
-              <div key={i} className="px-3 py-2">
-                {item.resource_id && (
-                  <span className="inline-block text-xs bg-primary-subtle text-info-text rounded px-1.5 py-0.5 mb-1">
-                    {item.resource_id}
-                  </span>
-                )}
-                <pre className="text-xs text-text-secondary whitespace-pre-wrap break-all max-h-40 overflow-auto bg-surface rounded p-1">
-                  {item.content || "(no content)"}
-                </pre>
-              </div>
-            ))}
-          </div>
-        </details>
-      ))}
-    </div>
-  );
-}
 
 function CollectionDisplayMessage({
   data,
 }: {
   data: CollectionDisplayData;
 }) {
+  const { setCollectionData, setActivePhase } = useWorkspace();
+
+  useEffect(() => {
+    setCollectionData(data);
+    setActivePhase("collection");
+  }, [data, setCollectionData, setActivePhase]);
+
   if (data.parse_error) {
     return (
       <div className="space-y-2">
@@ -378,15 +366,6 @@ function CollectionDisplayMessage({
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Results</h3>
       <SourceSummaryTable summaries={data.source_summary} />
-      <SourceItemAccordions items={data.collected_data} />
-      <details className="group border-t border-border pt-2">
-        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
-          Raw JSON <Chevron />
-        </summary>
-        <pre className="mt-1 text-xs text-text-secondary bg-surface-muted rounded p-2 overflow-auto max-h-64 whitespace-pre-wrap break-all">
-          {JSON.stringify(data.collected_data, null, 2)}
-        </pre>
-      </details>
     </div>
   );
 }
@@ -403,6 +382,7 @@ export default function ChatWindow({
   onGatherMore,
   isSourceSelecting = false,
   isCollecting = false,
+  collectionStatus = null,
   availableSources = [],
   selectedSources = [],
   onToggleSourceSelection,
@@ -410,6 +390,7 @@ export default function ChatWindow({
   devPrefill,
   onDevPrefillConsumed,
 }: ChatWindowProps) {
+  const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -427,11 +408,9 @@ export default function ChatWindow({
 
   useEffect(() => {
     if (!devPrefill) return;
-    setInputValue(devPrefill);
     onDevPrefillConsumed?.();
     const id = setTimeout(() => {
       onSendMessage?.(devPrefill);
-      setInputValue("");
     }, 80);
     return () => clearTimeout(id);
   }, [devPrefill, onDevPrefillConsumed, onSendMessage]);
@@ -448,6 +427,8 @@ export default function ChatWindow({
   };
 
   const hasMessages = messages.length > 0;
+  const isAnalysisComplete = stage === "complete";
+  const hasConversationContent = hasMessages || isAnalysisComplete;
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
@@ -507,9 +488,9 @@ export default function ChatWindow({
 
   return (
     <div className="h-full w-full flex flex-col">
-      {hasMessages && (
+      {hasConversationContent && (
         <div className="flex-1 min-h-0 overflow-y-auto py-4">
-          <div className="w-full max-w-3xl mx-auto px-6 flex flex-col">
+          <div className={`${contentWidthClass} flex flex-col`}>
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -532,55 +513,66 @@ export default function ChatWindow({
                 </div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
+          {isAnalysisComplete && (
+            <div className={`${contentWidthClass} mt-4`}>
+              <section className="rounded-xl border border-border-muted bg-surface p-4 shadow-sm">
+                <AnalysisPrototypeView />
+              </section>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
         </div>
       )}
 
-      <div
-        className={`flex flex-col items-center gap-4 pb-6 ${
-          hasMessages ? "pt-2" : "flex-1 justify-center"
-        }`}
-      >
-        {!hasMessages && (
-          <p className="text-2xl font-normal text-text-secondary text-center">
-            Ready to start?
-          </p>
-        )}
+      {!isAnalysisComplete && (
+        <div
+          className={`flex flex-col items-center gap-4 pb-6 ${
+            hasConversationContent ? "pt-2" : "flex-1 justify-center"
+          }`}
+        >
+          {!hasConversationContent && (
+            <p className="text-2xl font-normal text-text-secondary text-center">
+              Ready to start?
+            </p>
+          )}
 
         <div className="w-full max-w-3xl px-6">
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
-              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-                <h3 className="text-lg font-semibold text-gray-800">Select Sources</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Choose one or more data sources before collection starts.
-                </p>
-
-                {availableSources.length === 0 ? (
-                  <p className="mt-4 text-sm text-gray-600">
-                    No source suggestions available.
+              <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-text-primary">Select Sources</h3>
+                  <p className="text-sm text-text-secondary">
+                    Choose one or more data sources before collection starts.
                   </p>
-                ) : (
-                  <div className="mt-4 space-y-2">
-                    {availableSources.map((source) => (
-                      <label
-                        key={source}
-                        className="flex items-center gap-2 text-sm text-gray-700"
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedSources.includes(source)}
-                          onChange={() => onToggleSourceSelection?.(source)}
-                          disabled={isLoading}
-                        />
-                        {source}
-                      </label>
-                    ))}
-                  </div>
-                )}
-
+                  {availableSources.length === 0 ? (
+                    <p className="mt-2 text-xs text-text-secondary">No source suggestions available.</p>
+                  ) : (
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {[...availableSources].sort((a, b) => a.localeCompare(b)).map((source) => {
+                        const isActive = selectedSources.includes(source);
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => onToggleSourceSelection?.(source)}
+                            disabled={isLoading}
+                            aria-pressed={isActive}
+                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                              isActive
+                                ? "bg-primary border-primary-dark text-text-inverse"
+                                : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
+                            }`}
+                          >
+                            {source}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => onSubmitSourceSelection?.()}
@@ -589,24 +581,73 @@ export default function ChatWindow({
                     availableSources.length === 0 ||
                     selectedSources.length === 0
                   }
-                  className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Start Collecting
                 </button>
               </section>
             ) : isCollecting ? (
-              <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-                <h3 className="text-lg font-semibold text-gray-800">Collecting Data</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  The system is collecting and reviewing data from the selected sources.
+              <section className="rounded-lg border border-border bg-surface p-4">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">
+                  Collecting
                 </p>
+                {collectionStatus ? (
+                  <ul className="flex flex-col gap-2">
+                    {Object.entries(collectionStatus.sources).map(([source, info]) => {
+                      const isActive = collectionStatus.current_source === source;
+                      const isDone = info.call_count > 0 && !isActive;
+                      const showActivity = isActive && collectionStatus.current_activity;
+                      return (
+                        <li key={source} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-3 text-sm">
+                            <span className={`shrink-0 w-4 text-center font-medium ${
+                              isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
+                            }`}>
+                              {isDone ? "✓" : isActive ? "→" : "○"}
+                            </span>
+                            <span className={
+                              isDone ? "text-text-secondary" :
+                              isActive ? "text-text-primary font-medium" :
+                              "text-text-muted"
+                            }>
+                              {source}
+                            </span>
+                            <span className="ml-auto text-xs text-text-muted tabular-nums">
+                              {info.call_count > 0
+                                ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
+                                : "—"}
+                            </span>
+                            {isActive && !showActivity && (
+                              <span className="flex gap-0.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                              </span>
+                            )}
+                          </div>
+                          {showActivity && (
+                            <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
+                              <span>{collectionStatus.current_activity}</span>
+                              <span className="flex gap-0.5">
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                              </span>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-text-secondary">Starting collection…</p>
+                )}
               </section>
             ) : isConfirming ? (
               stage === "reviewing" ? (
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}
-                  onModify={onReject}
                   onGatherMore={onGatherMore}
                 />
               ) : (
@@ -662,9 +703,10 @@ export default function ChatWindow({
                 </button>
               </form>
             )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }

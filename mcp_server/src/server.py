@@ -25,6 +25,7 @@ from prompts import (
     build_pir_generation_prompt,
 )
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
+from tools.google_search import register_google_search_tools
 from tools.upload_tools import register_upload_tools
 
 load_dotenv()
@@ -39,8 +40,9 @@ mcp = FastMCP(
     ),
 )
 
-# Register tools from the upload_tools module to allow file uploads to the MCP staging area. These tools will be used by the Collection Agent to stage parsed markdown files for processing in the Direction phase.
+# Register tools
 register_upload_tools(mcp)
+register_google_search_tools(mcp)
 
 
 UPLOADS_ROOT = Path(
@@ -226,6 +228,7 @@ def collection_collect(
     session_id: str = "",
     since_date: str = "",
     existing_data: str = "",
+    perspectives: str = "[]",
 ) -> str:
     """Prompt for collecting raw intelligence data via tools in the Collection phase.
 
@@ -236,6 +239,7 @@ def collection_collect(
         session_id: Session ID used for search_local_data (uploaded documents).
         since_date: ISO date (YYYY-MM-DD) to filter OTX pulses by modification date.
         existing_data: Raw data already collected in previous attempts (for retry context).
+        perspectives: JSON array of geopolitical perspectives from the Direction phase.
     """
     return build_collection_collect_prompt(
         pir=pir,
@@ -244,6 +248,7 @@ def collection_collect(
         session_id=session_id or None,
         since_date=since_date or None,
         existing_data=existing_data or None,
+        perspectives=json.loads(perspectives) or None,
     )
 
 
@@ -556,7 +561,9 @@ def _otx_request(path: str, params: dict | None = None) -> dict:
     except httpx.HTTPStatusError as e:
         logger.error(f"[query_otx] HTTP {e.response.status_code} for {path}")
         if e.response.status_code == 403:
-            raise PermissionError("OTX API key is invalid or not authorized (HTTP 403)") from e
+            raise PermissionError(
+                "OTX API key is invalid or not authorized (HTTP 403)"
+            ) from e
         return {}
     except httpx.HTTPError as e:
         logger.error(f"[query_otx] Request failed: {e}")
@@ -614,9 +621,7 @@ def _search_otx_pulses(query: str, since_date: str = "") -> list[dict]:
         params: dict = {"q": query, "limit": limit, "page": page}
         if since_date:
             params["modified_since"] = since_date
-        data = _otx_request(
-            "search/pulses", params=params
-        )
+        data = _otx_request("search/pulses", params=params)
         if not data:
             break
 
@@ -695,16 +700,27 @@ def query_otx(search_term: str, indicator_type: str = "", since_date: str = "") 
     try:
         if indicator_type:
             results = _search_otx_indicator(indicator_type.strip(), search_term.strip())
-            return json.dumps({
-                "search_term": search_term,
-                "indicator_type": indicator_type,
-                "results": results,
-                "total_results": len(results),
-            })
+            return json.dumps(
+                {
+                    "search_term": search_term,
+                    "indicator_type": indicator_type,
+                    "results": results,
+                    "total_results": len(results),
+                }
+            )
         else:
-            pulses = _search_otx_pulses(search_term.strip(), since_date=since_date.strip())
+            pulses = _search_otx_pulses(
+                search_term.strip(), since_date=since_date.strip()
+            )
     except PermissionError as e:
-        return json.dumps({"error": str(e), "search_term": search_term, "results": [], "total_results": 0})
+        return json.dumps(
+            {
+                "error": str(e),
+                "search_term": search_term,
+                "results": [],
+                "total_results": 0,
+            }
+        )
 
     # Enrich top 3 pulses with full details (IoCs, TTPs, description, etc.)
     enriched = []
@@ -718,13 +734,15 @@ def query_otx(search_term: str, indicator_type: str = "", since_date: str = "") 
     # Remaining pulses returned as metadata only
     remaining = pulses[3:]
 
-    return json.dumps({
-        "search_term": search_term,
-        "indicator_type": "keyword",
-        "total_results": len(pulses),
-        "enriched_pulses": enriched,
-        "additional_pulses": remaining,
-    })
+    return json.dumps(
+        {
+            "search_term": search_term,
+            "indicator_type": "keyword",
+            "total_results": len(pulses),
+            "enriched_pulses": enriched,
+            "additional_pulses": remaining,
+        }
+    )
 
 
 def _split_query_terms(query: str) -> list[str]:

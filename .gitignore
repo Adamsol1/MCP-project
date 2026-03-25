@@ -269,3 +269,7 @@ site/
 *.env
 /backend/data/imports
 /mcp_server/uploads
+/backend/data/web_search
+install.sh
+/backend/data/web_search
+/backend/data

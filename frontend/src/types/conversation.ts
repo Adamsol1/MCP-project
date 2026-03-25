@@ -80,10 +80,19 @@ export interface SummaryData {
 }
 
 /**
+ * A single step in the collection plan with a short title and detailed description.
+ */
+export interface CollectionPlanStep {
+  title: string;
+  description: string;
+}
+
+/**
  * Collection plan payload generated from approved PIRs.
  */
 export interface CollectionPlanData {
   plan: string;
+  steps?: CollectionPlanStep[];
   suggested_sources: string[];
 }
 
@@ -163,6 +172,12 @@ export interface CollectedItem {
   source: string;
   resource_id: string | null;
   content: string;
+  // Optional fields populated by the url_context second pass (fetch_page items only)
+  title?: string;
+  apa_citation?: string;
+  author?: string;
+  date?: string;
+  publisher?: string;
 }
 
 /**
@@ -176,10 +191,27 @@ export interface CollectionSourceSummary {
 }
 
 /**
+ * A single attempt entry in the activity summary, showing what the collector
+ * did and what feedback the reviewer gave for that attempt.
+ */
+export interface ActivitySummaryItem {
+  /** Attempt number, starting at 1. */
+  attempt: number;
+  /** Display names of the sources the collector queried in this attempt. */
+  collector_sources: string[];
+  /** Whether the reviewer approved the collected data on this attempt. */
+  reviewer_approved: boolean;
+  /** Reviewer suggestions for improvement, or null if approved with no comments. */
+  reviewer_suggestions: string | null;
+}
+
+/**
  * The data structure for displaying the collected information from various sources during the collection review stage, including the collected data, a summary of the sources used, and any parsing errors encountered.
  */
 export interface CollectionDisplayData {
   collected_data: CollectedItem[];
   source_summary: CollectionSourceSummary[];
   parse_error?: string;
+  /** Per-attempt summary of what the collector did and what the reviewer said. */
+  activity_summary?: ActivitySummaryItem[];
 }

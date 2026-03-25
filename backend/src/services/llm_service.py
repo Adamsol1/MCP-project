@@ -73,9 +73,15 @@ class LLMService:
 
     @staticmethod
     def _strip_fences(text: str) -> str:
-        """Strip markdown code fences from a response string."""
+        """Strip markdown code fences and trailing non-JSON content from a response string."""
         text = text.strip()
         if text.startswith("```"):
             lines = text.splitlines()
-            text = "\n".join(lines[1:-1])
+            text = "\n".join(lines[1:-1]).strip()
+        # Extract the outermost JSON object or array, discarding any trailing text.
+        for start_char, end_char in (("{", "}"), ("[", "]")):
+            start = text.find(start_char)
+            end = text.rfind(end_char)
+            if start != -1 and end != -1 and end > start:
+                return text[start : end + 1]
         return text

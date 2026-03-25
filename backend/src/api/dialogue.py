@@ -302,6 +302,21 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     )
 
 
+@router.get("/collection-status/{session_id}")
+async def get_collection_status(session_id: str):
+    """Return the live collection tool-call status for a session.
+
+    The frontend polls this every ~1.5 s while isCollecting is true to drive
+    the per-source progress indicator in the IntelligencePanel.
+    Returns 404 if no status file exists yet for the session.
+    """
+    from src.services.collection_status import CollectionStatusTracker
+    status = CollectionStatusTracker.read(session_id)
+    if status is None:
+        raise HTTPException(status_code=404, detail="No collection status found")
+    return status
+
+
 @router.get("/dev/state")
 async def get_dev_state(session_id: str) -> DialogueDevStateResponse:
     """DEV endpoint: read current dialogue state for a session."""

@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
 import type { UploadedFileRecord } from "../../services/upload";
 
@@ -18,6 +18,7 @@ interface OptionsPanelProps {
 
 /** Maximum number of files shown before the "Show X more" toggle appears. */
 const VISIBLE_FILE_COUNT = 2;
+const OPTIONS_CONTENT_REVEAL_DELAY_MS = 180;
 
 export function OptionsPanel({
   selectedPerspectives,
@@ -27,7 +28,39 @@ export function OptionsPanel({
   onFileRemove,
 }: OptionsPanelProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showExpandedContent, setShowExpandedContent] = useState(true);
   const [showAllFiles, setShowAllFiles] = useState(false);
+  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleToggleOptions = () => {
+    if (revealTimeoutRef.current !== null) {
+      window.clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
+    }
+
+    setIsCollapsed((prev) => {
+      const next = !prev;
+
+      if (next) {
+        setShowExpandedContent(false);
+      } else {
+        revealTimeoutRef.current = window.setTimeout(() => {
+          setShowExpandedContent(true);
+          revealTimeoutRef.current = null;
+        }, OPTIONS_CONTENT_REVEAL_DELAY_MS);
+      }
+
+      return next;
+    });
+  };
 
   const visibleFiles = showAllFiles
     ? uploadedFiles
@@ -39,11 +72,11 @@ export function OptionsPanel({
     <aside
       className={`${
         isCollapsed ? "w-14" : "w-64"
-      } bg-surface-muted border-l border-border-muted flex flex-col overflow-hidden`}
+      } bg-surface-muted border-l border-border-muted flex flex-col overflow-hidden transition-[width] duration-300 ease-in-out motion-reduce:transition-none`}
     >
       <button
         aria-label="Toggle options"
-        onClick={() => setIsCollapsed((prev) => !prev)}
+        onClick={handleToggleOptions}
         className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
         <svg
@@ -56,12 +89,15 @@ export function OptionsPanel({
           strokeLinecap="round"
           strokeLinejoin="round"
           aria-hidden="true"
+          className={`transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
+            isCollapsed ? "rotate-180" : "rotate-0"
+          }`}
         >
           {isCollapsed ? <path d="M15 18l-6-6 6-6" /> : <path d="M9 18l6-6-6-6" />}
         </svg>
       </button>
 
-      {!isCollapsed && (
+      {showExpandedContent && (
         <div className="flex flex-col gap-6 p-4 overflow-y-auto">
           <div>
             <PerspectiveSelector
@@ -77,7 +113,7 @@ export function OptionsPanel({
 
             <button
               onClick={onOpenFileUpload}
-              className="w-full p-2 bg-primary-dark text-text-inverse rounded text-sm font-medium hover:bg-primary-hover transition-colors"
+              className="w-full whitespace-nowrap p-2 bg-primary-dark text-text-inverse rounded text-sm font-medium hover:bg-primary-hover transition-colors"
             >
               Upload Files
             </button>

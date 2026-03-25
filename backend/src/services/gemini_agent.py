@@ -12,6 +12,7 @@ which tools to call and when are made by the agent itself.
 import json
 import logging
 import os
+import re
 from pathlib import Path
 
 from google import genai
@@ -61,8 +62,8 @@ class GeminiAgent:
       5. Repeat until Gemini returns a final text response (no more tool calls)
 
     Args:
-        model: Gemini model ID to use.
-        mcp_client: Connected MCPClient instance for tool execution.
+        model:           Gemini model ID to use.
+        mcp_client:      Connected MCPClient instance for tool execution.
         max_tool_rounds: Safety limit on tool-call iterations (prevents infinite loops).
     """
 
@@ -70,7 +71,7 @@ class GeminiAgent:
         self,
         mcp_client,
         model: str = "gemini-2.5-flash",
-        max_tool_rounds: int = 25,
+        max_tool_rounds: int = 50,
     ):
         api_key = os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=api_key)
@@ -78,23 +79,28 @@ class GeminiAgent:
         self.mcp_client = mcp_client
         self.max_tool_rounds = max_tool_rounds
 
-    async def run(self, system_prompt: str, task: str) -> str:
+    async def run(
+        self,
+        system_prompt: str,
+        task: str,
+        allowed_tool_names: set[str] | None = None,
+        status_tracker=None,
+    ) -> str:
         """Run the agent on a task, autonomously calling MCP tools as needed.
 
         Args:
-            system_prompt: Instructions that define the agent's role and behaviour.
-            task: The specific task to complete (e.g. "Collect data for these PIRs: ...").
+            system_prompt:      Instructions that define the agent's role and behaviour.
+            task:               The specific task to complete.
+            allowed_tool_names: When provided, only tools in this set are exposed to
+                                the model. Enforces source selection at the API level
+                                rather than relying on prompt instructions alone.
 
         Returns:
             The agent's final text response after all tool calls are complete.
         """
-        # Discover available tools from the MCP server
-        available_tools = await self._get_tool_declarations()
-        logger.info(
-            f"[GeminiAgent] Starting run with {len(available_tools)} tools available"
-        )
+        available_tools = await self._get_tool_declarations(allowed_tool_names)
+        logger.info(f"[GeminiAgent] Starting run with {len(available_tools)} tools available")
 
-        # Build initial message history
         contents = [
             types.Content(
                 role="user",
@@ -107,7 +113,6 @@ class GeminiAgent:
             tools=available_tools,
         )
 
-        # Tool-use loop
         for round_num in range(self.max_tool_rounds):
             response = await self.client.aio.models.generate_content(
                 model=self.model,
@@ -116,8 +121,6 @@ class GeminiAgent:
             )
 
             candidate = response.candidates[0]
-
-            # Check if the model wants to call tools
             tool_calls = [
                 part
                 for part in candidate.content.parts
@@ -125,7 +128,6 @@ class GeminiAgent:
             ]
 
             if not tool_calls:
-                # No tool calls — agent is done, return final text
                 text = "".join(
                     part.text
                     for part in candidate.content.parts
@@ -134,16 +136,15 @@ class GeminiAgent:
                 logger.info(f"[GeminiAgent] Completed in {round_num + 1} round(s)")
                 return text
 
-            # Execute all requested tool calls
-            logger.info(
-                f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)"
-            )
+            logger.info(f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)")
             contents.append(candidate.content)
 
             tool_results = []
             for part in tool_calls:
                 fc = part.function_call
                 logger.info(f"[GeminiAgent] Calling tool: {fc.name}({dict(fc.args)})")
+                if status_tracker is not None:
+                    status_tracker.record_tool_call(fc.name, dict(fc.args))
                 try:
                     result = await self.mcp_client.call_tool(fc.name, dict(fc.args))
                     result_text = (
@@ -164,24 +165,113 @@ class GeminiAgent:
 
             contents.append(types.Content(role="tool", parts=tool_results))
 
-        # Safety: max rounds reached — return whatever the model last said
-        logger.warning(
-            f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached"
-        )
+        logger.warning(f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached")
         last_text = "".join(
             part.text for part in candidate.content.parts if part.text is not None
         )
         return last_text or "Agent reached maximum tool iterations without completing."
 
-    async def _get_tool_declarations(self) -> list:
+    async def fetch_url_summaries(
+        self,
+        urls: list[str],
+        pir: str,
+        perspectives: list[str],
+        batch_size: int = 15,
+    ) -> list[dict]:
+        """Second-pass: fetch and summarise web pages using Gemini url_context.
+
+        Makes a separate Gemini call with the url_context built-in tool — no MCP
+        tools, no scraping. Gemini fetches each URL server-side through Google's
+        infrastructure.
+
+        Returns a list of collected_data-compatible dicts with source="fetch_page".
+        """
+        if not urls:
+            return []
+
+        results: list[dict] = []
+        perspectives_str = ", ".join(perspectives) if perspectives else "neutral"
+
+        for i in range(0, len(urls), batch_size):
+            batch = urls[i : i + batch_size]
+            url_list = "\n".join(f"- {url}" for url in batch)
+
+            prompt = (
+                f"PIR (Priority Intelligence Requirement): {pir}\n"
+                f"Analysis perspectives: {perspectives_str}\n\n"
+                f"Fetch and read each URL listed below. For each accessible page:\n"
+                f"1. Extract the article title, author name(s), publication date, and publisher/website name.\n"
+                f"2. Write a concise intelligence-focused summary (3-5 sentences) highlighting facts "
+                f"and analysis directly relevant to the PIR.\n"
+                f"3. Construct a correctly formatted APA 7th edition citation.\n\n"
+                f"APA format: Author, A. A. (Year, Month Day). Title of article. Publisher. URL\n"
+                f"- If author is unknown use the publisher/website name as author.\n"
+                f"- If date is unknown omit it.\n"
+                f"- Dates must use the format: YYYY, Month DD (e.g. 2026, March 15).\n\n"
+                f"URLs to fetch:\n{url_list}\n\n"
+                f"Respond ONLY with valid JSON — no markdown fences, no explanation:\n"
+                f'{{"page_summaries": ['
+                f'{{"url": "...", "title": "...", "author": "Last, F. M. or null", '
+                f'"date": "YYYY-MM-DD or null", "publisher": "...", '
+                f'"apa_citation": "...", "summary": "..."}}'
+                f']}}'
+            )
+
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        tools=[{"url_context": {}}],
+                    ),
+                )
+                text = "".join(
+                    part.text
+                    for part in response.candidates[0].content.parts
+                    if part.text is not None
+                )
+                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+                text = fence.group(1).strip() if fence else text.strip()
+                parsed = json.loads(text)
+                for item in parsed.get("page_summaries", []):
+                    if item.get("url") and item.get("summary"):
+                        citation = item.get("apa_citation", "")
+                        content = (
+                            f"[{item.get('title', 'Article')}]\n"
+                            f"{item['summary']}"
+                        )
+                        if citation:
+                            content += f"\n\nCitation: {citation}"
+                        results.append({
+                            "source": "fetch_page",
+                            "resource_id": item["url"],
+                            "content": content,
+                            "apa_citation": citation,
+                            "author": item.get("author"),
+                            "date": item.get("date"),
+                            "publisher": item.get("publisher"),
+                            "title": item.get("title"),
+                        })
+                logger.info(
+                    f"[GeminiAgent] url_context batch {i // batch_size + 1}: "
+                    f"{len(parsed.get('page_summaries', []))} pages summarised"
+                )
+            except Exception as e:
+                logger.error(f"[GeminiAgent] url_context batch failed: {e}")
+
+        return results
+
+    async def _get_tool_declarations(self, allowed_tool_names: set[str] | None = None) -> list:
         """Fetch available tools from the MCP server and convert to Gemini format.
 
-        Converts each tool's inputSchema to a Gemini Schema so Gemini knows
-        what arguments to pass when calling the tool.
+        When allowed_tool_names is provided, only tools in that set are returned,
+        enforcing source selection at the function-declaration level.
         """
         raw_tools = await self.mcp_client.list_tools()
         declarations = []
         for tool in raw_tools:
+            if allowed_tool_names is not None and tool["name"] not in allowed_tool_names:
+                continue
             input_schema = tool.get("inputSchema", {})
             parameters = (
                 _json_schema_to_gemini(input_schema)

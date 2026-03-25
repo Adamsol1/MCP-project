@@ -21,7 +21,6 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
     rawStage === "pir_confirming" ||
     rawStage === "planning" ||
     rawStage === "plan_confirming" ||
-    rawStage === "source_selecting" ||
     rawStage === "collecting" ||
     rawStage === "reviewing" ||
     rawStage === "complete"

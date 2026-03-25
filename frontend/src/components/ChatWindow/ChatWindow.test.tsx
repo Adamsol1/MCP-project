@@ -6,6 +6,10 @@ import ChatWindow from "./ChatWindow";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
+vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
+  default: () => <div>Inline analysis view</div>,
+}));
+
 // ChatWindow renders ToastContainer (needs ToastProvider) and PirMessage
 // calls useWorkspace (needs WorkspaceProvider).
 function renderWithToast(ui: ReactNode) {
@@ -626,6 +630,20 @@ describe("ChatWindow", () => {
 
     expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
+  });
+
+  it("renders the analysis inline and hides the composer when stage is complete", () => {
+    const messages = [
+      { id: "1", text: "Analysis complete.", sender: "system" as const },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} stage="complete" />);
+
+    expect(screen.getByText("Analysis complete.")).toBeInTheDocument();
+    expect(screen.getByText("Inline analysis view")).toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText(/ask anything/i),
+    ).not.toBeInTheDocument();
   });
 });
 

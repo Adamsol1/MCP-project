@@ -67,6 +67,7 @@ describe("SettingsContext", () => {
           language: "no",
           theme: "light",
           inputParameters: { timeframe: "Last 30 days" },
+          councilSettings: { rounds: 3 },
         }),
       );
 
@@ -78,6 +79,10 @@ describe("SettingsContext", () => {
       expect(result.current.settings.theme).toBe("light");
       expect(result.current.settings.inputParameters.timeframe).toBe(
         "Last 30 days",
+      );
+      expect(result.current.settings.councilSettings.rounds).toBe(3);
+      expect(result.current.settings.councilSettings.mode).toBe(
+        DEFAULT_SETTINGS.councilSettings.mode,
       );
     });
 
@@ -136,6 +141,9 @@ describe("SettingsContext", () => {
       expect(result.current.settings.inputParameters).toEqual(
         DEFAULT_SETTINGS.inputParameters,
       );
+      expect(result.current.settings.councilSettings).toEqual(
+        DEFAULT_SETTINGS.councilSettings,
+      );
     });
   });
 
@@ -179,6 +187,9 @@ describe("SettingsContext", () => {
       expect(result.current.settings.language).toBe(DEFAULT_SETTINGS.language);
       expect(result.current.settings.inputParameters).toEqual(
         DEFAULT_SETTINGS.inputParameters,
+      );
+      expect(result.current.settings.councilSettings).toEqual(
+        DEFAULT_SETTINGS.councilSettings,
       );
     });
   });
@@ -225,6 +236,53 @@ describe("SettingsContext", () => {
       // Only timeframe changed — language and theme are untouched.
       expect(result.current.settings.language).toBe(DEFAULT_SETTINGS.language);
       expect(result.current.settings.theme).toBe(DEFAULT_SETTINGS.theme);
+    });
+  });
+
+  describe("updateCouncilSettings", () => {
+    it("updates council settings in state", () => {
+      const { result } = renderHook(() => useSettings(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.updateCouncilSettings({ rounds: 4, mode: "quick" });
+      });
+
+      expect(result.current.settings.councilSettings.rounds).toBe(4);
+      expect(result.current.settings.councilSettings.mode).toBe("quick");
+    });
+
+    it("persists the updated council settings to localStorage", () => {
+      const { result } = renderHook(() => useSettings(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.updateCouncilSettings({ timeoutSeconds: 240 });
+      });
+
+      const stored = JSON.parse(localStorage.getItem("mcp-settings")!);
+      expect(stored.councilSettings.timeoutSeconds).toBe(240);
+    });
+
+    it("merges council settings without wiping other settings", () => {
+      const { result } = renderHook(() => useSettings(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.updateCouncilSettings({ voteRetryAttempts: 2 });
+      });
+
+      expect(result.current.settings.language).toBe(DEFAULT_SETTINGS.language);
+      expect(result.current.settings.theme).toBe(DEFAULT_SETTINGS.theme);
+      expect(result.current.settings.inputParameters).toEqual(
+        DEFAULT_SETTINGS.inputParameters,
+      );
+      expect(result.current.settings.councilSettings.voteRetryEnabled).toBe(
+        DEFAULT_SETTINGS.councilSettings.voteRetryEnabled,
+      );
     });
   });
 
