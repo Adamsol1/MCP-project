@@ -6,6 +6,7 @@ import SourceList from "../SourceList/SourceList";
 import type {
   CollectionDisplayData,
   CollectionPlanData,
+  CollectionPlanStep,
   CollectionSourceSummary,
   CollectionSummaryData,
   Message,
@@ -134,9 +135,27 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
-      <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+
+      {/* Structured steps — shown when the AI returns step breakdown */}
+      {planData.steps && planData.steps.length > 0 ? (
+        <div className="space-y-2">
+          {planData.steps.map((step: CollectionPlanStep, index: number) => (
+            <div
+              key={index}
+              className="rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-0.5"
+            >
+              <p className="text-xs font-semibold text-text-primary">{step.title}</p>
+              <p className="text-xs text-text-secondary">{step.description}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        /* Fallback to plain text if no steps */
+        <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+      )}
+
       {planData.suggested_sources.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Suggested sources</p>
