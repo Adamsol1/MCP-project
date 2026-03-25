@@ -10,7 +10,6 @@ For each collection phase we:
 import json
 import logging
 import re
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +20,7 @@ from src.services.gemini_agent import GeminiAgent
 logger = logging.getLogger("app")
 
 _DEFAULT_SOURCE = "Internal Knowledge Bank"
-_WEB_SEARCH_DIR = Path(__file__).parent.parent.parent / "data" / "web_search"
-_WEB_SOURCE_NAMES = {"google_search", "google_news_search", "fetch_page"}
+_SESSIONS_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "sessions"
 
 # Maps UI source names to the MCP tool names they are allowed to call.
 # Must stay in sync with SOURCE_TOOL_MAP in mcp_server/src/prompts/__init__.py.
@@ -299,10 +297,13 @@ class CollectionService:
                 normalized_plan = json.dumps(plan_text if plan_text is not None else parsed, ensure_ascii=False, indent=2)
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
-            return {
+            result: dict[str, Any] = {
                 "plan": normalized_plan,
                 "suggested_sources": suggested_sources,
             }
+            if isinstance(parsed.get("steps"), list):
+                result["steps"] = parsed["steps"]
+            return result
 
         return {
             "plan": raw_plan.strip(),
@@ -435,74 +436,12 @@ class CollectionService:
                         f"[CollectionService] url_context: added {len(summaries)} page summaries"
                     )
 
-        if session_id and "Web Search" in selected_sources:
-            self._save_web_results(session_id, raw_data, pir)
-
         return raw_data
 
     @staticmethod
-    def _save_web_results(session_id: str, raw_data: str, pir: str) -> None:
-        """Persist web search/news/fetch results for this session to disk.
-
-        Merges with any existing file so retries accumulate rather than overwrite.
-        Only items from web tools (google_search, google_news_search, fetch_page) are saved.
-        """
-        try:
-            _SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
-            segments = [raw_data] if _SEPARATOR not in raw_data else [
-                s.strip() for s in raw_data.split(_SEPARATOR) if s.strip()
-            ]
-            new_items: list[dict] = []
-            for seg in segments:
-                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
-                seg = fence.group(1).strip() if fence else seg
-                try:
-                    parsed = json.loads(seg)
-                except json.JSONDecodeError:
-                    repaired = re.sub(r",\s*([}\]])", r"\1", seg)
-                    try:
-                        parsed = json.loads(repaired)
-                    except json.JSONDecodeError:
-                        continue
-                for item in parsed.get("collected_data", []):
-                    if item.get("source") in _WEB_SOURCE_NAMES:
-                        new_items.append(item)
-
-            if not new_items:
-                return
-
-            _WEB_SEARCH_DIR.mkdir(parents=True, exist_ok=True)
-            doc_path = _WEB_SEARCH_DIR / f"{session_id}.json"
-            now = datetime.now(UTC).isoformat()
-
-            if doc_path.exists():
-                try:
-                    existing = json.loads(doc_path.read_text(encoding="utf-8"))
-                except Exception:
-                    existing = {"items": []}
-                existing_contents = {i.get("content", "") for i in existing.get("items", [])}
-                merged = existing.get("items", []) + [
-                    i for i in new_items if i.get("content", "") not in existing_contents
-                ]
-                existing["items"] = merged
-                existing["updated_at"] = now
-                doc_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-            else:
-                doc_path.write_text(json.dumps({
-                    "session_id": session_id,
-                    "pir": pir,
-                    "created_at": now,
-                    "updated_at": now,
-                    "items": new_items,
-                }, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        except Exception:
-            logger.exception(f"[CollectionService] Failed to save web results for session {session_id}")
-
-    @staticmethod
     def delete_web_results(session_id: str) -> None:
-        """Remove the web search results document for a session."""
-        doc_path = _WEB_SEARCH_DIR / f"{session_id}.json"
+        """Remove the collected data file for a session."""
+        doc_path = _SESSIONS_DATA_DIR / session_id / "collected.json"
         if doc_path.exists():
             doc_path.unlink()
 

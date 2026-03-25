@@ -402,14 +402,21 @@ Do not call any other tools during planning.
 
 ## Instructions
 1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
-2. Based on the PIRs and background knowledge, write a concise step-by-step collection plan
+2. Based on the PIRs and background knowledge, write one step per PIR — each step explains what to collect for that specific requirement, from which source, and why
 3. Select which sources are most relevant to answer the PIRs
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.
+You MUST include all three fields: "plan", "steps", and "suggested_sources".
 
 {{
-  "plan": "Step-by-step collection plan describing what to collect, from which sources, and why",
+  "plan": "Full collection plan as a single text string (used internally)",
+  "steps": [
+    {{
+      "title": "Short title describing this PIR's collection goal (max 8 words)",
+      "description": "Detailed explanation of what to collect, from which source, and why"
+    }}
+  ],
   "suggested_sources": ["source name as listed in Available Sources"]
 }}
 

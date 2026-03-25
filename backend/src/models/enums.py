@@ -57,6 +57,8 @@ class DataSource(str, Enum):
     TXT_UPLOAD = "txt_upload"
     JSON_UPLOAD = "json_upload"
     MANUAL = "manual"  # Manual entry
+    KNOWLEDGE_BASE = "knowledge_base"  # Internal knowledge bank
+    WEB_SEARCH = "web_search"  # Google/web search results
 
 
 class ExtractionMethod(str, Enum):
