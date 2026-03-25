@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
 import type { UploadedFileRecord } from "../../services/upload";
 
@@ -30,19 +30,37 @@ export function OptionsPanel({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(true);
   const [showAllFiles, setShowAllFiles] = useState(false);
+  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
-    if (isCollapsed) {
-      setShowExpandedContent(false);
-      return;
+    return () => {
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleToggleOptions = () => {
+    if (revealTimeoutRef.current !== null) {
+      window.clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setShowExpandedContent(true);
-    }, OPTIONS_CONTENT_REVEAL_DELAY_MS);
+    setIsCollapsed((prev) => {
+      const next = !prev;
 
-    return () => window.clearTimeout(timeoutId);
-  }, [isCollapsed]);
+      if (next) {
+        setShowExpandedContent(false);
+      } else {
+        revealTimeoutRef.current = window.setTimeout(() => {
+          setShowExpandedContent(true);
+          revealTimeoutRef.current = null;
+        }, OPTIONS_CONTENT_REVEAL_DELAY_MS);
+      }
+
+      return next;
+    });
+  };
 
   const visibleFiles = showAllFiles
     ? uploadedFiles
@@ -58,7 +76,7 @@ export function OptionsPanel({
     >
       <button
         aria-label="Toggle options"
-        onClick={() => setIsCollapsed((prev) => !prev)}
+        onClick={handleToggleOptions}
         className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
         <svg

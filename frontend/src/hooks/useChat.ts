@@ -301,7 +301,10 @@ export function useChat() {
   const [localSourceContext, setLocalSourceContext] = useState<"plan" | "gather_more" | null>(null);
   const [pendingGatherMoreText, setPendingGatherMoreText] = useState<string | null>(null);
 
-  const messages = activeConversation?.messages ?? [];
+  const messages = useMemo(
+    () => activeConversation?.messages ?? [],
+    [activeConversation?.messages],
+  );
   const stage = activeConversation?.stage ?? "initial";
   const subState = activeConversation?.subState ?? null;
   const isConfirming =

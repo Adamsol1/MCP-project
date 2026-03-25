@@ -6,6 +6,8 @@ import React from "react";
 export type Phase = "direction" | "collection" | "processing" | "analysis";
 
 export interface WorkspaceContextValue {
+  highlightedRef: string | null;
+  setHighlightedRef: (ref: string | null) => void;
   highlightedRefs: string[];
   setHighlightedRefs: (refs: string[]) => void;
   pirData: PirData | null;
@@ -27,7 +29,13 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [pirData, setPirData] = useState<PirData | null>(null);
   const [activePhase, setActivePhase] = useState<Phase>("direction");
   const [collectionData, setCollectionData] = useState<CollectionDisplayData | null>(null);
+  const highlightedRef = highlightedRefs[0] ?? null;
+  const setHighlightedRef = (ref: string | null) => {
+    setHighlightedRefs(ref ? [ref] : []);
+  };
   const value = {
+    highlightedRef,
+    setHighlightedRef,
     highlightedRefs,
     setHighlightedRefs,
     pirData,

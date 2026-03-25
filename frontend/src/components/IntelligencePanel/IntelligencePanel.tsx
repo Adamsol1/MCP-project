@@ -10,9 +10,9 @@ import type { CollectionStatus } from "../../services/dialogue";
 const VISIBLE_FILE_COUNT = 3;
 
 interface IntelligencePanelProps {
-  selectedPerspectives: string[];
-  onPerspectiveChange: (perspectives: string[]) => void;
-  onOpenFileUpload: () => void;
+  selectedPerspectives?: string[];
+  onPerspectiveChange?: (perspectives: string[]) => void;
+  onOpenFileUpload?: () => void;
   uploadedFiles?: UploadedFileRecord[];
   onFileRemove?: (file: UploadedFileRecord) => void;
   isCollecting?: boolean;
@@ -20,9 +20,9 @@ interface IntelligencePanelProps {
 }
 
 export default function IntelligencePanel({
-  selectedPerspectives,
-  onPerspectiveChange,
-  onOpenFileUpload,
+  selectedPerspectives = ["NEUTRAL"],
+  onPerspectiveChange = () => {},
+  onOpenFileUpload = () => {},
   uploadedFiles = [],
   onFileRemove,
   isCollecting = false,

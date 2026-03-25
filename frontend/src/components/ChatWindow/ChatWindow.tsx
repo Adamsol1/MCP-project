@@ -54,6 +54,10 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     setPirData(pirData);
   }, [pirData, setPirData]);
 
+  const handleHoveredRefs = (value: string[] | string | null) => {
+    setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
+  };
+
   const reasoningPoints = (pirData.reasoning ?? "")
     .split(/(?=\d+\.\s)/)
     .map((s) => s.trim())
@@ -69,7 +73,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           text={pirData.pir_text}
           claims={pirData.claims}
           highlightedRefs={highlightedRefs}
-          onRefHover={setHighlightedRefs}
+          onRefHover={handleHoveredRefs}
         />
       )}
       <ol className="space-y-3 mt-1">
@@ -89,7 +93,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                   text={pir.rationale}
                   claims={pirData.claims}
                   highlightedRefs={highlightedRefs}
-                  onRefHover={setHighlightedRefs}
+                  onRefHover={handleHoveredRefs}
                 />
               </p>
             </details>
@@ -106,7 +110,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             <SourceList
               sources={pirData.sources}
               highlightedRefs={highlightedRefs}
-              onSourceHover={setHighlightedRefs}
+              onSourceHover={handleHoveredRefs}
             />
           </div>
         </details>
@@ -124,7 +128,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                   text={point}
                   claims={pirData.claims}
                   highlightedRefs={highlightedRefs}
-                  onRefHover={setHighlightedRefs}
+                  onRefHover={handleHoveredRefs}
                 />
               </p>
             ))}
@@ -404,11 +408,9 @@ export default function ChatWindow({
 
   useEffect(() => {
     if (!devPrefill) return;
-    setInputValue(devPrefill);
     onDevPrefillConsumed?.();
     const id = setTimeout(() => {
       onSendMessage?.(devPrefill);
-      setInputValue("");
     }, 80);
     return () => clearTimeout(id);
   }, [devPrefill, onDevPrefillConsumed, onSendMessage]);
@@ -672,78 +674,35 @@ export default function ChatWindow({
                       e.preventDefault();
                       submitMessage();
                     }
-                    className="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Start Collecting
-                  </button>
-                </section>
-              ) : isCollecting ? (
-                <section className="rounded-xl border-2 border-gray-300 bg-white p-4">
-                  <h3 className="text-lg font-semibold text-gray-800">Collecting Data</h3>
-                  <p className="mt-1 text-sm text-gray-600">
-                    The system is collecting and reviewing data from the selected sources.
-                  </p>
-                </section>
-              ) : isConfirming ? (
-                stage === "reviewing" ? (
-                  <CollectionReviewPrompt
-                    isLoading={isLoading}
-                    onAccept={onApprove}
-                    onGatherMore={onGatherMore}
-                  />
-                ) : (
-                  <ApprovalPrompt
-                    isLoading={isLoading}
-                    stage={stage}
-                    onApproveContinue={onApprove}
-                    onRejectWithFeedback={() => onReject?.()}
-                  />
-                )
-              ) : (
-                <form
-                  onSubmit={handleSubmit}
-                  className="relative border-2 border-border rounded-xl p-3 pb-12"
+                  }}
+                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                />
+                <button
+                  type="submit"
+                  disabled={inputValue.trim() === ""}
+                  aria-label="Send message"
+                  className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                    inputValue.trim() === ""
+                      ? "bg-surface-elevated text-text-muted cursor-not-allowed"
+                      : "bg-primary text-text-inverse hover:bg-primary-dark"
+                  }`}
                 >
-                  <textarea
-                    ref={textareaRef}
-                    rows={1}
-                    placeholder={inputPlaceholder}
-                    value={inputValue}
-                    onChange={(event) => setInputValue(event.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        submitMessage();
-                      }
-                    }}
-                    className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
-                  />
-                  <button
-                    type="submit"
-                    disabled={inputValue.trim() === ""}
-                    aria-label="Send message"
-                    className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
-                      inputValue.trim() === ""
-                        ? "bg-surface-elevated text-text-muted cursor-not-allowed"
-                        : "bg-primary text-text-inverse hover:bg-primary-dark"
-                    }`}
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
                   >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      aria-hidden="true"
-                    >
-                      <path d="M12 19V5M5 12l7-7 7 7" />
-                    </svg>
-                  </button>
-                </form>
-              )}
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+              </form>
+            )}
             </div>
           </div>
         </div>

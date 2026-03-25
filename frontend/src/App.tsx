@@ -1,8 +1,9 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
+import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { useToast } from "./hooks/useToast";
 import {
   deleteUploadedFile,
@@ -16,31 +17,34 @@ import {
 } from "./services/dialogue";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
-import type { DialogueStage } from "./types/dialogue";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
 
 function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
   const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
+
   useEffect(() => {
     setPirData(null);
     setActivePhase("direction");
     setCollectionData(null);
     setHighlightedRefs([]);
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   return null;
 }
 
-function WorkspacePhaseWatcher({ isSourceSelecting }: { isSourceSelecting: boolean }) {
+function WorkspaceStageWatcher({ stage }: { stage: ReturnType<typeof useChat>["stage"] }) {
   const { setActivePhase } = useWorkspace();
+
   useEffect(() => {
-    if (isSourceSelecting) setActivePhase("collection");
-  }, [isSourceSelecting]); // eslint-disable-line react-hooks/exhaustive-deps
+    setActivePhase(getWorkspacePhaseForDialogueStage(stage));
+  }, [stage, setActivePhase]);
+
   return null;
 }
 
-function App() {
+function AppShell() {
   const { success, error } = useToast();
   const { activePhase } = useWorkspace();
   const {
@@ -52,7 +56,6 @@ function App() {
     deleteAllConversations,
     renameConversation,
     updatePerspectives,
-    setStage,
   } = useConversation();
   const {
     messages,
@@ -88,42 +91,57 @@ function App() {
     return activeConversation ?? createNewConversation();
   };
 
-  const refreshUploadedFiles = async (sessionId: string) => {
-    try {
-      const files = await listUploadedFiles(sessionId);
-      setUploadedFiles(files);
-    } catch (loadError) {
-      console.error("Load uploads error:", loadError);
-      error("Failed to load uploaded files");
-    }
-  };
+  useEffect(() => {
+    if (!activeConversation?.sessionId) return;
+
+    let active = true;
+
+    const loadFiles = async () => {
+      try {
+        const files = await listUploadedFiles(activeConversation.sessionId);
+        if (active) {
+          setUploadedFiles(files);
+        }
+      } catch (loadError) {
+        console.error("Load uploads error:", loadError);
+        if (active) {
+          error("Failed to load uploaded files");
+        }
+      }
+    };
+
+    void loadFiles();
+
+    return () => {
+      active = false;
+    };
+  }, [activeConversation?.sessionId, error]);
 
   useEffect(() => {
-    if (!activeConversation?.sessionId) {
-      setUploadedFiles([]);
-      return;
-    }
-    refreshUploadedFiles(activeConversation.sessionId);
-  }, [activeConversation?.sessionId]);
+    if (!isCollecting || !activeConversation?.sessionId) return;
 
-  useEffect(() => {
-    if (!isCollecting || !activeConversation?.sessionId) {
-      if (!isCollecting) setCollectionStatus(null);
-      return;
-    }
     const sessionId = activeConversation.sessionId;
     let active = true;
+
     const poll = async () => {
       const status = await getCollectionStatus(sessionId);
       if (active) setCollectionStatus(status);
     };
+
     poll();
+
     const interval = setInterval(poll, 1500);
     return () => {
       active = false;
       clearInterval(interval);
     };
   }, [isCollecting, activeConversation?.sessionId]);
+
+  const visibleUploadedFiles = useMemo(
+    () => (activeConversation?.sessionId ? uploadedFiles : []),
+    [activeConversation?.sessionId, uploadedFiles],
+  );
+  const visibleCollectionStatus = isCollecting ? collectionStatus : null;
 
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
@@ -139,7 +157,8 @@ function App() {
       }
     }
 
-    await refreshUploadedFiles(conversation.sessionId);
+    const refreshedFiles = await listUploadedFiles(conversation.sessionId);
+    setUploadedFiles(refreshedFiles);
     setIsFileUploadOpen(false);
   };
 
@@ -160,58 +179,32 @@ function App() {
     }
   };
 
-  const openAnalysisDemo = () => {
-    createNewConversation();
-    setStage("complete", null);
-  };
-
   const isAnalysisPhase = activePhase === "analysis";
 
   return (
-    <WorkspaceProvider>
-    <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
-    <WorkspacePhaseWatcher isSourceSelecting={isSourceSelecting} />
-    <div className="flex h-screen">
-      <Sidebar
-        conversations={conversations}
-        activeConversationId={activeConversation?.id ?? null}
-        onNewChat={createNewConversation}
-        onSwitchConversation={switchConversation}
-        onDeleteConversation={deleteConversation}
-        onRenameConversation={renameConversation}
-        onDeleteAllConversations={deleteAllConversations}
-        onDevSendMessage={() =>
-          triggerDevMessage(
-            "What are the latest cyber threats targeting European critical infrastructure?",
-          )
-        }
-        onDevShowCollectionApproval={debugConfirm}
-        onDevJumpToStage={(nextStage: DialogueStage) => jumpToDevStage(nextStage)}
-        onDevSyncStage={syncDevStage}
-        onDevResetStage={resetDevStage}
-        onOpenSettings={() => setIsSettingsOpen(true)}
-      />
+    <>
+      <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
+      <WorkspaceStageWatcher stage={stage} />
 
-      <main className="flex-1 flex flex-col bg-surface-elevated mx-1">
-        <ChatWindow
-          messages={messages}
-          onSendMessage={sendMessage}
-          isConfirming={isConfirming}
-          stage={stage}
-          subState={subState}
-          isLoading={isLoading}
-          onApprove={approve}
-          onReject={reject}
-          onGatherMore={gatherMore}
-          isSourceSelecting={isSourceSelecting}
-          isCollecting={isCollecting}
-          collectionStatus={collectionStatus}
-          availableSources={availableSources}
-          selectedSources={selectedSources}
-          onToggleSourceSelection={toggleSourceSelection}
-          onSubmitSourceSelection={submitSourceSelection}
-          devPrefill={devPrefill}
-          onDevPrefillConsumed={clearDevPrefill}
+      <div className="flex h-screen">
+        <Sidebar
+          conversations={conversations}
+          activeConversationId={activeConversation?.id ?? null}
+          onNewChat={createNewConversation}
+          onSwitchConversation={switchConversation}
+          onDeleteConversation={deleteConversation}
+          onRenameConversation={renameConversation}
+          onDeleteAllConversations={deleteAllConversations}
+          onDevSendMessage={() =>
+            triggerDevMessage(
+              "What are the latest cyber threats targeting European critical infrastructure?",
+            )
+          }
+          onDevShowCollectionApproval={debugConfirm}
+          onDevJumpToStage={jumpToDevStage}
+          onDevSyncStage={syncDevStage}
+          onDevResetStage={resetDevStage}
+          onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
         <main className="flex-1 flex flex-col bg-surface-elevated mx-1 overflow-hidden">
@@ -227,6 +220,7 @@ function App() {
             onGatherMore={gatherMore}
             isSourceSelecting={isSourceSelecting}
             isCollecting={isCollecting}
+            collectionStatus={visibleCollectionStatus}
             availableSources={availableSources}
             selectedSources={selectedSources}
             onToggleSourceSelection={toggleSourceSelection}
@@ -246,21 +240,21 @@ function App() {
           selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
           onPerspectiveChange={updatePerspectives}
           onOpenFileUpload={() => setIsFileUploadOpen(true)}
-          uploadedFiles={uploadedFiles}
+          uploadedFiles={visibleUploadedFiles}
           onFileRemove={handleFileRemove}
         />
-
-        <FileUploadModal
-          isOpen={isFileUploadOpen}
-          onClose={() => setIsFileUploadOpen(false)}
-          onSubmit={handleSubmit}
-        />
-
-        <SettingsModal
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-        />
       </div>
+
+      <FileUploadModal
+        isOpen={isFileUploadOpen}
+        onClose={() => setIsFileUploadOpen(false)}
+        onSubmit={handleSubmit}
+      />
+
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </>
   );
 }
@@ -272,4 +266,5 @@ function App() {
     </WorkspaceProvider>
   );
 }
+
 export default App;

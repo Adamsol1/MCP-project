@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useConversation } from "../../hooks/useConversation";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import {
@@ -116,21 +116,21 @@ export default function AnalysisPrototypeView() {
   );
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const conversationSessionId = activeConversation?.sessionId ?? null;
+  const normalizedConversationPerspectives = useMemo(
+    () => normalizePerspectives(activeConversation?.perspectives),
+    [activeConversation?.perspectives],
+  );
 
   useEffect(() => {
-    setSelectedPerspectives(
-      normalizePerspectives(activeConversation?.perspectives),
-    );
+    setSelectedPerspectives(normalizedConversationPerspectives);
     setDebatePoint("");
     setSelectedFindingIds([]);
     setCouncilNote(null);
     setCouncilErrorMessage(null);
     setValidationMessage(null);
     setIsTranscriptExpanded(false);
-  }, [
-    activeConversation?.sessionId,
-    activeConversation?.perspectives?.join(","),
-  ]);
+  }, [conversationSessionId, normalizedConversationPerspectives]);
 
   useEffect(() => {
     let isCancelled = false;

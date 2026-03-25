@@ -25,7 +25,7 @@ function PhaseSeeder({ phase }: { phase: Phase }) {
   const { setActivePhase } = useWorkspace();
   useEffect(() => {
     setActivePhase(phase);
-  }, []);
+  }, [phase, setActivePhase]);
   return null;
 }
 

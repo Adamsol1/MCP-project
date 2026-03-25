@@ -7,6 +7,9 @@ import SourceList from "../SourceList/SourceList";
  */
 export default function PirSourcesView() {
   const { pirData, highlightedRefs, setHighlightedRefs } = useWorkspace();
+  const handleSourceHover = (value: string[] | string | null) => {
+    setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
+  };
 
   if (!pirData || pirData.sources.length === 0) {
     return (
@@ -24,7 +27,7 @@ export default function PirSourcesView() {
       <SourceList
         sources={pirData.sources}
         highlightedRefs={highlightedRefs}
-        onSourceHover={setHighlightedRefs}
+        onSourceHover={handleSourceHover}
       />
     </div>
   );

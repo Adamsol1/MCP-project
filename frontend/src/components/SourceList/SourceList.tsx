@@ -2,17 +2,25 @@ import type { Source } from "../../types/conversation";
 
 interface SourceListProps {
   sources: Source[];
-  highlightedRefs: string[];
-  onSourceHover: (refs: string[]) => void;
+  highlightedRef?: string | null;
+  highlightedRefs?: string[];
+  onSourceHover: (refs: string[] | string | null) => void;
 }
 
-export default function SourceList({ sources, highlightedRefs, onSourceHover }: SourceListProps) {
+export default function SourceList({
+  sources,
+  highlightedRef = null,
+  highlightedRefs,
+  onSourceHover,
+}: SourceListProps) {
+  const activeHighlightedRefs = highlightedRefs ?? (highlightedRef ? [highlightedRef] : []);
+
   if (sources.length === 0) return <ul></ul>;   // empty but still a DOM node
 
   return (
     <ul className="space-y-0 divide-y divide-border-muted">
       {sources.map((source) => {
-        const isHighlighted = highlightedRefs.includes(source.ref);
+        const isHighlighted = activeHighlightedRefs.includes(source.ref);
         const citation = source.citation;
 
         return (
@@ -24,8 +32,8 @@ export default function SourceList({ sources, highlightedRefs, onSourceHover }: 
                 ? "text-primary"
                 : "text-text-secondary hover:text-text-primary",
             ].join(" ")}
-            onMouseEnter={() => onSourceHover([source.ref])}
-            onMouseLeave={() => onSourceHover([])}
+            onMouseEnter={() => onSourceHover(source.ref)}
+            onMouseLeave={() => onSourceHover(null)}
           >
             <span
               className={[

@@ -97,6 +97,7 @@ export function Sidebar({
 
   // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   /**
    * Closes the options dropdown when the user clicks anywhere outside it.
@@ -117,17 +118,34 @@ export function Sidebar({
   }, [openMenuId]);
 
   useEffect(() => {
-    if (isCollapsed) {
-      setShowExpandedContent(false);
-      return;
+    return () => {
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleToggleSidebar = () => {
+    if (revealTimeoutRef.current !== null) {
+      window.clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
     }
 
-    const timeoutId = window.setTimeout(() => {
-      setShowExpandedContent(true);
-    }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
+    setIsCollapsed((prev) => {
+      const next = !prev;
 
-    return () => window.clearTimeout(timeoutId);
-  }, [isCollapsed]);
+      if (next) {
+        setShowExpandedContent(false);
+      } else {
+        revealTimeoutRef.current = window.setTimeout(() => {
+          setShowExpandedContent(true);
+          revealTimeoutRef.current = null;
+        }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
+      }
+
+      return next;
+    });
+  };
 
   return (
     <aside
@@ -140,7 +158,7 @@ export function Sidebar({
           left (‹) when expanded to signal "collapse". */}
       <button
         aria-label="Toggle sidebar"
-        onClick={() => setIsCollapsed((prev) => !prev)}
+        onClick={handleToggleSidebar}
         className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
         <svg

@@ -5,6 +5,7 @@ export type DialogueStage =
   | "pir_confirming"
   | "planning"
   | "plan_confirming"
+  | "source_selecting"
   | "collecting"
   | "reviewing"
   | "complete";

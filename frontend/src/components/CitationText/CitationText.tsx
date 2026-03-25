@@ -3,8 +3,9 @@ import type { Claim } from "../../types/conversation";
 interface CitationTextProps {
   text: string;
   claims: Claim[];
-  highlightedRefs: string[];
-  onRefHover: (refs: string[]) => void;
+  highlightedRef?: string | null;
+  highlightedRefs?: string[];
+  onRefHover: (refs: string[] | string | null) => void;
 }
 
 /**
@@ -39,9 +40,11 @@ function buildMarkerGroups(parts: string[]): Map<number, string[]> {
 export default function CitationText({
   text,
   claims,
+  highlightedRef = null,
   highlightedRefs,
   onRefHover,
 }: CitationTextProps) {
+  const activeHighlightedRefs = highlightedRefs ?? (highlightedRef ? [highlightedRef] : []);
   const parts = text.split(/(\[\d+\])/g);
   const markerGroups = buildMarkerGroups(parts);
 
@@ -53,13 +56,13 @@ export default function CitationText({
         // [N] marker — emit its full group on hover
         if (/^\[\d+\]$/.test(part)) {
           const group = markerGroups.get(i) ?? [part];
-          const isHighlighted = group.some((r) => highlightedRefs.includes(r));
+          const isHighlighted = group.some((r) => activeHighlightedRefs.includes(r));
           return (
             <sup
               key={i}
               className={isHighlighted ? "text-primary" : undefined}
-              onMouseEnter={() => onRefHover(group)}
-              onMouseLeave={() => onRefHover([])}
+              onMouseEnter={() => onRefHover(group.length === 1 ? group[0] : group)}
+              onMouseLeave={() => onRefHover(null)}
             >
               {part}
             </sup>
@@ -70,13 +73,13 @@ export default function CitationText({
         const claim = claims.find((c) => c.text === part.trim());
 
         if (claim) {
-          const isHighlighted = highlightedRefs.includes(claim.source_ref);
+          const isHighlighted = activeHighlightedRefs.includes(claim.source_ref);
           return (
             <span
               key={i}
               className={isHighlighted ? "bg-primary-subtle" : ""}
-              onMouseEnter={() => onRefHover([claim.source_ref])}
-              onMouseLeave={() => onRefHover([])}
+              onMouseEnter={() => onRefHover(claim.source_ref)}
+              onMouseLeave={() => onRefHover(null)}
             >
               {part}
             </span>
@@ -92,13 +95,15 @@ export default function CitationText({
           else break;
         }
         if (followingRefs.length > 0) {
-          const isHighlighted = followingRefs.some((r) => highlightedRefs.includes(r));
+          const isHighlighted = followingRefs.some((r) => activeHighlightedRefs.includes(r));
           return (
             <span
               key={i}
               className={isHighlighted ? "bg-primary-subtle" : ""}
-              onMouseEnter={() => onRefHover(followingRefs)}
-              onMouseLeave={() => onRefHover([])}
+              onMouseEnter={() =>
+                onRefHover(followingRefs.length === 1 ? followingRefs[0] : followingRefs)
+              }
+              onMouseLeave={() => onRefHover(null)}
             >
               {part}
             </span>
