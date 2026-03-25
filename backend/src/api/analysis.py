@@ -5,7 +5,12 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
-from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
+from src.models.analysis import (
+    AnalysisDraft,
+    CouncilNote,
+    CouncilRunSettings,
+    ProcessingResult,
+)
 from src.services.analysis_prototype_service import AnalysisPrototypeService
 from src.services.analysis_session_store import AnalysisSessionStore
 from src.services.council_service import CouncilService
@@ -37,6 +42,7 @@ class AnalysisCouncilRequest(BaseModel):
     debate_point: str = ""
     finding_ids: list[str] = Field(default_factory=list)
     selected_perspectives: list[str] = Field(..., min_length=2)
+    council_settings: CouncilRunSettings | None = None
 
     @field_validator("debate_point")
     @classmethod
@@ -165,6 +171,7 @@ async def create_analysis_council(
             processing_result=draft_response.processing_result,
             analysis_draft=draft_response.analysis_draft,
             finding_ids=request.finding_ids or None,
+            council_settings=request.council_settings,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -181,6 +188,11 @@ async def create_analysis_council(
                 "debate_point": request.debate_point,
                 "selected_perspectives": request.selected_perspectives,
                 "finding_ids": request.finding_ids,
+                "council_settings": (
+                    request.council_settings.model_dump()
+                    if request.council_settings
+                    else None
+                ),
                 "transcript_path": council_note.transcript_path,
                 "council_summary": council_note.summary,
             }

@@ -56,7 +56,7 @@ describe("SettingsModal", () => {
       ).toBeInTheDocument();
     });
 
-    it("renders all three nav categories", () => {
+    it("renders all four nav categories", () => {
       renderModal();
       expect(
         screen.getByRole("button", { name: /language/i }),
@@ -66,6 +66,9 @@ describe("SettingsModal", () => {
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /parameters/i }),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /council/i }),
       ).toBeInTheDocument();
     });
 
@@ -121,6 +124,16 @@ describe("SettingsModal", () => {
       await user.click(screen.getByRole("button", { name: /language/i }));
 
       expect(screen.getByText(/ai output language/i)).toBeInTheDocument();
+    });
+
+    it("shows Council content when Council nav item is clicked", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.click(screen.getByRole("button", { name: /council/i }));
+
+      expect(screen.getByText(/^mode$/i)).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: /rounds/i })).toBeInTheDocument();
     });
   });
 
@@ -211,6 +224,55 @@ describe("SettingsModal", () => {
       await user.type(input, "Q1 2025");
 
       expect(input).toHaveValue("Q1 2025");
+    });
+  });
+
+  describe("Council section", () => {
+    it("renders council runtime controls", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.click(screen.getByRole("button", { name: /council/i }));
+
+      expect(screen.getByRole("combobox", { name: /mode/i })).toHaveValue(
+        "conference",
+      );
+      expect(screen.getByRole("combobox", { name: /rounds/i })).toHaveValue("2");
+      expect(screen.getByRole("combobox", { name: /round timeout/i })).toHaveValue(
+        "180",
+      );
+      expect(screen.getByRole("button", { name: /^on$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(
+        screen.getByRole("combobox", { name: /vote retry attempts/i }),
+      ).toHaveValue("1");
+    });
+
+    it("updates council settings controls", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.click(screen.getByRole("button", { name: /council/i }));
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: /mode/i }),
+        screen.getByRole("option", { name: /quick/i }),
+      );
+      await user.selectOptions(
+        screen.getByRole("combobox", { name: /rounds/i }),
+        screen.getByRole("option", { name: "4" }),
+      );
+      await user.click(screen.getByRole("button", { name: /^off$/i }));
+
+      expect(screen.getByRole("combobox", { name: /mode/i })).toHaveValue(
+        "quick",
+      );
+      expect(screen.getByRole("combobox", { name: /rounds/i })).toHaveValue("4");
+      expect(screen.getByRole("button", { name: /^off$/i })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
     });
   });
 });

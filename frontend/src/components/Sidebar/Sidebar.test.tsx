@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
@@ -467,7 +467,9 @@ describe("Sidebar", () => {
     await user.click(toggle);
     await user.click(toggle);
 
-    expect(screen.getByText("My chat")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("My chat")).toBeInTheDocument();
+    });
   });
 
   it("keeps the New Chat button accessible when the sidebar is collapsed", async () => {

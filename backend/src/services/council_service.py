@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from src.models.analysis import (
     AnalysisDraft,
     CouncilNote,
+    CouncilRunSettings,
     CouncilRuntimeProfile,
     CouncilTranscriptEntry,
     ProcessingResult,
@@ -32,6 +33,9 @@ class CouncilService:
     DEFAULT_MODEL = "gemini-2.5-flash"
     DEFAULT_MODE = "conference"
     DEFAULT_ROUNDS = 2
+    DEFAULT_TIMEOUT_PER_ROUND = 180
+    DEFAULT_VOTE_RETRY_ENABLED = True
+    DEFAULT_VOTE_RETRY_ATTEMPTS = 1
     FILE_TREE_INJECTION_ENABLED = False
     DECISION_GRAPH_ENABLED = False
 
@@ -45,17 +49,26 @@ class CouncilService:
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
 
-    @property
-    def runtime_profile(self) -> CouncilRuntimeProfile:
+    def resolve_runtime_profile(
+        self, council_settings: CouncilRunSettings | None = None
+    ) -> CouncilRuntimeProfile:
+        settings = council_settings or CouncilRunSettings()
         return CouncilRuntimeProfile(
             adapter=self.DEFAULT_ADAPTER,
             model=self.DEFAULT_MODEL,
-            mode=self.DEFAULT_MODE,
-            rounds=self.DEFAULT_ROUNDS,
+            mode=settings.mode,
+            rounds=settings.rounds,
+            timeout_per_round_seconds=settings.timeout_seconds,
+            vote_retry_enabled=settings.vote_retry_enabled,
+            vote_retry_attempts=settings.vote_retry_attempts,
             working_directory=str(self.working_directory),
             file_tree_injection_enabled=self.FILE_TREE_INJECTION_ENABLED,
             decision_graph_enabled=self.DECISION_GRAPH_ENABLED,
         )
+
+    @property
+    def runtime_profile(self) -> CouncilRuntimeProfile:
+        return self.resolve_runtime_profile()
 
     def _normalize_perspectives(
         self, selected_perspectives: list[str]
@@ -152,8 +165,10 @@ class CouncilService:
         selected_perspectives: list[str],
         processing_result: ProcessingResult,
         analysis_draft: AnalysisDraft,
+        council_settings: CouncilRunSettings | None = None,
         selected_findings=None,
     ) -> DeliberateRequest:
+        runtime_profile = self.resolve_runtime_profile(council_settings)
         participants = self.build_participants(selected_perspectives)
         question = self.build_question(debate_point, selected_findings or [])
         context = self.build_context(
@@ -166,13 +181,13 @@ class CouncilService:
         return DeliberateRequest(
             question=question,
             participants=participants,
-            rounds=self.runtime_profile.rounds,
-            mode=self.runtime_profile.mode,
+            rounds=runtime_profile.rounds,
+            mode=runtime_profile.mode,
             context=context,
-            working_directory=self.runtime_profile.working_directory,
+            working_directory=runtime_profile.working_directory,
         )
 
-    def _build_engine(self):
+    def _build_engine(self, runtime_profile: CouncilRuntimeProfile):
         command_path = self._resolve_gemini_command()
         adapter = GeminiAdapter(
             command=command_path,
@@ -182,13 +197,13 @@ class CouncilService:
         adapters = {self.DEFAULT_ADAPTER: adapter}
         config = SimpleNamespace(
             defaults=SimpleNamespace(
-                timeout_per_round=180,
-                rounds=self.runtime_profile.rounds,
+                timeout_per_round=runtime_profile.timeout_per_round_seconds,
+                rounds=runtime_profile.rounds,
             ),
             deliberation=SimpleNamespace(
                 convergence_detection=SimpleNamespace(enabled=False),
                 file_tree=SimpleNamespace(
-                    enabled=self.runtime_profile.file_tree_injection_enabled,
+                    enabled=runtime_profile.file_tree_injection_enabled,
                     max_depth=0,
                     max_files=0,
                 ),
@@ -197,13 +212,13 @@ class CouncilService:
                     max_file_size_bytes=1_048_576,
                 ),
                 vote_retry=SimpleNamespace(
-                    enabled=True,
-                    max_retries=1,
+                    enabled=runtime_profile.vote_retry_enabled,
+                    max_retries=runtime_profile.vote_retry_attempts,
                     min_response_length=100,
                 ),
             ),
             decision_graph=SimpleNamespace(
-                enabled=self.runtime_profile.decision_graph_enabled
+                enabled=runtime_profile.decision_graph_enabled
             ),
         )
         transcript_manager = TranscriptManager(output_dir=str(self.transcript_dir))
@@ -252,8 +267,10 @@ class CouncilService:
         processing_result: ProcessingResult,
         analysis_draft: AnalysisDraft,
         finding_ids: list[str] | None = None,
+        council_settings: CouncilRunSettings | None = None,
     ) -> CouncilNote:
         del session_id
+        runtime_profile = self.resolve_runtime_profile(council_settings)
         selected_findings = (
             [finding for finding in processing_result.findings if finding.id in finding_ids]
             if finding_ids
@@ -264,10 +281,11 @@ class CouncilService:
             selected_perspectives=selected_perspectives,
             processing_result=processing_result,
             analysis_draft=analysis_draft,
+            council_settings=council_settings,
             selected_findings=selected_findings,
         )
 
-        engine = self._build_engine()
+        engine = self._build_engine(runtime_profile)
         try:
             result = await engine.execute(request)
         except Exception as exc:  # pragma: no cover - adapter/runtime failure path

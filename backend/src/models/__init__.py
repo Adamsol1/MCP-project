@@ -10,6 +10,7 @@ Usage:
 from src.models.analysis import (
     AnalysisDraft,
     CouncilNote,
+    CouncilRunSettings,
     CouncilRuntimeProfile,
     CouncilTranscriptEntry,
     FindingModel,
@@ -39,6 +40,7 @@ __all__ = [
     "ProcessingResult",
     "AnalysisDraft",
     "CouncilTranscriptEntry",
+    "CouncilRunSettings",
     "CouncilRuntimeProfile",
     "CouncilNote",
     # Enums

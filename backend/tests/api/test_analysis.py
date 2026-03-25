@@ -40,12 +40,14 @@ class _FakeCouncilService:
         processing_result,
         analysis_draft,
         finding_ids=None,
+        council_settings=None,
     ):
         assert session_id
         assert processing_result.findings
         assert analysis_draft.summary
         assert len(selected_perspectives) >= 2
         assert finding_ids is None or isinstance(finding_ids, list)
+        assert council_settings is None or council_settings.rounds >= 1
         return CouncilNote(
             status="complete",
             question=debate_point or "Assess the selected findings.",
@@ -185,6 +187,13 @@ def test_analysis_council_happy_path(monkeypatch, tmp_path):
             "debate_point": "Assess whether the phishing staging indicates coordinated access development.",
             "finding_ids": ["F-001", "F-002"],
             "selected_perspectives": ["us", "china", "neutral"],
+            "council_settings": {
+                "mode": "conference",
+                "rounds": 3,
+                "timeout_seconds": 240,
+                "vote_retry_enabled": True,
+                "vote_retry_attempts": 2,
+            },
         },
     )
 

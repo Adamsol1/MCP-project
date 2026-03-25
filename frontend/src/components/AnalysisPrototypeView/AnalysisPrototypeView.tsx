@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useConversation } from "../../hooks/useConversation";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import {
   getAnalysisDraft,
   runAnalysisCouncil,
@@ -99,6 +100,7 @@ function getFindingPreview(finding: ProcessingFinding) {
 
 export default function AnalysisPrototypeView() {
   const { activeConversation } = useConversation();
+  const { settings } = useSettings();
   const [data, setData] = useState<AnalysisDraftResponse | null>(null);
   const [councilNote, setCouncilNote] = useState<CouncilNote | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -201,6 +203,13 @@ export default function AnalysisPrototypeView() {
         debate_point: debatePoint.trim(),
         finding_ids: selectedFindingIds,
         selected_perspectives: selectedPerspectives,
+        council_settings: {
+          mode: settings.councilSettings.mode,
+          rounds: settings.councilSettings.rounds,
+          timeout_seconds: settings.councilSettings.timeoutSeconds,
+          vote_retry_enabled: settings.councilSettings.voteRetryEnabled,
+          vote_retry_attempts: settings.councilSettings.voteRetryAttempts,
+        },
       });
       setCouncilNote(response);
       setIsTranscriptExpanded(false);
@@ -598,6 +607,14 @@ export default function AnalysisPrototypeView() {
                   );
                 })}
               </div>
+              <p className="text-xs text-text-secondary">
+                Runtime: {settings.councilSettings.mode}, {settings.councilSettings.rounds}{" "}
+                round{settings.councilSettings.rounds === 1 ? "" : "s"}, timeout{" "}
+                {settings.councilSettings.timeoutSeconds}s, vote retry{" "}
+                {settings.councilSettings.voteRetryEnabled
+                  ? `${settings.councilSettings.voteRetryAttempts}x`
+                  : "off"}
+              </p>
             </div>
 
             <div className="space-y-2">

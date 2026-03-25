@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ReactNode } from "react";
 import AnalysisPrototypeView from "./AnalysisPrototypeView";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 import type { ConversationStore } from "../../types/conversation";
 import type {
   AnalysisDraftResponse,
@@ -132,7 +133,11 @@ const demoResponse: AnalysisDraftResponse = {
 
 function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
-    return <ConversationProvider>{children}</ConversationProvider>;
+    return (
+      <SettingsProvider>
+        <ConversationProvider>{children}</ConversationProvider>
+      </SettingsProvider>
+    );
   };
 }
 
@@ -274,10 +279,27 @@ describe("AnalysisPrototypeView", () => {
           "Assess whether the selected findings indicate coordinated access development.",
         finding_ids: ["F-001"],
         selected_perspectives: ["us", "neutral"],
+        council_settings: {
+          mode: "conference",
+          rounds: 2,
+          timeout_seconds: 180,
+          vote_retry_enabled: true,
+          vote_retry_attempts: 1,
+        },
       });
     });
     expect(
       await screen.findByText(/deliberate access-development activity/i),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the active council runtime settings in the form", async () => {
+    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
+
+    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+
+    expect(
+      await screen.findByText(/Runtime: conference, 2 rounds, timeout 180s, vote retry 1x/i),
     ).toBeInTheDocument();
   });
 

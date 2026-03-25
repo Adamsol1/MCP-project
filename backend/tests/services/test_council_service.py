@@ -114,6 +114,9 @@ class TestCouncilService:
         assert profile.model == "gemini-2.5-flash"
         assert profile.mode == "conference"
         assert profile.rounds == 2
+        assert profile.timeout_per_round_seconds == 180
+        assert profile.vote_retry_enabled is True
+        assert profile.vote_retry_attempts == 1
         assert profile.working_directory == str(tmp_path)
         assert profile.file_tree_injection_enabled is False
         assert profile.decision_graph_enabled is False
@@ -129,7 +132,7 @@ class TestCouncilService:
             processing_result
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda: _FakeEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda profile: _FakeEngine())
 
         result = await service.run_council(
             session_id="session-council",
@@ -160,7 +163,7 @@ class TestCouncilService:
             processing_result
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda: _ErrorEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())
 
         with pytest.raises(RuntimeError, match="Gemini CLI could not be launched"):
             await service.run_council(

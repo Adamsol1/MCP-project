@@ -1,3 +1,11 @@
+export interface CouncilRunSettings {
+  mode: "conference" | "quick";
+  rounds: number;
+  timeout_seconds: number;
+  vote_retry_enabled: boolean;
+  vote_retry_attempts: number;
+}
+
 export interface ProcessingFinding {
   id: string;
   title: string;
@@ -55,4 +63,5 @@ export interface RunAnalysisCouncilRequest {
   debate_point: string;
   finding_ids: string[];
   selected_perspectives: string[];
+  council_settings?: CouncilRunSettings;
 }

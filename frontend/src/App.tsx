@@ -17,7 +17,6 @@ import type { DialogueStage } from "./types/dialogue";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
-import AnalysisPrototypeView from "./components/AnalysisPrototypeView/AnalysisPrototypeView";
 
 function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
   const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
@@ -174,33 +173,25 @@ function AppShell() {
         />
 
         <main className="flex-1 flex flex-col bg-surface-elevated mx-1 overflow-hidden">
-          {isAnalysisPhase ? (
-            <div className="flex-1 overflow-y-auto px-4 py-4 scrollbar-chatgpt">
-              <section className="rounded-xl border border-border-muted bg-surface p-4 shadow-sm">
-                <AnalysisPrototypeView />
-              </section>
-            </div>
-          ) : (
-            <ChatWindow
-              messages={messages}
-              onSendMessage={sendMessage}
-              isConfirming={isConfirming}
-              stage={stage}
-              subState={subState}
-              isLoading={isLoading}
-              onApprove={approve}
-              onReject={reject}
-              onGatherMore={gatherMore}
-              isSourceSelecting={isSourceSelecting}
-              isCollecting={isCollecting}
-              availableSources={availableSources}
-              selectedSources={selectedSources}
-              onToggleSourceSelection={toggleSourceSelection}
-              onSubmitSourceSelection={submitSourceSelection}
-              devPrefill={devPrefill}
-              onDevPrefillConsumed={clearDevPrefill}
-            />
-          )}
+          <ChatWindow
+            messages={messages}
+            onSendMessage={sendMessage}
+            isConfirming={isConfirming}
+            stage={stage}
+            subState={subState}
+            isLoading={isLoading}
+            onApprove={approve}
+            onReject={reject}
+            onGatherMore={gatherMore}
+            isSourceSelecting={isSourceSelecting}
+            isCollecting={isCollecting}
+            availableSources={availableSources}
+            selectedSources={selectedSources}
+            onToggleSourceSelection={toggleSourceSelection}
+            onSubmitSourceSelection={submitSourceSelection}
+            devPrefill={devPrefill}
+            onDevPrefillConsumed={clearDevPrefill}
+          />
         </main>
 
         {!isAnalysisPhase && (

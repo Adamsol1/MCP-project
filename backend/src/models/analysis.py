@@ -72,6 +72,15 @@ class CouncilRuntimeProfile(BaseModel):
     model: str = Field(..., description="Default model identifier")
     mode: str = Field(..., description="Deliberation mode")
     rounds: int = Field(..., description="Configured round count")
+    timeout_per_round_seconds: int = Field(
+        ..., description="Configured timeout per round in seconds"
+    )
+    vote_retry_enabled: bool = Field(
+        ..., description="Whether vote retry prompting is enabled"
+    )
+    vote_retry_attempts: int = Field(
+        ..., description="Configured vote retry attempts"
+    )
     working_directory: str = Field(..., description="Working directory for council")
     file_tree_injection_enabled: bool = Field(
         ..., description="Whether file-tree injection is enabled"
@@ -79,6 +88,16 @@ class CouncilRuntimeProfile(BaseModel):
     decision_graph_enabled: bool = Field(
         ..., description="Whether decision-graph context is enabled"
     )
+
+
+class CouncilRunSettings(BaseModel):
+    """User-configurable runtime overrides for analysis-stage council runs."""
+
+    mode: str = Field(default="conference", pattern="^(conference|quick)$")
+    rounds: int = Field(default=2, ge=1, le=5)
+    timeout_seconds: int = Field(default=180, ge=30, le=900)
+    vote_retry_enabled: bool = Field(default=True)
+    vote_retry_attempts: int = Field(default=1, ge=0, le=3)
 
 
 class CouncilNote(BaseModel):
