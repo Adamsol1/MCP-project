@@ -193,6 +193,7 @@ data/outputs/*
 !data/outputs/.gitkeep
 backend/data/outputs/*
 !backend/data/outputs/.gitkeep
+!backend/data/outputs/demo_processing_result.json
 
 # Session files (persisted dialogue state)
 backend/sessions/*
@@ -273,3 +274,6 @@ site/
 install.sh
 /backend/data/web_search
 /backend/data
+!/backend/data/
+!/backend/data/outputs/
+!/backend/data/outputs/demo_processing_result.json

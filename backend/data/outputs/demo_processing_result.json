@@ -1,0 +1,299 @@
+{
+  "findings": [
+    {
+      "id": "F-001",
+      "title": "Repeated credential-access activity against telecom administration services",
+      "finding": "Demo telemetry indicates a short-duration surge of credential-access activity targeting remote administration services associated with a fictional Northern European telecom operator. Multiple login attempts against VPN, webmail, and identity federation endpoints were followed by two successful logins from infrastructure not previously associated with the affected user accounts. The activity pattern suggests password-spraying combined with possible use of previously exposed credentials rather than broad brute force. Follow-on access included mailbox rule changes and directory queries consistent with reconnaissance of privileged accounts and network operations personnel.",
+      "evidence_summary": "Network and identity telemetry show concentrated authentication failures from a small cluster of VPS-hosted IPs, followed by successful authentication on legacy-compatible endpoints for two accounts within 90 minutes. Subsequent session behavior included unusual user-agent strings, mailbox forwarding-rule creation, and LDAP enumeration against groups tied to core network administration.",
+      "source": "network_telemetry",
+      "confidence": 82,
+      "relevant_to": [
+        "PIR-1",
+        "PIR-2",
+        "PIR-3"
+      ],
+      "supporting_data": {
+        "iocs": [
+          "demo-user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 DemoBrowser/122.0",
+          "mailbox-rule: forward_external_to=ops-review@northsea-demo.net",
+          "ldap-query-pattern: memberOf=CN=Core-Network-Admins,OU=Groups,DC=telco-demo,DC=local"
+        ],
+        "kb_refs": [
+          "KB-DEMO-TA-2026-014",
+          "KB-DEMO-IDENTITY-2026-009",
+          "KB-DEMO-TELECOM-PRIV-ACCESS-003"
+        ],
+        "attack_ids": [
+          "T1110.003",
+          "T1078",
+          "T1087",
+          "T1098"
+        ],
+        "source_refs": [
+          "NT-CASE-2026-0318",
+          "IDP-ALERT-44721",
+          "SOC-NOTE-NE-2026-118"
+        ],
+        "entities": [
+          "Nordtel Grid Services",
+          "NOC Shift Lead Account",
+          "Federated Identity Gateway",
+          "Core Network Admins"
+        ],
+        "timestamps": [
+          "2026-03-11T05:12:00Z",
+          "2026-03-11T05:48:00Z",
+          "2026-03-11T06:39:00Z",
+          "2026-03-11T07:02:00Z"
+        ],
+        "locations": [
+          "Oslo, Norway",
+          "Stockholm, Sweden",
+          "Helsinki, Finland"
+        ],
+        "domains": [
+          "vpn.nordtel-demo.net",
+          "mail.nordtel-demo.net",
+          "login.nordtel-demo.net"
+        ],
+        "ip_addresses": [
+          "185.203.116.44",
+          "91.224.92.17",
+          "203.0.113.88"
+        ],
+        "urls": [
+          "https://vpn.nordtel-demo.net/remote/login",
+          "https://mail.nordtel-demo.net/owa/",
+          "https://login.nordtel-demo.net/adfs/ls/"
+        ]
+      },
+      "why_it_matters": "If valid accounts were obtained, the activity provides a credible access path into telecom administration workflows and could enable lateral movement toward network management systems. The apparent focus on operational and directory data is analytically significant because it aligns with pre-intrusion mapping of personnel, privileges, and service dependencies in critical infrastructure environments.",
+      "uncertainties": [
+        "It is not yet confirmed whether the successful logins used sprayed passwords, previously compromised credentials, or session tokens.",
+        "The observed directory queries may reflect manual operator actions by an intruder or automated collection by a scripted post-login workflow.",
+        "It remains unclear whether any access extended beyond cloud identity and messaging services into on-premises telecom management systems."
+      ]
+    },
+    {
+      "id": "F-002",
+      "title": "Recently registered lookalike domains appear staged for telecom phishing",
+      "finding": "Demo OSINT and registrar metadata indicate a cluster of recently registered lookalike domains imitating a fictional Nordic telecom brand and one of its infrastructure subsidiaries. The domains were registered within a narrow time window using privacy-shielded identities, shared naming conventions, and overlapping hosting providers. Two domains resolved to simple credential-harvest pages styled as employee SSO portals, while another hosted a benign-looking maintenance notice page that may be intended for staged payload delivery or delayed phishing activation.",
+      "evidence_summary": "Passive DNS, certificate transparency, and page-capture data show three related domains registered within 36 hours, all using Let's Encrypt certificates, identical favicon hashes, and overlapping HTML structure. One page requested username, password, and MFA code with language localized for Scandinavian users.",
+      "source": "osint",
+      "confidence": 76,
+      "relevant_to": [
+        "PIR-1",
+        "PIR-3"
+      ],
+      "supporting_data": {
+        "iocs": [
+          "favicon-hash: 448921733",
+          "html-title: Nordtel Secure Access",
+          "form-field-pattern: username,password,mfa_code"
+        ],
+        "kb_refs": [
+          "KB-DEMO-PHISH-CLUSTER-2026-006",
+          "KB-DEMO-BRAND-ABUSE-2026-004"
+        ],
+        "attack_ids": [
+          "T1583.001",
+          "T1584.001",
+          "T1566.002"
+        ],
+        "source_refs": [
+          "WHOIS-SNAPSHOT-2026-03-12-A",
+          "PDNS-CASE-NE-771",
+          "OSINT-COLLECT-2026-204"
+        ],
+        "entities": [
+          "Nordtel Grid Services",
+          "Nordtel Infrastructure AB",
+          "Arctic Relay Hosting",
+          "BlueHarbor Registrar"
+        ],
+        "timestamps": [
+          "2026-03-10T21:14:00Z",
+          "2026-03-11T06:03:00Z",
+          "2026-03-12T09:27:00Z"
+        ],
+        "locations": [
+          "Stockholm, Sweden",
+          "Copenhagen, Denmark",
+          "Tallinn, Estonia"
+        ],
+        "domains": [
+          "nordtel-support.net",
+          "nordtei-portal.com",
+          "nordtelinfra-login.org"
+        ],
+        "ip_addresses": [
+          "198.51.100.45",
+          "198.51.100.59",
+          "203.0.113.124"
+        ],
+        "urls": [
+          "https://nordtel-support.net/auth/verify",
+          "https://nordtei-portal.com/sso/index.html",
+          "https://nordtelinfra-login.org/maintenance/notice"
+        ]
+      },
+      "why_it_matters": "The registration tempo, branding choices, and localized lure design suggest preparation for targeted credential theft against telecom staff rather than generic spam operations. This supports a hypothesis that the actor is building access options in parallel, potentially to improve resilience if one intrusion path is blocked.",
+      "uncertainties": [
+        "No confirmed delivery vector has been observed, so it is unclear whether these domains were used in email, SMS, QR, or direct messaging lures.",
+        "The staging pages may belong to a broader commodity phishing service rather than a campaign specifically focused on telecom targets.",
+        "The relationship between the domain cluster and the suspicious logins in F-001 is assessed as plausible but not yet directly evidenced."
+      ]
+    },
+    {
+      "id": "F-003",
+      "title": "Tooling and infrastructure overlap suggest reuse of a known intrusion playbook",
+      "finding": "Demo malware-analysis and infrastructure correlation indicate that artifacts recovered from a suspicious loader sample share operational similarities with prior intrusion reporting tied to telecom-focused access operations. The sample used a simple encrypted configuration format, periodic HTTPS beacons to a VPS-hosted endpoint, and command naming conventions overlapping with an older knowledge-base case. Separately, one IP associated with the phishing cluster also appeared in historical passive DNS records for a domain previously linked to remote access tooling in a fictional energy-sector intrusion.",
+      "evidence_summary": "Static analysis identified repeated string markers, a matching config delimiter pattern, and AES key length consistent with an internally tracked demo malware family. Infrastructure review found certificate reuse and short-lived VPS allocation patterns similar to prior cases. Similarity is moderate and points to shared tooling or operator tradecraft rather than definitive common authorship.",
+      "source": "malware_analysis",
+      "confidence": 69,
+      "relevant_to": [
+        "PIR-2",
+        "PIR-3",
+        "PIR-4"
+      ],
+      "supporting_data": {
+        "iocs": [
+          "sha256: 6c3e9c7f5a1f2c4d9b8e7130a4f55a83f4e6a9df3b0c1a297d9123ef4a5b6c77",
+          "mutex: Global\\NTH-Update-Host",
+          "config-marker: ##CFG_START##"
+        ],
+        "kb_refs": [
+          "KB-DEMO-MALFAM-NORTHBRIDGE-002",
+          "KB-DEMO-ENERGY-INTRUSION-2025-041",
+          "KB-DEMO-TACTICS-SHARED-INFRA-008"
+        ],
+        "attack_ids": [
+          "T1071.001",
+          "T1105",
+          "T1573",
+          "T1584.004"
+        ],
+        "source_refs": [
+          "MAL-REPORT-2026-031",
+          "SANDBOX-RUN-55681",
+          "INFRA-CORR-NE-2026-019"
+        ],
+        "entities": [
+          "Northbridge Loader",
+          "Arctic Relay Hosting",
+          "Demo Energy Sector Case 2025-041",
+          "Beacon Node BR-17"
+        ],
+        "timestamps": [
+          "2026-03-09T14:22:00Z",
+          "2026-03-11T01:15:00Z",
+          "2026-03-12T16:44:00Z"
+        ],
+        "locations": [
+          "Riga, Latvia",
+          "Vilnius, Lithuania",
+          "Espoo, Finland"
+        ],
+        "domains": [
+          "api-syncnode.net",
+          "cdn-northbridge.com",
+          "nordtel-support.net"
+        ],
+        "ip_addresses": [
+          "203.0.113.124",
+          "203.0.113.201",
+          "198.51.100.77"
+        ],
+        "urls": [
+          "https://api-syncnode.net/v1/checkin",
+          "https://cdn-northbridge.com/assets/update.dat",
+          "https://nordtel-support.net/static/logo.png"
+        ]
+      },
+      "why_it_matters": "Shared tooling and infrastructure patterns can narrow analytical hypotheses about operator maturity, resourcing, and likely next steps, even when attribution remains unresolved. For downstream analysis, this finding strengthens the case that the observed activity is part of a deliberate access campaign against critical infrastructure rather than isolated opportunistic abuse.",
+      "uncertainties": [
+        "The malware similarities may reflect shared builder kits or leased criminal infrastructure rather than a single coherent threat actor.",
+        "The recovered sample has not been forensically tied to a confirmed endpoint inside the telecom environment.",
+        "Certificate and VPS reuse are suggestive but insufficient on their own to establish campaign continuity."
+      ]
+    },
+    {
+      "id": "F-004",
+      "title": "Targeting pattern suggests interest in regional telecom resilience and interconnection operations",
+      "finding": "Demo reporting from internal analysis and external vendor intelligence indicates that the activity cluster aligns with a broader pattern of collection against organizations supporting telecom backbone operations, subsea cable coordination, emergency communications, and managed service dependencies across Northern Europe. The observed account targeting, lure branding, and entity selection point toward pre-positioning for intelligence collection or future disruption options focused on operational continuity rather than immediate monetization. Several targeted personas appear linked to network operations centers, identity administration, and vendor-access management rather than finance or customer support.",
+      "evidence_summary": "Victim-adjacent references across reporting include fictional telecom and infrastructure entities in Norway, Sweden, Denmark, and Finland. Thematic overlap centers on remote administration, carrier interconnection, outage coordination, and trusted third-party access. No ransom messaging, payment instructions, or broad consumer targeting has been observed.",
+      "source": "vendor_intel",
+      "confidence": 73,
+      "relevant_to": [
+        "PIR-1",
+        "PIR-4"
+      ],
+      "supporting_data": {
+        "iocs": [
+          "persona-theme: noc_admin",
+          "target-function: identity_and_vendor_access",
+          "lure-subject-pattern: service continuity review"
+        ],
+        "kb_refs": [
+          "KB-DEMO-REGIONAL-TARGETING-2026-011",
+          "KB-DEMO-TELECOM-INTENT-2026-002",
+          "KB-DEMO-CRITINFRA-VICTIMOLOGY-005"
+        ],
+        "attack_ids": [
+          "T1591",
+          "T1589",
+          "T1656"
+        ],
+        "source_refs": [
+          "VTI-BRIEF-2026-Q1-17",
+          "INT-ANALYST-NOTE-2026-088",
+          "SECTOR-SHARE-NE-2026-022"
+        ],
+        "entities": [
+          "Nordtel Grid Services",
+          "Skagerrak Fiber Exchange",
+          "Baltic Emergency Routing Forum",
+          "NorthSea Managed Access"
+        ],
+        "timestamps": [
+          "2026-02-27T10:00:00Z",
+          "2026-03-08T12:30:00Z",
+          "2026-03-13T08:05:00Z"
+        ],
+        "locations": [
+          "Bergen, Norway",
+          "Stockholm, Sweden",
+          "Copenhagen, Denmark",
+          "Tampere, Finland"
+        ],
+        "domains": [
+          "northsea-managed-access.net",
+          "skagerrak-fiber-demo.org",
+          "baltic-routing-forum.info"
+        ],
+        "ip_addresses": [
+          "198.51.100.210",
+          "203.0.113.61",
+          "203.0.113.124"
+        ],
+        "urls": [
+          "https://northsea-managed-access.net/continuity-review",
+          "https://skagerrak-fiber-demo.org/partner/login",
+          "https://baltic-routing-forum.info/docs/update"
+        ]
+      },
+      "why_it_matters": "This targeting pattern informs assessment of campaign intent and potential strategic objectives. If the actor is prioritizing telecom resilience functions and trusted-access pathways, the risk extends beyond single-account compromise to broader visibility into network dependencies, outage handling, and future contingency operations across interconnected critical infrastructure.",
+      "uncertainties": [
+        "The current evidence supports a collection-oriented hypothesis, but preparation for disruption cannot be ruled out.",
+        "Victimology remains partly inferred from targeting artifacts and sector reporting rather than confirmed compromise notifications from all named entities.",
+        "Overlap with regional infrastructure themes may reflect opportunistic targeting of high-value administrators rather than a coherent strategic campaign."
+      ]
+    }
+  ],
+  "gaps": [
+    "Attribution remains unclear because current overlaps could reflect shared tooling, rented infrastructure, or operator handoff rather than a single threat actor.",
+    "Corroboration is insufficient to confirm whether the phishing domains in F-002 directly enabled the successful account activity observed in F-001.",
+    "Victimology is incomplete, including whether additional Northern European telecom or interconnection organizations were compromised versus only targeted.",
+    "Campaign intent is not fully established; available evidence supports intelligence collection and access development, but pre-disruption preparation has not been confirmed."
+  ]
+}
