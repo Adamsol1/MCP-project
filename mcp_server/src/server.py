@@ -23,6 +23,8 @@ from prompts import (
     build_direction_dialogue_prompt,
     build_direction_summary_prompt,
     build_pir_generation_prompt,
+    build_processing_modify_prompt,
+    build_processing_prompt,
 )
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
 from tools.google_search import register_google_search_tools
@@ -987,8 +989,44 @@ def search_local_data(session_id: str, query: str, max_results: int = 20) -> str
     )
 
 
-# Processing Tools
-# TODO: Implement normalize_data, enrich_ioc, map_to_mitre
+# Processing Prompts
+
+
+@mcp.prompt
+def processing_process(
+    pir: str,
+    collected_data: str,
+    feedback: str = "",
+) -> str:
+    """Prompt for processing raw collected data into structured PMESII entities.
+
+    Args:
+        pir: The approved PIRs from the Direction phase.
+        collected_data: Raw data from the Collection phase.
+        feedback: Optional reviewer feedback from a previous attempt.
+    """
+    return build_processing_prompt(
+        pir=pir,
+        collected_data=collected_data,
+        feedback=feedback or None,
+    )
+
+
+@mcp.prompt
+def processing_modify(
+    existing_result: str,
+    modifications: str,
+) -> str:
+    """Prompt for applying analyst modifications to an existing processing result.
+
+    Args:
+        existing_result: The current ProcessingResult JSON string.
+        modifications: The analyst's requested changes.
+    """
+    return build_processing_modify_prompt(
+        existing_result=existing_result,
+        modifications=modifications,
+    )
 
 
 # Health check

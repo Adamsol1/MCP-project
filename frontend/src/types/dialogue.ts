@@ -7,6 +7,7 @@ export type DialogueStage =
   | "plan_confirming"
   | "collecting"
   | "reviewing"
+  | "processing"
   | "complete";
 
 export type DialogueSubState =
@@ -23,5 +24,7 @@ export type DialogueAction =
   | "show_plan"
   | "start_collecting"
   | "show_collection"
+  | "show_processing"
+  | "select_gaps"
   | "error"
   | "complete";

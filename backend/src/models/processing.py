@@ -1,62 +1,35 @@
-"""Models for the Processing phase output.
-
-IntelligenceFinding represents a single processed intelligence observation,
-combining normalized, enriched, and correlated data from the collection phase.
-
-ProcessingResult is the top-level output sent to the Analysis phase.
-"""
+from enum import Enum
 
 from pydantic import BaseModel, Field
 
 from src.models.enums import DataSource
 
 
-class IntelligenceFinding(BaseModel):
-    """A single processed intelligence observation.
+class PMESIICategory(str, Enum):
+    POLITICAL = "political"
+    MILITARY = "military"
+    ECONOMIC = "economic"
+    SOCIAL = "social"
+    INFORMATION = "information"
+    INFRASTRUCTURE = "infrastructure"
 
-    Represents one meaningful thing learned during processing —
-    after normalization, enrichment, and correlation. This is the
-    unit of intelligence passed to the Analysis phase.
-    """
 
-    finding: str = Field(..., description="Plain-text description of what was found")
-
-    source: DataSource = Field(..., description="Primary source this finding came from")
-
-    confidence: int = Field(..., ge=0, le=100, description="Confidence score 0-100")
-
-    relevant_to: list[str] = Field(
-        default_factory=list,
-        description="PIR IDs this finding is relevant to (e.g. ['PIR-1', 'PIR-2'])",
-    )
-
-    supporting_data: dict = Field(
-        default_factory=dict,
-        description=(
-            "Curated evidence supporting this finding. "
-            "For IoCs: ips, domains, attack_ids, first_seen, linked_actors. "
-            "For geopolitical: kb_references, related_events, context snippets."
-        ),
-    )
+class PMESIIEntity(BaseModel):
+    id: str = Field(..., description="Unique identifier for this entity")
+    name: str = Field(..., description="Short name or label for the entity")
+    description: str = Field(..., description="Factual description — no interpretation or conclusions")
+    categories: list[PMESIICategory] = Field(..., description="One or more PMESII categories")
+    sources: list[DataSource] = Field(..., description="All sources that contributed to this entity")
+    confidence: int = Field(..., ge=0, le=100, description="How well this finding is supported (0-100)")
+    relevant_to: list[str] = Field(default_factory=list, description="PIR IDs this entity helps answer")
+    tags: list[str] = Field(default_factory=list, description="Free-form tags for relations and context")
+    first_observed: str | None = Field(default=None, description="ISO date when first observed")
+    last_updated: str | None = Field(default=None, description="ISO date when last updated")
 
 
 class ProcessingResult(BaseModel):
-    """Output of the Processing phase, sent as input to the Analysis phase.
-
-    Contains all processed intelligence findings and identified gaps.
-    Gaps are as analytically important as findings — they show where
-    the collection did not produce sufficient data to answer PIRs.
-    """
-
-    findings: list[IntelligenceFinding] = Field(
-        default_factory=list,
-        description="All processed intelligence findings",
-    )
-
-    gaps: list[str] = Field(
-        default_factory=list,
-        description=(
-            "Topics or PIRs where insufficient data was found. "
-            "Each gap is a plain-text description of what is missing."
-        ),
-    )
+    entities: list[PMESIIEntity] = Field(default_factory=list)
+    gaps: list[str] = Field(default_factory=list)
+    processing_summary: str = Field(default="")
+    assessment_changed: bool = Field(default=False)
+    change_summary: str | None = Field(default=None)

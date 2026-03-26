@@ -11,6 +11,7 @@ import type {
   CollectionSummaryData,
   Message,
   PirData,
+  ProcessingData,
   SuggestedSourcesData,
 } from "../../types/conversation";
 import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
@@ -262,6 +263,37 @@ function CollectionReviewPrompt({
   );
 }
 
+function ProcessingMessage({ data }: { data: ProcessingData }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Processing Results</h3>
+      <p className="text-sm text-text-secondary whitespace-pre-wrap">{data.processing_summary}</p>
+      <details className="group">
+        <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+          {data.entities.length} entities <Chevron />
+        </summary>
+        <div className="mt-2 space-y-2">
+          {data.entities.map((e) => (
+            <div key={e.id} className="rounded border border-border-muted bg-surface px-3 py-2 text-sm">
+              <p className="font-medium text-text-primary">{e.name}</p>
+              <p className="text-xs text-text-muted mt-0.5">{e.categories.join(", ")} · confidence {e.confidence}% · {e.relevant_to.join(", ")}</p>
+              <p className="text-xs text-text-secondary mt-1">{e.description}</p>
+            </div>
+          ))}
+        </div>
+      </details>
+      {data.gaps.length > 0 && (
+        <div className="border-t border-border pt-2">
+          <p className="text-sm font-medium text-text-secondary">Gaps</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
+            {data.gaps.map((gap, i) => <li key={i}>{gap}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
   messages?: Message[];
@@ -272,6 +304,7 @@ interface ChatWindowProps {
   onApprove?: () => void;
   onReject?: () => void;
   onGatherMore?: () => void;
+  onGatherMoreFromProcessing?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
   collectionStatus?: CollectionStatus | null;
@@ -375,6 +408,7 @@ export default function ChatWindow({
   onApprove,
   onReject,
   onGatherMore,
+  onGatherMoreFromProcessing,
   isSourceSelecting = false,
   isCollecting = false,
   collectionStatus = null,
@@ -456,6 +490,10 @@ export default function ChatWindow({
       Array.isArray(message.data)
     ) {
       return <SuggestedSourcesMessage sources={message.data as SuggestedSourcesData} />;
+    }
+
+    if (message.type === "processing" && message.data && "entities" in message.data) {
+      return <ProcessingMessage data={message.data as ProcessingData} />;
     }
 
     if (
@@ -630,7 +668,24 @@ export default function ChatWindow({
                 )}
               </section>
             ) : isConfirming ? (
-              stage === "reviewing" ? (
+              stage === "processing" ? (
+                <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-text-primary">Processing Review</h3>
+                    <p className="text-sm text-text-secondary">Accept the analysis or go back to collect more data.</p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button type="button" onClick={() => onApprove?.()} disabled={isLoading}
+                      className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50">
+                      Accept
+                    </button>
+                    <button type="button" onClick={() => onGatherMoreFromProcessing?.()} disabled={isLoading}
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
+                      Gather More
+                    </button>
+                  </div>
+                </section>
+              ) : stage === "reviewing" ? (
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}

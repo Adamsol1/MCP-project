@@ -68,6 +68,7 @@ class CollectionFlow(BasePhaseFlow):
         self.collection_plan: str | None = None
         self.selected_sources: list[str] = []
         self.pending_reasoning_log: ReasoningLog | None = None
+        self.gather_more_feedback: str | None = None
 
     def to_dict(self) -> dict:
         """Serialize session state to a plain dict for JSON persistence.
@@ -79,6 +80,7 @@ class CollectionFlow(BasePhaseFlow):
             "pir": self.pir,
             "collection_plan": self.collection_plan,
             "selected_sources": self.selected_sources,
+            "gather_more_feedback": self.gather_more_feedback,
             "direction_context": self.direction_context.model_dump() if self.direction_context else None,
             "pending_reasoning_log": (
                 self.pending_reasoning_log.model_dump() if self.pending_reasoning_log else None
@@ -98,6 +100,7 @@ class CollectionFlow(BasePhaseFlow):
         flow.state = CollectionState(data["state"])
         flow.collection_plan = data["collection_plan"]
         flow.selected_sources = data["selected_sources"]
+        flow.gather_more_feedback = data.get("gather_more_feedback")
         flow.pending_reasoning_log = (
             ReasoningLog.model_validate(data["pending_reasoning_log"])
             if data.get("pending_reasoning_log")
@@ -184,6 +187,8 @@ class CollectionFlow(BasePhaseFlow):
             [p.value for p in self.direction_context.perspectives]
             if self.direction_context else []
         )
+        feedback = self.gather_more_feedback
+        self.gather_more_feedback = None  # consume once
         try:
             if orchestrator and reviewer:
                 collection_summary = await orchestrator.collect_and_review(
@@ -196,6 +201,7 @@ class CollectionFlow(BasePhaseFlow):
                     direction_context=self.direction_context,
                     timeframe=timeframe,
                     perspectives=perspectives,
+                    feedback=feedback,
                 )
             else:
                 collection_summary = await collection_service.collect(
@@ -264,8 +270,11 @@ class CollectionFlow(BasePhaseFlow):
             return DialogueResponse(action="complete", content="Collection phase complete")
 
         elif gather_more:
-            self._log_user_action(action="gather_more", phase="reviewing", modifications=None, perspectives=None)
-            self.selected_sources = selected_sources or []
+            self._log_user_action(action="gather_more", phase="reviewing", modifications=user_message, perspectives=None)
+            if selected_sources:
+                self.selected_sources = selected_sources
+            # else: keep existing selected_sources from the previous collection run
+            self.gather_more_feedback = user_message or None
             self.state = CollectionState.COLLECTING
             return DialogueResponse(action="start_collecting", content=json.dumps(self.selected_sources))
 
