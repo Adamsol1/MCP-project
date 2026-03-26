@@ -1,7 +1,68 @@
 import type { CollectionDisplayData, CollectedItem } from "../../types/conversation";
 import { useT } from "../../i18n/useT";
 
-// ── Article type classification ──────────────────────────────────────────────
+// ── Pie chart ─────────────────────────────────────────────────────────────────
+
+const SLICE_COLORS = [
+  "#3b82f6", // blue
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#8b5cf6", // violet
+  "#ef4444", // red
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#84cc16", // lime
+];
+
+interface SliceData {
+  name: string;
+  count: number;
+  color: string;
+}
+
+function PieChart({ slices }: { slices: SliceData[] }) {
+  const total = slices.reduce((s, d) => s + d.count, 0);
+  if (total === 0) return null;
+
+  const cx = 100, cy = 100, r = 88, innerR = 52;
+  let angle = -Math.PI / 2;
+
+  const paths = slices.map((slice) => {
+    const sweep = (slice.count / total) * 2 * Math.PI;
+    const start = angle;
+    angle += sweep;
+    const end = angle;
+
+    const x1o = cx + r * Math.cos(start), y1o = cy + r * Math.sin(start);
+    const x2o = cx + r * Math.cos(end),   y2o = cy + r * Math.sin(end);
+    const x1i = cx + innerR * Math.cos(end),   y1i = cy + innerR * Math.sin(end);
+    const x2i = cx + innerR * Math.cos(start), y2i = cy + innerR * Math.sin(start);
+    const large = sweep > Math.PI ? 1 : 0;
+
+    const d =
+      `M ${x1o} ${y1o} A ${r} ${r} 0 ${large} 1 ${x2o} ${y2o}` +
+      ` L ${x1i} ${y1i} A ${innerR} ${innerR} 0 ${large} 0 ${x2i} ${y2i} Z`;
+
+    return { ...slice, d };
+  });
+
+  return (
+    <svg viewBox="0 0 200 200" className="w-44 h-44">
+      {paths.map((p) => (
+        <path key={p.name} d={p.d} fill={p.color} stroke="transparent" strokeWidth="1" />
+      ))}
+      {/* Center label */}
+      <text x="100" y="96" textAnchor="middle" fill="var(--color-text-primary)" fontSize="11" fontWeight="600">
+        {total}
+      </text>
+      <text x="100" y="110" textAnchor="middle" fill="var(--color-text-muted)" fontSize="9">
+        items
+      </text>
+    </svg>
+  );
+}
+
+// ── Article type classification ───────────────────────────────────────────────
 
 const NEWS_DOMAINS = new Set([
   "reuters.com", "bloomberg.com", "bbc.com", "bbc.co.uk", "nytimes.com",
@@ -26,16 +87,13 @@ function classifyArticle(url: string, source: string): ArticleLabel {
   if (source === "google_news_search") return "News";
   let hostname = "";
   try { hostname = new URL(url).hostname.replace(/^www\./, ""); } catch { /* invalid url */ }
-
   if (NEWS_DOMAINS.has(hostname)) return "News";
   if (ANALYSIS_DOMAINS.has(hostname)) return "Analysis";
   if (/\.(gov|mil)$/.test(hostname)) return "Official";
-
   const path = url.toLowerCase();
   if (/\/(news|breaking|latest|article)\//.test(path)) return "News";
   if (/\/(research|report|paper|publication|brief|working-paper)\//.test(path)) return "Report";
   if (/\/(analysis|insight|commentary|opinion|perspective|dispatch)\//.test(path)) return "Analysis";
-
   return "Article";
 }
 
@@ -50,15 +108,7 @@ const LABEL_STYLES: Record<ArticleLabel, string> = {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function cleanTitle(title: string): string {
-  // Strip trailing "| Publisher", "- Publisher", "— Publisher" suffixes from page <title> tags
   return title.replace(/\s*[|–—]\s*[^|–—]+$/, "").replace(/\s+-\s+[^-]+$/, "").trim();
-}
-
-function displayLabel(item: CollectedItem): string | null {
-  if (!item.resource_id) return null;
-  if (item.source === "fetch_page") return classifyArticle(item.resource_id, item.source);
-  if (item.source === "google_news_search") return "News";
-  return null;
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
@@ -73,12 +123,6 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   fetch_page: "Web Fetch",
 };
 
-interface CollectionStatsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  collectionData: CollectionDisplayData | null;
-}
-
 function groupBySource(items: CollectedItem[]): Record<string, CollectedItem[]> {
   const groups: Record<string, CollectedItem[]> = {};
   for (const item of items) {
@@ -87,6 +131,279 @@ function groupBySource(items: CollectedItem[]): Record<string, CollectedItem[]> 
     groups[name].push(item);
   }
   return groups;
+}
+
+// ── Content parsers ───────────────────────────────────────────────────────────
+
+/** Render KB markdown content as formatted HTML-like JSX. */
+function KbContent({ content }: { content: string }) {
+  if (!content.trim()) return <span className="text-text-muted text-xs italic">(no content)</span>;
+
+  const lines = content.split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (/^### /.test(line)) {
+      elements.push(
+        <h4 key={i} className="text-xs font-bold text-text-primary mt-3 mb-1">
+          {line.slice(4)}
+        </h4>
+      );
+    } else if (/^## /.test(line)) {
+      elements.push(
+        <h3 key={i} className="text-sm font-bold text-text-primary mt-3 mb-1">
+          {line.slice(3)}
+        </h3>
+      );
+    } else if (/^# /.test(line)) {
+      elements.push(
+        <h2 key={i} className="text-sm font-semibold text-text-primary mt-3 mb-1 border-b border-border pb-1">
+          {line.slice(2)}
+        </h2>
+      );
+    } else if (/^[-*] /.test(line)) {
+      elements.push(
+        <li key={i} className="ml-4 text-xs text-text-secondary list-disc">
+          <InlineMarkdown text={line.slice(2)} />
+        </li>
+      );
+    } else if (/^\d+\. /.test(line)) {
+      elements.push(
+        <li key={i} className="ml-4 text-xs text-text-secondary list-decimal">
+          <InlineMarkdown text={line.replace(/^\d+\. /, "")} />
+        </li>
+      );
+    } else if (line.trim() === "") {
+      elements.push(<div key={i} className="h-1" />);
+    } else {
+      elements.push(
+        <p key={i} className="text-xs text-text-secondary">
+          <InlineMarkdown text={line} />
+        </p>
+      );
+    }
+    i++;
+  }
+
+  return <div className="space-y-0.5">{elements}</div>;
+}
+
+function InlineMarkdown({ text }: { text: string }) {
+  // Handle **bold** and *italic*
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  return (
+    <>
+      {parts.map((part, i) => {
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+          return <strong key={i} className="font-semibold text-text-primary">{part.slice(2, -2)}</strong>;
+        }
+        if (/^\*[^*]+\*$/.test(part)) {
+          return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        return <span key={i}>{part}</span>;
+      })}
+    </>
+  );
+}
+
+interface OtxPulse {
+  // present on both search results and detail-enriched pulses
+  pulse_name?: string;
+  name?: string;          // from _fetch_pulse_details (richer source)
+  adversary?: string;
+  tags?: string[];
+  targeted_countries?: string[];
+  malware_families?: string[];
+  attack_ids?: string[];
+  description?: string;
+  created?: string;
+  modified?: string;
+  indicator_count?: number;
+  references?: string[];
+}
+
+/** Extract a flat array of pulses from the query_otx JSON response.
+ *
+ * The tool returns:
+ *   { search_term, total_results, enriched_pulses: [...], additional_pulses: [...] }
+ * or for indicator lookups:
+ *   { search_term, indicator_type, results: [...], total_results }
+ * or legacy: a flat array.
+ */
+function extractOtxPulses(parsed: unknown): OtxPulse[] {
+  if (Array.isArray(parsed)) return parsed as OtxPulse[];
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as Record<string, unknown>;
+    // Keyword search response
+    const enriched = obj["enriched_pulses"];
+    const additional = obj["additional_pulses"];
+    if (Array.isArray(enriched)) {
+      return [
+        ...(enriched as OtxPulse[]),
+        ...(Array.isArray(additional) ? (additional as OtxPulse[]) : []),
+      ];
+    }
+    // Indicator search response
+    const results = obj["results"];
+    if (Array.isArray(results)) return results as OtxPulse[];
+  }
+  return [];
+}
+
+/** Try to render OTX content as structured pulse cards, fall back to raw text. */
+function OtxContent({ content }: { content: string }) {
+  if (!content.trim()) return <span className="text-text-muted text-xs italic">(no content)</span>;
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    // not JSON — show raw text
+  }
+
+  if (!parsed) {
+    return <pre className="text-xs text-text-secondary whitespace-pre-wrap break-all">{content}</pre>;
+  }
+
+  const pulses = extractOtxPulses(parsed);
+  if (pulses.length === 0) {
+    // Parsed fine but unexpected shape — show raw
+    return <pre className="text-xs text-text-secondary whitespace-pre-wrap break-all">{content}</pre>;
+  }
+
+  return (
+    <div className="space-y-3">
+      {pulses.map((pulse, i) => {
+        const title = pulse.name || pulse.pulse_name;
+        return (
+          <div key={i} className="rounded border border-border bg-surface-muted p-3 space-y-2">
+            {title && (
+              <p className="text-xs font-semibold text-text-primary">{title}</p>
+            )}
+            {pulse.description && (
+              <p className="text-xs text-text-secondary">{pulse.description}</p>
+            )}
+            <div className="flex flex-wrap gap-x-6 gap-y-1">
+              {pulse.adversary && (
+                <span className="text-xs text-text-muted">
+                  <span className="font-medium text-text-secondary">Adversary:</span> {pulse.adversary}
+                </span>
+              )}
+              {pulse.indicator_count !== undefined && (
+                <span className="text-xs text-text-muted">
+                  <span className="font-medium text-text-secondary">Indicators:</span> {pulse.indicator_count}
+                </span>
+              )}
+              {pulse.created && (
+                <span className="text-xs text-text-muted">
+                  <span className="font-medium text-text-secondary">Created:</span>{" "}
+                  {new Date(pulse.created).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            {pulse.tags && pulse.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {pulse.tags.slice(0, 12).map((tag) => (
+                  <span key={tag} className="rounded bg-surface-elevated px-1.5 py-0.5 text-[10px] text-text-muted">
+                    {tag}
+                  </span>
+                ))}
+                {pulse.tags.length > 12 && (
+                  <span className="text-[10px] text-text-muted">+{pulse.tags.length - 12} more</span>
+                )}
+              </div>
+            )}
+            {pulse.targeted_countries && pulse.targeted_countries.length > 0 && (
+              <p className="text-xs text-text-muted">
+                <span className="font-medium text-text-secondary">Countries:</span>{" "}
+                {pulse.targeted_countries.join(", ")}
+              </p>
+            )}
+            {pulse.malware_families && pulse.malware_families.length > 0 && (
+              <p className="text-xs text-text-muted">
+                <span className="font-medium text-text-secondary">Malware:</span>{" "}
+                {pulse.malware_families.join(", ")}
+              </p>
+            )}
+            {pulse.attack_ids && pulse.attack_ids.length > 0 && (
+              <p className="text-xs text-text-muted">
+                <span className="font-medium text-text-secondary">ATT&CK:</span>{" "}
+                {pulse.attack_ids.join(", ")}
+              </p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function isOtxSource(source: string) {
+  return source === "query_otx";
+}
+
+function isKbSource(source: string) {
+  return source === "list_knowledge_base" || source === "read_knowledge_base";
+}
+
+// ── Item renderer ─────────────────────────────────────────────────────────────
+
+function ItemCard({ item }: { item: CollectedItem }) {
+  const isOtx = isOtxSource(item.source);
+  const isKb = isKbSource(item.source);
+  const isFetch = item.source === "fetch_page";
+
+  const label = isFetch && item.resource_id
+    ? classifyArticle(item.resource_id, item.source) as ArticleLabel
+    : item.source === "google_news_search" ? "News" as ArticleLabel
+    : null;
+
+  const displayTitle = isFetch
+    ? (item.title ? cleanTitle(item.title) : item.resource_id)
+    : item.resource_id;
+
+  return (
+    <div className="rounded border border-border bg-surface p-3 space-y-2">
+      {item.resource_id && (
+        <div className="flex flex-wrap items-center gap-1.5">
+          {label && (
+            <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${LABEL_STYLES[label]}`}>
+              {label}
+            </span>
+          )}
+          <a
+            href={item.resource_id}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text hover:underline max-w-[60ch] truncate inline-block"
+            title={item.resource_id}
+          >
+            {displayTitle}
+          </a>
+        </div>
+      )}
+      {isOtx ? (
+        <OtxContent content={item.content} />
+      ) : isKb ? (
+        <KbContent content={item.content} />
+      ) : (
+        <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
+          {item.content || "(no content)"}
+        </pre>
+      )}
+    </div>
+  );
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+interface CollectionStatsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  collectionData: CollectionDisplayData | null;
 }
 
 export default function CollectionStatsModal({
@@ -112,23 +429,30 @@ export default function CollectionStatsModal({
 
   const groups = groupBySource(collectionData.collected_data);
   const totalItems = collectionData.source_summary.reduce((sum, s) => sum + s.count, 0);
-  const maxCount = Math.max(...collectionData.source_summary.map((s) => s.count), 1);
+
+  const slices: SliceData[] = collectionData.source_summary
+    .filter((s) => s.count > 0)
+    .map((s, i) => ({
+      name: s.display_name,
+      count: s.count,
+      color: SLICE_COLORS[i % SLICE_COLORS.length],
+    }));
 
   return (
     <div
       data-testid="modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
     >
       <div
         data-testid="collection-stats-modal"
         role="dialog"
         aria-modal="true"
-        className="flex h-[85vh] w-225 max-w-[95vw] flex-col overflow-hidden rounded-lg border border-border bg-surface shadow-2xl"
+        className="flex h-[95vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
-        <div className="flex items-center justify-between border-b border-border px-16 py-4">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-8 py-4">
           <div>
             <h2 className="text-base font-semibold text-text-primary">{t.collectionResultsHeader}</h2>
             <p className="mt-0.5 text-xs text-text-muted">
@@ -138,101 +462,83 @@ export default function CollectionStatsModal({
           <button
             aria-label="close"
             onClick={onClose}
-            className="text-text-muted hover:text-text-primary transition-colors"
+            className="rounded p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
           >
             ✕
           </button>
         </div>
 
-        {/* ── Scrollable body ── */}
-        <div className="flex-1 overflow-y-auto px-16 py-5 space-y-6">
+        {/* ── Body: two-column layout ── */}
+        <div className="flex flex-1 overflow-hidden">
+          {/* Left panel — pie chart + legend */}
+          <div className="flex w-72 shrink-0 flex-col gap-6 border-r border-border overflow-y-auto px-6 py-6">
+            <div>
+              <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-text-muted">
+                {t.sourceDistribution}
+              </p>
+              <div className="flex justify-center">
+                <PieChart slices={slices} />
+              </div>
+            </div>
 
-          {/* Stats section */}
-          <section>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-text-muted">
-              {t.sourceDistribution}
-            </p>
+            {/* Legend */}
             <div className="space-y-2">
-              {collectionData.source_summary.map((source) => (
-                <div key={source.display_name} className="flex items-center gap-3">
-                  <span className="w-44 shrink-0 text-xs text-text-secondary truncate">
-                    {source.display_name}
-                  </span>
-                  <div className="flex-1 h-2 rounded-full bg-surface-elevated overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        source.has_content ? "bg-primary" : "bg-border"
-                      }`}
-                      style={{ width: `${(source.count / maxCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="w-8 text-right text-xs font-medium tabular-nums text-text-secondary">
-                    {source.count}
-                  </span>
-                  {!source.has_content && (
-                    <span className="text-[10px] uppercase tracking-wide text-text-muted">
-                      {t.empty}
-                    </span>
-                  )}
+              {slices.map((slice) => (
+                <div key={slice.name} className="flex items-center gap-2.5">
+                  <span
+                    className="h-3 w-3 shrink-0 rounded-sm"
+                    style={{ backgroundColor: slice.color }}
+                  />
+                  <span className="flex-1 truncate text-xs text-text-secondary">{slice.name}</span>
+                  <span className="tabular-nums text-xs font-medium text-text-primary">{slice.count}</span>
                 </div>
               ))}
+              {collectionData.source_summary
+                .filter((s) => !s.has_content)
+                .map((s) => (
+                  <div key={s.display_name} className="flex items-center gap-2.5 opacity-50">
+                    <span className="h-3 w-3 shrink-0 rounded-sm bg-border" />
+                    <span className="flex-1 truncate text-xs text-text-muted">{s.display_name}</span>
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted">{t.empty}</span>
+                  </div>
+                ))}
             </div>
-          </section>
+          </div>
 
-          {/* Raw data section */}
-          <section>
-            <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-text-muted">
+          {/* Right panel — collected data by source */}
+          <div className="flex-1 overflow-y-auto px-8 py-6 space-y-4">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-text-muted">
               {t.rawCollectedData}
             </p>
             <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
               {Object.entries(groups).map(([groupName, items]) => (
-                <details
-                  key={groupName}
-                  role="group"
-                  open
-                  className="group"
-                >
-                  <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-2.5 bg-surface-muted border-b border-border-muted text-sm font-medium text-text-secondary hover:text-text-primary list-none">
-                    {groupName}
-                    <span className="text-xs text-text-muted">{t.itemCount(items.length)}</span>
+                <details key={groupName} open className="group">
+                  <summary className="flex cursor-pointer select-none items-center justify-between px-5 py-3 bg-surface-muted hover:bg-surface-elevated transition-colors list-none">
+                    <span className="text-sm font-medium text-text-primary">{groupName}</span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-text-muted">{t.itemCount(items.length)}</span>
+                      <svg
+                        className="h-4 w-4 text-text-muted transition-transform group-open:rotate-180"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                      >
+                        <path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </div>
                   </summary>
-                  <div className="divide-y divide-border-muted">
-                    {items.map((item, i) => {
-                      const label = displayLabel(item) as ArticleLabel | null;
-                      const displayTitle = item.source === "fetch_page"
-                        ? (item.title ? cleanTitle(item.title) : item.resource_id)
-                        : item.resource_id;
-                      return (
-                        <div key={i} className="px-4 py-3">
-                          {item.resource_id && (
-                            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
-                              {label && (
-                                <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${LABEL_STYLES[label]}`}>
-                                  {label}
-                                </span>
-                              )}
-                              <a
-                                href={item.resource_id}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text hover:underline max-w-[60ch] truncate inline-block"
-                                title={item.resource_id}
-                              >
-                                {displayTitle}
-                              </a>
-                            </div>
-                          )}
-                          <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
-                            {item.content || t.noContent}
-                          </pre>
-                        </div>
-                      );
-                    })}
+                  <div className="divide-y divide-border-muted px-5 py-4 space-y-3">
+                    {items.map((item, i) => (
+                      <div key={i} className={i > 0 ? "pt-3" : ""}>
+                        <ItemCard item={item} />
+                      </div>
+                    ))}
                   </div>
                 </details>
               ))}
             </div>
-          </section>
+          </div>
         </div>
       </div>
     </div>

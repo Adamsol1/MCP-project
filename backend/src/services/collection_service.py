@@ -78,11 +78,22 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
 
 
 def _extract_search_urls(raw_data: str) -> list[str]:
-    """Extract unique URLs from google_search and google_news_search tool results."""
-    found = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    """Extract unique URLs from google_search and google_news_search tool results.
+
+    Handles two output formats:
+    - Legacy / partial copy: tool text includes "URL: https://..." lines
+    - Current format: model puts URL in "resource_id" JSON field
+    Both are searched so the second-pass fetch runs regardless of which format
+    the model used.
+    """
+    # Format 1 — legacy text: "URL: https://..."
+    text_urls = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    # Format 2 — JSON resource_id field containing an HTTP URL
+    resource_ids = re.findall(r'"resource_id"\s*:\s*"(https?://[^"]+)"', raw_data)
+
     seen: set[str] = set()
     unique: list[str] = []
-    for url in found:
+    for url in text_urls + resource_ids:
         url = url.rstrip(".,)")
         if url not in seen:
             seen.add(url)

@@ -19,8 +19,10 @@ export interface InputParameters {
  * Persisted to localStorage under the key "mcp-settings".
  */
 export interface Settings {
-  /** Language the AI will use in its responses. */
+  /** Language used to render the UI (menus, labels, etc.). */
   language: Language;
+  /** Language the AI will use in its responses (sent to backend). */
+  aiLanguage: Language;
   /** Visual theme applied to the UI. */
   theme: Theme;
   /** Prompt context parameters auto-filled on every message send. */
@@ -33,6 +35,7 @@ export interface Settings {
  */
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
+  aiLanguage: "en",
   theme: "dark",
   inputParameters: {
     timeframe: "",

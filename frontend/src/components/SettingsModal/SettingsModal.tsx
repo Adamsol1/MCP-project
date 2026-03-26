@@ -30,7 +30,7 @@ type NavSection = "general" | "parameters";
  *   All settings values come from SettingsContext via useSettings().
  */
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
-  const { settings, updateLanguage, updateTheme, updateInputParameters } =
+  const { settings, updateLanguage, updateAiLanguage, updateTheme, updateInputParameters } =
     useSettings();
   const t = useT();
 
@@ -100,8 +100,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             )}
             {activeSection === "parameters" && (
               <ParametersSection
-                language={settings.language}
-                onLanguageChange={updateLanguage}
+                aiLanguage={settings.aiLanguage}
+                onAiLanguageChange={updateAiLanguage}
                 timeframe={settings.inputParameters.timeframe}
                 onTimeframeChange={(v) => updateInputParameters({ timeframe: v })}
               />
@@ -228,13 +228,13 @@ function GeneralSection({
 
 /** Parameters section — AI output language and prompt context fields. */
 function ParametersSection({
-  language,
-  onLanguageChange,
+  aiLanguage,
+  onAiLanguageChange,
   timeframe,
   onTimeframeChange,
 }: {
-  language: Language;
-  onLanguageChange: (l: Language) => void;
+  aiLanguage: Language;
+  onAiLanguageChange: (l: Language) => void;
   timeframe: string;
   onTimeframeChange: (v: string) => void;
 }) {
@@ -246,8 +246,8 @@ function ParametersSection({
         description={t.aiOutputLanguageDesc}
         control={
           <select
-            value={language}
-            onChange={(e) => onLanguageChange(e.target.value as Language)}
+            value={aiLanguage}
+            onChange={(e) => onAiLanguageChange(e.target.value as Language)}
             className={selectClass}
           >
             <option value="en">{t.langEnglish}</option>

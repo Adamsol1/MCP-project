@@ -368,7 +368,7 @@ export function useChat() {
       sessionId,
       perspectives,
       approved,
-      settings.language,
+      settings.aiLanguage,
       settings.inputParameters.timeframe,
       options,
     );
@@ -384,7 +384,7 @@ export function useChat() {
       sessionId,
       perspectives,
       undefined,
-      settings.language,
+      settings.aiLanguage,
       settings.inputParameters.timeframe,
     );
     applyResponse(collectResponse, conversationId, "collecting", null);

@@ -290,12 +290,6 @@ function SourceSummaryTable({
             <th className="text-right px-3 py-1.5 font-medium text-text-secondary">
               {t.tableItems}
             </th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
-              {t.tableResources}
-            </th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
-              {t.tableStatus}
-            </th>
           </tr>
         </thead>
         <tbody>
@@ -306,19 +300,6 @@ function SourceSummaryTable({
               </td>
               <td className="px-3 py-1.5 text-right text-text-secondary">
                 {s.count}
-              </td>
-              <td className="px-3 py-1.5 text-xs text-text-muted">
-                {s.resource_ids.length > 0 ? s.resource_ids.join(", ") : "—"}
-              </td>
-              <td className="px-3 py-1.5">
-                <span
-                  className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                    s.has_content ? "bg-success" : "bg-warning-dark"
-                  }`}
-                />
-                <span className="text-xs text-text-secondary">
-                  {s.has_content ? t.dataFound : t.empty}
-                </span>
               </td>
             </tr>
           ))}
