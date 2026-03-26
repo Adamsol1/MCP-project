@@ -1,4 +1,5 @@
 import type { DialogueStage } from "../../types/dialogue";
+import { useT } from "../../i18n/useT";
 
 interface ApprovalPromptProps {
   /** Called when the user approves and continues. */
@@ -16,32 +17,34 @@ interface PromptCopy {
   subtitle: string;
 }
 
-const DEFAULT_PROMPT_COPY: PromptCopy = {
-  title: "Approval Prompt",
-  subtitle: "Review the generated output before continuing.",
-};
-
-const PROMPT_COPY_BY_STAGE: Partial<Record<DialogueStage, PromptCopy>> = {
-  summary_confirming: {
-    title: "Summary Approval Prompt",
-    subtitle: "Review the generated summary before continuing to PIR.",
-  },
-  pir_confirming: {
-    title: "PIR Approval Prompt",
-    subtitle: "Review the generated PIR before completing Direction.",
-  },
-  plan_confirming: {
-    title: "Collection Plan Approval Prompt",
-    subtitle: "Review the generated collection plan before selecting sources.",
-  },
-};
-
 export default function ApprovalPrompt({
   onApproveContinue,
   onRejectWithFeedback,
   isLoading = false,
   stage,
 }: ApprovalPromptProps) {
+  const t = useT();
+
+  const DEFAULT_PROMPT_COPY: PromptCopy = {
+    title: t.approvalDefault,
+    subtitle: t.approvalDefaultSubtitle,
+  };
+
+  const PROMPT_COPY_BY_STAGE: Partial<Record<DialogueStage, PromptCopy>> = {
+    summary_confirming: {
+      title: t.approvalSummary,
+      subtitle: t.approvalSummarySubtitle,
+    },
+    pir_confirming: {
+      title: t.approvalPir,
+      subtitle: t.approvalPirSubtitle,
+    },
+    plan_confirming: {
+      title: t.approvalPlan,
+      subtitle: t.approvalPlanSubtitle,
+    },
+  };
+
   const promptCopy = stage
     ? (PROMPT_COPY_BY_STAGE[stage] ?? DEFAULT_PROMPT_COPY)
     : DEFAULT_PROMPT_COPY;
@@ -63,7 +66,7 @@ export default function ApprovalPrompt({
           disabled={!canApprove}
           className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Approve & Continue
+          {t.approveContinue}
         </button>
 
         <button
@@ -72,7 +75,7 @@ export default function ApprovalPrompt({
           disabled={!canReject}
           className="rounded-md bg-error px-4 py-2 text-sm font-medium text-text-inverse hover:bg-error-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Reject with Feedback
+          {t.rejectWithFeedback}
         </button>
       </div>
     </section>

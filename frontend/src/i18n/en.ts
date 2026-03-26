@@ -1,0 +1,161 @@
+export const en = {
+  // Sidebar
+  toggleSidebar: "Toggle sidebar",
+  newChat: "New Chat",
+  newConversationDefault: "New conversation",
+  noConversations: "No conversations yet",
+  chatOptions: "Chat options",
+  rename: "Rename",
+  delete: "Delete",
+  openSettings: "Open settings",
+  devTools: "Dev Tools",
+  show: "Show",
+  hide: "Hide",
+  expandDevTools: "Expand dev tools",
+  minimizeDevTools: "Minimize dev tools",
+  sendTestMessage: "Send test message",
+  showCollectionApproval: "Show collection approval",
+  directionPhase: "Direction Phase",
+  expandDirectionPhase: "Expand direction phase",
+  minimizeDirectionPhase: "Minimize direction phase",
+  jumpToInitial: "Jump to Initial",
+  jumpToGathering: "Jump to Gathering",
+  jumpToSummary: "Jump to Summary",
+  jumpToPir: "Jump to PIR",
+  jumpToComplete: "Jump to Complete",
+  syncStage: "Sync stage",
+  resetStage: "Reset stage",
+  deleteAllConversations: "Delete all conversations",
+
+  // ChatWindow
+  readyToStart: "Ready to start?",
+  sendMessage: "Send message",
+  placeholderDefault: "Type anything...",
+  placeholderPlanModify: "Describe the changes you want in the collection plan...",
+  placeholderSummaryModify: "Describe how to modify the collection summary...",
+  placeholderGatherMore: "Describe what to gather more information about...",
+  pirHeader: "Priority Intelligence Requirements (PIRs)",
+  rationale: "Rationale",
+  showReasoning: "Show reasoning",
+  collectionPlanHeader: "Collection Plan",
+  suggestedSources: "Suggested sources",
+  suggestedSourcesHeader: "Suggested Sources",
+  noSourceSuggestions: "No source suggestions were returned.",
+  collectionSummaryHeader: "Collection Summary",
+  sourcesUsed: "Sources used",
+  gaps: "Gaps",
+  noGapsIdentified: "No gaps identified.",
+  collectionReviewHeader: "Collection Review",
+  collectionReviewSubtitle:
+    "Accept the collected data or collect more from additional sources.",
+  accept: "Accept",
+  collectMoreData: "Collect More Data",
+  collectionResultsHeader: "Collection Results",
+  couldNotParseCollection: "Could not parse collection output.",
+  rawOutput: "Raw output",
+  selectSourcesHeader: "Select Sources",
+  selectSourcesSubtitle:
+    "Choose one or more data sources before collection starts.",
+  noSourceSuggestionsAvailable: "No source suggestions available.",
+  startCollecting: "Start Collecting",
+  collecting: "Collecting",
+  startingCollection: "Starting collection\u2026",
+  tableSource: "Source",
+  tableItems: "Items",
+  tableResources: "Resources",
+  tableStatus: "Status",
+  dataFound: "Data found",
+  empty: "Empty",
+  priorityHigh: "High",
+  priorityMedium: "Medium",
+  priorityLow: "Low",
+  resultSingular: "result",
+  resultPlural: "results",
+
+  // PerspectiveSelector
+  perspective: "Perspective",
+  perspectiveLabels: {
+    NEUTRAL: "Neutral",
+    CHINA: "China",
+    EU: "EU",
+    NORWAY: "Norway",
+    RUSSIA: "Russia",
+    US: "US",
+  } as Record<string, string>,
+
+  // PirSourcesView
+  noSourcesAvailable: "No sources available.",
+  pirSources: (n: number) => `Sources (${n})`,
+
+  // CollectionStatsView
+  statsSources: "Sources",
+  bySource: "By Source",
+  viewRawData: "View Raw Data \u2192",
+  noCollectionData: "No collection data",
+
+  // CollectionStatsModal
+  sourceDistribution: "Source Distribution",
+  rawCollectedData: "Raw Collected Data",
+  itemsAcrossSources: (items: number, sources: number) =>
+    `${items} items across ${sources} sources`,
+  itemCount: (n: number) => `${n} item${n !== 1 ? "s" : ""}`,
+  noDataAvailable: "No data available",
+  noContent: "(no content)",
+
+  // IntelligencePanel
+  intelligenceWorkspace: "Intelligence Workspace",
+  processingArtifacts: "Processing artifacts will appear here.",
+  analysisOutputs: "Analysis outputs will appear here.",
+  files: "Files",
+  uploadFiles: "Upload Files",
+  showLess: "Show less",
+  showMore: (n: number) => `Show ${n} more`,
+  removeFile: (name: string) => `Remove ${name}`,
+  phaseLabels: {
+    direction: "DIRECTION",
+    collection: "COLLECTION",
+    processing: "PROCESSING",
+    analysis: "ANALYSIS",
+  } as Record<string, string>,
+
+  // SettingsModal
+  settingsOptions: "Options",
+  navLabels: {
+    general: "general",
+    parameters: "parameters",
+  } as Record<string, string>,
+  closeSettings: "Close settings",
+  uiLanguage: "Language",
+  uiLanguageDesc: "The language used throughout the interface.",
+  aiOutputLanguage: "AI Output Language",
+  aiOutputLanguageDesc: "The language the AI will use in its responses.",
+  langEnglish: "English",
+  langNorwegian: "Norwegian",
+  themeLabel: "Theme",
+  themeDesc: "Choose between light and dark interface.",
+  themeLabels: {
+    light: "light",
+    dark: "dark",
+  } as Record<string, string>,
+  timeframeLabel: "Timeframe",
+  timeframeDesc:
+    "Auto-filled into each prompt so the AI knows the relevant period.",
+  timeframePlaceholder: "e.g. Last 30 days",
+
+  // ApprovalPrompt
+  approvalDefault: "Approval Prompt",
+  approvalDefaultSubtitle: "Review the generated output before continuing.",
+  approvalSummary: "Summary Approval Prompt",
+  approvalSummarySubtitle:
+    "Review the generated summary before continuing to PIR.",
+  approvalPir: "PIR Approval Prompt",
+  approvalPirSubtitle:
+    "Review the generated PIR before completing Direction.",
+  approvalPlan: "Collection Plan Approval Prompt",
+  approvalPlanSubtitle:
+    "Review the generated collection plan before selecting sources.",
+  approveContinue: "Approve \u0026 Continue",
+  rejectWithFeedback: "Reject with Feedback",
+};
+
+export type Translations = typeof en;

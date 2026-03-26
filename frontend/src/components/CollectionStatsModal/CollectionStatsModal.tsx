@@ -1,4 +1,5 @@
 import type { CollectionDisplayData, CollectedItem } from "../../types/conversation";
+import { useT } from "../../i18n/useT";
 
 // ── Article type classification ──────────────────────────────────────────────
 
@@ -93,6 +94,8 @@ export default function CollectionStatsModal({
   onClose,
   collectionData,
 }: CollectionStatsModalProps) {
+  const t = useT();
+
   if (!isOpen) return null;
 
   if (!collectionData)
@@ -102,7 +105,7 @@ export default function CollectionStatsModal({
           data-testid="collection-stats-modal"
           className="rounded-lg border border-border bg-surface p-8 shadow-2xl"
         >
-          <p className="text-sm text-text-secondary">No data available</p>
+          <p className="text-sm text-text-secondary">{t.noDataAvailable}</p>
         </div>
       </div>
     );
@@ -127,9 +130,9 @@ export default function CollectionStatsModal({
         {/* ── Header ── */}
         <div className="flex items-center justify-between border-b border-border px-16 py-4">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Collection Results</h2>
+            <h2 className="text-base font-semibold text-text-primary">{t.collectionResultsHeader}</h2>
             <p className="mt-0.5 text-xs text-text-muted">
-              {totalItems} items across {collectionData.source_summary.length} sources
+              {t.itemsAcrossSources(totalItems, collectionData.source_summary.length)}
             </p>
           </div>
           <button
@@ -147,7 +150,7 @@ export default function CollectionStatsModal({
           {/* Stats section */}
           <section>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-text-muted">
-              Source Distribution
+              {t.sourceDistribution}
             </p>
             <div className="space-y-2">
               {collectionData.source_summary.map((source) => (
@@ -168,7 +171,7 @@ export default function CollectionStatsModal({
                   </span>
                   {!source.has_content && (
                     <span className="text-[10px] uppercase tracking-wide text-text-muted">
-                      Empty
+                      {t.empty}
                     </span>
                   )}
                 </div>
@@ -179,7 +182,7 @@ export default function CollectionStatsModal({
           {/* Raw data section */}
           <section>
             <p className="mb-3 text-[11px] font-semibold uppercase tracking-widest text-text-muted">
-              Raw Collected Data
+              {t.rawCollectedData}
             </p>
             <div className="rounded-lg border border-border overflow-hidden divide-y divide-border">
               {Object.entries(groups).map(([groupName, items]) => (
@@ -191,7 +194,7 @@ export default function CollectionStatsModal({
                 >
                   <summary className="flex cursor-pointer select-none items-center justify-between px-4 py-2.5 bg-surface-muted border-b border-border-muted text-sm font-medium text-text-secondary hover:text-text-primary list-none">
                     {groupName}
-                    <span className="text-xs text-text-muted">{items.length} items</span>
+                    <span className="text-xs text-text-muted">{t.itemCount(items.length)}</span>
                   </summary>
                   <div className="divide-y divide-border-muted">
                     {items.map((item, i) => {
@@ -220,7 +223,7 @@ export default function CollectionStatsModal({
                             </div>
                           )}
                           <pre className="mt-1 max-h-36 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
-                            {item.content || "(no content)"}
+                            {item.content || t.noContent}
                           </pre>
                         </div>
                       );

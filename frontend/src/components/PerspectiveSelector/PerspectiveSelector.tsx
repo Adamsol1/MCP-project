@@ -24,21 +24,21 @@ interface PerspectiveSelectorProps {
  *     (React serialises the boolean to "true" / "false" automatically).
  *   - data-selected mirrors the state as a string attribute for CSS/test hooks.
  */
+import { useT } from "../../i18n/useT";
+
 export default function PerspectiveSelector({
   selected,
   onChange,
 }: PerspectiveSelectorProps) {
-  /**
-   * Each perspective has a human-readable label shown in the button and a
-   * value string used in the selected array and sent to the backend.
-   */
+  const t = useT();
+
   const perspectives = [
-    { label: "Neutral", value: "NEUTRAL" },
-    { label: "China", value: "CHINA" },
-    { label: "EU", value: "EU" },
-    { label: "Norway", value: "NORWAY" },
-    { label: "Russia", value: "RUSSIA" },
-    { label: "US", value: "US" },
+    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL" },
+    { label: t.perspectiveLabels["CHINA"], value: "CHINA" },
+    { label: t.perspectiveLabels["EU"], value: "EU" },
+    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY" },
+    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA" },
+    { label: t.perspectiveLabels["US"], value: "US" },
   ];
 
   /**
@@ -70,7 +70,7 @@ export default function PerspectiveSelector({
   return (
     <div className="flex flex-col gap-2">
       <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-        Perspective
+        {t.perspective}
       </p>
 
       <div className="grid grid-cols-2 gap-1">

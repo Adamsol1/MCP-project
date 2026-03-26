@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+import { useT } from "../../i18n/useT";
 import type { Language, Theme } from "../../types/settings";
 
 /** Props for the SettingsModal component. */
@@ -10,8 +11,8 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-/** The three navigable sections in the settings left-nav. */
-type NavSection = "language" | "appearance" | "parameters";
+/** The navigable sections in the settings left-nav. */
+type NavSection = "general" | "parameters";
 
 /**
  * Full-screen settings modal with an Obsidian-inspired two-panel layout.
@@ -31,30 +32,30 @@ type NavSection = "language" | "appearance" | "parameters";
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { settings, updateLanguage, updateTheme, updateInputParameters } =
     useSettings();
+  const t = useT();
 
   // Tracks which settings category is displayed in the right panel.
-  const [activeSection, setActiveSection] = useState<NavSection>("language");
+  const [activeSection, setActiveSection] = useState<NavSection>("general");
 
   // Return nothing when closed — keeps the DOM clean and avoids focus issues.
   if (!isOpen) return null;
 
   return (
-    /* Full-screen dark backdrop — clicking outside the modal box does NOT close
-       it intentionally, to avoid accidental dismissal mid-edit. */
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       {/* Modal box */}
       <div
         role="dialog"
         aria-modal="true"
         className="flex h-130 w-185 overflow-hidden rounded-lg border border-border bg-surface text-text-primary shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* ── Left nav ─────────────────────────────────────── */}
         {/* Each button sets activeSection, which swaps the right panel content. */}
         <nav className="flex w-48 flex-col gap-1 border-r border-border p-4 pt-6">
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
-            Options
+            {t.settingsOptions}
           </p>
-          {(["language", "appearance", "parameters"] as const).map(
+          {(["general", "parameters"] as const).map(
             (section) => (
               <button
                 key={section}
@@ -65,7 +66,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                     : "text-text-secondary hover:bg-surface-elevated hover:text-text-primary"
                 }`}
               >
-                {section}
+                {t.navLabels[section]}
               </button>
             ),
           )}
@@ -75,7 +76,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="relative flex flex-1 flex-col p-8 pt-6">
           {/* Close button — positioned absolute so it never pushes content down. */}
           <button
-            aria-label="Close settings"
+            aria-label={t.closeSettings}
             onClick={onClose}
             className="absolute right-4 top-4 text-text-muted hover:text-text-primary"
           >
@@ -84,27 +85,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Section heading mirrors the active nav item. */}
           <h2 className="mb-1 text-base font-semibold capitalize text-text-primary">
-            {activeSection}
+            {t.navLabels[activeSection]}
           </h2>
 
           {/* Only the active section component is mounted at a time. */}
           <main className="mt-2">
-            {activeSection === "language" && (
-              <LanguageSection
+            {activeSection === "general" && (
+              <GeneralSection
                 language={settings.language}
-                onChange={updateLanguage}
-              />
-            )}
-            {activeSection === "appearance" && (
-              <AppearanceSection
+                onLanguageChange={updateLanguage}
                 theme={settings.theme}
-                onChange={updateTheme}
+                onThemeChange={updateTheme}
               />
             )}
             {activeSection === "parameters" && (
               <ParametersSection
+                language={settings.language}
+                onLanguageChange={updateLanguage}
                 timeframe={settings.inputParameters.timeframe}
-                onChange={(v) => updateInputParameters({ timeframe: v })}
+                onTimeframeChange={(v) => updateInputParameters({ timeframe: v })}
               />
             )}
           </main>
@@ -172,107 +171,105 @@ const inputClass =
 
 // ─── Section components ───────────────────────────────────────────────────────
 
-/**
- * Language section — lets the user pick the AI output language.
- * Rendered when the "language" nav item is active.
- */
-function LanguageSection({
+/** General section — interface language and theme. */
+function GeneralSection({
   language,
-  onChange,
-}: {
-  /** Currently selected language code. */
-  language: Language;
-  /** Called with the new language code when the user changes the dropdown. */
-  onChange: (l: Language) => void;
-}) {
-  return (
-    <SettingRow
-      label="AI Output Language"
-      description="The language the AI will use in its responses."
-      control={
-        <select
-          value={language}
-          onChange={(e) => onChange(e.target.value as Language)}
-          className={selectClass}
-        >
-          <option value="en">English</option>
-          <option value="no">Norwegian</option>
-        </select>
-      }
-    />
-  );
-}
-
-/**
- * Appearance section — lets the user switch between light and dark theme.
- * Uses aria-pressed on each button so screen readers announce the active state.
- * Rendered when the "appearance" nav item is active.
- */
-function AppearanceSection({
+  onLanguageChange,
   theme,
-  onChange,
+  onThemeChange,
 }: {
-  /** Currently active theme. */
+  language: Language;
+  onLanguageChange: (l: Language) => void;
   theme: Theme;
-  /** Called with the chosen theme when the user clicks a button. */
-  onChange: (t: Theme) => void;
+  onThemeChange: (t: Theme) => void;
 }) {
+  const t = useT();
   return (
-    <SettingRow
-      label="Theme"
-      description="Choose between light and dark interface."
-      control={
-        <div className="flex gap-2">
-          {/* Render one toggle button per theme option. aria-pressed reflects selection. */}
-          {(["light", "dark"] as const).map((t) => (
-            <button
-              key={t}
-              aria-pressed={theme === t}
-              onClick={() => onChange(t)}
-              className={`rounded border px-4 py-1.5 text-sm capitalize transition-colors ${
-                theme === t
-                  ? "border-primary bg-primary-dark text-text-inverse"
-                  : "border-border bg-surface text-text-primary hover:bg-surface-elevated"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-      }
-    />
+    <>
+      <SettingRow
+        label={t.uiLanguage}
+        description={t.uiLanguageDesc}
+        control={
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value as Language)}
+            className={selectClass}
+          >
+            <option value="en">{t.langEnglish}</option>
+            <option value="no">{t.langNorwegian}</option>
+          </select>
+        }
+      />
+      <SettingRow
+        label={t.themeLabel}
+        description={t.themeDesc}
+        control={
+          <div className="flex gap-2">
+            {(["light", "dark"] as const).map((themeOption) => (
+              <button
+                key={themeOption}
+                aria-pressed={theme === themeOption}
+                onClick={() => onThemeChange(themeOption)}
+                className={`rounded border px-4 py-1.5 text-sm capitalize transition-colors ${
+                  theme === themeOption
+                    ? "border-primary bg-primary-dark text-text-inverse"
+                    : "border-border bg-surface text-text-primary hover:bg-surface-elevated"
+                }`}
+              >
+                {t.themeLabels[themeOption]}
+              </button>
+            ))}
+          </div>
+        }
+      />
+    </>
   );
 }
 
-/**
- * Parameters section — free-text fields that are auto-injected into every
- * prompt so the AI has context without needing to ask.
- * Rendered when the "parameters" nav item is active.
- */
+/** Parameters section — AI output language and prompt context fields. */
 function ParametersSection({
+  language,
+  onLanguageChange,
   timeframe,
-  onChange,
+  onTimeframeChange,
 }: {
-  /** Current timeframe string (may be empty). */
+  language: Language;
+  onLanguageChange: (l: Language) => void;
   timeframe: string;
-  /** Called with the updated value on every keystroke. */
-  onChange: (v: string) => void;
+  onTimeframeChange: (v: string) => void;
 }) {
+  const t = useT();
   return (
-    <SettingRow
-      label="Timeframe"
-      htmlFor="timeframe"
-      description="Auto-filled into each prompt so the AI knows the relevant period."
-      control={
-        <input
-          id="timeframe"
-          type="text"
-          value={timeframe}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="e.g. Last 30 days"
-          className={inputClass}
-        />
-      }
-    />
+    <>
+      <SettingRow
+        label={t.aiOutputLanguage}
+        description={t.aiOutputLanguageDesc}
+        control={
+          <select
+            value={language}
+            onChange={(e) => onLanguageChange(e.target.value as Language)}
+            className={selectClass}
+          >
+            <option value="en">{t.langEnglish}</option>
+            <option value="no">{t.langNorwegian}</option>
+          </select>
+        }
+      />
+      <SettingRow
+        label={t.timeframeLabel}
+        htmlFor="timeframe"
+        description={t.timeframeDesc}
+        control={
+          <input
+            id="timeframe"
+            type="text"
+            value={timeframe}
+            onChange={(e) => onTimeframeChange(e.target.value)}
+            placeholder={t.timeframePlaceholder}
+            className={inputClass}
+          />
+        }
+      />
+    </>
   );
 }

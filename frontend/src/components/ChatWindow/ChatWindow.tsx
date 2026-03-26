@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ToastContainer } from "../Toast";
+import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
@@ -35,14 +36,15 @@ function Chevron() {
   );
 }
 
-const PRIORITY_LABEL: Record<string, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-};
 
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
+  const t = useT();
+  const PRIORITY_LABEL: Record<string, string> = {
+    high: t.priorityHigh,
+    medium: t.priorityMedium,
+    low: t.priorityLow,
+  };
 
   useEffect(() => {
     setPirData(pirData);
@@ -56,7 +58,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
   return (
     <div className="space-y-2">
       <h3 className="font-semibold">
-        Priority Intelligence Requirements (PIRs)
+        {t.pirHeader}
       </h3>
       {pirData.pir_text && (
         <CitationText
@@ -75,7 +77,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             <p className="font-medium text-base leading-snug">{pir.question}</p>
             <details className="group pl-1">
               <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
-                Rationale
+                {t.rationale}
                 <Chevron />
               </summary>
               <p className="mt-1 text-sm text-text-secondary">
@@ -108,7 +110,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
       {reasoningPoints.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
-            Show reasoning
+            {t.showReasoning}
             <Chevron />
           </summary>
           <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
@@ -130,16 +132,17 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 }
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
+  const t = useT();
   return (
     <div className="space-y-2">
-      <h3 className="font-semibold">Collection Plan</h3>
+      <h3 className="font-semibold">{t.collectionPlanHeader}</h3>
       <p className="whitespace-pre-wrap text-sm text-text-primary">
         {planData.plan}
       </p>
       {planData.suggested_sources.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">
-            Suggested sources
+            {t.suggestedSources}
           </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {planData.suggested_sources.map((source) => (
@@ -157,13 +160,14 @@ function SuggestedSourcesMessage({
 }: {
   sources: SuggestedSourcesData;
 }) {
+  const t = useT();
   if (sources.length === 0) {
-    return <p>No source suggestions were returned.</p>;
+    return <p>{t.noSourceSuggestions}</p>;
   }
 
   return (
     <div className="space-y-2">
-      <h3 className="font-semibold">Suggested Sources</h3>
+      <h3 className="font-semibold">{t.suggestedSourcesHeader}</h3>
       <ul className="list-disc pl-5 text-sm text-text-secondary">
         {sources.map((source) => (
           <li key={source}>{source}</li>
@@ -174,16 +178,17 @@ function SuggestedSourcesMessage({
 }
 
 function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
+  const t = useT();
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Collection Summary</h3>
+      <h3 className="font-semibold">{t.collectionSummaryHeader}</h3>
       <p className="whitespace-pre-wrap text-sm text-text-primary">
         {data.summary}
       </p>
       {data.sources_used.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">
-            Sources used
+            {t.sourcesUsed}
           </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {data.sources_used.map((source) => (
@@ -193,9 +198,9 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
         </div>
       )}
       <div className="border-t border-border pt-2">
-        <p className="text-sm font-medium text-text-secondary">Gaps</p>
+        <p className="text-sm font-medium text-text-secondary">{t.gaps}</p>
         <p className="mt-1 text-sm text-text-secondary">
-          {data.gaps ?? "No gaps identified."}
+          {data.gaps ?? t.noGapsIdentified}
         </p>
       </div>
     </div>
@@ -211,14 +216,15 @@ function CollectionReviewPrompt({
   onAccept?: () => void;
   onGatherMore?: () => void;
 }) {
+  const t = useT();
   return (
     <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
       <div className="flex-1 min-w-0">
         <h3 className="text-sm font-semibold text-text-primary">
-          Collection Review
+          {t.collectionReviewHeader}
         </h3>
         <p className="text-sm text-text-secondary">
-          Accept the collected data or collect more from additional sources.
+          {t.collectionReviewSubtitle}
         </p>
       </div>
 
@@ -229,7 +235,7 @@ function CollectionReviewPrompt({
           disabled={isLoading}
           className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Accept
+          {t.accept}
         </button>
 
         <button
@@ -238,7 +244,7 @@ function CollectionReviewPrompt({
           disabled={isLoading}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Collect More Data
+          {t.collectMoreData}
         </button>
       </div>
     </section>
@@ -271,6 +277,7 @@ function SourceSummaryTable({
 }: {
   summaries: CollectionSourceSummary[];
 }) {
+  const t = useT();
   if (summaries.length === 0) return null;
   return (
     <div className="overflow-x-auto rounded border border-border-muted">
@@ -278,16 +285,16 @@ function SourceSummaryTable({
         <thead className="bg-surface-muted">
           <tr>
             <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
-              Source
+              {t.tableSource}
             </th>
             <th className="text-right px-3 py-1.5 font-medium text-text-secondary">
-              Items
+              {t.tableItems}
             </th>
             <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
-              Resources
+              {t.tableResources}
             </th>
             <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
-              Status
+              {t.tableStatus}
             </th>
           </tr>
         </thead>
@@ -310,7 +317,7 @@ function SourceSummaryTable({
                   }`}
                 />
                 <span className="text-xs text-text-secondary">
-                  {s.has_content ? "Data found" : "Empty"}
+                  {s.has_content ? t.dataFound : t.empty}
                 </span>
               </td>
             </tr>
@@ -323,6 +330,7 @@ function SourceSummaryTable({
 
 function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   const { setCollectionData, setActivePhase } = useWorkspace();
+  const t = useT();
 
   useEffect(() => {
     setCollectionData(data);
@@ -332,13 +340,13 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   if (data.parse_error) {
     return (
       <div className="space-y-2">
-        <h3 className="font-semibold">Collection Results</h3>
+        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
         <p className="text-sm text-error-text">
-          Could not parse collection output.
+          {t.couldNotParseCollection}
         </p>
         <details className="group">
           <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
-            Raw output <Chevron />
+            {t.rawOutput} <Chevron />
           </summary>
           <pre className="mt-1 text-xs text-text-muted whitespace-pre-wrap break-all">
             {data.parse_error}
@@ -350,7 +358,7 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Collection Results</h3>
+      <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
       <SourceSummaryTable summaries={data.source_summary} />
     </div>
   );
@@ -376,6 +384,7 @@ export default function ChatWindow({
   devPrefill,
   onDevPrefillConsumed,
 }: ChatWindowProps) {
+  const t = useT();
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -417,12 +426,12 @@ export default function ChatWindow({
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
-      ? "Describe the changes you want in the collection plan..."
+      ? t.placeholderPlanModify
       : stage === "reviewing" && subState === "awaiting_modifications"
-        ? "Describe how to modify the collection summary..."
+        ? t.placeholderSummaryModify
         : stage === "reviewing" && subState === "awaiting_gather_more"
-          ? "Describe what to gather more information about..."
-          : "Type anything...";
+          ? t.placeholderGatherMore
+          : t.placeholderDefault;
 
   function renderMessageContent(message: Message) {
     if (
@@ -527,7 +536,7 @@ export default function ChatWindow({
       >
         {!hasMessages && (
           <p className="text-2xl font-normal text-text-secondary text-center">
-            Ready to start?
+            {t.readyToStart}
           </p>
         )}
 
@@ -538,14 +547,14 @@ export default function ChatWindow({
               <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-text-primary">
-                    Select Sources
+                    {t.selectSourcesHeader}
                   </h3>
                   <p className="text-sm text-text-secondary">
-                    Choose one or more data sources before collection starts.
+                    {t.selectSourcesSubtitle}
                   </p>
                   {availableSources.length === 0 ? (
                     <p className="mt-2 text-xs text-text-secondary">
-                      No source suggestions available.
+                      {t.noSourceSuggestionsAvailable}
                     </p>
                   ) : (
                     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -583,13 +592,13 @@ export default function ChatWindow({
                   }
                   className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Start Collecting
+                  {t.startCollecting}
                 </button>
               </section>
             ) : isCollecting ? (
               <section className="rounded-lg border border-border bg-surface p-4">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">
-                  Collecting
+                  {t.collecting}
                 </p>
                 {collectionStatus ? (
                   <ul className="flex flex-col gap-2">
@@ -627,7 +636,7 @@ export default function ChatWindow({
                               </span>
                               <span className="ml-auto text-xs text-text-muted tabular-nums">
                                 {info.call_count > 0
-                                  ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
+                                  ? `${info.call_count} ${info.call_count !== 1 ? t.resultPlural : t.resultSingular}`
                                   : "—"}
                               </span>
                               {isActive && !showActivity && (
@@ -655,7 +664,7 @@ export default function ChatWindow({
                   </ul>
                 ) : (
                   <p className="text-sm text-text-secondary">
-                    Starting collection…
+                    {t.startingCollection}
                   </p>
                 )}
               </section>
@@ -677,7 +686,7 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="relative border-2 border-border rounded-xl p-3 pb-12"
+                className="flex items-end gap-2 border-2 border-border rounded-xl px-3 py-2"
               >
                 <textarea
                   ref={textareaRef}
@@ -691,13 +700,13 @@ export default function ChatWindow({
                       submitMessage();
                     }
                   }}
-                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                  className="flex-1 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
                 />
                 <button
                   type="submit"
                   disabled={inputValue.trim() === ""}
-                  aria-label="Send message"
-                  className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                  aria-label={t.sendMessage}
+                  className={`shrink-0 p-2 rounded-full transition-colors ${
                     inputValue.trim() === ""
                       ? "bg-surface-elevated text-text-muted cursor-not-allowed"
                       : "bg-primary text-text-inverse hover:bg-primary-dark"

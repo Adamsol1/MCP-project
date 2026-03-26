@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
 import type { DialogueStage } from "../../types/dialogue";
+import { useT } from "../../i18n/useT";
 
 /** Props for the Sidebar component. */
 interface SidebarProps {
@@ -32,13 +33,6 @@ interface SidebarProps {
   onOpenSettings: () => void;
 }
 
-const DEV_STAGE_ACTIONS: Array<{ label: string; stage: DialogueStage }> = [
-  { label: "Jump to Initial", stage: "initial" },
-  { label: "Jump to Gathering", stage: "gathering" },
-  { label: "Jump to Summary", stage: "summary_confirming" },
-  { label: "Jump to PIR", stage: "pir_confirming" },
-  { label: "Jump to Complete", stage: "complete" },
-];
 
 /**
  * Left-hand navigation sidebar showing all conversations.
@@ -75,6 +69,16 @@ export function Sidebar({
   onDevResetStage,
   onOpenSettings,
 }: SidebarProps) {
+  const t = useT();
+
+  const DEV_STAGE_ACTIONS: Array<{ label: string; stage: DialogueStage }> = [
+    { label: t.jumpToInitial, stage: "initial" },
+    { label: t.jumpToGathering, stage: "gathering" },
+    { label: t.jumpToSummary, stage: "summary_confirming" },
+    { label: t.jumpToPir, stage: "pir_confirming" },
+    { label: t.jumpToComplete, stage: "complete" },
+  ];
+
   // Sort a copy so the original prop array is never mutated.
   const sortedConversations = [...conversations].sort(
     (a, b) => b.updatedAt - a.updatedAt,
@@ -124,7 +128,7 @@ export function Sidebar({
           Points right (›) when collapsed to signal "expand",
           left (‹) when expanded to signal "collapse". */}
       <button
-        aria-label="Toggle sidebar"
+        aria-label={t.toggleSidebar}
         onClick={() => setIsCollapsed((prev) => !prev)}
         className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
       >
@@ -152,13 +156,13 @@ export function Sidebar({
           get a consistent accessible name. */}
       <button
         onClick={onNewChat}
-        aria-label="New Chat"
+        aria-label={t.newChat}
         className={`mx-2 mb-2 py-1.5 px-2 bg-primary-dark text-white rounded flex items-center justify-center gap-1.5 shrink-0 ${
           isCollapsed ? "" : "w-[calc(100%-1rem)]"
         }`}
       >
         <span className="text-sm leading-none">+</span>
-        {!isCollapsed && <span className="text-xs">New Chat</span>}
+        {!isCollapsed && <span className="text-xs">{t.newChat}</span>}
       </button>
 
       {/* Conversation list — hidden entirely when collapsed to keep the rail clean. */}
@@ -166,7 +170,7 @@ export function Sidebar({
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 ? (
             <div className="flex items-center justify-center text-text-secondary h-full">
-              No conversations yet
+              {t.noConversations}
             </div>
           ) : (
             sortedConversations.map((conv) => (
@@ -206,7 +210,7 @@ export function Sidebar({
                       }
                       className="flex-1 text-left p-2 text-sm"
                     >
-                      {conv.title}
+                      {conv.title || t.newConversationDefault}
                     </button>
 
                     {/* Options button — always in the DOM but only visible on
@@ -215,7 +219,7 @@ export function Sidebar({
                         handler in the useEffect does not close the menu
                         before onClick has a chance to open it. */}
                     <button
-                      aria-label="Chat options"
+                      aria-label={t.chatOptions}
                       aria-expanded={openMenuId === conv.id}
                       onMouseDown={(e) => e.stopPropagation()}
                       onClick={(e) => {
@@ -257,7 +261,7 @@ export function Sidebar({
                       }}
                       className="block w-full text-left px-4 py-2 hover:bg-surface-elevated"
                     >
-                      Rename
+                      {t.rename}
                     </button>
 
                     <button
@@ -269,7 +273,7 @@ export function Sidebar({
                       }}
                       className="block w-full text-left px-4 py-2 hover:bg-surface-elevated text-error"
                     >
-                      Delete
+                      {t.delete}
                     </button>
                   </div>
                 )}
@@ -281,7 +285,7 @@ export function Sidebar({
       {/* Settings gear — sits just above Dev Tools */}
       <div className="shrink-0 border-t border-border p-2 flex justify-end">
         <button
-          aria-label="Open settings"
+          aria-label={t.openSettings}
           onClick={onOpenSettings}
           className="p-2 rounded text-text-muted hover:bg-surface-elevated hover:text-text-primary"
         >
@@ -298,17 +302,17 @@ export function Sidebar({
         <div className="shrink-0 border-t border-border p-2">
           <div className="mb-1 flex items-center justify-between">
             <p className="px-1 text-xs font-semibold uppercase tracking-widest text-warning">
-              Dev Tools
+              {t.devTools}
             </p>
             <button
               type="button"
               aria-label={
-                isDevToolsMinimized ? "Expand dev tools" : "Minimize dev tools"
+                isDevToolsMinimized ? t.expandDevTools : t.minimizeDevTools
               }
               onClick={() => setIsDevToolsMinimized((prev) => !prev)}
               className="rounded px-2 py-1 text-xs text-text-secondary hover:bg-surface-elevated"
             >
-              {isDevToolsMinimized ? "Show" : "Hide"}
+              {isDevToolsMinimized ? t.show : t.hide}
             </button>
           </div>
           {!isDevToolsMinimized && (
@@ -317,14 +321,14 @@ export function Sidebar({
                 onClick={onDevSendMessage}
                 className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
               >
-                Send test message
+                {t.sendTestMessage}
               </button>
               {onDevShowCollectionApproval && (
                 <button
                   onClick={onDevShowCollectionApproval}
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
-                  Show collection approval
+                  {t.showCollectionApproval}
                 </button>
               )}
               {onDevJumpToStage && (
@@ -333,8 +337,8 @@ export function Sidebar({
                     type="button"
                     aria-label={
                       isCollectionPhaseMinimized
-                        ? "Expand direction phase"
-                        : "Minimize direction phase"
+                        ? t.expandDirectionPhase
+                        : t.minimizeDirectionPhase
                     }
                     onClick={() =>
                       setIsCollectionPhaseMinimized((prev) => !prev)
@@ -345,7 +349,7 @@ export function Sidebar({
                       <span aria-hidden="true" className="text-xs text-text-secondary">
                         {isCollectionPhaseMinimized ? ">" : "v"}
                       </span>
-                      <span>Direction Phase</span>
+                      <span>{t.directionPhase}</span>
                     </span>
                   </button>
                   {!isCollectionPhaseMinimized &&
@@ -365,7 +369,7 @@ export function Sidebar({
                   onClick={onDevSyncStage}
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
-                  Sync stage
+                  {t.syncStage}
                 </button>
               )}
               {onDevResetStage && (
@@ -373,14 +377,14 @@ export function Sidebar({
                   onClick={onDevResetStage}
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
-                  Reset stage
+                  {t.resetStage}
                 </button>
               )}
               <button
                 onClick={onDeleteAllConversations}
                 className="w-full text-left px-2 py-1.5 rounded text-sm text-error hover:bg-surface-elevated"
               >
-                Delete all conversations
+                {t.deleteAllConversations}
               </button>
             </>
           )}

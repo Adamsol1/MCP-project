@@ -161,7 +161,7 @@ function App() {
     <WorkspaceProvider>
     <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
     <WorkspacePhaseWatcher isSourceSelecting={isSourceSelecting} />
-    <div className="flex h-screen">
+    <div className="flex h-screen bg-surface">
       <Sidebar
         conversations={conversations}
         activeConversationId={activeConversation?.id ?? null}
@@ -205,7 +205,7 @@ function App() {
         />
       </main>
 
-      <div className="w-56 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+      <div className="w-56 bg-surface border-l border-border flex flex-col overflow-hidden">
         <IntelligencePanel
           selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
           onPerspectiveChange={updatePerspectives}
