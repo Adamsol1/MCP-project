@@ -417,15 +417,18 @@ class CollectionService:
 
         # Second pass: summarize full page content via Gemini url_context (no scraping).
         # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        # We pass up to 25 URLs (buffer) because some pages will be inaccessible and get
+        # filtered out inside fetch_url_summaries, so we need extras to hit the ~15 target.
         if "Web Search" in selected_sources:
             urls = _extract_search_urls(raw_data)
             if urls:
                 url_agent = GeminiAgent(self.mcp_client)
+                _url_buffer = min(len(urls), 25)
                 logger.info(
-                    f"[CollectionService] url_context: fetching {min(len(urls), 15)} of {len(urls)} URLs"
+                    f"[CollectionService] url_context: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
                 )
                 summaries = await url_agent.fetch_url_summaries(
-                    urls=urls[:15],
+                    urls=urls[:_url_buffer],
                     pir=pir,
                     perspectives=perspectives or [],
                 )

@@ -454,7 +454,9 @@ def build_collection_collect_prompt(
 
     existing_data_section = (
         f"\n## Already Collected Data\nThe following data was gathered in a previous attempt. "
-        f"Do NOT re-collect data that is already here. Only collect NEW data not yet covered.\n{existing_data}"
+        f"Do NOT duplicate content already present here, but you MUST still query ALL approved sources — "
+        f"each source may have additional data not yet covered. "
+        f"Use different queries, angles, or resources to fill the gaps identified by the reviewer.\n{existing_data}"
         if existing_data else ""
     )
 
@@ -479,7 +481,7 @@ def build_collection_collect_prompt(
         )
         _web_examples = "\n".join(
             (
-                f"  google_search(query=\"<topic> {p} perspective\", num_results=5, "
+                f"  google_search(query=\"<topic> {p} perspective\", num_results=10, "
                 f"region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0]}\", "
                 f"language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1]}\", date_restrict=\"<code>\")"
             )
@@ -487,7 +489,7 @@ def build_collection_collect_prompt(
         )
         _news_examples = "\n".join(
             (
-                f"  google_news_search(query=\"<topic> {p} latest\", num_results=5, "
+                f"  google_news_search(query=\"<topic> {p} latest\", num_results=10, "
                 f"region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0]}\", "
                 f"language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1]}\", date_restrict=\"<code>\")"
             )
@@ -495,6 +497,7 @@ def build_collection_collect_prompt(
         )
         _max_web = len(_active) * 5
         _max_news = len(_active) * 5
+        _num_results_per_call = 10  # Buffer: request 10 per call so some can be inaccessible and we still hit the target
         web_search_note = (
             f"\n## Web Search Guidance"
             f"\nPerspectives selected: {_persp_str}"
@@ -503,12 +506,20 @@ def build_collection_collect_prompt(
             f"\nAlways pass region and language when calling either tool."
             f"\n"
             f"\nFor EACH perspective call BOTH tools separately:"
-            f"\n  1. google_search  — background reports, analysis, deep web"
+            f"\n  1. google_search  — background reports, analysis, official publications"
             f"\n  2. google_news_search — recent/breaking news, press releases"
+            f"\n"
+            f"\nSource authority hierarchy — prefer sources in this order:"
+            f"\n  1. Government & official sources (.gov, .mil, ministry/agency sites)"
+            f"\n  2. Established research institutions & think tanks (CSIS, RAND, Chatham House, RUSI, etc.)"
+            f"\n  3. Trusted international news outlets (Reuters, BBC, AP, Financial Times, etc.)"
+            f"\n  4. Other credible sources"
+            f"\n"
+            f"\nUse num_results={_num_results_per_call} per call (buffer: some pages may be inaccessible)."
             f"\n"
             f"\nInclude the perspective in every query string:"
             f"\n  BAD:  google_search(query=\"GPS jamming\")"
-            f"\n  GOOD: google_search(query=\"GPS jamming Russia perspective\", region=\"ru\", language=\"ru\")"
+            f"\n  GOOD: google_search(query=\"GPS jamming Russia perspective\", region=\"ru\", language=\"ru\", num_results={_num_results_per_call})"
             f"\n"
             f"\ngoogle_search examples:"
             f"\n{_web_examples}"
@@ -538,11 +549,12 @@ Do not query any source or tool not listed above.{unmapped_note}{session_note}{s
 {web_search_note}
 
 ## Instructions
-1. Use the approved tools to collect data relevant to the PIRs only
+1. Use ALL approved tools — do not skip any source that was approved by the user
 2. For query_otx: only search for threat actors, APT groups, and country names that are explicitly mentioned in the PIRs above (e.g. "APT29", "Russia", "GRU"). Do NOT search for generic terms like "energy sector", "reconnaissance", "network mapping", or "vulnerability identification". One search term per call. query_otx automatically returns full details (IoCs, TTPs, description, targeted countries) for the top results — no follow-up calls needed.
 3. For knowledge base tools: read each relevant resource separately
-4. Return content verbatim — do not summarize, rephrase, or interpret
-5. If a source returns no relevant data, still include it in output with empty content
+4. For uploaded document tools: you MUST call list_uploads first to see what files are available, then read any that may be relevant to the PIRs. Do not skip uploads without checking.
+5. Return content verbatim — do not summarize, rephrase, or interpret
+6. If a source returns no relevant data, still include it in output with empty content
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.
@@ -550,6 +562,26 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
 IMPORTANT: The "content" field must be a plain text string — never a JSON object or nested structure.
 Copy only the text string the tool returned. Do not wrap it in {{"result": ...}} or any other object.
 
+CRITICAL for google_search and google_news_search: Output ONE separate item per result URL.
+Do NOT bundle all results from one search call into a single item.
+Set "resource_id" to the URL of that specific result. Set "content" to its title and snippet text.
+Example — a search returning 3 URLs becomes 3 separate items:
+{{
+  "collected_data": [
+    {{
+      "source": "google_search",
+      "resource_id": "https://example.gov/report",
+      "content": "Title: Report Title\nSnippet: The snippet text for this specific result."
+    }},
+    {{
+      "source": "google_search",
+      "resource_id": "https://think-tank.org/analysis",
+      "content": "Title: Analysis Title\nSnippet: The snippet text for this specific result."
+    }}
+  ]
+}}
+
+For all other tools (knowledge base, OTX, uploads), one item per tool call is fine:
 {{
   "collected_data": [
     {{

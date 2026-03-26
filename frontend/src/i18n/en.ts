@@ -31,7 +31,8 @@ export const en = {
   readyToStart: "Ready to start?",
   sendMessage: "Send message",
   placeholderDefault: "Type anything...",
-  placeholderPlanModify: "Describe the changes you want in the collection plan...",
+  placeholderPlanModify:
+    "Describe the changes you want in the collection plan...",
   placeholderSummaryModify: "Describe how to modify the collection summary...",
   placeholderGatherMore: "Describe what to gather more information about...",
   pirHeader: "Priority Intelligence Requirements (PIRs)",
@@ -58,6 +59,18 @@ export const en = {
     "Choose one or more data sources before collection starts.",
   noSourceSuggestionsAvailable: "No source suggestions available.",
   startCollecting: "Start Collecting",
+  sourceNames: {
+    "AlienVault OTX": "AlienVault OTX",
+    "Internal Knowledge Bank": "Internal Knowledge Bank",
+    "Uploaded Documents": "Uploaded Documents",
+    "Web Search": "Web Search",
+  } as Record<string, string>,
+  sourceDescriptions: {
+    "AlienVault OTX": "Open threat exchange feeds",
+    "Internal Knowledge Bank": "Your org's curated intel",
+    "Uploaded Documents": "PDFs, reports, etc.",
+    "Web Search": "Searching the web for relevant information",
+  } as Record<string, string>,
   collecting: "Collecting",
   startingCollection: "Starting collection\u2026",
   tableSource: "Source",
@@ -149,8 +162,7 @@ export const en = {
   approvalSummarySubtitle:
     "Review the generated summary before continuing to PIR.",
   approvalPir: "PIR Approval Prompt",
-  approvalPirSubtitle:
-    "Review the generated PIR before completing Direction.",
+  approvalPirSubtitle: "Review the generated PIR before completing Direction.",
   approvalPlan: "Collection Plan Approval Prompt",
   approvalPlanSubtitle:
     "Review the generated collection plan before selecting sources.",

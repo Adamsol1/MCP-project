@@ -37,8 +37,7 @@ export const no = {
     "Beskriv endringene du \u00f8nsker i innsamlingsplanen...",
   placeholderSummaryModify:
     "Beskriv hvordan du vil endre innsamlingsoppsummeringen...",
-  placeholderGatherMore:
-    "Beskriv hva du vil samle mer informasjon om...",
+  placeholderGatherMore: "Beskriv hva du vil samle mer informasjon om...",
   pirHeader: "Prioriterte etterretningskrav (PIRer)",
   rationale: "Begrunnelse",
   showReasoning: "Vis resonnement",
@@ -63,6 +62,18 @@ export const no = {
     "Velg \u00e9n eller flere datakilder f\u00f8r innsamlingen starter.",
   noSourceSuggestionsAvailable: "Ingen tilgjengelige kildeforslag.",
   startCollecting: "Start innsamling",
+  sourceNames: {
+    "AlienVault OTX": "AlienVault OTX",
+    "Internal Knowledge Bank": "Intern kunnskapsbank",
+    "Uploaded Documents": "Opplastede dokumenter",
+    "Web Search": "Nettsøk",
+  } as Record<string, string>,
+  sourceDescriptions: {
+    "AlienVault OTX": "Åpne trusselinnmatinger",
+    "Internal Knowledge Bank": "Organisasjonens kuraterte intel",
+    "Uploaded Documents": "PDF-er, rapporter, o.l.",
+    "Web Search": "Søker på nettet etter relevant informasjon",
+  } as Record<string, string>,
   collecting: "Samler inn",
   startingCollection: "Starter innsamling\u2026",
   tableSource: "Kilde",

@@ -544,60 +544,84 @@ export default function ChatWindow({
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
-              <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-text-primary">
-                    {t.selectSourcesHeader}
-                  </h3>
-                  <p className="text-sm text-text-secondary">
-                    {t.selectSourcesSubtitle}
+              <section className="rounded-lg border border-border bg-surface p-4">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  {t.selectSourcesHeader}
+                </h3>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {t.selectSourcesSubtitle}
+                </p>
+
+                {availableSources.length === 0 ? (
+                  <p className="mt-3 text-xs text-text-secondary">
+                    {t.noSourceSuggestionsAvailable}
                   </p>
-                  {availableSources.length === 0 ? (
-                    <p className="mt-2 text-xs text-text-secondary">
-                      {t.noSourceSuggestionsAvailable}
-                    </p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {[...availableSources]
-                        .sort((a, b) => a.localeCompare(b))
-                        .map((source) => {
-                          const isActive = selectedSources.includes(source);
-                          return (
-                            <button
-                              key={source}
-                              type="button"
-                              onClick={() => onToggleSourceSelection?.(source)}
-                              disabled={isLoading}
-                              aria-pressed={isActive}
-                              className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
-                                isActive
-                                  ? "bg-primary border-primary-dark text-text-inverse"
-                                  : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
-                              }`}
-                            >
-                              {source}
-                            </button>
-                          );
-                        })}
-                    </div>
-                  )}
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[...availableSources]
+                      .sort((a, b) => a.localeCompare(b))
+                      .map((source) => {
+                        const isActive = selectedSources.includes(source);
+                        const displayName = t.sourceNames[source] ?? source;
+                        const description = t.sourceDescriptions[source];
+                        return (
+                          <button
+                            key={source}
+                            type="button"
+                            onClick={() => onToggleSourceSelection?.(source)}
+                            disabled={isLoading}
+                            aria-pressed={isActive}
+                            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                              isActive
+                                ? "border-primary bg-primary-subtle hover:border-primary-dark hover:bg-primary-subtle"
+                                : "border-border bg-surface hover:border-primary hover:bg-primary-subtle/40"
+                            }`}
+                          >
+                            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                              isActive
+                                ? "border-primary bg-primary text-text-inverse"
+                                : "border-border bg-surface"
+                            }`}>
+                              {isActive && (
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <span className={`block text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}>
+                                {displayName}
+                              </span>
+                              {description && (
+                                <span className={`mt-0.5 block text-xs leading-tight ${isActive ? "text-primary/70" : "text-text-secondary"}`}>
+                                  {description}
+                                </span>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
+                  </div>
+                )}
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onSubmitSourceSelection?.()}
+                    disabled={
+                      isLoading ||
+                      availableSources.length === 0 ||
+                      selectedSources.length === 0
+                    }
+                    className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                  >
+                    {t.startCollecting}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onSubmitSourceSelection?.()}
-                  disabled={
-                    isLoading ||
-                    availableSources.length === 0 ||
-                    selectedSources.length === 0
-                  }
-                  className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {t.startCollecting}
-                </button>
               </section>
             ) : isCollecting ? (
               <section className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
                   {t.collecting}
                 </p>
                 {collectionStatus ? (
@@ -621,7 +645,7 @@ export default function ChatWindow({
                                       : "text-text-muted"
                                 }`}
                               >
-                                {isDone ? "✓" : isActive ? "→" : "○"}
+                                {isDone ? "✓" : isActive ? "●" : "○"}
                               </span>
                               <span
                                 className={
@@ -686,7 +710,7 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="flex items-end gap-2 border-2 border-border rounded-xl px-3 py-2"
+                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2"
               >
                 <textarea
                   ref={textareaRef}
@@ -706,7 +730,7 @@ export default function ChatWindow({
                   type="submit"
                   disabled={inputValue.trim() === ""}
                   aria-label={t.sendMessage}
-                  className={`shrink-0 p-2 rounded-full transition-colors ${
+                  className={`self-end shrink-0 p-2 rounded-full transition-colors ${
                     inputValue.trim() === ""
                       ? "bg-surface-elevated text-text-muted cursor-not-allowed"
                       : "bg-primary text-text-inverse hover:bg-primary-dark"

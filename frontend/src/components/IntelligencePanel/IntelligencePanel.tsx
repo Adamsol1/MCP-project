@@ -180,7 +180,7 @@ function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
                 <span className={`shrink-0 w-3.5 text-center ${
                   isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
                 }`}>
-                  {isDone ? "✓" : isActive ? "→" : "○"}
+                  {isDone ? "✓" : isActive ? "●" : "○"}
                 </span>
                 <span className={
                   isDone ? "text-text-secondary" :
