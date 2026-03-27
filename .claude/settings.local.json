@@ -9,7 +9,8 @@
       "Bash(npx vitest:*)",
       "WebSearch",
       "WebFetch(domain:brave.com)",
-      "WebFetch(domain:serper.dev)"
+      "WebFetch(domain:serper.dev)",
+      "Bash(npm run:*)"
     ]
   }
 }

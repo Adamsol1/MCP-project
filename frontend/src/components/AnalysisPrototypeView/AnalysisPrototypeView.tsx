@@ -8,6 +8,7 @@ import {
 import type {
   AnalysisDraftResponse,
   CouncilNote,
+  CouncilTranscriptEntry,
   ProcessingFinding,
 } from "../../types/analysis";
 
@@ -19,6 +20,31 @@ const PERSPECTIVE_ORDER = [
   "russia",
   "neutral",
 ];
+const COUNCIL_SUMMARY_VIEW = "council-summary";
+
+type CouncilSectionItem = {
+  type: "paragraph" | "bullet";
+  text: string;
+};
+
+type CouncilSection = {
+  title: string | null;
+  items: CouncilSectionItem[];
+};
+
+type CouncilVote = {
+  option: string;
+  confidence: number | null;
+  rationale: string;
+};
+
+type CouncilParticipantView = {
+  participant: string;
+  entries: CouncilTranscriptEntry[];
+  latestEntry: CouncilTranscriptEntry | null;
+  sections: CouncilSection[];
+  vote: CouncilVote | null;
+};
 
 function formatPerspectiveLabel(key: string) {
   return key === "us" || key === "eu"
@@ -98,11 +124,347 @@ function getFindingPreview(finding: ProcessingFinding) {
   return `${finding.evidence_summary} ${finding.why_it_matters}`;
 }
 
+function stripMarkdown(value: string) {
+  return value.replace(/\*\*(.*?)\*\*/g, "$1").trim();
+}
+
+function normalizeSectionTitle(value: string) {
+  return stripMarkdown(value).replace(/:\s*$/, "").trim();
+}
+
+function splitVoteFromResponse(response: string) {
+  const voteIndex = response.lastIndexOf("VOTE:");
+  if (voteIndex === -1) {
+    return {
+      body: response.trim(),
+      vote: null,
+    };
+  }
+
+  const body = response.slice(0, voteIndex).trim();
+  const voteCandidate = response.slice(voteIndex + "VOTE:".length).trim();
+
+  try {
+    const parsed = JSON.parse(voteCandidate) as {
+      option?: string;
+      confidence?: number;
+      rationale?: string;
+    };
+
+    return {
+      body,
+      vote: {
+        option: parsed.option?.trim() || "No position provided",
+        confidence:
+          typeof parsed.confidence === "number" ? parsed.confidence : null,
+        rationale: parsed.rationale?.trim() || "No rationale provided.",
+      } satisfies CouncilVote,
+    };
+  } catch {
+    return {
+      body: response.trim(),
+      vote: null,
+    };
+  }
+}
+
+function buildCouncilSections(body: string) {
+  const sections: CouncilSection[] = [];
+  let currentSection: CouncilSection = { title: null, items: [] };
+  let paragraphBuffer: string[] = [];
+
+  function flushParagraph() {
+    if (paragraphBuffer.length === 0) {
+      return;
+    }
+
+    currentSection.items.push({
+      type: "paragraph",
+      text: stripMarkdown(paragraphBuffer.join(" ")),
+    });
+    paragraphBuffer = [];
+  }
+
+  function flushSection() {
+    flushParagraph();
+    if (currentSection.title || currentSection.items.length > 0) {
+      sections.push(currentSection);
+    }
+    currentSection = { title: null, items: [] };
+  }
+
+  for (const rawLine of body.split(/\r?\n/)) {
+    const line = rawLine.trim();
+
+    if (!line) {
+      flushParagraph();
+      continue;
+    }
+
+    const numberedHeadingMatch = line.match(/^\d+\.\s+\*\*(.+?)\*\*\s*$/);
+    if (numberedHeadingMatch) {
+      flushSection();
+      currentSection = {
+        title: normalizeSectionTitle(numberedHeadingMatch[1]),
+        items: [],
+      };
+      continue;
+    }
+
+    const headingMatch = line.match(/^\*\*(.+?)\*\*\s*$/);
+    if (headingMatch) {
+      flushSection();
+      currentSection = {
+        title: normalizeSectionTitle(headingMatch[1]),
+        items: [],
+      };
+      continue;
+    }
+
+    const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+    if (bulletMatch) {
+      flushParagraph();
+      currentSection.items.push({
+        type: "bullet",
+        text: bulletMatch[1].trim(),
+      });
+      continue;
+    }
+
+    paragraphBuffer.push(line);
+  }
+
+  flushSection();
+
+  if (sections.length === 0 && body.trim()) {
+    return [
+      {
+        title: null,
+        items: [{ type: "paragraph", text: stripMarkdown(body) }],
+      },
+    ];
+  }
+
+  return sections;
+}
+
+function buildCouncilParticipantViews(councilNote: CouncilNote) {
+  return councilNote.participants.map((participant) => {
+    const entries = councilNote.full_debate.filter(
+      (entry) => entry.participant === participant,
+    );
+    const latestEntry = entries.at(-1) ?? null;
+    const { body, vote } = splitVoteFromResponse(latestEntry?.response ?? "");
+
+    return {
+      participant,
+      entries,
+      latestEntry,
+      sections: buildCouncilSections(body),
+      vote,
+    } satisfies CouncilParticipantView;
+  });
+}
+
+function splitLabeledText(text: string) {
+  const cleaned = text.trim();
+  const match = cleaned.match(/^\*\*(.+?)\*\*:?\s*(.*)$/);
+  if (!match) {
+    return null;
+  }
+
+  return {
+    label: normalizeSectionTitle(match[1]),
+    body: stripMarkdown(match[2]),
+  };
+}
+
+function renderCouncilSectionItem(item: CouncilSectionItem, index: number) {
+  if (item.type === "paragraph") {
+    return (
+      <p key={index} className="text-sm leading-7 text-text-primary">
+        {item.text}
+      </p>
+    );
+  }
+
+  const labeled = splitLabeledText(item.text);
+  if (labeled) {
+    return (
+      <div key={index} className="flex gap-3 text-sm leading-7 text-text-primary">
+        <span className="mt-[0.7em] h-1.5 w-1.5 rounded-full bg-border" />
+        <p className="flex-1">
+          <span className="font-medium text-text-primary">{labeled.label}</span>
+          {labeled.body ? `: ${labeled.body}` : ""}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div key={index} className="flex gap-3 text-sm leading-7 text-text-primary">
+      <span className="mt-[0.7em] h-1.5 w-1.5 rounded-full bg-border" />
+      <p className="flex-1">{stripMarkdown(item.text)}</p>
+    </div>
+  );
+}
+
+function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
+  return (
+    <div className="space-y-5">
+      <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+          Summary
+        </p>
+        <p className="mt-3 text-sm leading-7 text-text-primary">
+          {councilNote.summary}
+        </p>
+      </section>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
+        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+            Key agreements
+          </p>
+          <ul className="mt-4 space-y-3">
+            {councilNote.key_agreements.map((item) => (
+              <li key={item} className="flex gap-3 text-sm leading-6 text-text-primary">
+                <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+            Key disagreements
+          </p>
+          {councilNote.key_disagreements.length === 0 ||
+          (councilNote.key_disagreements.length === 1 &&
+            councilNote.key_disagreements[0].toLowerCase() === "none") ? (
+            <p className="mt-4 text-sm italic text-text-muted">
+              No disagreements recorded.
+            </p>
+          ) : (
+            <ul className="mt-4 space-y-3">
+              {councilNote.key_disagreements.map((item) => (
+                <li key={item} className="flex gap-3 text-sm leading-6 text-text-secondary">
+                  <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
+                  <span>{item}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      <section className="rounded-[20px] border-l-[3px] border-l-primary border border-border bg-primary-subtle/40 px-5 py-5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+          Final recommendation
+        </p>
+        <p className="mt-3 text-sm leading-7 text-text-primary">
+          {councilNote.final_recommendation}
+        </p>
+      </section>
+    </div>
+  );
+}
+
+function CouncilParticipantPanel({
+  participantView,
+}: {
+  participantView: CouncilParticipantView;
+}) {
+  const leadSection = participantView.sections.find(
+    (section) => section.title === null,
+  );
+  const namedSections = participantView.sections.filter(
+    (section) => section.title !== null,
+  );
+
+  return (
+    <div className="space-y-4">
+      <section className="rounded-[20px] border border-border bg-[linear-gradient(135deg,rgba(255,255,255,0.82)_0%,rgba(244,239,230,0.82)_100%)] px-4 py-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+            Active view
+          </span>
+          {participantView.latestEntry ? (
+            <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] text-text-secondary">
+              Round {participantView.latestEntry.round}
+            </span>
+          ) : null}
+        </div>
+        <h3 className="mt-3 text-xl font-semibold text-text-primary">
+          {participantView.participant}
+        </h3>
+        {participantView.latestEntry ? (
+          <p className="mt-2 text-xs text-text-secondary">
+            Latest response: {participantView.latestEntry.timestamp}
+          </p>
+        ) : null}
+      </section>
+
+      {leadSection ? (
+        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+            Perspective overview
+          </p>
+          <div className="mt-3 space-y-3">
+            {leadSection.items.map(renderCouncilSectionItem)}
+          </div>
+        </section>
+      ) : null}
+
+      <div className="grid gap-4">
+        {namedSections.map((section) => (
+          <section
+            key={section.title}
+            className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4"
+          >
+            <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+              {section.title}
+            </p>
+            <div className="mt-3 space-y-3">
+              {section.items.map(renderCouncilSectionItem)}
+            </div>
+          </section>
+        ))}
+      </div>
+
+      {participantView.vote ? (
+        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
+          <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+            Latest vote
+          </p>
+          <div className="mt-3 grid gap-3 md:grid-cols-[1fr,auto] md:items-start">
+            <div className="space-y-2">
+              <p className="text-sm font-medium text-text-primary">
+                {participantView.vote.option}
+              </p>
+              <p className="text-sm leading-6 text-text-secondary">
+                {participantView.vote.rationale}
+              </p>
+            </div>
+            {participantView.vote.confidence !== null ? (
+              <span className="rounded-full border border-border bg-surface px-3 py-1 text-sm font-medium text-text-primary">
+                {Math.round(participantView.vote.confidence * 100)}% confidence
+              </span>
+            ) : null}
+          </div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 export default function AnalysisPrototypeView() {
   const { activeConversation } = useConversation();
   const { settings } = useSettings();
   const [data, setData] = useState<AnalysisDraftResponse | null>(null);
   const [councilNote, setCouncilNote] = useState<CouncilNote | null>(null);
+  const [activeCouncilView, setActiveCouncilView] = useState(COUNCIL_SUMMARY_VIEW);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
@@ -127,10 +489,15 @@ export default function AnalysisPrototypeView() {
     setDebatePoint("");
     setSelectedFindingIds([]);
     setCouncilNote(null);
+    setActiveCouncilView(COUNCIL_SUMMARY_VIEW);
     setCouncilErrorMessage(null);
     setValidationMessage(null);
     setIsTranscriptExpanded(false);
   }, [conversationSessionId, normalizedConversationPerspectives]);
+
+  useEffect(() => {
+    setActiveCouncilView(COUNCIL_SUMMARY_VIEW);
+  }, [councilNote]);
 
   useEffect(() => {
     let isCancelled = false;
@@ -238,6 +605,11 @@ export default function AnalysisPrototypeView() {
     setValidationMessage(null);
   }
 
+  const councilParticipantViews = useMemo(
+    () => (councilNote ? buildCouncilParticipantViews(councilNote) : []),
+    [councilNote],
+  );
+
   if (!activeConversation?.sessionId) {
     return (
       <p className="text-sm text-text-secondary">
@@ -287,6 +659,12 @@ export default function AnalysisPrototypeView() {
     (key) => key in analysisDraft.per_perspective_implications,
   ).map((key) => [key, analysisDraft.per_perspective_implications[key]] as const);
   const councilRuntimeIssue = getCouncilRuntimeIssue(councilNote);
+  const activeParticipantView =
+    activeCouncilView === COUNCIL_SUMMARY_VIEW
+      ? null
+      : councilParticipantViews.find(
+          (view) => view.participant === activeCouncilView,
+        ) ?? null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-8">
@@ -686,7 +1064,7 @@ export default function AnalysisPrototypeView() {
         <article className="rounded-[24px] border border-border bg-surface px-5 py-5 shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
                 Council Note
               </p>
               <h2 className="mt-1 text-2xl font-semibold text-text-primary">
@@ -694,7 +1072,7 @@ export default function AnalysisPrototypeView() {
               </h2>
             </div>
             {councilNote ? (
-              <span className="rounded-full border border-border bg-surface-muted px-3 py-1 text-xs text-text-secondary">
+              <span className="rounded-full border border-primary/30 bg-primary-subtle px-3 py-1 text-xs font-medium text-primary">
                 {councilNote.rounds_completed} rounds
               </span>
             ) : null}
@@ -712,90 +1090,70 @@ export default function AnalysisPrototypeView() {
                 </div>
               ) : null}
 
-              <div>
-                <p className="text-sm font-medium text-text-primary">
+              <div className="rounded-[14px] border border-border-muted bg-surface-muted/40 px-4 py-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
+                  Debate point
+                </p>
+                <p className="mt-1.5 text-sm leading-6 text-text-primary">
                   {councilNote.question}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
-                {councilNote.participants.map((participant) => (
-                  <span
-                    key={participant}
-                    className="rounded-full border border-border-muted bg-surface-muted px-2.5 py-1 text-[11px] text-text-secondary"
+              <div className="flex flex-wrap gap-1.5 rounded-[14px] border border-border-muted bg-surface-muted/50 p-1.5">
+                <button
+                  type="button"
+                  onClick={() => setActiveCouncilView(COUNCIL_SUMMARY_VIEW)}
+                  aria-pressed={activeCouncilView === COUNCIL_SUMMARY_VIEW}
+                  className={
+                    activeCouncilView === COUNCIL_SUMMARY_VIEW
+                      ? "rounded-[10px] bg-surface px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm"
+                      : "rounded-[10px] px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+                  }
+                >
+                  Council Summary
+                </button>
+                {councilParticipantViews.map((participantView) => (
+                  <button
+                    key={participantView.participant}
+                    type="button"
+                    onClick={() => setActiveCouncilView(participantView.participant)}
+                    aria-pressed={activeCouncilView === participantView.participant}
+                    className={
+                      activeCouncilView === participantView.participant
+                        ? "rounded-[10px] bg-surface px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm"
+                        : "rounded-[10px] px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+                    }
                   >
-                    {participant}
-                  </span>
+                    {participantView.participant}
+                  </button>
                 ))}
               </div>
 
-              <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-                  Summary
-                </p>
-                <p className="mt-2 text-sm leading-6 text-text-primary">
-                  {councilNote.summary}
-                </p>
-              </section>
+              {activeParticipantView ? (
+                <CouncilParticipantPanel participantView={activeParticipantView} />
+              ) : (
+                <CouncilSummaryPanel councilNote={councilNote} />
+              )}
 
-              <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-                    Key agreements
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {councilNote.key_agreements.map((item) => (
-                      <li key={item} className="text-sm leading-6 text-text-primary">
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-
-                <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-                  <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-                    Key disagreements
-                  </p>
-                  <ul className="mt-3 space-y-2">
-                    {councilNote.key_disagreements.map((item) => (
-                      <li
-                        key={item}
-                        className="text-sm leading-6 text-text-secondary"
-                      >
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              </div>
-
-              <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-                <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-                  Final recommendation
-                </p>
-                <p className="mt-2 text-sm leading-6 text-text-primary">
-                  {councilNote.final_recommendation}
-                </p>
-              </section>
-
-              <div className="space-y-2">
+              <div className="space-y-2 border-t border-border-muted pt-4">
                 <button
                   type="button"
                   onClick={() => setIsTranscriptExpanded((current) => !current)}
-                  className="rounded-[16px] border border-border-muted px-3 py-2 text-sm text-text-primary"
+                  className="inline-flex items-center gap-2 rounded-[12px] border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted"
                 >
+                  <span className="text-xs text-text-muted">{isTranscriptExpanded ? "▾" : "▸"}</span>
                   {isTranscriptExpanded ? "Hide full debate" : "Show full debate"}
                 </button>
                 {councilNote.transcript_path ? (
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-[11px] text-text-muted">
                     Transcript path: {councilNote.transcript_path}
                   </p>
                 ) : null}
               </div>
 
-              {isTranscriptExpanded ? (
-                <div className="space-y-3">
-                  {councilNote.full_debate.map((entry, index) => (
+                {isTranscriptExpanded ? (
+                  <div className="space-y-3">
+                    {councilNote.full_debate.map((entry, index) => (
                     <article
                       key={`${entry.round}-${entry.participant}-${index}`}
                       className="rounded-[18px] border border-border bg-surface-muted/60 px-4 py-4"

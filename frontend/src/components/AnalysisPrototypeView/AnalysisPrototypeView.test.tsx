@@ -47,7 +47,14 @@ const demoCouncilNote: CouncilNote = {
       round: 1,
       participant: "Neutral Evidence Analyst",
       response:
-        "The evidence is sufficient for a cautious access-development assessment.",
+        "The evidence is sufficient for a cautious access-development assessment.\n\n**Uncertainties:**\n- Attribution remains unresolved.\n\nVOTE: {\"option\":\"Cautious access development assessment\",\"confidence\":0.81,\"rationale\":\"Credential theft and phishing staging support the access-development hypothesis, but attribution is still unresolved.\"}",
+      timestamp: "2026-03-20T10:00:00Z",
+    },
+    {
+      round: 1,
+      participant: "US Strategic Analyst",
+      response:
+        "The activity matters because allied telecom infrastructure is a strategic dependency.\n\n**Operational implications:**\n- Shared vendor-access pathways may be exposed.\n\nVOTE: {\"option\":\"Strategic telecom intrusion assessment\",\"confidence\":0.87,\"rationale\":\"The findings suggest deliberate access development against infrastructure relevant to alliance coordination.\"}",
       timestamp: "2026-03-20T10:00:00Z",
     },
   ],
@@ -356,6 +363,47 @@ describe("AnalysisPrototypeView", () => {
     expect(
       screen.getByText(/likely access-development campaign against Northern European telecom functions/i),
     ).toBeInTheDocument();
+  });
+
+  it("switches between council summary and participant views", async () => {
+    const user = userEvent.setup();
+    vi.mocked(getAnalysisDraft).mockResolvedValue({
+      ...demoResponse,
+      latest_council_note: demoCouncilNote,
+    });
+
+    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+
+    expect(
+      await screen.findByText(/deliberate access-development activity/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Council Summary/i })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByText(/Key agreements/i)).toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", { name: /Neutral Evidence Analyst/i }),
+    );
+
+    expect(
+      screen.getByRole("button", { name: /Neutral Evidence Analyst/i }),
+    ).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText(/Perspective overview/i)).toBeInTheDocument();
+    expect(screen.getByText(/Attribution remains unresolved/i)).toBeInTheDocument();
+    expect(screen.getByText(/Cautious access development assessment/i)).toBeInTheDocument();
+    expect(screen.getByText(/81% confidence/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Key agreements/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Council Summary/i }));
+
+    expect(screen.getByText(/Key agreements/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/Attribution remains unresolved/i),
+      ).not.toBeInTheDocument();
+    });
   });
 
   it("reloads with the persisted council note while keeping the draft visible", async () => {
