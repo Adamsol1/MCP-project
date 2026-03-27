@@ -7,7 +7,19 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-from prompts import register_prompts
+# from pymisp import PyMISP  # MISP not configured on external server
+from prompts import (
+    build_collection_collect_prompt,
+    build_collection_modify_prompt,
+    build_collection_plan_prompt,
+    build_collection_summarize_prompt,
+    build_direction_dialogue_prompt,
+    build_direction_summary_prompt,
+    build_pir_generation_prompt,
+    build_processing_modify_prompt,
+    build_processing_prompt,
+)
+from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
 from tools.google_search import register_google_search_tools
 from tools.knowledge_tools import register_knowledge_resources, register_knowledge_tools
 from tools.local_search import register_local_search_tools

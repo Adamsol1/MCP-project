@@ -22,6 +22,7 @@ from src.models.extraction import (
     RawIOC,
 )
 from src.models.indicators import NormalizedIndicator
+from src.models.processing import PMESIIEntity, ProcessingResult
 from src.models.reasoning import ReasoningLogEntry
 from src.models.reports import ThreatReport
 
@@ -44,4 +45,7 @@ __all__ = [
     "ThreatReport",
     # Reasoning
     "ReasoningLogEntry",
+    # Processing
+    "IntelligenceFinding",
+    "ProcessingResult",
 ]

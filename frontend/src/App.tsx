@@ -65,6 +65,7 @@ function App() {
     approve,
     reject,
     gatherMore,
+    gatherMoreFromProcessing,
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,
@@ -202,6 +203,7 @@ function App() {
           onApprove={approve}
           onReject={reject}
           onGatherMore={gatherMore}
+          onGatherMoreFromProcessing={gatherMoreFromProcessing}
           isSourceSelecting={isSourceSelecting}
           isCollecting={isCollecting}
           collectionStatus={collectionStatus}

@@ -26,6 +26,9 @@ class DialogueAction(str, Enum):
     START_COLLECTING = "start_collecting"
     SHOW_COLLECTION = "show_collection"
     ERROR = "error"
+    # Processing phase
+    SHOW_PROCESSING = "show_processing"
+    SELECT_GAPS = "select_gaps"
     # Shared
     COMPLETE = "complete"
 
@@ -59,6 +62,13 @@ class CollectionContext(BaseModel):
     pir: str
     plan: str
     direction_context: DialogueContext | None = None
+
+
+class ProcessingContext(BaseModel):
+    """Context passed to the reviewer during the processing phase."""
+
+    pir: str
+    collected_data: str
 
 
 class DialogueResponse(BaseModel):

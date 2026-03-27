@@ -16,10 +16,12 @@ import { useConversation } from "./useConversation";
 import { useToast } from "./useToast";
 import type {
   CollectionPlanData,
+  CollectionPlanStep,
   CollectionSummaryData,
   CollectionDisplayData,
   Message,
   PirData,
+  ProcessingData,
   SuggestedSourcesData,
   SummaryData,
 } from "../types/conversation";
@@ -30,6 +32,7 @@ const DECISION_STAGES: DialogueStage[] = [
   "pir_confirming",
   "plan_confirming",
   "reviewing",
+  "processing",
 ];
 
 const ACTION_TO_MESSAGE_TYPE: Record<
@@ -41,9 +44,10 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   show_pir: "pir",
   max_questions: "summary",
   show_plan: "plan",
-  show_suggested_sources: "suggested_sources",
   start_collecting: "question",
   show_collection: "collection",
+  show_processing: "processing",
+  select_gaps: "question",
   error: "error",
   complete: "complete",
 };
@@ -135,8 +139,19 @@ function parsePlanData(raw: string): CollectionPlanData {
       ? planValue
       : JSON.stringify(planValue ?? parsed, null, 2);
 
+  const rawSteps = parsed.steps;
+  const steps: CollectionPlanStep[] | undefined =
+    Array.isArray(rawSteps)
+      ? (rawSteps as unknown[]).filter(
+          (s): s is CollectionPlanStep =>
+            typeof (s as CollectionPlanStep)?.title === "string" &&
+            typeof (s as CollectionPlanStep)?.description === "string",
+        )
+      : undefined;
+
   return {
     plan,
+    steps: steps && steps.length > 0 ? steps : undefined,
     suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
   };
 }
@@ -189,14 +204,17 @@ function inferStageFromResponse(
   if (response.action === "show_plan") {
     return { stage: "plan_confirming", subState: "awaiting_decision" };
   }
-  if (response.action === "show_suggested_sources") {
-    return { stage: "source_selecting", subState: null };
-  }
   if (response.action === "start_collecting") {
     return { stage: "collecting", subState: null };
   }
   if (response.action === "show_collection") {
     return { stage: "reviewing", subState: "awaiting_decision" };
+  }
+  if (response.action === "show_processing") {
+    return { stage: "processing", subState: "awaiting_decision" };
+  }
+  if (response.action === "select_gaps") {
+    return { stage: "reviewing", subState: "awaiting_gather_more" };
   }
   if (response.action === "complete") {
     return { stage: "complete", subState: null };
@@ -256,6 +274,13 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     message.data = parsePlanData(response.question);
   }
 
+  if (messageType === "processing") {
+    const parsed = tryParseJson<ProcessingData>(response.question);
+    if (parsed) {
+      message.data = parsed;
+    }
+  }
+
   if (messageType === "suggested_sources") {
     const sources = parseSuggestedSources(response.question);
     if (sources.length > 0) {
@@ -290,6 +315,8 @@ export function useChat() {
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [localSourceContext, setLocalSourceContext] = useState<"plan" | "gather_more" | null>(null);
+  const [pendingGatherMoreText, setPendingGatherMoreText] = useState<string | null>(null);
 
   const messages = activeConversation?.messages ?? [];
   const stage = activeConversation?.stage ?? "initial";
@@ -298,7 +325,7 @@ export function useChat() {
     isDecisionStage(stage) &&
     subState === "awaiting_decision" &&
     !isDecisionPending;
-  const isSourceSelecting = stage === "source_selecting";
+  const isSourceSelecting = localSourceContext !== null;
   const isCollecting = stage === "collecting";
 
   const fallbackSuggestedSources = useMemo(() => {
@@ -306,6 +333,9 @@ export function useChat() {
       const message = messages[i];
       if (message.type === "suggested_sources" && Array.isArray(message.data)) {
         return message.data as SuggestedSourcesData;
+      }
+      if (message.type === "plan" && message.data && "suggested_sources" in message.data) {
+        return (message.data as CollectionPlanData).suggested_sources;
       }
     }
     return [] as string[];
@@ -330,6 +360,8 @@ export function useChat() {
   useEffect(() => {
     setSuggestedSources([]);
     setSelectedSources([]);
+    setLocalSourceContext(null);
+    setPendingGatherMoreText(null);
   }, [activeConversation?.id]);
 
   const applyResponse = (
@@ -339,11 +371,6 @@ export function useChat() {
     fallbackSubState: DialogueSubState,
   ) => {
     addMessage(buildSystemMessage(response), conversationId);
-
-    if (response.action === "show_suggested_sources") {
-      const sources = parseSuggestedSources(response.question);
-      setSuggestedSources(sources);
-    }
 
     const next = inferStageFromResponse(
       response,
@@ -398,8 +425,12 @@ export function useChat() {
       conversation.id,
     );
 
-    const gatherMore =
-      stage === "reviewing" && subState === "awaiting_gather_more";
+    // Intercept gather_more text — store locally and show source selection instead of backend call
+    if (stage === "reviewing" && subState === "awaiting_gather_more") {
+      setPendingGatherMoreText(text);
+      setLocalSourceContext("gather_more");
+      return;
+    }
 
     setIsLoading(true);
     try {
@@ -408,7 +439,7 @@ export function useChat() {
         conversation.sessionId,
         text,
         approved,
-        { gatherMore },
+        {},
         stage,
         subState,
         conversation.perspectives,
@@ -422,6 +453,13 @@ export function useChat() {
 
   const approve = async () => {
     if (!activeConversation) return;
+
+    // For plan_confirming: show local source selection instead of calling backend
+    if (stage === "plan_confirming") {
+      setLocalSourceContext("plan");
+      return;
+    }
+
     setIsDecisionPending(true);
     setIsLoading(true);
     try {
@@ -462,6 +500,27 @@ export function useChat() {
     info("Add your feedback in chat.");
   };
 
+  const gatherMoreFromProcessing = async () => {
+    if (!activeConversation) return;
+    setIsLoading(true);
+    try {
+      await sendAndHandle(
+        activeConversation.id,
+        activeConversation.sessionId,
+        "",
+        undefined,
+        { gatherMore: true },
+        stage,
+        subState,
+        activeConversation.perspectives,
+      );
+    } catch (e) {
+      error(`Gather more failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const gatherMore = () => {
     if (!activeConversation || stage !== "reviewing") {
       return;
@@ -495,14 +554,24 @@ export function useChat() {
       return;
     }
 
+    const isGatherMore = localSourceContext === "gather_more";
+    const message = isGatherMore ? (pendingGatherMoreText ?? "") : "approve";
+    const approved = isGatherMore ? undefined : true;
+    const options = isGatherMore
+      ? { gatherMore: true, selectedSources }
+      : { selectedSources };
+
+    setLocalSourceContext(null);
+    setPendingGatherMoreText(null);
+
     setIsLoading(true);
     try {
       await sendAndHandle(
         activeConversation.id,
         activeConversation.sessionId,
-        "sources_selected",
-        undefined,
-        { selectedSources },
+        message,
+        approved,
+        options,
         stage,
         subState,
         activeConversation.perspectives,
@@ -595,6 +664,7 @@ export function useChat() {
     approve,
     reject,
     gatherMore,
+    gatherMoreFromProcessing,
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,

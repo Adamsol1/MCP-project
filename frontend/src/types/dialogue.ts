@@ -5,9 +5,9 @@ export type DialogueStage =
   | "pir_confirming"
   | "planning"
   | "plan_confirming"
-  | "source_selecting"
   | "collecting"
   | "reviewing"
+  | "processing"
   | "complete";
 
 export type DialogueSubState =
@@ -22,8 +22,9 @@ export type DialogueAction =
   | "show_pir"
   | "max_questions"
   | "show_plan"
-  | "show_suggested_sources"
   | "start_collecting"
   | "show_collection"
+  | "show_processing"
+  | "select_gaps"
   | "error"
   | "complete";
