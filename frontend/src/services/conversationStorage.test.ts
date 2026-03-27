@@ -142,10 +142,10 @@ describe("conversationStorage", () => {
       expect(conv.perspectives).toEqual(["US", "EU", "NORWAY"]);
     });
 
-    it("creates a conversation with 'New conversation' as title", () => {
+    it("creates a conversation with an empty string title", () => {
       const conv = createConversation();
 
-      expect(conv.title).toBe("New conversation");
+      expect(conv.title).toBe("");
     });
 
     it("creates a conversation with a UUID sessionId", () => {

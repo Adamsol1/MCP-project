@@ -5,14 +5,17 @@ import type { ReactNode } from "react";
 import ChatWindow from "./ChatWindow";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 
-// ChatWindow renders ToastContainer (needs ToastProvider) and PirMessage
-// calls useWorkspace (needs WorkspaceProvider).
+// ChatWindow renders ToastContainer (needs ToastProvider), PirMessage
+// calls useWorkspace (needs WorkspaceProvider), and uses useT (needs SettingsProvider).
 function renderWithToast(ui: ReactNode) {
   return render(
-    <WorkspaceProvider>
-      <ToastProvider>{ui}</ToastProvider>
-    </WorkspaceProvider>
+    <SettingsProvider>
+      <WorkspaceProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </WorkspaceProvider>
+    </SettingsProvider>
   );
 }
 
