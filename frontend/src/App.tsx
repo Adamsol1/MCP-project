@@ -80,6 +80,8 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
   const ensureConversationSession = () => {
     return activeConversation ?? createNewConversation();
@@ -125,7 +127,11 @@ function App() {
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
 
-    for (const file of files) {
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       try {
         const result = await uploadFile(file, conversation.sessionId);
         console.log("Upload result:", result);
@@ -134,9 +140,12 @@ function App() {
         console.error("Upload error:", uploadError);
         error(`Failed to upload ${file.name}`);
       }
+      setUploadProgress({ current: i + 1, total: files.length });
     }
 
     await refreshUploadedFiles(conversation.sessionId);
+    setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
     setIsFileUploadOpen(false);
   };
 
@@ -221,6 +230,8 @@ function App() {
         isOpen={isFileUploadOpen}
         onClose={() => setIsFileUploadOpen(false)}
         onSubmit={handleSubmit}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
       />
 
       <SettingsModal

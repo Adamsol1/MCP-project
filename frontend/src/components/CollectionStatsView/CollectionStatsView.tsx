@@ -19,7 +19,6 @@ export default function CollectionStatsView({
   }
 
   const total = collectionData.source_summary.reduce((sum, source) => sum + source.count, 0);
-  const maxCount = Math.max(...collectionData.source_summary.map((s) => s.count), 1);
 
   return (
     <div className="space-y-4">
@@ -37,24 +36,16 @@ export default function CollectionStatsView({
       </div>
 
       {/* Source bars */}
-      <div className="space-y-2">
-        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.bySource}</p>
+      <div className="space-y-1">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">{t.bySource}</p>
         {collectionData.source_summary.map((source) => (
-          <div key={source.display_name} className="space-y-0.5">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-text-secondary truncate max-w-[80%]">
-                {source.display_name}
-              </span>
-              <span className="text-xs tabular-nums font-medium text-text-muted">
-                {source.has_content ? source.count : <span className="text-[10px] uppercase tracking-wide">{t.empty}</span>}
-              </span>
-            </div>
-            <div className="h-1.5 w-full rounded-full bg-surface-elevated overflow-hidden">
-              <div
-                className={`h-full rounded-full ${source.has_content ? "bg-primary" : "bg-border"}`}
-                style={{ width: `${(source.count / maxCount) * 100}%` }}
-              />
-            </div>
+          <div key={source.display_name} className="flex items-center justify-between">
+            <span className="text-xs text-text-secondary truncate max-w-[80%]">
+              {source.display_name}
+            </span>
+            <span className="text-xs tabular-nums font-medium text-text-muted">
+              {source.has_content ? source.count : <span className="text-[10px] uppercase tracking-wide">{t.empty}</span>}
+            </span>
           </div>
         ))}
       </div>

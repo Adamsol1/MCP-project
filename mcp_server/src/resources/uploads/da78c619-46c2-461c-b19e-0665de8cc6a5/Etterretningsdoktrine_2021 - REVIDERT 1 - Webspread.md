@@ -1,5 +1,5 @@
 ---
-file_upload_id: "e216c89b-08ea-42c7-a4b8-68ac5ffc6ceb"
+file_upload_id: "cf0bd72c-9a9b-4d88-a304-e866616666ce"
 session_id: "da78c619-46c2-461c-b19e-0665de8cc6a5"
 source_filename: "Etterretningsdoktrine_2021 - REVIDERT 1 - Webspread.pdf"
 author: "Forsvaret"
@@ -9,7 +9,7 @@ publisher: "Unknown"
 metadata_confidence: "medium"
 metadata_flags:
   - "missing_publisher"
-parsed_at: "2026-03-26T12:28:55.639667+00:00"
+parsed_at: "2026-03-27T08:15:10.966426+00:00"
 page_count: 57
 ocr_applied: false
 ---

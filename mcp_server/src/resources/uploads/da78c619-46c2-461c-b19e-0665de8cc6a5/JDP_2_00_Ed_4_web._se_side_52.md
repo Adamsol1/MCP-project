@@ -1,5 +1,5 @@
 ---
-file_upload_id: "9a5db5f3-8cb7-4575-a067-9ac14ed65545"
+file_upload_id: "2154fea1-8439-4822-80e9-a56cc8967f0f"
 session_id: "da78c619-46c2-461c-b19e-0665de8cc6a5"
 source_filename: "JDP_2_00_Ed_4_web._se_side_52.pdf"
 author: "Development Concepts and Doctrine Centre"
@@ -9,7 +9,7 @@ publisher: "Adobe PDF Library 17.0"
 metadata_confidence: "high"
 metadata_flags:
   - "none"
-parsed_at: "2026-03-26T12:29:18.881131+00:00"
+parsed_at: "2026-03-27T08:15:27.210160+00:00"
 page_count: 192
 ocr_applied: false
 ---
