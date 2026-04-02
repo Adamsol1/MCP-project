@@ -400,7 +400,21 @@ export function useChat() {
       settings.language,
       settings.inputParameters.timeframe,
     );
-    applyResponse(collectResponse, conversationId, "collecting", null);
+
+    if (collectResponse.action === "error") {
+      const errorStage: DialogueStage =
+        collectResponse.stage === "collecting"
+          ? "plan_confirming"
+          : (collectResponse.stage ?? "plan_confirming");
+      applyResponse(
+        collectResponse,
+        conversationId,
+        errorStage,
+        "awaiting_decision",
+      );
+    } else {
+      applyResponse(collectResponse, conversationId, "collecting", null);
+    }
   };
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
@@ -432,6 +446,9 @@ export function useChat() {
       );
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
+      if (activeConversation?.stage === "collecting") {
+        setStage("plan_confirming", "awaiting_decision");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -462,6 +479,9 @@ export function useChat() {
       success("Request approved");
     } catch (e) {
       error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
+      if (activeConversation?.stage === "collecting") {
+        setStage("plan_confirming", "awaiting_decision");
+      }
     } finally {
       setIsLoading(false);
       setIsDecisionPending(false);
@@ -547,6 +567,9 @@ export function useChat() {
           e instanceof Error ? e.message : String(e)
         }`,
       );
+      if (activeConversation?.stage === "collecting") {
+        setStage("plan_confirming", "awaiting_decision");
+      }
     } finally {
       setIsLoading(false);
     }
