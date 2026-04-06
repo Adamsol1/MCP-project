@@ -99,17 +99,31 @@ def _extract_search_urls(raw_data: str) -> list[str]:
     return unique
 
 
+def _try_parse_json_lenient(s: str) -> dict | None:
+    """Try json.loads; on failure strip trailing commas and retry once."""
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+    try:
+        repaired = re.sub(r",\s*([}\]])", r"\1", s)
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
+
+
 def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
     """Insert additional items into the collected_data list in raw_data JSON."""
-    try:
-        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
-        json_str = fence.group(1).strip() if fence else raw_data.strip()
-        parsed = json.loads(json_str)
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+    json_str = fence.group(1).strip() if fence else raw_data.strip()
+
+    parsed = _try_parse_json_lenient(json_str)
+    if parsed is not None:
         parsed["collected_data"] = parsed.get("collected_data", []) + extra_items
         return json.dumps(parsed, ensure_ascii=False)
-    except Exception:
-        # Fallback: append as a separate JSON block the AI can still read
-        return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
+
+    logger.warning("[CollectionService] _append_to_collected_data: could not parse base JSON, appending separately")
+    return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
 
 
 class CollectionService:
@@ -189,18 +203,6 @@ class CollectionService:
                 deduped.append(normalized)
         return deduped
 
-    @staticmethod
-    def _try_parse_json_lenient(s: str) -> dict | None:
-        """Try json.loads; on failure strip trailing commas and retry once."""
-        try:
-            return json.loads(s)
-        except json.JSONDecodeError:
-            pass
-        try:
-            repaired = re.sub(r",\s*([}\]])", r"\1", s)
-            return json.loads(repaired)
-        except json.JSONDecodeError:
-            return None
 
     @staticmethod
     def parse_collected_data(raw_data: str) -> dict[str, Any]:
@@ -224,19 +226,19 @@ class CollectionService:
                 for seg in segments:
                     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
                     seg = fence.group(1).strip() if fence else seg
-                    seg_parsed = CollectionService._try_parse_json_lenient(seg) if seg else None
+                    seg_parsed = _try_parse_json_lenient(seg) if seg else None
                     if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
                         items.extend(seg_parsed["collected_data"])
             else:
                 fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
                 if fence_match:
                     stripped = fence_match.group(1).strip()
-                parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
+                parsed = _try_parse_json_lenient(stripped) if stripped else {}
                 if parsed is None:
                     # Last resort: extract largest {...} block
                     start, end = stripped.find("{"), stripped.rfind("}")
                     if 0 <= start < end:
-                        parsed = CollectionService._try_parse_json_lenient(stripped[start:end + 1])
+                        parsed = _try_parse_json_lenient(stripped[start:end + 1])
                 if not parsed:
                     raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
                 items = parsed.get("collected_data", [])

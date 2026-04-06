@@ -217,10 +217,10 @@ class AIOrchestrator:
         """
         accumulated = {"raw_data": ""}
 
-        async def collect_fn(feedback=None):
+        async def collect_fn(reviewer_feedback=None):
             new_data = await collection_service.collect(
                 sources, pir, plan,
-                feedback=feedback,
+                feedback=reviewer_feedback or feedback,
                 session_id=session_id,
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,
