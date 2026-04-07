@@ -1,6 +1,14 @@
 @import "./styles/theme.css";
 @import "tailwindcss";
 
+body {
+  font-family: var(--font-sans);
+}
+
+@theme {
+  --font-family-sans: var(--font-sans);
+}
+
 @keyframes slideIn {
   from {
     opacity: 0;

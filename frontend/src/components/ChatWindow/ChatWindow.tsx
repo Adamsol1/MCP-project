@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ToastContainer } from "../Toast";
+import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
@@ -12,6 +13,7 @@ import type {
   CollectionSummaryData,
   Message,
   PirData,
+  ProcessingData,
   SuggestedSourcesData,
 } from "../../types/conversation";
 import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
@@ -38,17 +40,14 @@ function Chevron() {
 }
 
 
-const PRIORITY_LABEL: Record<string, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
-};
-
-
-
-
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
+  const t = useT();
+  const PRIORITY_LABEL: Record<string, string> = {
+    high: t.priorityHigh,
+    medium: t.priorityMedium,
+    low: t.priorityLow,
+  };
 
   useEffect(() => {
     setPirData(pirData);
@@ -66,7 +65,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
   return (
     <div className="space-y-2">
       <h3 className="font-semibold">
-        Priority Intelligence Requirements (PIRs)
+        {t.pirHeader}
       </h3>
       {pirData.pir_text && (
         <CitationText
@@ -85,7 +84,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             <p className="font-medium text-base leading-snug">{pir.question}</p>
             <details className="group pl-1">
               <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
-                Rationale
+                {t.rationale}
                 <Chevron />
               </summary>
               <p className="mt-1 text-sm text-text-secondary">
@@ -118,7 +117,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
       {reasoningPoints.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
-            Show reasoning
+            {t.showReasoning}
             <Chevron />
           </summary>
           <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
@@ -140,6 +139,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 }
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
+  const t = useT();
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
@@ -164,7 +164,9 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
 
       {planData.suggested_sources.length > 0 && (
         <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">Suggested sources</p>
+          <p className="text-sm font-medium text-text-secondary">
+            {t.suggestedSources}
+          </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {planData.suggested_sources.map((source) => (
               <li key={source}>{source}</li>
@@ -181,13 +183,14 @@ function SuggestedSourcesMessage({
 }: {
   sources: SuggestedSourcesData;
 }) {
+  const t = useT();
   if (sources.length === 0) {
-    return <p>No source suggestions were returned.</p>;
+    return <p>{t.noSourceSuggestions}</p>;
   }
 
   return (
     <div className="space-y-2">
-      <h3 className="font-semibold">Suggested Sources</h3>
+      <h3 className="font-semibold">{t.suggestedSourcesHeader}</h3>
       <ul className="list-disc pl-5 text-sm text-text-secondary">
         {sources.map((source) => (
           <li key={source}>{source}</li>
@@ -197,18 +200,19 @@ function SuggestedSourcesMessage({
   );
 }
 
-function CollectionSummaryMessage({
-  data,
-}: {
-  data: CollectionSummaryData;
-}) {
+function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
+  const t = useT();
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Collection Summary</h3>
-      <p className="whitespace-pre-wrap text-sm text-text-primary">{data.summary}</p>
+      <h3 className="font-semibold">{t.collectionSummaryHeader}</h3>
+      <p className="whitespace-pre-wrap text-sm text-text-primary">
+        {data.summary}
+      </p>
       {data.sources_used.length > 0 && (
         <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">Sources used</p>
+          <p className="text-sm font-medium text-text-secondary">
+            {t.sourcesUsed}
+          </p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
             {data.sources_used.map((source) => (
               <li key={source}>{source}</li>
@@ -217,9 +221,9 @@ function CollectionSummaryMessage({
         </div>
       )}
       <div className="border-t border-border pt-2">
-        <p className="text-sm font-medium text-text-secondary">Gaps</p>
+        <p className="text-sm font-medium text-text-secondary">{t.gaps}</p>
         <p className="mt-1 text-sm text-text-secondary">
-          {data.gaps ?? "No gaps identified."}
+          {data.gaps ?? t.noGapsIdentified}
         </p>
       </div>
     </div>
@@ -235,12 +239,15 @@ function CollectionReviewPrompt({
   onAccept?: () => void;
   onGatherMore?: () => void;
 }) {
+  const t = useT();
   return (
     <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
       <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-semibold text-text-primary">Collection Review</h3>
+        <h3 className="text-sm font-semibold text-text-primary">
+          {t.collectionReviewHeader}
+        </h3>
         <p className="text-sm text-text-secondary">
-          Accept the collected data or collect more from additional sources.
+          {t.collectionReviewSubtitle}
         </p>
       </div>
 
@@ -251,7 +258,7 @@ function CollectionReviewPrompt({
           disabled={isLoading}
           className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Accept
+          {t.accept}
         </button>
 
         <button
@@ -260,10 +267,41 @@ function CollectionReviewPrompt({
           disabled={isLoading}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
-          Collect More Data
+          {t.collectMoreData}
         </button>
       </div>
     </section>
+  );
+}
+
+function ProcessingMessage({ data }: { data: ProcessingData }) {
+  return (
+    <div className="space-y-3">
+      <h3 className="font-semibold">Processing Results</h3>
+      <p className="text-sm text-text-secondary whitespace-pre-wrap">{data.processing_summary}</p>
+      <details className="group">
+        <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+          {data.entities.length} entities <Chevron />
+        </summary>
+        <div className="mt-2 space-y-2">
+          {data.entities.map((e) => (
+            <div key={e.id} className="rounded border border-border-muted bg-surface px-3 py-2 text-sm">
+              <p className="font-medium text-text-primary">{e.name}</p>
+              <p className="text-xs text-text-muted mt-0.5">{e.categories.join(", ")} · confidence {e.confidence}% · {e.relevant_to.join(", ")}</p>
+              <p className="text-xs text-text-secondary mt-1">{e.description}</p>
+            </div>
+          ))}
+        </div>
+      </details>
+      {data.gaps.length > 0 && (
+        <div className="border-t border-border pt-2">
+          <p className="text-sm font-medium text-text-secondary">Gaps</p>
+          <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
+            {data.gaps.map((gap, i) => <li key={i}>{gap}</li>)}
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -277,6 +315,7 @@ interface ChatWindowProps {
   onApprove?: () => void;
   onReject?: () => void;
   onGatherMore?: () => void;
+  onGatherMoreFromProcessing?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
   collectionStatus?: CollectionStatus | null;
@@ -288,41 +327,34 @@ interface ChatWindowProps {
   onDevPrefillConsumed?: () => void;
 }
 
-
 function SourceSummaryTable({
   summaries,
 }: {
   summaries: CollectionSourceSummary[];
 }) {
+  const t = useT();
   if (summaries.length === 0) return null;
   return (
     <div className="overflow-x-auto rounded border border-border-muted">
       <table className="min-w-full text-sm">
         <thead className="bg-surface-muted">
           <tr>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Source</th>
-            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">Items</th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Resources</th>
-            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">Status</th>
+            <th className="text-left px-3 py-1.5 font-medium text-text-secondary">
+              {t.tableSource}
+            </th>
+            <th className="text-right px-3 py-1.5 font-medium text-text-secondary">
+              {t.tableItems}
+            </th>
           </tr>
         </thead>
         <tbody>
           {summaries.map((s) => (
             <tr key={s.display_name} className="border-t border-border-muted">
-              <td className="px-3 py-1.5 font-medium text-text-primary">{s.display_name}</td>
-              <td className="px-3 py-1.5 text-right text-text-secondary">{s.count}</td>
-              <td className="px-3 py-1.5 text-xs text-text-muted">
-                {s.resource_ids.length > 0 ? s.resource_ids.join(", ") : "—"}
+              <td className="px-3 py-1.5 font-medium text-text-primary">
+                {s.display_name}
               </td>
-              <td className="px-3 py-1.5">
-                <span
-                  className={`inline-block w-2 h-2 rounded-full mr-1.5 ${
-                    s.has_content ? "bg-success" : "bg-warning-dark"
-                  }`}
-                />
-                <span className="text-xs text-text-secondary">
-                  {s.has_content ? "Data found" : "Empty"}
-                </span>
+              <td className="px-3 py-1.5 text-right text-text-secondary">
+                {s.count}
               </td>
             </tr>
           ))}
@@ -332,13 +364,9 @@ function SourceSummaryTable({
   );
 }
 
-
-function CollectionDisplayMessage({
-  data,
-}: {
-  data: CollectionDisplayData;
-}) {
+function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   const { setCollectionData, setActivePhase } = useWorkspace();
+  const t = useT();
 
   useEffect(() => {
     setCollectionData(data);
@@ -348,11 +376,13 @@ function CollectionDisplayMessage({
   if (data.parse_error) {
     return (
       <div className="space-y-2">
-        <h3 className="font-semibold">Collection Results</h3>
-        <p className="text-sm text-error-text">Could not parse collection output.</p>
+        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+        <p className="text-sm text-error-text">
+          {t.couldNotParseCollection}
+        </p>
         <details className="group">
           <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
-            Raw output <Chevron />
+            {t.rawOutput} <Chevron />
           </summary>
           <pre className="mt-1 text-xs text-text-muted whitespace-pre-wrap break-all">
             {data.parse_error}
@@ -364,7 +394,7 @@ function CollectionDisplayMessage({
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Collection Results</h3>
+      <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
       <SourceSummaryTable summaries={data.source_summary} />
     </div>
   );
@@ -380,6 +410,7 @@ export default function ChatWindow({
   onApprove,
   onReject,
   onGatherMore,
+  onGatherMoreFromProcessing,
   isSourceSelecting = false,
   isCollecting = false,
   collectionStatus = null,
@@ -390,6 +421,7 @@ export default function ChatWindow({
   devPrefill,
   onDevPrefillConsumed,
 }: ChatWindowProps) {
+  const t = useT();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
   const [inputValue, setInputValue] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -432,12 +464,12 @@ export default function ChatWindow({
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
-      ? "Describe the changes you want in the collection plan..."
+      ? t.placeholderPlanModify
       : stage === "reviewing" && subState === "awaiting_modifications"
-      ? "Describe how to modify the collection summary..."
-      : stage === "reviewing" && subState === "awaiting_gather_more"
-      ? "Describe what to gather more information about..."
-      : "Ask anything...";
+        ? t.placeholderSummaryModify
+        : stage === "reviewing" && subState === "awaiting_gather_more"
+          ? t.placeholderGatherMore
+          : t.placeholderDefault;
 
   function renderMessageContent(message: Message) {
     if (
@@ -454,14 +486,21 @@ export default function ChatWindow({
     }
 
     if (message.type === "plan" && message.data && "plan" in message.data) {
-      return <CollectionPlanMessage planData={message.data as CollectionPlanData} />;
+      return (
+        <CollectionPlanMessage planData={message.data as CollectionPlanData} />
+      );
     }
 
-    if (
-      message.type === "suggested_sources" &&
-      Array.isArray(message.data)
-    ) {
-      return <SuggestedSourcesMessage sources={message.data as SuggestedSourcesData} />;
+    if (message.type === "suggested_sources" && Array.isArray(message.data)) {
+      return (
+        <SuggestedSourcesMessage
+          sources={message.data as SuggestedSourcesData}
+        />
+      );
+    }
+
+    if (message.type === "processing" && message.data && "entities" in message.data) {
+      return <ProcessingMessage data={message.data as ProcessingData} />;
     }
 
     if (
@@ -469,7 +508,11 @@ export default function ChatWindow({
       message.data &&
       "collected_data" in message.data
     ) {
-      return <CollectionDisplayMessage data={message.data as CollectionDisplayData} />;
+      return (
+        <CollectionDisplayMessage
+          data={message.data as CollectionDisplayData}
+        />
+      );
     }
 
     if (
@@ -479,7 +522,9 @@ export default function ChatWindow({
       "sources_used" in message.data
     ) {
       return (
-        <CollectionSummaryMessage data={message.data as CollectionSummaryData} />
+        <CollectionSummaryMessage
+          data={message.data as CollectionSummaryData}
+        />
       );
     }
 
@@ -497,9 +542,17 @@ export default function ChatWindow({
                 data-sender={message.sender}
                 className={`max-w-[75%] p-3 rounded-lg mb-2 ${
                   message.sender === "user"
-                    ? "self-end bg-primary text-text-inverse"
+                    ? "self-end"
                     : "self-start bg-surface-muted text-text-primary"
                 }`}
+                style={
+                  message.sender === "user"
+                    ? {
+                        background: "var(--color-user-bubble)",
+                        color: "var(--color-user-bubble-text)",
+                      }
+                    : undefined
+                }
               >
                 {renderMessageContent(message)}
               </div>
@@ -533,7 +586,7 @@ export default function ChatWindow({
         >
           {!hasConversationContent && (
             <p className="text-2xl font-normal text-text-secondary text-center">
-              Ready to start?
+              {t.readyToStart}
             </p>
           )}
 
@@ -541,18 +594,26 @@ export default function ChatWindow({
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
-              <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-semibold text-text-primary">Select Sources</h3>
-                  <p className="text-sm text-text-secondary">
-                    Choose one or more data sources before collection starts.
+              <section className="rounded-lg border border-border bg-surface p-4">
+                <h3 className="text-sm font-semibold text-text-primary">
+                  {t.selectSourcesHeader}
+                </h3>
+                <p className="mt-0.5 text-xs text-text-secondary">
+                  {t.selectSourcesSubtitle}
+                </p>
+
+                {availableSources.length === 0 ? (
+                  <p className="mt-3 text-xs text-text-secondary">
+                    {t.noSourceSuggestionsAvailable}
                   </p>
-                  {availableSources.length === 0 ? (
-                    <p className="mt-2 text-xs text-text-secondary">No source suggestions available.</p>
-                  ) : (
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {[...availableSources].sort((a, b) => a.localeCompare(b)).map((source) => {
+                ) : (
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {[...availableSources]
+                      .sort((a, b) => a.localeCompare(b))
+                      .map((source) => {
                         const isActive = selectedSources.includes(source);
+                        const displayName = t.sourceNames[source] ?? source;
+                        const description = t.sourceDescriptions[source];
                         return (
                           <button
                             key={source}
@@ -560,91 +621,146 @@ export default function ChatWindow({
                             onClick={() => onToggleSourceSelection?.(source)}
                             disabled={isLoading}
                             aria-pressed={isActive}
-                            className={`px-4 py-2 rounded-full text-sm font-medium border transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${
+                            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
                               isActive
-                                ? "bg-primary border-primary-dark text-text-inverse"
-                                : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
+                                ? "border-primary bg-primary-subtle hover:border-primary-dark hover:bg-primary-subtle"
+                                : "border-border bg-surface hover:border-primary hover:bg-primary-subtle/40"
                             }`}
                           >
-                            {source}
+                            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                              isActive
+                                ? "border-primary bg-primary text-text-inverse"
+                                : "border-border bg-surface"
+                            }`}>
+                              {isActive && (
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </span>
+                            <span className="min-w-0">
+                              <span className={`block text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}>
+                                {displayName}
+                              </span>
+                              {description && (
+                                <span className={`mt-0.5 block text-xs leading-tight ${isActive ? "text-primary/70" : "text-text-secondary"}`}>
+                                  {description}
+                                </span>
+                              )}
+                            </span>
                           </button>
                         );
                       })}
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                <div className="mt-3 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => onSubmitSourceSelection?.()}
+                    disabled={
+                      isLoading ||
+                      availableSources.length === 0 ||
+                      selectedSources.length === 0
+                    }
+                    className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                  >
+                    {t.startCollecting}
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => onSubmitSourceSelection?.()}
-                  disabled={
-                    isLoading ||
-                    availableSources.length === 0 ||
-                    selectedSources.length === 0
-                  }
-                  className="shrink-0 rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Start Collecting
-                </button>
               </section>
             ) : isCollecting ? (
               <section className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-3">
-                  Collecting
+                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
+                  {t.collecting}
                 </p>
                 {collectionStatus ? (
                   <ul className="flex flex-col gap-2">
-                    {Object.entries(collectionStatus.sources).map(([source, info]) => {
-                      const isActive = collectionStatus.current_source === source;
-                      const isDone = info.call_count > 0 && !isActive;
-                      const showActivity = isActive && collectionStatus.current_activity;
-                      return (
-                        <li key={source} className="flex flex-col gap-1">
-                          <div className="flex items-center gap-3 text-sm">
-                            <span className={`shrink-0 w-4 text-center font-medium ${
-                              isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
-                            }`}>
-                              {isDone ? "✓" : isActive ? "→" : "○"}
-                            </span>
-                            <span className={
-                              isDone ? "text-text-secondary" :
-                              isActive ? "text-text-primary font-medium" :
-                              "text-text-muted"
-                            }>
-                              {source}
-                            </span>
-                            <span className="ml-auto text-xs text-text-muted tabular-nums">
-                              {info.call_count > 0
-                                ? `${info.call_count} result${info.call_count !== 1 ? "s" : ""}`
-                                : "—"}
-                            </span>
-                            {isActive && !showActivity && (
-                              <span className="flex gap-0.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-                                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                    {Object.entries(collectionStatus.sources).map(
+                      ([source, info]) => {
+                        const isActive =
+                          collectionStatus.current_source === source;
+                        const isDone = info.call_count > 0 && !isActive;
+                        const showActivity =
+                          isActive && collectionStatus.current_activity;
+                        return (
+                          <li key={source} className="flex flex-col gap-1">
+                            <div className="flex items-center gap-3 text-sm">
+                              <span
+                                className={`shrink-0 w-4 text-center font-medium ${
+                                  isDone
+                                    ? "text-success"
+                                    : isActive
+                                      ? "text-primary"
+                                      : "text-text-muted"
+                                }`}
+                              >
+                                {isDone ? "✓" : isActive ? "●" : "○"}
                               </span>
-                            )}
-                          </div>
-                          {showActivity && (
-                            <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
-                              <span>{collectionStatus.current_activity}</span>
-                              <span className="flex gap-0.5">
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
-                                <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                              <span
+                                className={
+                                  isDone
+                                    ? "text-text-secondary"
+                                    : isActive
+                                      ? "text-text-primary font-medium"
+                                      : "text-text-muted"
+                                }
+                              >
+                                {source}
                               </span>
+                              <span className="ml-auto text-xs text-text-muted tabular-nums">
+                                {info.call_count > 0
+                                  ? `${info.call_count} ${info.call_count !== 1 ? t.resultPlural : t.resultSingular}`
+                                  : "—"}
+                              </span>
+                              {isActive && !showActivity && (
+                                <span className="flex gap-0.5">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                                </span>
+                              )}
                             </div>
-                          )}
-                        </li>
-                      );
-                    })}
+                            {showActivity && (
+                              <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
+                                <span>{collectionStatus.current_activity}</span>
+                                <span className="flex gap-0.5">
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                                </span>
+                              </div>
+                            )}
+                          </li>
+                        );
+                      },
+                    )}
                   </ul>
                 ) : (
-                  <p className="text-sm text-text-secondary">Starting collection…</p>
+                  <p className="text-sm text-text-secondary">
+                    {t.startingCollection}
+                  </p>
                 )}
               </section>
             ) : isConfirming ? (
-              stage === "reviewing" ? (
+              stage === "processing" ? (
+                <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-sm font-semibold text-text-primary">Processing Review</h3>
+                    <p className="text-sm text-text-secondary">Accept the analysis or go back to collect more data.</p>
+                  </div>
+                  <div className="shrink-0 flex items-center gap-2">
+                    <button type="button" onClick={() => onApprove?.()} disabled={isLoading}
+                      className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50">
+                      Accept
+                    </button>
+                    <button type="button" onClick={() => onGatherMoreFromProcessing?.()} disabled={isLoading}
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
+                      Gather More
+                    </button>
+                  </div>
+                </section>
+              ) : stage === "reviewing" ? (
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}
@@ -661,7 +777,7 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="relative border-2 border-border rounded-xl p-3 pb-12"
+                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2"
               >
                 <textarea
                   ref={textareaRef}
@@ -675,13 +791,13 @@ export default function ChatWindow({
                       submitMessage();
                     }
                   }}
-                  className="w-full pl-1 pr-2 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                  className="flex-1 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
                 />
                 <button
                   type="submit"
                   disabled={inputValue.trim() === ""}
-                  aria-label="Send message"
-                  className={`absolute bottom-2 right-2 p-2 rounded-full transition-colors ${
+                  aria-label={t.sendMessage}
+                  className={`self-end shrink-0 p-2 rounded-full transition-colors ${
                     inputValue.trim() === ""
                       ? "bg-surface-elevated text-text-muted cursor-not-allowed"
                       : "bg-primary text-text-inverse hover:bg-primary-dark"

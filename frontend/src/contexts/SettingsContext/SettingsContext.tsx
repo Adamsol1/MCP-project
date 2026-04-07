@@ -30,8 +30,10 @@ const STORAGE_KEY = "mcp-settings";
 export interface SettingsContextValue {
   /** The current settings object. */
   settings: Settings;
-  /** Replace the selected AI output language. */
+  /** Replace the UI display language. */
   updateLanguage: (language: Language) => void;
+  /** Replace the AI output language sent to the backend. */
+  updateAiLanguage: (language: Language) => void;
   /** Switch the UI theme between light and dark. */
   updateTheme: (theme: Theme) => void;
   /**
@@ -121,6 +123,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, language }));
   }, []);
 
+  const updateAiLanguage = useCallback((aiLanguage: Language) => {
+    setSettings((prev) => ({ ...prev, aiLanguage }));
+  }, []);
+
   const updateTheme = useCallback((theme: Theme) => {
     setSettings((prev) => ({ ...prev, theme }));
   }, []);
@@ -153,6 +159,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const value: SettingsContextValue = {
     settings,
     updateLanguage,
+    updateAiLanguage,
     updateTheme,
     updateInputParameters,
     updateCouncilSettings,

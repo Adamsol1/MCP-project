@@ -109,7 +109,7 @@ export function createConversation(perspectives?: string[]): Conversation {
   const timeNow = Date.now();
   return {
     id: crypto.randomUUID(),
-    title: "New conversation",
+    title: "",
     messages: [],
     perspectives: perspectives ?? ["NEUTRAL"],
     sessionId: crypto.randomUUID(), // Separate UUID used to identify this session on the backend.

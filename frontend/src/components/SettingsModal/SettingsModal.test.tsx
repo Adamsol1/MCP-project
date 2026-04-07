@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
@@ -28,6 +28,9 @@ function renderModal(props: { isOpen?: boolean; onClose?: () => void } = {}) {
 
 // ─── SettingsModal tests ──────────────────────────────────────────────────────
 describe("SettingsModal", () => {
+  // Clear localStorage before each test to prevent language pollution from
+  // other test files that may store "no" as the language.
+  beforeEach(() => localStorage.clear());
   // ── Visibility ───────────────────────────────────────────────────────────
   // The modal must only be in the DOM when isOpen is true.
   // This is the most fundamental test — if this fails, nothing else matters.
@@ -58,11 +61,9 @@ describe("SettingsModal", () => {
 
     it("renders all four nav categories", () => {
       renderModal();
+      // The modal has two sections: "general" and "parameters"
       expect(
-        screen.getByRole("button", { name: /language/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /appearance/i }),
+        screen.getByRole("button", { name: /general/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /parameters/i }),
@@ -72,10 +73,11 @@ describe("SettingsModal", () => {
       ).toBeInTheDocument();
     });
 
-    it("shows Language section content by default", () => {
+    it("shows General section content by default", () => {
       renderModal();
-      // The right panel should start on Language
-      expect(screen.getByText(/ai output language/i)).toBeInTheDocument();
+      // Default section is "general" which contains Language and Theme settings
+      expect(screen.getByText(/^language$/i)).toBeInTheDocument();
+      expect(screen.getByText(/theme/i)).toBeInTheDocument();
     });
   });
 
@@ -98,15 +100,6 @@ describe("SettingsModal", () => {
   // Clicking a nav item switches the right panel content.
 
   describe("navigation", () => {
-    it("shows Appearance content when Appearance nav item is clicked", async () => {
-      const user = userEvent.setup();
-      renderModal();
-
-      await user.click(screen.getByRole("button", { name: /appearance/i }));
-
-      expect(screen.getByText(/theme/i)).toBeInTheDocument();
-    });
-
     it("shows Parameters content when Parameters nav item is clicked", async () => {
       const user = userEvent.setup();
       renderModal();
@@ -116,14 +109,14 @@ describe("SettingsModal", () => {
       expect(screen.getByText(/timeframe/i)).toBeInTheDocument();
     });
 
-    it("shows Language content when Language nav item is clicked after switching away", async () => {
+    it("shows General content when switching back from Parameters", async () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.click(screen.getByRole("button", { name: /appearance/i }));
-      await user.click(screen.getByRole("button", { name: /language/i }));
+      await user.click(screen.getByRole("button", { name: /parameters/i }));
+      await user.click(screen.getByRole("button", { name: /^general$/i }));
 
-      expect(screen.getByText(/ai output language/i)).toBeInTheDocument();
+      expect(screen.getByText(/^language$/i)).toBeInTheDocument();
     });
 
     it("shows Council content when Council nav item is clicked", async () => {
@@ -155,29 +148,19 @@ describe("SettingsModal", () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.selectOptions(
-        screen.getByRole("combobox"),
-        screen.getByRole("option", { name: /norwegian/i }),
-      );
+      const select = screen.getByRole("combobox");
+      await user.selectOptions(select, "no");
 
-      expect(
-        (
-          screen.getByRole("option", {
-            name: /norwegian/i,
-          }) as HTMLOptionElement
-        ).selected,
-      ).toBe(true);
+      expect(select).toHaveValue("no");
     });
   });
 
-  // ── Appearance section ────────────────────────────────────────────────────
+  // ── General section (theme) ───────────────────────────────────────────────
+  // Theme buttons live in the "general" section which is shown by default.
 
-  describe("Appearance section", () => {
-    it("renders Light and Dark theme buttons", async () => {
-      const user = userEvent.setup();
+  describe("General section (theme)", () => {
+    it("renders Light and Dark theme buttons", () => {
       renderModal();
-
-      await user.click(screen.getByRole("button", { name: /appearance/i }));
 
       expect(
         screen.getByRole("button", { name: /^light$/i }),
@@ -191,7 +174,6 @@ describe("SettingsModal", () => {
       const user = userEvent.setup();
       renderModal();
 
-      await user.click(screen.getByRole("button", { name: /appearance/i }));
       await user.click(screen.getByRole("button", { name: /^light$/i }));
 
       expect(screen.getByRole("button", { name: /^light$/i })).toHaveAttribute(

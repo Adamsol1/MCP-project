@@ -20,10 +20,7 @@ from dotenv import load_dotenv
 from fastmcp import FastMCP
 from starlette.responses import JSONResponse
 
-from prompts import (
-    build_collection_review_prompt,
-    build_direction_review_prompt,
-)
+from prompts import register_prompts
 
 load_dotenv()
 
@@ -38,43 +35,7 @@ mcp = FastMCP(
     ),
 )
 
-
-# ── Review Prompts ────────────────────────────────────────────────────────────
-
-@mcp.prompt
-def direction_review(content: str, context: str) -> str:
-    """Review prompt for PIRs generated in the Direction phase.
-
-    Args:
-        content: The generated PIRs to review (JSON string).
-        context: The dialogue context used to generate the PIRs (JSON string).
-    """
-    print("[ReviewServer] direction_review prompt requested", file=stderr, flush=True)
-    return build_direction_review_prompt(content, context)
-
-
-@mcp.prompt
-def collection_review(content: str, context: str) -> str:
-    """Review prompt for data collected in the Collection phase.
-
-    Args:
-        content: The collected data summary to review (JSON string).
-        context: The collection plan and PIRs used as basis (JSON string).
-    """
-    print("[ReviewServer] collection_review prompt requested", file=stderr, flush=True)
-    return build_collection_review_prompt(content, context)
-
-
-@mcp.prompt
-def processing_review(content: str, context: str) -> str:
-    """Review prompt for correlations produced in the Processing phase.
-
-    Args:
-        content: The correlation report to review (JSON string).
-        context: The collected data used as input (JSON string).
-    """
-    print("[ReviewServer] processing_review prompt requested", file=stderr, flush=True)
-    return build_processing_review_prompt(content, context)
+register_prompts(mcp)
 
 
 # ── Health check ─────────────────────────────────────────────────────────────

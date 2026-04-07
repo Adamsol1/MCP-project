@@ -74,6 +74,7 @@ function AppShell() {
     approve,
     reject,
     gatherMore,
+    gatherMoreFromProcessing,
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,
@@ -89,6 +90,8 @@ function AppShell() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
 
   const analysisDemoConfig: Record<string, { title: string }> = {
     demo_processing_result: {
@@ -161,7 +164,11 @@ function AppShell() {
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
 
-    for (const file of files) {
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       try {
         const result = await uploadFile(file, conversation.sessionId);
         console.log("Upload result:", result);
@@ -170,10 +177,13 @@ function AppShell() {
         console.error("Upload error:", uploadError);
         error(`Failed to upload ${file.name}`);
       }
+      setUploadProgress({ current: i + 1, total: files.length });
     }
 
     const refreshedFiles = await listUploadedFiles(conversation.sessionId);
     setUploadedFiles(refreshedFiles);
+    setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
     setIsFileUploadOpen(false);
   };
 
@@ -268,6 +278,7 @@ function AppShell() {
             onApprove={approve}
             onReject={reject}
             onGatherMore={gatherMore}
+            onGatherMoreFromProcessing={gatherMoreFromProcessing}
             isSourceSelecting={isSourceSelecting}
             isCollecting={isCollecting}
             collectionStatus={visibleCollectionStatus}
@@ -299,6 +310,8 @@ function AppShell() {
         isOpen={isFileUploadOpen}
         onClose={() => setIsFileUploadOpen(false)}
         onSubmit={handleSubmit}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
       />
 
       <SettingsModal

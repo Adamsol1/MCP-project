@@ -44,7 +44,7 @@ class UserActionLogEntry(BaseModel):
     entry_type: Literal["user_action"] = "user_action"
     session_id: str | None
     timestamp: datetime
-    action: Literal["approve", "reject", "modify"]
+    action: Literal["approve", "reject", "modify", "gather_more"]
     phase: str
     modifications: str | None = None
     perspectives_selected: list[str] | None
