@@ -44,6 +44,7 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   show_plan: "plan",
   start_collecting: "question",
   show_collection: "collection",
+  show_processing: "processing",
   error: "error",
   complete: "complete",
 };
@@ -206,6 +207,9 @@ function inferStageFromResponse(
   if (response.action === "show_collection") {
     return { stage: "reviewing", subState: "awaiting_decision" };
   }
+  if (response.action === "show_processing") {
+    return { stage: "reviewing", subState: "awaiting_decision" };
+  }
   if (response.action === "complete") {
     return { stage: "complete", subState: null };
   }
@@ -258,6 +262,20 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
         message.data = parsed as CollectionSummaryData;
       }
     }
+    // Prevent raw JSON dump in chat — if parsing failed or structure didn't match,
+    // create a minimal display payload with parse_error so the component handles it.
+    if (!message.data) {
+      message.data = {
+        collected_data: [],
+        source_summary: [],
+        parse_error: "Collection data could not be parsed for display.",
+      } as CollectionDisplayData;
+    }
+    message.text = "Collection complete";
+  }
+
+  if (messageType === "processing") {
+    message.text = "Processing complete — results are ready for review.";
   }
 
   if (messageType === "plan") {

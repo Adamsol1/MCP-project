@@ -114,11 +114,17 @@ class GeminiAgent:
         )
 
         for round_num in range(self.max_tool_rounds):
-            response = await self.client.aio.models.generate_content(
-                model=self.model,
-                contents=contents,
-                config=config,
-            )
+            try:
+                response = await self.client.aio.models.generate_content(
+                    model=self.model,
+                    contents=contents,
+                    config=config,
+                )
+            except BaseException as e:
+                if isinstance(e, ExceptionGroup):
+                    logger.error(f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}")
+                    raise e.exceptions[0] from e
+                raise
 
             candidate = response.candidates[0]
             tool_calls = [
@@ -218,13 +224,19 @@ class GeminiAgent:
             )
 
             try:
-                response = await self.client.aio.models.generate_content(
-                    model=self.model,
-                    contents=prompt,
-                    config=types.GenerateContentConfig(
-                        tools=[{"url_context": {}}],
-                    ),
-                )
+                try:
+                    response = await self.client.aio.models.generate_content(
+                        model=self.model,
+                        contents=prompt,
+                        config=types.GenerateContentConfig(
+                            tools=[{"url_context": {}}],
+                        ),
+                    )
+                except BaseException as e:
+                    if isinstance(e, ExceptionGroup):
+                        logger.error(f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}")
+                        raise e.exceptions[0] from e
+                    raise
                 text = "".join(
                     part.text
                     for part in response.candidates[0].content.parts

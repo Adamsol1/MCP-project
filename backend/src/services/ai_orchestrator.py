@@ -79,7 +79,13 @@ class AIOrchestrator:
             generation_start = time.time()
             try:
                 generated = await generate_fn(feedback)
-            except Exception as e:
+            except BaseException as e:
+                # Unwrap nested ExceptionGroups to find the root cause
+                original = e
+                while isinstance(e, ExceptionGroup) and e.exceptions:
+                    e = e.exceptions[0]
+                if e is not original:
+                    logger.error(f"[Orchestrator] Unwrapped ExceptionGroup root cause: {type(e).__name__}: {e}")
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
                 logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}")
@@ -240,6 +246,26 @@ class AIOrchestrator:
             session_id=session_id,
         )
 
-    # TODO: Processing phase - AI #1 processes data, AI #2 verifies
-    # async def process_and_review(self, data, processor, reviewer, session_id):
-    #   Same retry pattern: process → review → retry if rejected
+    async def process_and_review(
+        self,
+        collected_data: str,
+        pir: str,
+        processing_service,
+        reviewer,
+        session_id: str,
+    ) -> str:
+        async def process_fn(feedback=None):
+            return await processing_service.process(
+                collected_data=collected_data,
+                pir=pir,
+                feedback=feedback,
+            )
+
+        from src.models.dialogue import ProcessingContext
+        return await self._run_with_review(
+            generate_fn=process_fn,
+            reviewer=reviewer,
+            context=ProcessingContext(pir=pir, collected_data=collected_data),
+            phase="processing",
+            session_id=session_id,
+        )

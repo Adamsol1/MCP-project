@@ -39,9 +39,15 @@ function Chevron() {
 
 
 const PRIORITY_LABEL: Record<string, string> = {
-  high: "High",
-  medium: "Medium",
-  low: "Low",
+  high: "High priority",
+  medium: "Medium priority",
+  low: "Low priority",
+};
+
+const PRIORITY_COLOR: Record<string, string> = {
+  high: "text-error",
+  medium: "text-warning-dark",
+  low: "text-text-muted",
 };
 
 
@@ -64,42 +70,46 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     .filter(Boolean);
 
   return (
-    <div className="space-y-2">
-      <h3 className="font-semibold">
+    <div className="space-y-3">
+      <h3 className="font-semibold text-base">
         Priority Intelligence Requirements (PIRs)
       </h3>
       {pirData.pir_text && (
-        <CitationText
-          text={pirData.pir_text}
-          claims={pirData.claims}
-          highlightedRefs={highlightedRefs}
-          onRefHover={handleHoveredRefs}
-        />
+        <div className="text-sm text-text-secondary leading-relaxed">
+          <CitationText
+            text={pirData.pir_text}
+            claims={pirData.claims}
+            highlightedRefs={highlightedRefs}
+            onRefHover={handleHoveredRefs}
+          />
+        </div>
       )}
-      <ol className="space-y-3 mt-1">
+      <div className="space-y-4 mt-2">
         {pirData.pirs.map((pir, i) => (
-          <li key={i} className="flex flex-col gap-1">
-            <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
-              {i + 1}. {PRIORITY_LABEL[pir.priority]}
-            </span>
-            <p className="font-medium text-base leading-snug">{pir.question}</p>
-            <details className="group pl-1">
-              <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
-                Rationale
-                <Chevron />
+          <div key={i} className="rounded-lg border border-border-muted bg-surface-muted/50 p-3 space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-text-muted">PIR-{i + 1}</span>
+              <span className={`text-xs font-semibold uppercase tracking-wide ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"}`}>
+                {PRIORITY_LABEL[pir.priority] ?? pir.priority}
+              </span>
+            </div>
+            <p className="font-medium text-sm leading-snug text-text-primary">{pir.question}</p>
+            <details className="group">
+              <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+                Rationale <Chevron />
               </summary>
-              <p className="mt-1 text-sm text-text-secondary">
+              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-1 border-l-2 border-border-muted ml-0.5">
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
                   highlightedRefs={highlightedRefs}
                   onRefHover={handleHoveredRefs}
                 />
-              </p>
+              </div>
             </details>
-          </li>
+          </div>
         ))}
-      </ol>
+      </div>
       {pirData.sources && pirData.sources.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2" open>
           <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
@@ -121,18 +131,23 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             Show reasoning
             <Chevron />
           </summary>
-          <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
+          <ol className="mt-2 space-y-3 bg-surface-muted rounded-md p-3 list-none">
             {reasoningPoints.map((point, i) => (
-              <p key={i} className="text-sm text-text-secondary">
-                <CitationText
-                  text={point}
-                  claims={pirData.claims}
-                  highlightedRefs={highlightedRefs}
-                  onRefHover={handleHoveredRefs}
-                />
-              </p>
+              <li key={i} className="text-sm text-text-secondary leading-relaxed flex gap-2">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-border/60 flex items-center justify-center text-[10px] font-bold text-text-muted mt-0.5">
+                  {i + 1}
+                </span>
+                <div className="flex-1">
+                  <CitationText
+                    text={point.replace(/^\d+\.\s*/, "")}
+                    claims={pirData.claims}
+                    highlightedRefs={highlightedRefs}
+                    onRefHover={handleHoveredRefs}
+                  />
+                </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </details>
       )}
     </div>
@@ -481,6 +496,10 @@ export default function ChatWindow({
       return (
         <CollectionSummaryMessage data={message.data as CollectionSummaryData} />
       );
+    }
+
+    if (message.type === "processing") {
+      return <p>{message.text}</p>;
     }
 
     return <p>{message.text}</p>;

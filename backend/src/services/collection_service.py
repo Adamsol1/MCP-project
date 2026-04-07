@@ -212,8 +212,13 @@ class CollectionService:
                 items = []
                 for seg in segments:
                     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
-                    seg = fence.group(1).strip() if fence else seg
-                    seg_parsed = CollectionService._try_parse_json_lenient(seg) if seg else None
+                    seg_text = fence.group(1).strip() if fence else seg
+                    seg_parsed = CollectionService._try_parse_json_lenient(seg_text) if seg_text else None
+                    # If fence regex failed (e.g. closing ``` split away), extract by braces
+                    if seg_parsed is None:
+                        start, end = seg.find("{"), seg.rfind("}")
+                        if 0 <= start < end:
+                            seg_parsed = CollectionService._try_parse_json_lenient(seg[start : end + 1])
                     if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
                         items.extend(seg_parsed["collected_data"])
             else:

@@ -15,6 +15,7 @@ export interface Message {
     | "plan"
     | "suggested_sources"
     | "collection"
+    | "processing"
     | "error"
     | "complete";
   data?:

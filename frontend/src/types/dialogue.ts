@@ -24,5 +24,6 @@ export type DialogueAction =
   | "show_plan"
   | "start_collecting"
   | "show_collection"
+  | "show_processing"
   | "error"
   | "complete";

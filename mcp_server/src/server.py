@@ -23,6 +23,8 @@ from prompts import (
     build_direction_dialogue_prompt,
     build_direction_summary_prompt,
     build_pir_generation_prompt,
+    build_processing_modify_prompt,
+    build_processing_process_prompt,
 )
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
 from tools.google_search import register_google_search_tools
@@ -289,6 +291,46 @@ def collection_modify(
         collected_data=collected_data,
         modifications=modifications,
         language=language,
+    )
+
+
+# ── Processing Prompts ───────────────────────────────────────────────────────
+
+
+@mcp.prompt
+def processing_process(
+    pir: str,
+    collected_data: str,
+    feedback: str = "",
+) -> str:
+    """Prompt for processing collected intelligence into structured PMESII entities.
+
+    Args:
+        pir: The approved PIRs from the Direction phase (JSON string).
+        collected_data: Raw collected intelligence data to process.
+        feedback: Optional analyst feedback from a previous processing attempt.
+    """
+    return build_processing_process_prompt(
+        pir=pir,
+        collected_data=collected_data,
+        feedback=feedback or None,
+    )
+
+
+@mcp.prompt
+def processing_modify(
+    existing_result: str,
+    modifications: str,
+) -> str:
+    """Prompt for applying analyst modifications to an existing processing result.
+
+    Args:
+        existing_result: The existing processing result (JSON string).
+        modifications: The analyst's requested changes.
+    """
+    return build_processing_modify_prompt(
+        existing_result=existing_result,
+        modifications=modifications,
     )
 
 

@@ -13,10 +13,12 @@ from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
+from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
-from src.services.state_machines.collection_flow import CollectionFlow
+from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
+from src.services.state_machines.processing_flow import ProcessingFlow
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
@@ -45,6 +47,7 @@ class IntelligenceSession:
         self.research_logger = research_logger
         self.direction_flow = DirectionFlow(session_id=session_id, research_logger=research_logger)
         self.collection_flow: CollectionFlow | None = None
+        self.processing_flow: ProcessingFlow | None = None
 
 
 _sessions: dict[str, IntelligenceSession] = {}
@@ -56,6 +59,7 @@ def _save_session(session: IntelligenceSession) -> None:
         "session_id": session.session_id,
         "direction_flow": session.direction_flow.to_dict(),
         "collection_flow": session.collection_flow.to_dict() if session.collection_flow else None,
+        "processing_flow": session.processing_flow.to_dict() if session.processing_flow else None,
     }
     path = _SESSIONS_DIR / f"{session.session_id}.json"
     path.write_text(json.dumps(data), encoding="utf-8")
@@ -74,6 +78,11 @@ def _load_session(session_id: str, research_logger) -> IntelligenceSession | Non
     session.collection_flow = (
         CollectionFlow.from_dict(data["collection_flow"], research_logger=research_logger)
         if data.get("collection_flow")
+        else None
+    )
+    session.processing_flow = (
+        ProcessingFlow.from_dict(data["processing_flow"], research_logger=research_logger)
+        if data.get("processing_flow")
         else None
     )
     logger.info(f"[Session {session_id}] Restored from disk")
@@ -240,6 +249,27 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         reviewer_model="gemini-2.5-flash",
     )
 
+    # Route to processing phase if already started
+    if session.processing_flow:
+        if request.gather_more:
+            if not session.collection_flow:
+                raise HTTPException(status_code=500, detail="No collection flow found")
+            session.processing_flow = None
+            session.collection_flow.state = CollectionState.REVIEWING
+            _save_session(session)
+            return _convert_to_message_response(
+                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
+                stage=session.collection_flow.state.value,
+            )
+        processing_service = ProcessingService(mcp_client)
+        response = await session.processing_flow.process_user_message(
+            user_message=request.message,
+            processing_service=processing_service,
+            approved=request.approved,
+        )
+        _save_session(session)
+        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
+
     # Route to collection phase if already started
     if session.collection_flow:
         collection_service = CollectionService(mcp_client)
@@ -255,6 +285,22 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             reviewer=review_service,
             gather_more=request.gather_more,
         )
+        if session.collection_flow.state == CollectionState.COMPLETE and session.processing_flow is None:
+            processing_service = ProcessingService(mcp_client)
+            session.processing_flow = ProcessingFlow(
+                session_id=request.session_id,
+                pir=session.collection_flow.pir,
+                direction_context=session.collection_flow.direction_context,
+                research_logger=session.research_logger,
+            )
+            init_response = await session.processing_flow.initialize(
+                processing_service=processing_service,
+                orchestrator=orchestrator,
+                reviewer=review_service,
+            )
+            _save_session(session)
+            return _convert_to_message_response(init_response, stage=session.processing_flow.state.value)
+
         _save_session(session)
         return _convert_to_message_response(response, stage=session.collection_flow.state.value)
 

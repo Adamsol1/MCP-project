@@ -39,7 +39,7 @@ class TestAnalysisPrototypeService:
     @pytest.mark.asyncio
     async def test_generates_draft_from_valid_processing_result(self):
         """Service should generate a grounded draft from a valid ProcessingResult."""
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-123"
         )
 
@@ -56,7 +56,7 @@ class TestAnalysisPrototypeService:
     @pytest.mark.asyncio
     async def test_summary_is_non_empty(self):
         """Generated summary should not be empty."""
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-456"
         )
 
@@ -69,7 +69,7 @@ class TestAnalysisPrototypeService:
     @pytest.mark.asyncio
     async def test_gaps_propagated_into_information_gaps(self):
         """Processing gaps should be propagated into the draft."""
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-789"
         )
 
@@ -82,7 +82,7 @@ class TestAnalysisPrototypeService:
     @pytest.mark.asyncio
     async def test_per_perspective_implications_contains_expected_keys(self):
         """Draft should include the canonical perspective keys."""
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-999"
         )
 
