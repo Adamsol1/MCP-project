@@ -79,7 +79,13 @@ class AIOrchestrator:
             generation_start = time.time()
             try:
                 generated = await generate_fn(feedback)
-            except Exception as e:
+            except BaseException as e:
+                # Unwrap nested ExceptionGroups to find the root cause
+                original = e
+                while isinstance(e, ExceptionGroup) and e.exceptions:
+                    e = e.exceptions[0]
+                if e is not original:
+                    logger.error(f"[Orchestrator] Unwrapped ExceptionGroup root cause: {type(e).__name__}: {e}")
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
                 logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}", exc_info=True)

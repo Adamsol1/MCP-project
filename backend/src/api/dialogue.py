@@ -15,10 +15,12 @@ from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
+from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
+from src.services.state_machines.processing_flow import ProcessingFlow
 
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
@@ -269,6 +271,27 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         _save_session(session)
         return _convert_to_message_response(response, stage=session.processing_flow.state.value)
 
+
+    # Route to processing phase if already started
+    if session.processing_flow:
+        if request.gather_more:
+            if not session.collection_flow:
+                raise HTTPException(status_code=500, detail="No collection flow found")
+            session.processing_flow = None
+            session.collection_flow.state = CollectionState.REVIEWING
+            _save_session(session)
+            return _convert_to_message_response(
+                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
+                stage=session.collection_flow.state.value,
+            )
+        processing_service = ProcessingService(mcp_client)
+        response = await session.processing_flow.process_user_message(
+            user_message=request.message,
+            processing_service=processing_service,
+            approved=request.approved,
+        )
+        _save_session(session)
+        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
 
     # Route to collection phase if already started
     if session.collection_flow:

@@ -68,14 +68,16 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         {t.pirHeader}
       </h3>
       {pirData.pir_text && (
-        <CitationText
-          text={pirData.pir_text}
-          claims={pirData.claims}
-          highlightedRefs={highlightedRefs}
-          onRefHover={handleHoveredRefs}
-        />
+        <div className="text-sm text-text-secondary leading-relaxed">
+          <CitationText
+            text={pirData.pir_text}
+            claims={pirData.claims}
+            highlightedRefs={highlightedRefs}
+            onRefHover={handleHoveredRefs}
+          />
+        </div>
       )}
-      <ol className="space-y-3 mt-1">
+      <div className="space-y-4 mt-2">
         {pirData.pirs.map((pir, i) => (
           <li key={i} className="flex flex-col gap-1">
             <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
@@ -87,18 +89,18 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 {t.rationale}
                 <Chevron />
               </summary>
-              <p className="mt-1 text-sm text-text-secondary">
+              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-1 border-l-2 border-border-muted ml-0.5">
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
                   highlightedRefs={highlightedRefs}
                   onRefHover={handleHoveredRefs}
                 />
-              </p>
+              </div>
             </details>
-          </li>
+          </div>
         ))}
-      </ol>
+      </div>
       {pirData.sources && pirData.sources.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2" open>
           <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
@@ -120,18 +122,23 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             {t.showReasoning}
             <Chevron />
           </summary>
-          <div className="mt-2 space-y-2 bg-surface-muted rounded-md p-2">
+          <ol className="mt-2 space-y-3 bg-surface-muted rounded-md p-3 list-none">
             {reasoningPoints.map((point, i) => (
-              <p key={i} className="text-sm text-text-secondary">
-                <CitationText
-                  text={point}
-                  claims={pirData.claims}
-                  highlightedRefs={highlightedRefs}
-                  onRefHover={handleHoveredRefs}
-                />
-              </p>
+              <li key={i} className="text-sm text-text-secondary leading-relaxed flex gap-2">
+                <span className="shrink-0 w-5 h-5 rounded-full bg-border/60 flex items-center justify-center text-[10px] font-bold text-text-muted mt-0.5">
+                  {i + 1}
+                </span>
+                <div className="flex-1">
+                  <CitationText
+                    text={point.replace(/^\d+\.\s*/, "")}
+                    claims={pirData.claims}
+                    highlightedRefs={highlightedRefs}
+                    onRefHover={handleHoveredRefs}
+                  />
+                </div>
+              </li>
             ))}
-          </div>
+          </ol>
         </details>
       )}
     </div>
@@ -526,6 +533,10 @@ export default function ChatWindow({
           data={message.data as CollectionSummaryData}
         />
       );
+    }
+
+    if (message.type === "processing") {
+      return <p>{message.text}</p>;
     }
 
     return <p>{message.text}</p>;

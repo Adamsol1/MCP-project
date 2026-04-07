@@ -43,7 +43,7 @@ class TestAnalysisSessionStore:
     def test_draft_persistence(self, tmp_path):
         """Saved drafts should be reloaded after a later read."""
         store = AnalysisSessionStore(sessions_dir=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-draft"
         )
         draft = _make_draft()
@@ -70,7 +70,7 @@ class TestAnalysisSessionStore:
     def test_reload_behavior_preserves_draft_and_latest_note(self, tmp_path):
         """Reloading should preserve both the draft and the latest council note."""
         store = AnalysisSessionStore(sessions_dir=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result, _ = ProcessingPrototypeService().get_processing_result(
             "session-reload"
         )
         draft = _make_draft()

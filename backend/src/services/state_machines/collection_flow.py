@@ -213,6 +213,7 @@ class CollectionFlow(BasePhaseFlow):
                 )
         except Exception as e:
             logger.error(f"[Session {self.session_id}] Collection failed: {e}")
+            self.state = CollectionState.PLAN_CONFIRMING
             return DialogueResponse(action="error", content=f"Collection failed: {e}")
 
         if orchestrator:

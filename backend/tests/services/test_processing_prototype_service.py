@@ -15,17 +15,18 @@ class TestProcessingPrototypeService:
         """Service should load the demo processing result successfully."""
         service = ProcessingPrototypeService()
 
-        result = service.get_processing_result("session-123")
+        result, data_source = service.get_processing_result("session-123")
 
         assert isinstance(result, ProcessingResult)
         assert len(result.findings) == 4
         assert len(result.gaps) == 4
+        assert data_source == "demo"
 
     def test_returned_type_is_processing_result(self):
         """Service should return a validated ProcessingResult instance."""
         service = ProcessingPrototypeService()
 
-        result = service.get_processing_result("session-456")
+        result, _ = service.get_processing_result("session-456")
 
         assert type(result) is ProcessingResult
 
@@ -50,7 +51,7 @@ class TestProcessingPrototypeService:
         service = ProcessingPrototypeService(prototype_path=missing_path)
 
         with pytest.raises(ValueError, match="Failed to load processing result"):
-            service.get_processing_result("session-789")
+            service.get_processing_result("nonexistent-session")
 
     def test_invalid_file_raises_clear_error(self, tmp_path):
         """Invalid JSON should raise a clear backend error."""
@@ -61,7 +62,7 @@ class TestProcessingPrototypeService:
         with pytest.raises(
             ValueError, match="Failed to parse processing result JSON"
         ):
-            service.get_processing_result("session-789")
+            service.get_processing_result("nonexistent-session")
 
     def test_invalid_payload_raises_clear_error(self, tmp_path):
         """Schema-invalid payload should raise a clear backend error."""
@@ -73,4 +74,4 @@ class TestProcessingPrototypeService:
         service = ProcessingPrototypeService(prototype_path=invalid_payload_path)
 
         with pytest.raises(ValueError, match="Failed to validate processing result"):
-            service.get_processing_result("session-789")
+            service.get_processing_result("nonexistent-session")

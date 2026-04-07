@@ -34,6 +34,7 @@ class AnalysisDraftResponse(BaseModel):
     processing_result: ProcessingResult
     analysis_draft: AnalysisDraft
     latest_council_note: CouncilNote | None = None
+    data_source: str = "demo"
 
 
 class AnalysisCouncilRequest(BaseModel):
@@ -102,8 +103,9 @@ async def _build_draft(
     analysis_service = analysis_service or AnalysisPrototypeService()
 
     state = store.get_or_create(session_id)
+    data_source = "demo"
     if force_refresh or state.processing_result is None or state.analysis_draft is None:
-        processing_result = processing_service.get_processing_result(session_id)
+        processing_result, data_source = processing_service.get_processing_result(session_id)
         analysis_draft = await analysis_service.generate_draft(processing_result)
         if force_refresh:
             state.session_id = session_id
@@ -118,6 +120,7 @@ async def _build_draft(
         processing_result=state.processing_result,
         analysis_draft=state.analysis_draft,
         latest_council_note=state.latest_council_note,
+        data_source=data_source,
     )
 
 
