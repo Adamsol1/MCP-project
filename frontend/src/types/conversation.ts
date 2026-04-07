@@ -24,7 +24,8 @@ export interface Message {
     | CollectionPlanData
     | SuggestedSourcesData
     | CollectionSummaryData
-    | CollectionDisplayData;
+    | CollectionDisplayData
+    | ProcessingData;
 }
 
 /**
@@ -204,6 +205,27 @@ export interface ActivitySummaryItem {
   reviewer_approved: boolean;
   /** Reviewer suggestions for improvement, or null if approved with no comments. */
   reviewer_suggestions: string | null;
+}
+
+export interface ProcessingEntity {
+  id: string;
+  name: string;
+  description: string;
+  categories: string[];
+  sources: string[];
+  confidence: number;
+  relevant_to: string[];
+  tags: string[];
+  first_observed?: string;
+  last_updated?: string;
+}
+
+export interface ProcessingData {
+  entities: ProcessingEntity[];
+  gaps: string[];
+  processing_summary: string;
+  assessment_changed: boolean;
+  change_summary?: string | null;
 }
 
 /**

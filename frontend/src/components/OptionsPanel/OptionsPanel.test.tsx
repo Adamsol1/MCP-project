@@ -2,13 +2,14 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OptionsPanel } from "./OptionsPanel";
+import { renderWithSettings } from "../../test/renderWithProviders";
 
 // Helper: renders OptionsPanel with sensible defaults so each test only
 // specifies the props it actually cares about.
 function renderOptionsPanel(
   props: Partial<React.ComponentProps<typeof OptionsPanel>> = {},
 ) {
-  return render(
+  return renderWithSettings(
     <OptionsPanel
       selectedPerspectives={["NEUTRAL"]}
       onPerspectiveChange={vi.fn()}
@@ -22,9 +23,9 @@ describe("OptionsPanel", () => {
   it("renders the PerspectiveSelector", () => {
     renderOptionsPanel();
 
-    // PerspectiveSelector renders buttons with full labels
-    expect(screen.getByText("United States")).toBeInTheDocument();
-    expect(screen.getByText("European Union")).toBeInTheDocument();
+    // PerspectiveSelector renders buttons with abbreviated labels from perspectiveLabels
+    expect(screen.getByText("US")).toBeInTheDocument();
+    expect(screen.getByText("EU")).toBeInTheDocument();
     expect(screen.getByText("Neutral")).toBeInTheDocument();
   });
 
@@ -53,8 +54,8 @@ describe("OptionsPanel", () => {
 
     renderOptionsPanel({ selectedPerspectives: ["US"], onPerspectiveChange });
 
-    // Click European Union to toggle it — PerspectiveSelector should call onChange
-    await user.click(screen.getByText("European Union"));
+    // Click EU to toggle it — PerspectiveSelector should call onChange
+    await user.click(screen.getByText("EU"));
 
     expect(onPerspectiveChange).toHaveBeenCalled();
   });
@@ -74,7 +75,7 @@ describe("OptionsPanel", () => {
   it("shows panel content by default (starts expanded)", () => {
     renderOptionsPanel();
 
-    expect(screen.getByText("United States")).toBeInTheDocument();
+    expect(screen.getByText("US")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /upload files/i }),
     ).toBeInTheDocument();
@@ -87,7 +88,7 @@ describe("OptionsPanel", () => {
 
     await user.click(screen.getByRole("button", { name: /toggle options/i }));
 
-    expect(screen.queryByText("United States")).not.toBeInTheDocument();
+    expect(screen.queryByText("US")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /upload files/i }),
     ).not.toBeInTheDocument();

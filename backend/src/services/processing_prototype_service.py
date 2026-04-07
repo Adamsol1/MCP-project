@@ -43,15 +43,45 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
 class ProcessingPrototypeService:
     """Loads a processing result from session data, falling back to demo."""
 
-    def __init__(self, prototype_path: str | Path | None = None):
+    DEFAULT_DATASET = "demo_processing_result"
+    DATASET_PATTERN = re.compile(r"^demo_processing_result(?:_\d+)?$")
+
+    def __init__(
+        self,
+        prototype_path: str | Path | None = None,
+        dataset_name: str | None = None,
+    ):
         if prototype_path is None:
-            prototype_path = _DEMO_PATH
+            prototype_path = self._resolve_dataset_path(
+                dataset_name or self.DEFAULT_DATASET
+            )
         self.prototype_path = Path(prototype_path)
 
-    def get_processing_result(
-        self, session_id: str
-    ) -> tuple[ProcessingResult, str]:
-        """Load a processing result for the given session.
+    @classmethod
+    def _outputs_dir(cls) -> Path:
+        return Path(__file__).resolve().parents[2] / "data" / "outputs"
+
+    @classmethod
+    def _normalize_dataset_name(cls, dataset_name: str) -> str:
+        cleaned = dataset_name.strip()
+        if cleaned.endswith(".json"):
+            cleaned = cleaned[:-5]
+
+        if not cls.DATASET_PATTERN.fullmatch(cleaned):
+            raise ValueError(f"Unknown demo dataset '{dataset_name}'")
+
+        return cleaned
+
+    @classmethod
+    def _resolve_dataset_path(cls, dataset_name: str) -> Path:
+        normalized_name = cls._normalize_dataset_name(dataset_name)
+        path = cls._outputs_dir() / f"{normalized_name}.json"
+        if not path.exists():
+            raise ValueError(f"Unknown demo dataset '{dataset_name}'")
+        return path
+
+    def get_processing_result(self, session_id: str) -> ProcessingResult:
+        """Load and validate the prototype processing result.
 
         Returns a tuple of (ProcessingResult, data_source) where data_source
         is "session" or "demo".

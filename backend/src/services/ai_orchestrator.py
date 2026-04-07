@@ -27,7 +27,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
+        self.max_attempts = 1  # initial attempt + 1 retry on major review rejection
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -88,7 +88,7 @@ class AIOrchestrator:
                     logger.error(f"[Orchestrator] Unwrapped ExceptionGroup root cause: {type(e).__name__}: {e}")
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
-                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}")
+                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}", exc_info=True)
                 self._log_attempt(ReasoningLogEntry(
                     attempt_number=attempt,
                     timestamp=attempt_timestamp,
@@ -197,7 +197,7 @@ class AIOrchestrator:
         )
 
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None
+        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None, feedback: str | None = None
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -223,10 +223,10 @@ class AIOrchestrator:
         """
         accumulated = {"raw_data": ""}
 
-        async def collect_fn(feedback=None):
+        async def collect_fn(reviewer_feedback=None):
             new_data = await collection_service.collect(
                 sources, pir, plan,
-                feedback=feedback,
+                feedback=reviewer_feedback or feedback,
                 session_id=session_id,
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,

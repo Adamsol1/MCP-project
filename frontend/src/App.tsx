@@ -15,11 +15,13 @@ import {
   getCollectionStatus,
   type CollectionStatus,
 } from "./services/dialogue";
+import { getAnalysisDraft } from "./services/analysis";
 import { useChat } from "./hooks/useChat";
 import { useConversation } from "./hooks/useConversation";
 import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
+import { canReuseConversationForAnalysisDemo } from "./utils/analysisDemo";
 
 function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
   const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
@@ -46,7 +48,7 @@ function WorkspaceStageWatcher({ stage }: { stage: ReturnType<typeof useChat>["s
 
 function AppShell() {
   const { success, error } = useToast();
-  const { activePhase } = useWorkspace();
+  const { activePhase, setActivePhase } = useWorkspace();
   const {
     conversations,
     activeConversation,
@@ -56,6 +58,7 @@ function AppShell() {
     deleteAllConversations,
     renameConversation,
     updatePerspectives,
+    setStage,
   } = useConversation();
   const {
     messages,
@@ -71,6 +74,7 @@ function AppShell() {
     approve,
     reject,
     gatherMore,
+    gatherMoreFromProcessing,
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,
@@ -86,6 +90,20 @@ function AppShell() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+
+  const analysisDemoConfig: Record<string, { title: string }> = {
+    demo_processing_result: {
+      title: "Northern Europe telecom access-development assessment",
+    },
+    demo_processing_result_2: {
+      title: "US-Iran crisis access-development assessment",
+    },
+    demo_processing_result_3: {
+      title: "Taiwan contingency access-development assessment",
+    },
+  };
 
   const ensureConversationSession = () => {
     return activeConversation ?? createNewConversation();
@@ -146,7 +164,11 @@ function AppShell() {
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
 
-    for (const file of files) {
+    setIsUploading(true);
+    setUploadProgress({ current: 0, total: files.length });
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
       try {
         const result = await uploadFile(file, conversation.sessionId);
         console.log("Upload result:", result);
@@ -155,10 +177,13 @@ function AppShell() {
         console.error("Upload error:", uploadError);
         error(`Failed to upload ${file.name}`);
       }
+      setUploadProgress({ current: i + 1, total: files.length });
     }
 
     const refreshedFiles = await listUploadedFiles(conversation.sessionId);
     setUploadedFiles(refreshedFiles);
+    setIsUploading(false);
+    setUploadProgress({ current: 0, total: 0 });
     setIsFileUploadOpen(false);
   };
 
@@ -176,6 +201,40 @@ function AppShell() {
     } catch (deleteError) {
       console.error("Delete upload error:", deleteError);
       error(`Failed to remove ${file.filename}`);
+    }
+  };
+
+  const handleOpenAnalysisDemo = async (dataset: string) => {
+    const config = analysisDemoConfig[dataset];
+    if (!config) {
+      error("Unknown analysis demo dataset");
+      return;
+    }
+
+    let conversation =
+      conversations.find((item) => item.title === config.title) ?? null;
+
+    if (conversation) {
+      switchConversation(conversation.id);
+    } else if (canReuseConversationForAnalysisDemo(activeConversation)) {
+      conversation = activeConversation;
+      renameConversation(conversation.id, config.title);
+    } else {
+      conversation = createNewConversation();
+      renameConversation(conversation.id, config.title);
+    }
+
+    try {
+      await getAnalysisDraft(conversation.sessionId, {
+        forceRefresh: true,
+        demoDataset: dataset,
+      });
+      setStage("complete", null);
+      setActivePhase("analysis");
+      success(`Loaded ${config.title}`);
+    } catch (loadError) {
+      console.error("Prime analysis demo error:", loadError);
+      error(`Failed to load ${config.title}`);
     }
   };
 
@@ -201,6 +260,7 @@ function AppShell() {
             )
           }
           onDevShowCollectionApproval={debugConfirm}
+          onDevOpenAnalysis={handleOpenAnalysisDemo}
           onDevJumpToStage={jumpToDevStage}
           onDevSyncStage={syncDevStage}
           onDevResetStage={resetDevStage}
@@ -218,6 +278,7 @@ function AppShell() {
             onApprove={approve}
             onReject={reject}
             onGatherMore={gatherMore}
+            onGatherMoreFromProcessing={gatherMoreFromProcessing}
             isSourceSelecting={isSourceSelecting}
             isCollecting={isCollecting}
             collectionStatus={visibleCollectionStatus}
@@ -249,6 +310,8 @@ function AppShell() {
         isOpen={isFileUploadOpen}
         onClose={() => setIsFileUploadOpen(false)}
         onSubmit={handleSubmit}
+        isUploading={isUploading}
+        uploadProgress={uploadProgress}
       />
 
       <SettingsModal

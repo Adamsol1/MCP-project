@@ -149,7 +149,7 @@ function conversationReducer(
 
           // Auto-set the title from the first user message (max 50 chars).
           let newTitle = conv.title;
-          if (message.sender === "user" && conv.title === "New conversation") {
+          if (message.sender === "user" && (conv.title === "" || conv.title === "New conversation")) {
             newTitle =
               message.text.length > 50
                 ? message.text.slice(0, 50) + "..."

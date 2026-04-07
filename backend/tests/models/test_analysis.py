@@ -19,6 +19,14 @@ def _load_demo_processing_result() -> dict:
     return json.loads(demo_path.read_text(encoding="utf-8"))
 
 
+def _load_all_demo_processing_results() -> list[dict]:
+    outputs_dir = Path(__file__).resolve().parents[2] / "data" / "outputs"
+    return [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted(outputs_dir.glob("demo_processing_result*.json"))
+    ]
+
+
 class TestProcessingResult:
     """Test ProcessingResult model."""
 
@@ -40,6 +48,16 @@ class TestProcessingResult:
 
         with pytest.raises(ValidationError):
             ProcessingResult.model_validate(payload)
+
+    def test_all_demo_processing_results_validate(self):
+        """All demo processing payloads should validate successfully."""
+        payloads = _load_all_demo_processing_results()
+
+        assert len(payloads) >= 3
+        for payload in payloads:
+            result = ProcessingResult.model_validate(payload)
+            assert result.findings
+            assert result.gaps
 
 
 class TestAnalysisDraft:

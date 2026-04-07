@@ -153,7 +153,7 @@ function seedConversationStore(perspectives = ["US", "NEUTRAL"]) {
     conversations: [
       {
         id: "conv-1",
-        title: "Analysis conversation",
+        title: "Northern Europe telecom access-development assessment",
         messages: [],
         perspectives,
         sessionId: "session-1",
@@ -190,7 +190,12 @@ describe("AnalysisPrototypeView", () => {
     render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
 
     expect(
-      await screen.findByText(/likely access-development campaign/i),
+      await screen.findByRole("heading", {
+        name: /Northern Europe telecom access-development assessment/i,
+      }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/likely access-development campaign/i),
     ).toBeInTheDocument();
     expect(
       screen.getByLabelText(/finding f-001/i),
@@ -207,6 +212,38 @@ describe("AnalysisPrototypeView", () => {
       screen.getByText(/Review privileged telecom administration accounts/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/Attribution remains unclear/i)).toBeInTheDocument();
+  });
+
+  it("falls back to the first finding title when the conversation title is generic", async () => {
+    localStorage.clear();
+    const store: ConversationStore = {
+      conversations: [
+        {
+          id: "conv-1",
+          title: "New conversation",
+          messages: [],
+          perspectives: ["US", "NEUTRAL"],
+          sessionId: "session-1",
+          isConfirming: false,
+          stage: "complete",
+          subState: null,
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      ],
+      activeConversationId: "conv-1",
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
+
+    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+
+    expect(
+      await screen.findByRole("heading", {
+        name: /Repeated credential-access activity against telecom administration services/i,
+        level: 1,
+      }),
+    ).toBeInTheDocument();
   });
 
   it("renders an error state when the fetch fails", async () => {

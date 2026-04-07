@@ -177,6 +177,15 @@ class GeminiAgent:
         )
         return last_text or "Agent reached maximum tool iterations without completing."
 
+    # Phrases that indicate Gemini could not access the page.
+    _INACCESSIBLE_PHRASES: tuple[str, ...] = (
+        "not accessible", "unable to access", "cannot access", "could not access",
+        "access denied", "access is denied", "403", "404 not found",
+        "page not found", "could not fetch", "failed to fetch", "error fetching",
+        "blocked", "paywall", "subscription required", "behind a paywall",
+        "login required", "sign in required", "no content available",
+    )
+
     async def fetch_url_summaries(
         self,
         urls: list[str],
@@ -189,6 +198,9 @@ class GeminiAgent:
         Makes a separate Gemini call with the url_context built-in tool — no MCP
         tools, no scraping. Gemini fetches each URL server-side through Google's
         infrastructure.
+
+        Pages that are inaccessible (paywalled, 403/404, blocked) are silently
+        skipped so they don't pollute the collected data or the source count.
 
         Returns a list of collected_data-compatible dicts with source="fetch_page".
         """
@@ -205,17 +217,25 @@ class GeminiAgent:
             prompt = (
                 f"PIR (Priority Intelligence Requirement): {pir}\n"
                 f"Analysis perspectives: {perspectives_str}\n\n"
-                f"Fetch and read each URL listed below. For each accessible page:\n"
+                f"Fetch and read each URL listed below. For EACH page that is accessible:\n"
                 f"1. Extract the article title, author name(s), publication date, and publisher/website name.\n"
                 f"2. Write a concise intelligence-focused summary (3-5 sentences) highlighting facts "
                 f"and analysis directly relevant to the PIR.\n"
                 f"3. Construct a correctly formatted APA 7th edition citation.\n\n"
+                f"IMPORTANT: If a page is inaccessible, blocked, paywalled, returns a 403/404 error, "
+                f"or has no readable content, OMIT it entirely from the response — do not include it.\n\n"
+                f"Source authority hierarchy — prioritise pages in this order:\n"
+                f"1. Government & official sources (.gov, .mil, official agency/ministry sites)\n"
+                f"2. Established research institutions & think tanks (CSIS, RAND, Chatham House, RUSI, CFR, etc.)\n"
+                f"3. Trusted international news outlets (Reuters, BBC, AP News, Financial Times, etc.)\n"
+                f"4. Other credible sources\n\n"
                 f"APA format: Author, A. A. (Year, Month Day). Title of article. Publisher. URL\n"
                 f"- If author is unknown use the publisher/website name as author.\n"
                 f"- If date is unknown omit it.\n"
                 f"- Dates must use the format: YYYY, Month DD (e.g. 2026, March 15).\n\n"
                 f"URLs to fetch:\n{url_list}\n\n"
-                f"Respond ONLY with valid JSON — no markdown fences, no explanation:\n"
+                f"Respond ONLY with valid JSON — no markdown fences, no explanation.\n"
+                f"Only include accessible pages. Omit inaccessible ones entirely:\n"
                 f'{{"page_summaries": ['
                 f'{{"url": "...", "title": "...", "author": "Last, F. M. or null", '
                 f'"date": "YYYY-MM-DD or null", "publisher": "...", '
@@ -245,28 +265,39 @@ class GeminiAgent:
                 fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
                 text = fence.group(1).strip() if fence else text.strip()
                 parsed = json.loads(text)
+                batch_results = 0
+                batch_skipped = 0
                 for item in parsed.get("page_summaries", []):
-                    if item.get("url") and item.get("summary"):
-                        citation = item.get("apa_citation", "")
-                        content = (
-                            f"[{item.get('title', 'Article')}]\n"
-                            f"{item['summary']}"
-                        )
-                        if citation:
-                            content += f"\n\nCitation: {citation}"
-                        results.append({
-                            "source": "fetch_page",
-                            "resource_id": item["url"],
-                            "content": content,
-                            "apa_citation": citation,
-                            "author": item.get("author"),
-                            "date": item.get("date"),
-                            "publisher": item.get("publisher"),
-                            "title": item.get("title"),
-                        })
+                    if not item.get("url") or not item.get("summary"):
+                        batch_skipped += 1
+                        continue
+                    # Skip pages Gemini flagged as inaccessible
+                    summary_lower = item["summary"].lower()
+                    if any(phrase in summary_lower for phrase in self._INACCESSIBLE_PHRASES):
+                        logger.info(f"[GeminiAgent] Skipping inaccessible URL: {item['url']}")
+                        batch_skipped += 1
+                        continue
+                    citation = item.get("apa_citation", "")
+                    content = (
+                        f"[{item.get('title', 'Article')}]\n"
+                        f"{item['summary']}"
+                    )
+                    if citation:
+                        content += f"\n\nCitation: {citation}"
+                    results.append({
+                        "source": "fetch_page",
+                        "resource_id": item["url"],
+                        "content": content,
+                        "apa_citation": citation,
+                        "author": item.get("author"),
+                        "date": item.get("date"),
+                        "publisher": item.get("publisher"),
+                        "title": item.get("title"),
+                    })
+                    batch_results += 1
                 logger.info(
                     f"[GeminiAgent] url_context batch {i // batch_size + 1}: "
-                    f"{len(parsed.get('page_summaries', []))} pages summarised"
+                    f"{batch_results} accessible, {batch_skipped} skipped"
                 )
             except Exception as e:
                 logger.error(f"[GeminiAgent] url_context batch failed: {e}")

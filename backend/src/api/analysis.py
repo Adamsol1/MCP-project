@@ -25,6 +25,7 @@ class AnalysisDraftRequest(BaseModel):
 
     session_id: str = Field(..., min_length=1)
     force_refresh: bool = False
+    demo_dataset: str | None = None
 
 
 class AnalysisDraftResponse(BaseModel):
@@ -44,6 +45,7 @@ class AnalysisCouncilRequest(BaseModel):
     finding_ids: list[str] = Field(default_factory=list)
     selected_perspectives: list[str] = Field(..., min_length=2)
     council_settings: CouncilRunSettings | None = None
+    demo_dataset: str | None = None
 
     @field_validator("debate_point")
     @classmethod
@@ -91,10 +93,13 @@ async def _build_draft(
     session_id: str,
     store: AnalysisSessionStore,
     force_refresh: bool = False,
+    demo_dataset: str | None = None,
     processing_service: ProcessingPrototypeService | None = None,
     analysis_service: AnalysisPrototypeService | None = None,
 ) -> AnalysisDraftResponse:
-    processing_service = processing_service or ProcessingPrototypeService()
+    processing_service = processing_service or ProcessingPrototypeService(
+        dataset_name=demo_dataset
+    )
     analysis_service = analysis_service or AnalysisPrototypeService()
 
     state = store.get_or_create(session_id)
@@ -131,6 +136,7 @@ async def create_analysis_draft(
             request.session_id,
             store,
             force_refresh=request.force_refresh,
+            demo_dataset=request.demo_dataset,
         )
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -146,7 +152,11 @@ async def create_analysis_council(
     research_logger = ResearchLogger(session_id=request.session_id)
 
     try:
-        draft_response = await _build_draft(request.session_id, store)
+        draft_response = await _build_draft(
+            request.session_id,
+            store,
+            demo_dataset=request.demo_dataset,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 

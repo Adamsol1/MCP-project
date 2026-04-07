@@ -52,13 +52,13 @@ class _ErrorEngine:
                 SimpleNamespace(
                     round=1,
                     participant=request.participants[0].display_name,
-                    response="[ERROR: FileNotFoundError: [WinError 2] The system cannot find the file specified]",
+                    response="[ERROR: RuntimeError: synthetic backend failure]",
                     timestamp="2026-03-20T10:00:00Z",
                 ),
                 SimpleNamespace(
                     round=1,
                     participant=request.participants[1].display_name,
-                    response="[ERROR: FileNotFoundError: [WinError 2] The system cannot find the file specified]",
+                    response="[ERROR: RuntimeError: synthetic backend failure]",
                     timestamp="2026-03-20T10:00:00Z",
                 ),
             ],
@@ -165,7 +165,7 @@ class TestCouncilService:
 
         monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())
 
-        with pytest.raises(RuntimeError, match="Gemini CLI could not be launched"):
+        with pytest.raises(RuntimeError, match="Council runtime failed:"):
             await service.run_council(
                 session_id="session-council",
                 debate_point="Assess the strongest interpretation of the selected findings.",

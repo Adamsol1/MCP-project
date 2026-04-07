@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
@@ -29,6 +30,7 @@ export default function IntelligencePanel({
   collectionStatus = null,
 }: IntelligencePanelProps) {
   const { activePhase, collectionData } = useWorkspace();
+  const t = useT();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showAllFiles, setShowAllFiles] = useState(false);
 
@@ -37,7 +39,7 @@ export default function IntelligencePanel({
     : uploadedFiles.slice(0, VISIBLE_FILE_COUNT);
   const hiddenCount = uploadedFiles.length - VISIBLE_FILE_COUNT;
 
-  const phaseLabel = activePhase.toUpperCase();
+  const phaseLabel = t.phaseLabels[activePhase] ?? activePhase.toUpperCase();
 
   function renderPhaseContent() {
     switch (activePhase) {
@@ -101,7 +103,7 @@ export default function IntelligencePanel({
             </section>
             <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
               <p className="text-xs text-text-secondary">
-                Processing artifacts will appear here.
+                {t.processingArtifacts}
               </p>
             </section>
           </>
@@ -123,7 +125,7 @@ export default function IntelligencePanel({
             </section>
             <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
               <p className="text-xs text-text-secondary">
-                Analysis outputs will appear here.
+                {t.analysisOutputs}
               </p>
             </section>
           </>
@@ -138,7 +140,7 @@ export default function IntelligencePanel({
     <div className="h-full flex flex-col bg-surface">
       <header className="border-b border-border-muted px-3 py-2">
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
-          Intelligence Workspace
+          {t.intelligenceWorkspace}
         </p>
         <h2 className="mt-1 text-xs font-semibold text-text-primary">{phaseLabel}</h2>
       </header>
@@ -159,12 +161,13 @@ export default function IntelligencePanel({
 }
 
 function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
+  const t = useT();
   const entries = Object.entries(status.sources);
 
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-2">
-        Collecting
+        {t.collecting}
       </p>
       <ul className="flex flex-col gap-1.5">
         {entries.map(([source, info]) => {
@@ -177,7 +180,7 @@ function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
                 <span className={`shrink-0 w-3.5 text-center ${
                   isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
                 }`}>
-                  {isDone ? "✓" : isActive ? "→" : "○"}
+                  {isDone ? "✓" : isActive ? "●" : "○"}
                 </span>
                 <span className={
                   isDone ? "text-text-secondary" :
@@ -236,17 +239,18 @@ function FileUploadSection({
   onOpenFileUpload,
   onFileRemove,
 }: FileUploadSectionProps) {
+  const t = useT();
   return (
     <div>
       <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-2">
-        Files
+        {t.files}
       </p>
 
       <button
         onClick={onOpenFileUpload}
         className="w-full py-1 px-2 bg-primary-dark text-text-inverse rounded text-xs font-medium hover:bg-primary-hover transition-colors"
       >
-        Upload Files
+        {t.uploadFiles}
       </button>
 
       {uploadedFiles.length > 0 && (
@@ -266,7 +270,7 @@ function FileUploadSection({
                 <button
                   onClick={() => onFileRemove?.(file)}
                   className="shrink-0 text-text-muted hover:text-error transition-colors"
-                  aria-label={`Remove ${file.filename}`}
+                  aria-label={t.removeFile(file.filename)}
                 >
                   ✕
                 </button>
@@ -279,7 +283,7 @@ function FileUploadSection({
               onClick={onToggleShowAll}
               className="mt-2 text-xs text-primary-dark hover:underline"
             >
-              {showAllFiles ? "Show less" : `Show ${hiddenCount} more`}
+              {showAllFiles ? t.showLess : t.showMore(hiddenCount)}
             </button>
           )}
         </>

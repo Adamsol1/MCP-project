@@ -7,11 +7,21 @@ import type {
 
 const API_BACKEND_URL = "http://localhost:8000";
 
-export async function getAnalysisDraft(sessionId: string) {
+export interface GetAnalysisDraftOptions {
+  forceRefresh?: boolean;
+  demoDataset?: string;
+}
+
+export async function getAnalysisDraft(
+  sessionId: string,
+  options: GetAnalysisDraftOptions = {},
+) {
   const httpResponse = await axios.post<AnalysisDraftResponse>(
     `${API_BACKEND_URL}/api/analysis/draft`,
     {
       session_id: sessionId,
+      force_refresh: options.forceRefresh ?? false,
+      demo_dataset: options.demoDataset,
     },
   );
 
