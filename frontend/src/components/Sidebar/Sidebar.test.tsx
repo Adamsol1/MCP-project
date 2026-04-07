@@ -134,28 +134,34 @@ describe("Sidebar", () => {
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
   });
 
-  it("renders the analysis demo dev button when callback is provided", async () => {
+  it("renders the analysis demo dev buttons when callback is provided", async () => {
     const user = userEvent.setup();
     renderSidebar({ onDevOpenAnalysis: vi.fn() });
 
     await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
 
     expect(
-      screen.getByRole("button", { name: /open analysis demo/i }),
+      screen.getByRole("button", { name: /open analysis demo 1/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /open analysis demo 2/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /open analysis demo 3/i }),
     ).toBeInTheDocument();
   });
 
-  it("calls onDevOpenAnalysis when clicked", async () => {
+  it("calls onDevOpenAnalysis with the selected dataset when clicked", async () => {
     const user = userEvent.setup();
     const onDevOpenAnalysis = vi.fn();
 
     renderSidebar({ onDevOpenAnalysis });
     await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
     await user.click(
-      screen.getByRole("button", { name: /open analysis demo/i }),
+      screen.getByRole("button", { name: /open analysis demo 2/i }),
     );
 
-    expect(onDevOpenAnalysis).toHaveBeenCalledOnce();
+    expect(onDevOpenAnalysis).toHaveBeenCalledWith("demo_processing_result_2");
   });
 
   it("starts with direction phase minimized", async () => {

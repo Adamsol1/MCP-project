@@ -175,6 +175,44 @@ def test_analysis_draft_response_shape_is_valid(monkeypatch, tmp_path):
     }
 
 
+def test_analysis_draft_can_prime_specific_demo_dataset(monkeypatch, tmp_path):
+    """The draft endpoint should load a selected demo dataset when requested."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/draft",
+        json={
+            "session_id": "analysis-session-demo-3",
+            "force_refresh": True,
+            "demo_dataset": "demo_processing_result_3",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["processing_result"]["findings"]) == 6
+    assert len(data["processing_result"]["gaps"]) == 6
+
+
+def test_analysis_draft_rejects_unknown_demo_dataset(monkeypatch, tmp_path):
+    """Invalid demo datasets should fail with a clear backend error."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/draft",
+        json={
+            "session_id": "analysis-session-invalid-demo",
+            "force_refresh": True,
+            "demo_dataset": "does_not_exist",
+        },
+    )
+
+    assert response.status_code == 500
+    assert "Unknown demo dataset" in response.json()["detail"]
+
+
 def test_analysis_council_happy_path(monkeypatch, tmp_path):
     """Valid council requests should return a structured CouncilNote."""
     _configure_analysis_dependencies(monkeypatch, tmp_path)

@@ -124,6 +124,18 @@ function getFindingPreview(finding: ProcessingFinding) {
   return `${finding.evidence_summary} ${finding.why_it_matters}`;
 }
 
+function getAnalysisHeading(
+  conversationTitle: string | undefined,
+  findings: ProcessingFinding[],
+) {
+  const trimmedTitle = conversationTitle?.trim();
+  if (trimmedTitle && trimmedTitle !== "New conversation") {
+    return trimmedTitle;
+  }
+
+  return findings[0]?.title ?? "Analysis assessment";
+}
+
 function stripMarkdown(value: string) {
   return value.replace(/\*\*(.*?)\*\*/g, "$1").trim();
 }
@@ -655,6 +667,10 @@ export default function AnalysisPrototypeView() {
 
   const { processing_result: processingResult, analysis_draft: analysisDraft } = data;
   const averageConfidence = getAverageConfidence(processingResult.findings);
+  const analysisHeading = getAnalysisHeading(
+    activeConversation?.title,
+    processingResult.findings,
+  );
   const orderedPerspectiveEntries = PERSPECTIVE_ORDER.filter(
     (key) => key in analysisDraft.per_perspective_implications,
   ).map((key) => [key, analysisDraft.per_perspective_implications[key]] as const);
@@ -681,7 +697,7 @@ export default function AnalysisPrototypeView() {
             </div>
             <div>
               <h1 className="font-serif text-3xl leading-tight text-text-primary">
-                Northern Europe telecom access-development assessment
+                {analysisHeading}
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-text-secondary">
                 {analysisDraft.summary}
