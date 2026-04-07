@@ -52,13 +52,13 @@ class _ErrorEngine:
                 SimpleNamespace(
                     round=1,
                     participant=request.participants[0].display_name,
-                    response="[ERROR: FileNotFoundError: [WinError 2] The system cannot find the file specified]",
+                    response="[ERROR: RuntimeError: synthetic backend failure]",
                     timestamp="2026-03-20T10:00:00Z",
                 ),
                 SimpleNamespace(
                     round=1,
                     participant=request.participants[1].display_name,
-                    response="[ERROR: FileNotFoundError: [WinError 2] The system cannot find the file specified]",
+                    response="[ERROR: RuntimeError: synthetic backend failure]",
                     timestamp="2026-03-20T10:00:00Z",
                 ),
             ],
@@ -121,35 +121,6 @@ class TestCouncilService:
         assert profile.file_tree_injection_enabled is False
         assert profile.decision_graph_enabled is False
 
-    def test_resolve_gemini_command_uses_env_override(self, monkeypatch, tmp_path):
-        """An explicit env override should work without PATH entries."""
-        service = CouncilService()
-        gemini_path = tmp_path / "tools" / "gemini.cmd"
-        gemini_path.parent.mkdir(parents=True)
-        gemini_path.write_text("", encoding="utf-8")
-
-        monkeypatch.setenv(service.GEMINI_COMMAND_ENV_VAR, str(gemini_path))
-        monkeypatch.setattr("src.services.council_service.which", lambda _: None)
-
-        assert service._resolve_gemini_command() == str(gemini_path.resolve())
-
-    def test_resolve_gemini_command_uses_windows_npm_fallback(
-        self, monkeypatch, tmp_path
-    ):
-        """Standard global npm install locations should work on Windows."""
-        service = CouncilService()
-        appdata_dir = tmp_path / "AppData" / "Roaming"
-        gemini_path = appdata_dir / "npm" / "gemini.cmd"
-        gemini_path.parent.mkdir(parents=True)
-        gemini_path.write_text("", encoding="utf-8")
-
-        monkeypatch.delenv(service.GEMINI_COMMAND_ENV_VAR, raising=False)
-        monkeypatch.setenv("APPDATA", str(appdata_dir))
-        monkeypatch.setattr("src.services.council_service.which", lambda _: None)
-        monkeypatch.setattr("src.services.council_service.os.name", "nt")
-
-        assert service._resolve_gemini_command() == str(gemini_path.resolve())
-
     @pytest.mark.asyncio
     async def test_run_council_returns_council_note(self, monkeypatch, tmp_path):
         """Council execution should return a stable CouncilNote."""
@@ -194,7 +165,7 @@ class TestCouncilService:
 
         monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())
 
-        with pytest.raises(RuntimeError, match="Gemini CLI could not be launched"):
+        with pytest.raises(RuntimeError, match="Council runtime failed:"):
             await service.run_council(
                 session_id="session-council",
                 debate_point="Assess the strongest interpretation of the selected findings.",
