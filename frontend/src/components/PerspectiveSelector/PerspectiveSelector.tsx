@@ -24,21 +24,21 @@ interface PerspectiveSelectorProps {
  *     (React serialises the boolean to "true" / "false" automatically).
  *   - data-selected mirrors the state as a string attribute for CSS/test hooks.
  */
+import { useT } from "../../i18n/useT";
+
 export default function PerspectiveSelector({
   selected,
   onChange,
 }: PerspectiveSelectorProps) {
-  /**
-   * Each perspective has a human-readable label shown in the button and a
-   * value string used in the selected array and sent to the backend.
-   */
+  const t = useT();
+
   const perspectives = [
-    { label: "Neutral", value: "NEUTRAL" },
-    { label: "China", value: "CHINA" },
-    { label: "European Union", value: "EU" },
-    { label: "Norway", value: "NORWAY" },
-    { label: "Russia", value: "RUSSIA" },
-    { label: "United States", value: "US" },
+    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL" },
+    { label: t.perspectiveLabels["CHINA"], value: "CHINA" },
+    { label: t.perspectiveLabels["EU"], value: "EU" },
+    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY" },
+    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA" },
+    { label: t.perspectiveLabels["US"], value: "US" },
   ];
 
   /**
@@ -49,8 +49,7 @@ export default function PerspectiveSelector({
    */
   const togglePerspective = (value: string) => {
     const isSelected = selected.includes(value);
-    const isNeutralOnly =
-      selected.length === 1 && selected[0] === "NEUTRAL";
+    const isNeutralOnly = selected.length === 1 && selected[0] === "NEUTRAL";
 
     let updated: string[];
     if (isSelected) {
@@ -70,11 +69,11 @@ export default function PerspectiveSelector({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
-        Perspectives
+      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+        {t.perspective}
       </p>
 
-      <div className="flex flex-wrap gap-1.5">
+      <div className="grid grid-cols-2 gap-1">
         {perspectives.map((perspective) => {
           const isActive = selected.includes(perspective.value);
           return (
@@ -83,7 +82,7 @@ export default function PerspectiveSelector({
               onClick={() => togglePerspective(perspective.value)}
               aria-pressed={isActive}
               data-selected={isActive.toString()}
-              className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+              className={`py-1.5 rounded text-[11px] font-semibold uppercase tracking-[0.08em] border transition-colors cursor-pointer ${
                 isActive
                   ? "bg-primary border-primary-dark text-text-inverse"
                   : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"

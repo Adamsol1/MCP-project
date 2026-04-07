@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
+import { renderWithSettings } from "../../test/renderWithProviders";
 
 // Helper: creates a minimal conversation object for testing
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
@@ -26,7 +27,7 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
 function renderSidebar(
   props: Partial<React.ComponentProps<typeof Sidebar>> = {},
 ) {
-  return render(
+  return renderWithSettings(
     <Sidebar
       conversations={[]}
       activeConversationId={null}

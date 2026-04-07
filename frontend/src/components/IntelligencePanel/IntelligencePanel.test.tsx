@@ -55,7 +55,7 @@ describe("IntelligencePanel — phase label", () => {
       </ConversationProvider>
     );
 
-    // After the seeder's useEffect fires, the label should reflect 'collection'.
+    // After the seeder's useEffect fires, the h2 should reflect "COLLECTION".
     await act(async () => {});
 
     expect(screen.getByRole("heading", { name: /collection/i })).toBeInTheDocument();
@@ -91,9 +91,9 @@ describe("IntelligencePanel — phase view routing", () => {
 
     await act(async () => {});
 
+    // Header reflects the phase, PirSourcesView is not mounted.
     expect(screen.getByRole("heading", { name: /collection/i })).toBeInTheDocument();
-    // PirSourcesView should NOT be mounted for this phase.
-    expect(screen.queryByText(/no sources/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no sources available/i)).not.toBeInTheDocument();
   });
 
   it("renders a placeholder for the 'processing' phase", async () => {
@@ -109,7 +109,7 @@ describe("IntelligencePanel — phase view routing", () => {
     await act(async () => {});
 
     expect(screen.getByRole("heading", { name: /processing/i })).toBeInTheDocument();
-    expect(screen.queryByText(/no sources/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/no sources available/i)).not.toBeInTheDocument();
   });
 
   it("renders the analysis prototype view for the 'analysis' phase", async () => {

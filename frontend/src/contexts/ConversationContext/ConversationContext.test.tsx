@@ -213,8 +213,8 @@ describe("ConversationContext", () => {
         result.current.createNewConversation();
       });
 
-      // Title should be default before any messages
-      expect(result.current.activeConversation?.title).toBe("New conversation");
+      // Title starts empty before any user messages
+      expect(result.current.activeConversation?.title).toBe("");
 
       act(() => {
         result.current.addMessage({
@@ -272,8 +272,8 @@ describe("ConversationContext", () => {
         });
       });
 
-      // Title should still be the default since only user messages set the title
-      expect(result.current.activeConversation?.title).toBe("New conversation");
+      // Title should still be empty since only user messages set the title
+      expect(result.current.activeConversation?.title).toBe("");
     });
 
     it("does not update title on subsequent user messages", () => {

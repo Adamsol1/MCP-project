@@ -120,7 +120,7 @@ describe("conversationStorage", () => {
 
       // UUID v4 format: 8-4-4-4-12 hex characters
       expect(conv.id).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
       );
     });
 
@@ -142,17 +142,17 @@ describe("conversationStorage", () => {
       expect(conv.perspectives).toEqual(["US", "EU", "NORWAY"]);
     });
 
-    it("creates a conversation with 'New conversation' as title", () => {
+    it("creates a conversation with an empty string title", () => {
       const conv = createConversation();
 
-      expect(conv.title).toBe("New conversation");
+      expect(conv.title).toBe("");
     });
 
     it("creates a conversation with a UUID sessionId", () => {
       const conv = createConversation();
 
       expect(conv.sessionId).toMatch(
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
       );
     });
 

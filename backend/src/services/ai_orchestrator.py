@@ -27,7 +27,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
+        self.max_attempts = 1  # initial attempt + 1 retry on major review rejection
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -82,7 +82,7 @@ class AIOrchestrator:
             except Exception as e:
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
-                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}")
+                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}", exc_info=True)
                 self._log_attempt(ReasoningLogEntry(
                     attempt_number=attempt,
                     timestamp=attempt_timestamp,
@@ -191,7 +191,7 @@ class AIOrchestrator:
         )
 
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None
+        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None, feedback: str | None = None
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -217,10 +217,10 @@ class AIOrchestrator:
         """
         accumulated = {"raw_data": ""}
 
-        async def collect_fn(feedback=None):
+        async def collect_fn(reviewer_feedback=None):
             new_data = await collection_service.collect(
                 sources, pir, plan,
-                feedback=feedback,
+                feedback=reviewer_feedback or feedback,
                 session_id=session_id,
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,
@@ -240,6 +240,26 @@ class AIOrchestrator:
             session_id=session_id,
         )
 
-    # TODO: Processing phase - AI #1 processes data, AI #2 verifies
-    # async def process_and_review(self, data, processor, reviewer, session_id):
-    #   Same retry pattern: process → review → retry if rejected
+    async def process_and_review(
+        self,
+        collected_data: str,
+        pir: str,
+        processing_service,
+        reviewer,
+        session_id: str,
+    ) -> str:
+        async def process_fn(feedback=None):
+            return await processing_service.process(
+                collected_data=collected_data,
+                pir=pir,
+                feedback=feedback,
+            )
+
+        from src.models.dialogue import ProcessingContext
+        return await self._run_with_review(
+            generate_fn=process_fn,
+            reviewer=reviewer,
+            context=ProcessingContext(pir=pir, collected_data=collected_data),
+            phase="processing",
+            session_id=session_id,
+        )

@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import ChatWindow from "./ChatWindow";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 
 vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
   default: () => <div>Inline analysis view</div>,
@@ -14,9 +15,11 @@ vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
 // calls useWorkspace (needs WorkspaceProvider).
 function renderWithToast(ui: ReactNode) {
   return render(
-    <WorkspaceProvider>
-      <ToastProvider>{ui}</ToastProvider>
-    </WorkspaceProvider>
+    <SettingsProvider>
+      <WorkspaceProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </WorkspaceProvider>
+    </SettingsProvider>
   );
 }
 

@@ -21,6 +21,7 @@ import type {
   CollectionDisplayData,
   Message,
   PirData,
+  ProcessingData,
   SuggestedSourcesData,
   SummaryData,
 } from "../types/conversation";
@@ -31,6 +32,7 @@ const DECISION_STAGES: DialogueStage[] = [
   "pir_confirming",
   "plan_confirming",
   "reviewing",
+  "processing",
 ];
 
 const ACTION_TO_MESSAGE_TYPE: Record<
@@ -44,6 +46,8 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   show_plan: "plan",
   start_collecting: "question",
   show_collection: "collection",
+  show_processing: "processing",
+  select_gaps: "question",
   error: "error",
   complete: "complete",
 };
@@ -206,6 +210,12 @@ function inferStageFromResponse(
   if (response.action === "show_collection") {
     return { stage: "reviewing", subState: "awaiting_decision" };
   }
+  if (response.action === "show_processing") {
+    return { stage: "processing", subState: "awaiting_decision" };
+  }
+  if (response.action === "select_gaps") {
+    return { stage: "reviewing", subState: "awaiting_gather_more" };
+  }
   if (response.action === "complete") {
     return { stage: "complete", subState: null };
   }
@@ -262,6 +272,13 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
 
   if (messageType === "plan") {
     message.data = parsePlanData(response.question);
+  }
+
+  if (messageType === "processing") {
+    const parsed = tryParseJson<ProcessingData>(response.question);
+    if (parsed) {
+      message.data = parsed;
+    }
   }
 
   if (messageType === "suggested_sources") {
@@ -381,7 +398,7 @@ export function useChat() {
       sessionId,
       perspectives,
       approved,
-      settings.language,
+      settings.aiLanguage,
       settings.inputParameters.timeframe,
       options,
     );
@@ -397,7 +414,7 @@ export function useChat() {
       sessionId,
       perspectives,
       undefined,
-      settings.language,
+      settings.aiLanguage,
       settings.inputParameters.timeframe,
     );
     applyResponse(collectResponse, conversationId, "collecting", null);
@@ -484,6 +501,27 @@ export function useChat() {
 
     setStage(stage, "awaiting_modifications");
     info("Add your feedback in chat.");
+  };
+
+  const gatherMoreFromProcessing = async () => {
+    if (!activeConversation) return;
+    setIsLoading(true);
+    try {
+      await sendAndHandle(
+        activeConversation.id,
+        activeConversation.sessionId,
+        "",
+        undefined,
+        { gatherMore: true },
+        stage,
+        subState,
+        activeConversation.perspectives,
+      );
+    } catch (e) {
+      error(`Gather more failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const gatherMore = () => {
@@ -629,6 +667,7 @@ export function useChat() {
     approve,
     reject,
     gatherMore,
+    gatherMoreFromProcessing,
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,

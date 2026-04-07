@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CollectionStatsModal from "./CollectionStatsModal";
+import { renderWithSettings } from "../../test/renderWithProviders";
 import type { CollectionDisplayData } from "../../types/conversation";
 
 // ---------------------------------------------------------------------------
@@ -28,7 +29,7 @@ describe("CollectionStatsModal", () => {
   // --- Visibility ---
 
   it("renders nothing when isOpen is false", () => {
-    const { container } = render(
+    const { container } = renderWithSettings(
       <CollectionStatsModal
         isOpen={false}
         onClose={vi.fn()}
@@ -40,7 +41,7 @@ describe("CollectionStatsModal", () => {
   });
 
   it("renders modal content when isOpen is true", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
@@ -57,7 +58,7 @@ describe("CollectionStatsModal", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
 
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={onClose}
@@ -74,7 +75,7 @@ describe("CollectionStatsModal", () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
 
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={onClose}
@@ -90,7 +91,7 @@ describe("CollectionStatsModal", () => {
   // --- Stats section ---
 
   it("shows all source names in the stats section", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
@@ -103,7 +104,7 @@ describe("CollectionStatsModal", () => {
   });
 
   it("shows the item count for each source", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
@@ -119,7 +120,7 @@ describe("CollectionStatsModal", () => {
   // --- Raw data section ---
 
   it("renders a collapsible section for each source's raw items", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
@@ -134,7 +135,7 @@ describe("CollectionStatsModal", () => {
   });
 
   it("renders raw content for collected items", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
@@ -149,7 +150,7 @@ describe("CollectionStatsModal", () => {
   // --- Null data guard ---
 
   it("renders a fallback when collectionData is null", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsModal
         isOpen={true}
         onClose={vi.fn()}
