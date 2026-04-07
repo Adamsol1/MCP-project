@@ -1,8 +1,9 @@
 """Analysis-stage council wrapper using app runtime defaults."""
 
+import os
 import sys
-from shutil import which
 from pathlib import Path
+from shutil import which
 from types import SimpleNamespace
 
 from src.models.analysis import (
@@ -36,6 +37,7 @@ class CouncilService:
     DEFAULT_TIMEOUT_PER_ROUND = 180
     DEFAULT_VOTE_RETRY_ENABLED = True
     DEFAULT_VOTE_RETRY_ATTEMPTS = 1
+    GEMINI_COMMAND_ENV_VAR = "GEMINI_CLI_PATH"
     FILE_TREE_INJECTION_ENABLED = False
     DECISION_GRAPH_ENABLED = False
 
@@ -233,15 +235,75 @@ class CouncilService:
         engine.tool_execution_history = []
         return engine
 
-    def _resolve_gemini_command(self) -> str:
-        candidates = ["gemini.cmd", "gemini.exe", "gemini"]
+    def _resolve_command_candidate(self, candidate: str) -> str | None:
+        candidate_path = Path(candidate).expanduser()
+        if candidate_path.is_absolute() or candidate_path.parent != Path("."):
+            if candidate_path.exists():
+                return str(candidate_path.resolve())
+
+        resolved = which(candidate)
+        if resolved:
+            return resolved
+
+        if candidate_path.exists():
+            return str(candidate_path.resolve())
+
+        return None
+
+    def _windows_gemini_fallbacks(self) -> list[str]:
+        appdata = os.getenv("APPDATA")
+        localappdata = os.getenv("LOCALAPPDATA")
+        userprofile = os.getenv("USERPROFILE")
+
+        candidates: list[Path] = []
+        if appdata:
+            candidates.append(Path(appdata) / "npm" / "gemini.cmd")
+        if localappdata:
+            candidates.append(Path(localappdata) / "npm" / "gemini.cmd")
+        if userprofile:
+            candidates.append(
+                Path(userprofile) / "AppData" / "Roaming" / "npm" / "gemini.cmd"
+            )
+
+        deduped: list[str] = []
+        seen: set[str] = set()
         for candidate in candidates:
-            resolved = which(candidate)
+            normalized = str(candidate)
+            if normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(normalized)
+        return deduped
+
+    def _gemini_command_candidates(self) -> list[str]:
+        candidates: list[str] = []
+        env_override = os.getenv(self.GEMINI_COMMAND_ENV_VAR)
+        if env_override:
+            candidates.append(env_override)
+
+        candidates.extend(["gemini.cmd", "gemini.exe", "gemini"])
+
+        if os.name == "nt":
+            candidates.extend(self._windows_gemini_fallbacks())
+
+        deduped: list[str] = []
+        seen: set[str] = set()
+        for candidate in candidates:
+            normalized = candidate.strip()
+            if not normalized or normalized in seen:
+                continue
+            seen.add(normalized)
+            deduped.append(normalized)
+        return deduped
+
+    def _resolve_gemini_command(self) -> str:
+        for candidate in self._gemini_command_candidates():
+            resolved = self._resolve_command_candidate(candidate)
             if resolved:
                 return resolved
 
         raise RuntimeError(
-            "Gemini CLI not found. Install the Gemini CLI and ensure `gemini.cmd` is available in PATH."
+            "Gemini CLI not found. Install the Gemini CLI, or set `GEMINI_CLI_PATH` to the executable location."
         )
 
     def _raise_if_runtime_failed(self, result) -> None:
@@ -255,7 +317,7 @@ class CouncilService:
         first_error = responses[0].response.strip("[]")
         if "FileNotFoundError" in first_error:
             raise RuntimeError(
-                "Council runtime failed: Gemini CLI could not be launched. Ensure `gemini.cmd` is installed and available to the backend process."
+                "Council runtime failed: Gemini CLI could not be launched. Ensure the Gemini CLI is installed and accessible to the backend process."
             )
         raise RuntimeError(f"Council runtime failed: {first_error}")
 
