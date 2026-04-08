@@ -48,6 +48,11 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     medium: t.priorityMedium,
     low: t.priorityLow,
   };
+  const PRIORITY_COLOR: Record<string, string> = {
+    high: "text-error",
+    medium: "text-warning-dark",
+    low: "text-text-muted",
+  };
 
   useEffect(() => {
     setPirData(pirData);
@@ -63,7 +68,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     .filter(Boolean);
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <h3 className="font-semibold">
         {t.pirHeader}
       </h3>
@@ -79,17 +84,25 @@ function PirMessage({ pirData }: { pirData: PirData }) {
       )}
       <div className="space-y-4 mt-2">
         {pirData.pirs.map((pir, i) => (
-          <li key={i} className="flex flex-col gap-1">
-            <span className="text-sm font-bold text-text-secondary uppercase tracking-wide">
-              {i + 1}. {PRIORITY_LABEL[pir.priority]}
-            </span>
-            <p className="font-medium text-base leading-snug">{pir.question}</p>
-            <details className="group pl-1">
-              <summary className="cursor-pointer list-none text-sm text-text-muted hover:text-text-secondary select-none flex items-center">
+          <div
+            key={i}
+            className="rounded-lg border border-border-muted bg-surface-muted/50 p-3 space-y-1.5"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-text-muted">PIR-{i + 1}</span>
+              <span
+                className={`text-xs font-semibold uppercase tracking-wide ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"}`}
+              >
+                {PRIORITY_LABEL[pir.priority] ?? pir.priority}
+              </span>
+            </div>
+            <p className="font-medium text-sm leading-snug text-text-primary">{pir.question}</p>
+            <details className="group">
+              <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center">
                 {t.rationale}
                 <Chevron />
               </summary>
-              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-1 border-l-2 border-border-muted ml-0.5">
+              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-2 border-l-2 border-border-muted ml-0.5">
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}

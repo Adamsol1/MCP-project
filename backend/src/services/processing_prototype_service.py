@@ -80,7 +80,7 @@ class ProcessingPrototypeService:
             raise ValueError(f"Unknown demo dataset '{dataset_name}'")
         return path
 
-    def get_processing_result(self, session_id: str) -> ProcessingResult:
+    def get_processing_result(self, session_id: str) -> tuple[ProcessingResult, str]:
         """Load and validate the prototype processing result.
 
         Returns a tuple of (ProcessingResult, data_source) where data_source
