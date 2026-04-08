@@ -3,7 +3,6 @@ import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
-import { OptionsPanel } from "./components/OptionsPanel/OptionsPanel";
 import { useToast } from "./hooks/useToast";
 import {
   deleteUploadedFile,
@@ -217,7 +216,7 @@ function AppShell() {
     if (conversation) {
       switchConversation(conversation.id);
     } else if (canReuseConversationForAnalysisDemo(activeConversation)) {
-      conversation = activeConversation;
+      conversation = activeConversation!;
       renameConversation(conversation.id, config.title);
     } else {
       conversation = createNewConversation();
@@ -267,7 +266,7 @@ function AppShell() {
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
-        <main className="flex-1 flex flex-col bg-surface-elevated mx-1 overflow-hidden">
+        <main className="flex-1 flex flex-col bg-surface-elevated overflow-hidden">
           <ChatWindow
             messages={messages}
             onSendMessage={sendMessage}
@@ -293,17 +292,17 @@ function AppShell() {
 
         {!isAnalysisPhase && (
           <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
-            <IntelligencePanel />
+            <IntelligencePanel
+              selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
+              onPerspectiveChange={updatePerspectives}
+              onOpenFileUpload={() => setIsFileUploadOpen(true)}
+              uploadedFiles={visibleUploadedFiles}
+              onFileRemove={handleFileRemove}
+              isCollecting={isCollecting}
+              collectionStatus={visibleCollectionStatus}
+            />
           </div>
         )}
-
-        <OptionsPanel
-          selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
-          onPerspectiveChange={updatePerspectives}
-          onOpenFileUpload={() => setIsFileUploadOpen(true)}
-          uploadedFiles={visibleUploadedFiles}
-          onFileRemove={handleFileRemove}
-        />
       </div>
 
       <FileUploadModal

@@ -12,7 +12,7 @@ interface SettingsModalProps {
 }
 
 /** The navigable sections in the settings left-nav. */
-type NavSection = "language" | "appearance" | "parameters" | "council";
+type NavSection = "appearance" | "parameters" | "council";
 
 /**
  * Full-screen settings modal with an Obsidian-inspired two-panel layout.
@@ -41,7 +41,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const t = useT();
 
   // Tracks which settings category is displayed in the right panel.
-  const [activeSection, setActiveSection] = useState<NavSection>("language");
+  const [activeSection, setActiveSection] = useState<NavSection>("appearance");
 
   // Return nothing when closed — keeps the DOM clean and avoids focus issues.
   if (!isOpen) return null;
@@ -61,7 +61,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-text-muted">
             {t.settingsOptions}
           </p>
-          {(["language", "appearance", "parameters", "council"] as const).map(
+          {(["appearance", "parameters", "council"] as const).map(
             (section) => (
               <button
                 key={section}
@@ -96,7 +96,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
           {/* Only the active section component is mounted at a time. */}
           <main className="mt-2">
-            {(activeSection === "language" || activeSection === "appearance") && (
+            {activeSection === "appearance" && (
               <GeneralSection
                 language={settings.language}
                 onLanguageChange={updateLanguage}

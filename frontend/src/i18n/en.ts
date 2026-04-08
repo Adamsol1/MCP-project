@@ -134,8 +134,9 @@ export const en = {
   // SettingsModal
   settingsOptions: "Options",
   navLabels: {
-    general: "general",
-    parameters: "parameters",
+    appearance: "appearance",
+    parameters: "AI parameters",
+    council: "council",
   } as Record<string, string>,
   closeSettings: "Close settings",
   uiLanguage: "Language",

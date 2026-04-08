@@ -137,8 +137,9 @@ export const no = {
   // SettingsModal
   settingsOptions: "Alternativer",
   navLabels: {
-    general: "generelt",
-    parameters: "parametere",
+    appearance: "utseende",
+    parameters: "AI-parametere",
+    council: "r\u00e5d",
   } as Record<string, string>,
   closeSettings: "Lukk innstillinger",
   uiLanguage: "Spr\u00e5k",
