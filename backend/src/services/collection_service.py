@@ -28,7 +28,7 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
-    "Web Search": ["google_search", "google_news_search"],
+    "Web Search": ["google_search"],
 }
 
 
@@ -110,6 +110,34 @@ def _try_parse_json_lenient(s: str) -> dict | None:
         return json.loads(repaired)
     except json.JSONDecodeError:
         return None
+
+
+_SEARCH_SNIPPET_SOURCES = {"google_search", "google_news_search"}
+
+
+def _strip_search_snippet_items(raw_data: str) -> str:
+    """Remove google_search snippet items from collected_data.
+
+    After the url_context fetch pass, the Serper snippets are no longer needed —
+    only the fetch_page summaries carry real intelligence value.
+    Returns the modified JSON string, or the original if parsing fails.
+    """
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+    json_str = fence.group(1).strip() if fence else raw_data.strip()
+
+    parsed = _try_parse_json_lenient(json_str)
+    if parsed is None:
+        return raw_data
+
+    original_count = len(parsed.get("collected_data", []))
+    parsed["collected_data"] = [
+        item for item in parsed.get("collected_data", [])
+        if item.get("source") not in _SEARCH_SNIPPET_SOURCES
+    ]
+    stripped_count = original_count - len(parsed["collected_data"])
+    if stripped_count:
+        logger.info(f"[CollectionService] Stripped {stripped_count} Serper snippet items from collected_data")
+    return json.dumps(parsed, ensure_ascii=False)
 
 
 def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
@@ -454,6 +482,8 @@ class CollectionService:
                     logger.info(
                         f"[CollectionService] url_context: added {len(summaries)} page summaries"
                     )
+
+            raw_data = _strip_search_snippet_items(raw_data)
 
         return raw_data
 

@@ -9,7 +9,6 @@ _PROCESSING_TOOLS = [
     "list_knowledge_base",
     "read_knowledge_base",
     "google_search",
-    "google_news_search",
 ]
 
 

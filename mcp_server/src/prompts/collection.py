@@ -105,7 +105,7 @@ def build_collection_collect_prompt(
     _active = [p for p in (perspectives or []) if p != "neutral"]
     if not _active:
         _active = ["neutral"]
-    _has_web_tools = "google_search" in approved_tools or "google_news_search" in approved_tools
+    _has_web_tools = "google_search" in approved_tools
     if _has_web_tools:
         _persp_str = ", ".join(perspectives) if perspectives else "neutral"
         _timelimit_hint = since_date or "unspecified"
@@ -121,49 +121,49 @@ def build_collection_collect_prompt(
             )
             for p in _active
         )
-        _news_examples = "\n".join(
-            (
-                f"  google_news_search(query=\"<topic> {p} latest\", num_results=10, "
-                f"region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0]}\", "
-                f"language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1]}\", date_restrict=\"<code>\")"
-            )
-            for p in _active
-        )
         _max_web = len(_active) * 5
-        _max_news = len(_active) * 5
-        _num_results_per_call = 10  # Buffer: request 10 per call so some can be inaccessible and we still hit the target
         web_search_note = (
             f"\n## Web Search Guidance"
             f"\nPerspectives selected: {_persp_str}"
             f"\nPerspective → region + language mapping:"
             f"\n{_mapping_lines}"
-            f"\nAlways pass region and language when calling either tool."
+            f"\nAlways pass region and language when calling google_search."
             f"\n"
-            f"\nFor EACH perspective call BOTH tools separately:"
-            f"\n  1. google_search  — background reports, analysis, official publications"
-            f"\n  2. google_news_search — recent/breaking news, press releases"
+            f"\nIMPORTANT: google_search is used for URL discovery only. The backend will fetch and"
+            f"\nsummarise the full content of each page — your snippets are not stored as intelligence."
             f"\n"
-            f"\nSource authority hierarchy — prefer sources in this order:"
+            f"\n## Query Construction Rules"
+            f"\nWrite narrow, specific queries — not broad topic keywords."
+            f"\nBad queries match too many unrelated pages (military hardware wikis, hobby sites, blogs)."
+            f"\nGood queries combine: a specific named entity or event + the analytic angle + the source type."
+            f"\n"
+            f"\nQuery construction:"
+            f"\n  BAD:  \"China military Taiwan\"                → too broad, matches everything"
+            f"\n  BAD:  \"GPS jamming\"                         → matches hobby and history pages"
+            f"\n  GOOD: \"Volt Typhoon critical infrastructure pre-positioning CISA analysis\""
+            f"\n  GOOD: \"PLA amphibious capability assessment 2025 RAND\""
+            f"\n  GOOD: \"Russia hybrid warfare Norway Nordic analysis site:nato.int OR site:rand.org\""
+            f"\n"
+            f"\nTips for precision:"
+            f"\n  - Use named threat actors, operations, or policy names (e.g. 'Volt Typhoon', 'Operation X')"
+            f"\n  - Add source-type words: 'analysis', 'assessment', 'report', 'white paper'"
+            f"\n  - Add known authoritative domains with OR: 'site:csis.org OR site:rand.org OR site:rusi.org'"
+            f"\n  - Use year or date range when timeframe matters: '2025' or '2024 2025'"
+            f"\n"
+            f"\nSource authority hierarchy — prefer queries that surface sources in this order:"
             f"\n  1. Government & official sources (.gov, .mil, ministry/agency sites)"
-            f"\n  2. Established research institutions & think tanks (CSIS, RAND, Chatham House, RUSI, etc.)"
+            f"\n  2. Established research institutions & think tanks (CSIS, RAND, Chatham House, RUSI, CFR, Brookings, ISW)"
             f"\n  3. Trusted international news outlets (Reuters, BBC, AP, Financial Times, etc.)"
             f"\n  4. Other credible sources"
             f"\n"
-            f"\nUse num_results={_num_results_per_call} per call (buffer: some pages may be inaccessible)."
-            f"\n"
-            f"\nInclude the perspective in every query string:"
-            f"\n  BAD:  google_search(query=\"GPS jamming\")"
-            f"\n  GOOD: google_search(query=\"GPS jamming Russia perspective\", region=\"ru\", language=\"ru\", num_results={_num_results_per_call})"
+            f"\nUse num_results=10 per call."
             f"\n"
             f"\ngoogle_search examples:"
             f"\n{_web_examples}"
             f"\n"
-            f"\ngoogle_news_search examples:"
-            f"\n{_news_examples}"
-            f"\n"
             f"\nTimeframe hint: \"{_timelimit_hint}\""
             f"\ndate_restrict codes: \"d1\"=day, \"w1\"=week, \"m1\"=month, \"m3\"=3 months, \"m6\"=6 months, \"y1\"=year. Omit for no restriction."
-            f"\nSTRICT LIMITS: max {_max_web} google_search calls + max {_max_news} google_news_search calls ({len(_active)} perspective(s) × 5 each)."
+            f"\nSTRICT LIMITS: max {_max_web} google_search calls ({len(_active)} perspective(s) × 5 each)."
             f"\nSource authority: web search results carry LOWER authority than OTX. Always prefer OTX."
         )
     else:
@@ -196,7 +196,7 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
 IMPORTANT: The "content" field must be a plain text string — never a JSON object or nested structure.
 Copy only the text string the tool returned. Do not wrap it in {{"result": ...}} or any other object.
 
-CRITICAL for google_search and google_news_search: Output ONE separate item per result URL.
+CRITICAL for google_search: Output ONE separate item per result URL.
 Do NOT bundle all results from one search call into a single item.
 Set "resource_id" to the URL of that specific result. Set "content" to its title and snippet text.
 Example — a search returning 3 URLs becomes 3 separate items:
