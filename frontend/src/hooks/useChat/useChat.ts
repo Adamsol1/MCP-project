@@ -6,14 +6,14 @@ import {
   setDevDialogueState,
   type DialogueApiResponse,
   type DialogueSendOptions,
-} from "../services/dialogue";
+} from "../../services/dialogue/dialogue";
 import type {
   DialogueAction,
   DialogueStage,
   DialogueSubState,
-} from "../types/dialogue";
-import { useConversation } from "./useConversation";
-import { useToast } from "./useToast";
+} from "../../types/dialogue";
+import { useConversation } from "../useConversation/useConversation";
+import { useToast } from "../useToast/useToast";
 import type {
   CollectionPlanData,
   CollectionPlanStep,
@@ -24,8 +24,8 @@ import type {
   ProcessingData,
   SuggestedSourcesData,
   SummaryData,
-} from "../types/conversation";
-import { useSettings } from "../contexts/SettingsContext/SettingsContext";
+} from "../../types/conversation";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
@@ -140,14 +140,13 @@ function parsePlanData(raw: string): CollectionPlanData {
       : JSON.stringify(planValue ?? parsed, null, 2);
 
   const rawSteps = parsed.steps;
-  const steps: CollectionPlanStep[] | undefined =
-    Array.isArray(rawSteps)
-      ? (rawSteps as unknown[]).filter(
-          (s): s is CollectionPlanStep =>
-            typeof (s as CollectionPlanStep)?.title === "string" &&
-            typeof (s as CollectionPlanStep)?.description === "string",
-        )
-      : undefined;
+  const steps: CollectionPlanStep[] | undefined = Array.isArray(rawSteps)
+    ? (rawSteps as unknown[]).filter(
+        (s): s is CollectionPlanStep =>
+          typeof (s as CollectionPlanStep)?.title === "string" &&
+          typeof (s as CollectionPlanStep)?.description === "string",
+      )
+    : undefined;
 
   return {
     plan,
@@ -329,8 +328,12 @@ export function useChat() {
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [localSourceContext, setLocalSourceContext] = useState<"plan" | "gather_more" | null>(null);
-  const [pendingGatherMoreText, setPendingGatherMoreText] = useState<string | null>(null);
+  const [localSourceContext, setLocalSourceContext] = useState<
+    "plan" | "gather_more" | null
+  >(null);
+  const [pendingGatherMoreText, setPendingGatherMoreText] = useState<
+    string | null
+  >(null);
 
   const messages = useMemo(
     () => activeConversation?.messages ?? [],
@@ -351,7 +354,11 @@ export function useChat() {
       if (message.type === "suggested_sources" && Array.isArray(message.data)) {
         return message.data as SuggestedSourcesData;
       }
-      if (message.type === "plan" && message.data && "suggested_sources" in message.data) {
+      if (
+        message.type === "plan" &&
+        message.data &&
+        "suggested_sources" in message.data
+      ) {
         return (message.data as CollectionPlanData).suggested_sources;
       }
     }
@@ -552,7 +559,9 @@ export function useChat() {
         activeConversation.perspectives,
       );
     } catch (e) {
-      error(`Gather more failed: ${e instanceof Error ? e.message : String(e)}`);
+      error(
+        `Gather more failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     } finally {
       setIsLoading(false);
     }

@@ -1,5 +1,5 @@
-import type { Conversation, ConversationStore } from "../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../types/dialogue";
+import type { Conversation, ConversationStore } from "../../types/conversation";
+import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 
 /**
  * Single localStorage key under which the entire ConversationStore is stored

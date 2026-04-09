@@ -18,7 +18,7 @@ import type {
 } from "../../types/conversation";
 import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
-import type { CollectionStatus } from "../../services/dialogue";
+import type { CollectionStatus } from "../../services/dialogue/dialogue";
 
 function Chevron() {
   return (

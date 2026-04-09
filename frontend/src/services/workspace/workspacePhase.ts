@@ -1,5 +1,5 @@
-import type { Phase } from "../contexts/WorkspaceContext/WorkspaceContext";
-import type { DialogueStage } from "../types/dialogue";
+import type { Phase } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import type { DialogueStage } from "../../types/dialogue";
 
 export function getWorkspacePhaseForDialogueStage(
   stage: DialogueStage | undefined,

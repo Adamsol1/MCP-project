@@ -150,10 +150,10 @@ describe("SourceList — hover", () => {
     const card = screen.getByRole("listitem");
     await user.hover(card);
 
-    expect(onSourceHover).toHaveBeenCalledWith(["[1]"]);
+    expect(onSourceHover).toHaveBeenCalledWith("[1]");
   });
 
-  it("mouse leave on a source card calls onSourceHover with []", async () => {
+  it("mouse leave on a source card calls onSourceHover with null", async () => {
     const user = userEvent.setup();
     const onSourceHover = vi.fn();
 
@@ -169,7 +169,7 @@ describe("SourceList — hover", () => {
     await user.hover(card);
     await user.unhover(card);
 
-    expect(onSourceHover).toHaveBeenLastCalledWith([]);
+    expect(onSourceHover).toHaveBeenLastCalledWith(null);
   });
 });
 

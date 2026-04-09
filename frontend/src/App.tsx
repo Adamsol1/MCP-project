@@ -3,27 +3,35 @@ import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
-import { useToast } from "./hooks/useToast";
+import { useToast } from "./hooks/useToast/useToast";
 import {
   deleteUploadedFile,
   listUploadedFiles,
   uploadFile,
   type UploadedFileRecord,
-} from "./services/upload";
+} from "./services/upload/upload";
 import {
   getCollectionStatus,
   type CollectionStatus,
-} from "./services/dialogue";
-import { getAnalysisDraft } from "./services/analysis";
-import { useChat } from "./hooks/useChat";
-import { useConversation } from "./hooks/useConversation";
-import { WorkspaceProvider, useWorkspace } from "./contexts/WorkspaceContext/WorkspaceContext";
+} from "./services/dialogue/dialogue";
+import { getAnalysisDraft } from "./services/analysis/analysis";
+import { useChat } from "./hooks/useChat/useChat";
+import { useConversation } from "./hooks/useConversation/useConversation";
+import {
+  WorkspaceProvider,
+  useWorkspace,
+} from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
-import { getWorkspacePhaseForDialogueStage } from "./services/workspacePhase";
+import { getWorkspacePhaseForDialogueStage } from "./services/workspace/workspacePhase";
 import { canReuseConversationForAnalysisDemo } from "./utils/analysisDemo";
 
-function WorkspaceResetWatcher({ conversationId }: { conversationId: string | null }) {
-  const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } = useWorkspace();
+function WorkspaceResetWatcher({
+  conversationId,
+}: {
+  conversationId: string | null;
+}) {
+  const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } =
+    useWorkspace();
 
   useEffect(() => {
     setPirData(null);
@@ -35,7 +43,11 @@ function WorkspaceResetWatcher({ conversationId }: { conversationId: string | nu
   return null;
 }
 
-function WorkspaceStageWatcher({ stage }: { stage: ReturnType<typeof useChat>["stage"] }) {
+function WorkspaceStageWatcher({
+  stage,
+}: {
+  stage: ReturnType<typeof useChat>["stage"];
+}) {
   const { setActivePhase } = useWorkspace();
 
   useEffect(() => {
@@ -88,9 +100,13 @@ function AppShell() {
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
-  const [collectionStatus, setCollectionStatus] = useState<CollectionStatus | null>(null);
+  const [collectionStatus, setCollectionStatus] =
+    useState<CollectionStatus | null>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState<{ current: number; total: number }>({ current: 0, total: 0 });
+  const [uploadProgress, setUploadProgress] = useState<{
+    current: number;
+    total: number;
+  }>({ current: 0, total: 0 });
 
   const analysisDemoConfig: Record<string, { title: string }> = {
     demo_processing_result: {
@@ -192,7 +208,10 @@ function AppShell() {
     }
 
     try {
-      await deleteUploadedFile(activeConversation.sessionId, file.file_upload_id);
+      await deleteUploadedFile(
+        activeConversation.sessionId,
+        file.file_upload_id,
+      );
       setUploadedFiles((prev) =>
         prev.filter((item) => item.file_upload_id !== file.file_upload_id),
       );
@@ -293,7 +312,9 @@ function AppShell() {
         {!isAnalysisPhase && (
           <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
             <IntelligencePanel
-              selectedPerspectives={activeConversation?.perspectives ?? ["NEUTRAL"]}
+              selectedPerspectives={
+                activeConversation?.perspectives ?? ["NEUTRAL"]
+              }
               onPerspectiveChange={updatePerspectives}
               onOpenFileUpload={() => setIsFileUploadOpen(true)}
               uploadedFiles={visibleUploadedFiles}

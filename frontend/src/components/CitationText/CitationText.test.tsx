@@ -123,10 +123,11 @@ describe("CitationText — marker hover", () => {
     const sup = document.querySelector("sup")!;
     await user.hover(sup);
 
-    expect(onRefHover).toHaveBeenCalledWith(["[1]"]);
+    // Single marker: component passes the ref string directly, not wrapped in array
+    expect(onRefHover).toHaveBeenCalledWith("[1]");
   });
 
-  it("mouse leave on [N] calls onRefHover([])", async () => {
+  it("mouse leave on [N] calls onRefHover(null)", async () => {
     const user = userEvent.setup();
     const onRefHover = vi.fn();
 
@@ -143,7 +144,7 @@ describe("CitationText — marker hover", () => {
     await user.hover(sup);
     await user.unhover(sup);
 
-    expect(onRefHover).toHaveBeenLastCalledWith([]);
+    expect(onRefHover).toHaveBeenLastCalledWith(null);
   });
 });
 
@@ -166,10 +167,11 @@ describe("CitationText — claim text hover", () => {
     const claimSpan = screen.getByText("Norway faces elevated risk");
     await user.hover(claimSpan);
 
-    expect(onRefHover).toHaveBeenCalledWith(["[1]"]);
+    // Component passes claim.source_ref directly as a string
+    expect(onRefHover).toHaveBeenCalledWith("[1]");
   });
 
-  it("mouse leave on claim text span calls onRefHover([])", async () => {
+  it("mouse leave on claim text span calls onRefHover(null)", async () => {
     const user = userEvent.setup();
     const onRefHover = vi.fn();
 
@@ -186,7 +188,7 @@ describe("CitationText — claim text hover", () => {
     await user.hover(claimSpan);
     await user.unhover(claimSpan);
 
-    expect(onRefHover).toHaveBeenLastCalledWith([]);
+    expect(onRefHover).toHaveBeenLastCalledWith(null);
   });
 });
 
@@ -204,7 +206,7 @@ describe("CitationText — highlight state", () => {
     );
 
     const claimSpan = screen.getByText("Norway faces elevated risk");
-    expect(claimSpan).toHaveClass("text-primary");
+    expect(claimSpan).toHaveClass("bg-primary-subtle");
   });
 
   it("claim text span is not highlighted when highlightedRefs is empty", () => {
@@ -232,10 +234,10 @@ describe("CitationText — highlight state", () => {
     );
 
     expect(screen.getByText("Norway faces elevated risk")).toHaveClass(
-      "text-primary"
+      "bg-primary-subtle"
     );
     expect(
       screen.getByText("Energy infrastructure is vulnerable")
-    ).not.toHaveClass("text-primary");
+    ).not.toHaveClass("bg-primary-subtle");
   });
 });

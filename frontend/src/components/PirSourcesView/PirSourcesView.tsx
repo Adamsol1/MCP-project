@@ -1,4 +1,4 @@
-import { useWorkspace } from "../../hooks/useWorkspace";
+import { useWorkspace } from "../../hooks/useWorkspace/useWorkspace";
 import SourceList from "../SourceList/SourceList";
 import { useT } from "../../i18n/useT";
 

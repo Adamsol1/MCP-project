@@ -16,6 +16,7 @@ import {
   useWorkspace,
 } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 
 // ── Seeder helpers ────────────────────────────────────────────────────────────
 
@@ -35,11 +36,13 @@ describe("IntelligencePanel — phase label", () => {
   it("displays the current phase label in the header", () => {
     // Default phase is 'direction' — no seeder needed.
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     expect(screen.getByRole("heading", { name: /direction/i })).toBeInTheDocument();
@@ -47,12 +50,14 @@ describe("IntelligencePanel — phase label", () => {
 
   it("updates the phase label when activePhase changes", async () => {
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <PhaseSeeder phase="collection" />
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     // After the seeder's useEffect fires, the h2 should reflect "COLLECTION".
@@ -69,11 +74,13 @@ describe("IntelligencePanel — phase view routing", () => {
     // Default phase is 'direction'. PirSourcesView renders "No sources available."
     // when pirData is null — use that as the signal it is mounted.
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     expect(screen.getByText(/no sources/i)).toBeInTheDocument();
@@ -81,12 +88,14 @@ describe("IntelligencePanel — phase view routing", () => {
 
   it("renders a placeholder for the 'collection' phase", async () => {
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <PhaseSeeder phase="collection" />
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     await act(async () => {});
@@ -98,12 +107,14 @@ describe("IntelligencePanel — phase view routing", () => {
 
   it("renders a placeholder for the 'processing' phase", async () => {
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <PhaseSeeder phase="processing" />
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     await act(async () => {});
@@ -114,12 +125,14 @@ describe("IntelligencePanel — phase view routing", () => {
 
   it("renders the analysis prototype view for the 'analysis' phase", async () => {
     render(
+      <SettingsProvider>
       <ConversationProvider>
       <WorkspaceProvider>
         <PhaseSeeder phase="analysis" />
         <IntelligencePanel />
       </WorkspaceProvider>
       </ConversationProvider>
+      </SettingsProvider>
     );
 
     await act(async () => {});
@@ -127,7 +140,7 @@ describe("IntelligencePanel — phase view routing", () => {
     expect(screen.getByRole("heading", { name: /analysis/i })).toBeInTheDocument();
     expect(screen.queryByText(/no sources/i)).not.toBeInTheDocument();
     expect(
-      screen.getByText(/create or select a conversation to load the analysis prototype/i),
+      screen.getByText(/analysis outputs will appear here/i),
     ).toBeInTheDocument();
   });
 });

@@ -1,8 +1,15 @@
-import { useToast } from '../../hooks/useToast';
-import Toast from './Toast';
+import { useToast } from "../../hooks/useToast/useToast";
+import Toast from "./Toast";
 
 /** All supported anchor positions for the toast stack. */
-type Position = 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'top-center' | 'bottom-center' | 'above-input';
+type Position =
+  | "top-right"
+  | "top-left"
+  | "bottom-right"
+  | "bottom-left"
+  | "top-center"
+  | "bottom-center"
+  | "above-input";
 
 interface ToastContainerProps {
   /**
@@ -22,16 +29,28 @@ interface ToastContainerProps {
  *               automatically matches the chatbox width).
  * classes     — Tailwind utilities that set the offset / size for that anchor.
  */
-const positionConfig: Record<Position, { positioning: 'fixed' | 'absolute'; classes: string }> = {
-  'top-right':     { positioning: 'fixed',    classes: 'top-4 right-4' },
-  'top-left':      { positioning: 'fixed',    classes: 'top-4 left-4' },
-  'bottom-right':  { positioning: 'fixed',    classes: 'bottom-4 right-4' },
-  'bottom-left':   { positioning: 'fixed',    classes: 'bottom-4 left-4' },
-  'top-center':    { positioning: 'fixed',    classes: 'top-4 left-1/2 -translate-x-1/2' },
-  'bottom-center': { positioning: 'fixed',    classes: 'bottom-4 left-1/2 -translate-x-1/2' },
+const positionConfig: Record<
+  Position,
+  { positioning: "fixed" | "absolute"; classes: string }
+> = {
+  "top-right": { positioning: "fixed", classes: "top-4 right-4" },
+  "top-left": { positioning: "fixed", classes: "top-4 left-4" },
+  "bottom-right": { positioning: "fixed", classes: "bottom-4 right-4" },
+  "bottom-left": { positioning: "fixed", classes: "bottom-4 left-4" },
+  "top-center": {
+    positioning: "fixed",
+    classes: "top-4 left-1/2 -translate-x-1/2",
+  },
+  "bottom-center": {
+    positioning: "fixed",
+    classes: "bottom-4 left-1/2 -translate-x-1/2",
+  },
   // Anchors to the relative wrapper inside ChatWindow so the stack width
   // automatically tracks the chatbox. bottom-full places it just above the form.
-  'above-input':   { positioning: 'absolute', classes: 'bottom-full left-0 w-full pb-2' },
+  "above-input": {
+    positioning: "absolute",
+    classes: "bottom-full left-0 w-full pb-2",
+  },
 };
 
 /**
@@ -44,7 +63,9 @@ const positionConfig: Record<Position, { positioning: 'fixed' | 'absolute'; clas
  *
  * @param position - Where to anchor the stack. Defaults to 'top-right'.
  */
-export default function ToastContainer({ position = 'top-right' }: ToastContainerProps) {
+export default function ToastContainer({
+  position = "top-right",
+}: ToastContainerProps) {
   const { toasts, removeToast } = useToast();
 
   if (toasts.length === 0) {
@@ -52,7 +73,7 @@ export default function ToastContainer({ position = 'top-right' }: ToastContaine
   }
 
   const { positioning, classes } = positionConfig[position];
-  const fullWidth = position === 'above-input';
+  const fullWidth = position === "above-input";
 
   return (
     <div className={`${positioning} z-50 flex flex-col gap-2 ${classes}`}>

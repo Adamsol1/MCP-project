@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useConversation } from "../../hooks/useConversation";
+import { useConversation } from "../../hooks/useConversation/useConversation";
 import { ConversationProvider } from "./ConversationContext";
 import type { ConversationStore } from "../../types/conversation";
 

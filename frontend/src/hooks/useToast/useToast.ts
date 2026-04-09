@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ToastContext } from "../contexts/Toast/ToastContext";
+import { ToastContext } from "../../contexts/Toast/ToastContext";
 
 /**
  * Convenience hook for accessing the toast notification system.

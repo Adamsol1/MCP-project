@@ -18,7 +18,7 @@ export interface WorkspaceContextValue {
   setCollectionData: (data: CollectionDisplayData | null) => void;
 }
 
-export { useWorkspace } from "../../hooks/useWorkspace";
+export { useWorkspace } from "../../hooks/useWorkspace/useWorkspace";
 
 export const WorkspaceContext = createContext<WorkspaceContextValue | null>(
   null,
@@ -28,7 +28,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [highlightedRefs, setHighlightedRefs] = useState<string[]>([]);
   const [pirData, setPirData] = useState<PirData | null>(null);
   const [activePhase, setActivePhase] = useState<Phase>("direction");
-  const [collectionData, setCollectionData] = useState<CollectionDisplayData | null>(null);
+  const [collectionData, setCollectionData] =
+    useState<CollectionDisplayData | null>(null);
   const highlightedRef = highlightedRefs[0] ?? null;
   const setHighlightedRef = (ref: string | null) => {
     setHighlightedRefs(ref ? [ref] : []);

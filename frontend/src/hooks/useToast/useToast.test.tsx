@@ -15,7 +15,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { useToast } from "./useToast";
-import { ToastProvider } from "../contexts/Toast/ToastContext";
+import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import type { ReactNode } from "react";
 
 // ── Wrapper helper ────────────────────────────────────────────────────────────
@@ -98,7 +98,10 @@ describe("useToast — addToast", () => {
     const { result } = renderHook(() => useToast(), { wrapper });
 
     act(() => {
-      result.current.addToast("Custom toast", { type: "warning", duration: 3000 });
+      result.current.addToast("Custom toast", {
+        type: "warning",
+        duration: 3000,
+      });
     });
 
     expect(result.current.toasts[0].type).toBe("warning");

@@ -6,12 +6,9 @@ import AnalysisPrototypeView from "./AnalysisPrototypeView";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 import type { ConversationStore } from "../../types/conversation";
-import type {
-  AnalysisDraftResponse,
-  CouncilNote,
-} from "../../types/analysis";
+import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
 
-vi.mock("../../services/analysis", () => ({
+vi.mock("../../services/analysis/analysis", () => ({
   getAnalysisDraft: vi.fn(),
   runAnalysisCouncil: vi.fn(),
 }));
@@ -19,7 +16,7 @@ vi.mock("../../services/analysis", () => ({
 import {
   getAnalysisDraft,
   runAnalysisCouncil,
-} from "../../services/analysis";
+} from "../../services/analysis/analysis";
 
 const STORAGE_KEY = "mcp-conversations";
 
@@ -27,10 +24,7 @@ const demoCouncilNote: CouncilNote = {
   status: "complete",
   question:
     "Assess whether the phishing staging indicates coordinated access development.",
-  participants: [
-    "US Strategic Analyst",
-    "Neutral Evidence Analyst",
-  ],
+  participants: ["US Strategic Analyst", "Neutral Evidence Analyst"],
   rounds_completed: 2,
   summary:
     "The council assessed the findings as deliberate access-development activity.",
@@ -47,14 +41,14 @@ const demoCouncilNote: CouncilNote = {
       round: 1,
       participant: "Neutral Evidence Analyst",
       response:
-        "The evidence is sufficient for a cautious access-development assessment.\n\n**Uncertainties:**\n- Attribution remains unresolved.\n\nVOTE: {\"option\":\"Cautious access development assessment\",\"confidence\":0.81,\"rationale\":\"Credential theft and phishing staging support the access-development hypothesis, but attribution is still unresolved.\"}",
+        'The evidence is sufficient for a cautious access-development assessment.\n\n**Uncertainties:**\n- Attribution remains unresolved.\n\nVOTE: {"option":"Cautious access development assessment","confidence":0.81,"rationale":"Credential theft and phishing staging support the access-development hypothesis, but attribution is still unresolved."}',
       timestamp: "2026-03-20T10:00:00Z",
     },
     {
       round: 1,
       participant: "US Strategic Analyst",
       response:
-        "The activity matters because allied telecom infrastructure is a strategic dependency.\n\n**Operational implications:**\n- Shared vendor-access pathways may be exposed.\n\nVOTE: {\"option\":\"Strategic telecom intrusion assessment\",\"confidence\":0.87,\"rationale\":\"The findings suggest deliberate access development against infrastructure relevant to alliance coordination.\"}",
+        'The activity matters because allied telecom infrastructure is a strategic dependency.\n\n**Operational implications:**\n- Shared vendor-access pathways may be exposed.\n\nVOTE: {"option":"Strategic telecom intrusion assessment","confidence":0.87,"rationale":"The findings suggest deliberate access development against infrastructure relevant to alliance coordination."}',
       timestamp: "2026-03-20T10:00:00Z",
     },
   ],
@@ -89,7 +83,8 @@ const demoResponse: AnalysisDraftResponse = {
       },
       {
         id: "F-002",
-        title: "Recently registered lookalike domains appear staged for telecom phishing",
+        title:
+          "Recently registered lookalike domains appear staged for telecom phishing",
         finding:
           "Recently registered lookalike domains appear staged for telecom phishing.",
         evidence_summary:
@@ -103,15 +98,10 @@ const demoResponse: AnalysisDraftResponse = {
         },
         why_it_matters:
           "This supports a parallel credential-theft path against telecom staff.",
-        uncertainties: [
-          "The specific lure delivery method remains unknown.",
-        ],
+        uncertainties: ["The specific lure delivery method remains unknown."],
       },
     ],
-    gaps: [
-      "Attribution remains unclear.",
-      "Victimology is incomplete.",
-    ],
+    gaps: ["Attribution remains unclear.", "Victimology is incomplete."],
   },
   analysis_draft: {
     summary:
@@ -121,11 +111,17 @@ const demoResponse: AnalysisDraftResponse = {
     ],
     per_perspective_implications: {
       us: ["US analysts should monitor shared vendor-access pathways."],
-      norway: ["Norwegian operators should prioritize identity and telecom admin review."],
-      china: ["Actor-specific judgments should remain limited while attribution is unresolved."],
+      norway: [
+        "Norwegian operators should prioritize identity and telecom admin review.",
+      ],
+      china: [
+        "Actor-specific judgments should remain limited while attribution is unresolved.",
+      ],
       eu: ["Cross-border telecom dependencies increase regional significance."],
       russia: ["Regional critical-infrastructure scenarios remain relevant."],
-      neutral: ["The evidence is stronger on access preparation than final intent."],
+      neutral: [
+        "The evidence is stronger on access preparation than final intent.",
+      ],
     },
     recommended_actions: [
       "Review privileged telecom administration accounts for anomalous logins.",
@@ -197,21 +193,19 @@ describe("AnalysisPrototypeView", () => {
     expect(
       screen.getByText(/likely access-development campaign/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByLabelText(/finding f-001/i),
-    ).toBeInTheDocument();
+    expect(screen.getByLabelText(/finding f-001/i)).toBeInTheDocument();
     expect(screen.getAllByText("F-001").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Evidence summary/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Supporting data/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/attack ids/i)).toBeInTheDocument();
     expect(screen.getByText(/vpn.nordtel-demo.net/i)).toBeInTheDocument();
-    expect(
-      screen.getByText(/Perspective Implications/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/Perspective Implications/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Review privileged telecom administration accounts/i),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Attribution remains unclear/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Attribution remains unclear/i),
+    ).toBeInTheDocument();
   });
 
   it("falls back to the first finding title when the conversation title is generic", async () => {
@@ -273,7 +267,9 @@ describe("AnalysisPrototypeView", () => {
 
     render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
 
-    expect((await screen.findAllByText(/Uncertainties/i)).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText(/Uncertainties/i)).length,
+    ).toBeGreaterThan(0);
     expect(
       screen.getByText(/Successful logins may have used sprayed passwords/i),
     ).toBeInTheDocument();
@@ -343,7 +339,9 @@ describe("AnalysisPrototypeView", () => {
     render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
 
     expect(
-      await screen.findByText(/Runtime: conference, 2 rounds, timeout 180s, vote retry 1x/i),
+      await screen.findByText(
+        /Runtime: conference, 2 rounds, timeout 180s, vote retry 1x/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -376,7 +374,9 @@ describe("AnalysisPrototypeView", () => {
       await screen.findByText(/deliberate access-development activity/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/likely access-development campaign against Northern European telecom functions/i),
+      screen.getByText(
+        /likely access-development campaign against Northern European telecom functions/i,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText(/US Strategic Analyst/i)).toBeInTheDocument();
 
@@ -398,7 +398,9 @@ describe("AnalysisPrototypeView", () => {
       ).not.toBeInTheDocument();
     });
     expect(
-      screen.getByText(/likely access-development campaign against Northern European telecom functions/i),
+      screen.getByText(
+        /likely access-development campaign against Northern European telecom functions/i,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -414,10 +416,9 @@ describe("AnalysisPrototypeView", () => {
     expect(
       await screen.findByText(/deliberate access-development activity/i),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Council Summary/i })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.getByRole("button", { name: /Council Summary/i }),
+    ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Key agreements/i)).toBeInTheDocument();
 
     await user.click(
@@ -428,8 +429,12 @@ describe("AnalysisPrototypeView", () => {
       screen.getByRole("button", { name: /Neutral Evidence Analyst/i }),
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Perspective overview/i)).toBeInTheDocument();
-    expect(screen.getByText(/Attribution remains unresolved/i)).toBeInTheDocument();
-    expect(screen.getByText(/Cautious access development assessment/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Attribution remains unresolved/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Cautious access development assessment/i),
+    ).toBeInTheDocument();
     expect(screen.getByText(/81% confidence/i)).toBeInTheDocument();
     expect(screen.queryByText(/Key agreements/i)).not.toBeInTheDocument();
 
@@ -453,7 +458,9 @@ describe("AnalysisPrototypeView", () => {
       });
     vi.mocked(runAnalysisCouncil).mockResolvedValue(demoCouncilNote);
 
-    const view = render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    const view = render(<AnalysisPrototypeView />, {
+      wrapper: createWrapper(),
+    });
 
     await screen.findByText(/likely access-development campaign/i);
     await user.type(
@@ -471,7 +478,9 @@ describe("AnalysisPrototypeView", () => {
       await screen.findByText(/deliberate access-development activity/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/likely access-development campaign against Northern European telecom functions/i),
+      screen.getByText(
+        /likely access-development campaign against Northern European telecom functions/i,
+      ),
     ).toBeInTheDocument();
   });
 });

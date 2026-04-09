@@ -4,7 +4,7 @@ import {
   saveConversationStore,
   createConversation,
 } from "./conversationStorage";
-import type { ConversationStore } from "../types/conversation";
+import type { ConversationStore } from "../../types/conversation";
 
 const STORAGE_KEY = "mcp-conversations";
 

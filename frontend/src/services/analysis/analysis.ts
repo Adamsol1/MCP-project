@@ -3,7 +3,7 @@ import type {
   AnalysisDraftResponse,
   CouncilNote,
   RunAnalysisCouncilRequest,
-} from "../types/analysis";
+} from "../../types/analysis";
 
 const API_BACKEND_URL = "http://localhost:8000";
 
@@ -28,9 +28,7 @@ export async function getAnalysisDraft(
   return httpResponse.data;
 }
 
-export async function runAnalysisCouncil(
-  request: RunAnalysisCouncilRequest,
-) {
+export async function runAnalysisCouncil(request: RunAnalysisCouncilRequest) {
   const httpResponse = await axios.post<CouncilNote>(
     `${API_BACKEND_URL}/api/analysis/council`,
     request,

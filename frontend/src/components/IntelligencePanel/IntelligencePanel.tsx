@@ -5,8 +5,8 @@ import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
-import type { UploadedFileRecord } from "../../services/upload";
-import type { CollectionStatus } from "../../services/dialogue";
+import type { UploadedFileRecord } from "../../services/upload/upload";
+import type { CollectionStatus } from "../../services/dialogue/dialogue";
 
 const VISIBLE_FILE_COUNT = 3;
 
@@ -124,9 +124,7 @@ export default function IntelligencePanel({
               />
             </section>
             <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <p className="text-xs text-text-secondary">
-                {t.analysisOutputs}
-              </p>
+              <p className="text-xs text-text-secondary">{t.analysisOutputs}</p>
             </section>
           </>
         );
@@ -142,13 +140,13 @@ export default function IntelligencePanel({
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
           {t.intelligenceWorkspace}
         </p>
-        <h2 className="mt-1 text-xs font-semibold text-text-primary">{phaseLabel}</h2>
+        <h2 className="mt-1 text-xs font-semibold text-text-primary">
+          {phaseLabel}
+        </h2>
       </header>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-chatgpt">
-        <div className="flex flex-col gap-2">
-          {renderPhaseContent()}
-        </div>
+        <div className="flex flex-col gap-2">{renderPhaseContent()}</div>
       </div>
 
       <CollectionStatsModal
@@ -177,16 +175,26 @@ function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
           return (
             <li key={source} className="flex flex-col gap-0.5">
               <div className="flex items-center gap-2 text-xs">
-                <span className={`shrink-0 w-3.5 text-center ${
-                  isDone ? "text-success" : isActive ? "text-primary" : "text-text-muted"
-                }`}>
+                <span
+                  className={`shrink-0 w-3.5 text-center ${
+                    isDone
+                      ? "text-success"
+                      : isActive
+                        ? "text-primary"
+                        : "text-text-muted"
+                  }`}
+                >
                   {isDone ? "✓" : isActive ? "●" : "○"}
                 </span>
-                <span className={
-                  isDone ? "text-text-secondary" :
-                  isActive ? "text-text-primary font-medium" :
-                  "text-text-muted"
-                }>
+                <span
+                  className={
+                    isDone
+                      ? "text-text-secondary"
+                      : isActive
+                        ? "text-text-primary font-medium"
+                        : "text-text-muted"
+                  }
+                >
                   {source}
                 </span>
                 {info.call_count > 0 && (

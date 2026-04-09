@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useConversation } from "../../hooks/useConversation";
+import { useConversation } from "../../hooks/useConversation/useConversation";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import {
   getAnalysisDraft,
   runAnalysisCouncil,
-} from "../../services/analysis";
+} from "../../services/analysis/analysis";
 import type {
   AnalysisDraftResponse,
   CouncilNote,
@@ -12,14 +12,7 @@ import type {
   ProcessingFinding,
 } from "../../types/analysis";
 
-const PERSPECTIVE_ORDER = [
-  "us",
-  "norway",
-  "china",
-  "eu",
-  "russia",
-  "neutral",
-];
+const PERSPECTIVE_ORDER = ["us", "norway", "china", "eu", "russia", "neutral"];
 const COUNCIL_SUMMARY_VIEW = "council-summary";
 
 type CouncilSectionItem = {
@@ -148,7 +141,9 @@ const LABEL_MAP: Record<string, string> = {
 
 function getSupportingDataSummary(data: Record<string, string[]>) {
   return Object.entries(data)
-    .filter(([key, values]) => values.length > 0 && !PRIORITY_DATA_KEYS.includes(key))
+    .filter(
+      ([key, values]) => values.length > 0 && !PRIORITY_DATA_KEYS.includes(key),
+    )
     .map(([key, values]) => `${values.length} ${LABEL_MAP[key] || key}`)
     .join(" · ");
 }
@@ -392,7 +387,10 @@ function renderCouncilSectionItem(item: CouncilSectionItem, index: number) {
   const labeled = splitLabeledText(item.text);
   if (labeled) {
     return (
-      <div key={index} className="flex gap-3 text-sm leading-7 text-text-primary">
+      <div
+        key={index}
+        className="flex gap-3 text-sm leading-7 text-text-primary"
+      >
         <span className="mt-[0.7em] h-1.5 w-1.5 rounded-full bg-border" />
         <p className="flex-1">
           <span className="font-medium text-text-primary">{labeled.label}</span>
@@ -429,7 +427,10 @@ function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
           </p>
           <ul className="mt-4 space-y-3">
             {councilNote.key_agreements.map((item) => (
-              <li key={item} className="flex gap-3 text-sm leading-6 text-text-primary">
+              <li
+                key={item}
+                className="flex gap-3 text-sm leading-6 text-text-primary"
+              >
                 <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
                 <span>{item}</span>
               </li>
@@ -450,7 +451,10 @@ function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
           ) : (
             <ul className="mt-4 space-y-3">
               {councilNote.key_disagreements.map((item) => (
-                <li key={item} className="flex gap-3 text-sm leading-6 text-text-secondary">
+                <li
+                  key={item}
+                  className="flex gap-3 text-sm leading-6 text-text-secondary"
+                >
                   <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                   <span>{item}</span>
                 </li>
@@ -565,7 +569,8 @@ export default function AnalysisPrototypeView() {
   const { settings } = useSettings();
   const [data, setData] = useState<AnalysisDraftResponse | null>(null);
   const [councilNote, setCouncilNote] = useState<CouncilNote | null>(null);
-  const [activeCouncilView, setActiveCouncilView] = useState(COUNCIL_SUMMARY_VIEW);
+  const [activeCouncilView, setActiveCouncilView] =
+    useState(COUNCIL_SUMMARY_VIEW);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
@@ -577,7 +582,9 @@ export default function AnalysisPrototypeView() {
   const [councilErrorMessage, setCouncilErrorMessage] = useState<string | null>(
     null,
   );
-  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const [validationMessage, setValidationMessage] = useState<string | null>(
+    null,
+  );
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
   const conversationSessionId = activeConversation?.sessionId ?? null;
   const normalizedConversationPerspectives = useMemo(
@@ -612,18 +619,21 @@ export default function AnalysisPrototypeView() {
         if (!isCancelled) {
           if (response.data_source === "demo") {
             console.warn(
-              `[AnalysisView] Using DEMO fallback data for session ${sessionId}. No processed.json found or it could not be parsed as a valid ProcessingResult.`
+              `[AnalysisView] Using DEMO fallback data for session ${sessionId}. No processed.json found or it could not be parsed as a valid ProcessingResult.`,
             );
           } else {
             console.info(
-              `[AnalysisView] Loaded session data for ${sessionId} (source: ${response.data_source})`
+              `[AnalysisView] Loaded session data for ${sessionId} (source: ${response.data_source})`,
             );
           }
           setData(response);
           setCouncilNote(response.latest_council_note);
         }
       } catch (error) {
-        console.error(`[AnalysisView] Failed to load analysis draft for session ${sessionId}`, error);
+        console.error(
+          `[AnalysisView] Failed to load analysis draft for session ${sessionId}`,
+          error,
+        );
         if (!isCancelled) {
           setData(null);
           setCouncilNote(null);
@@ -660,7 +670,9 @@ export default function AnalysisPrototypeView() {
     }
 
     if (selectedPerspectives.length < 2) {
-      setValidationMessage("Select at least 2 perspectives before running council.");
+      setValidationMessage(
+        "Select at least 2 perspectives before running council.",
+      );
       return;
     }
 
@@ -722,8 +734,14 @@ export default function AnalysisPrototypeView() {
   );
 
   const findings = data?.processing_result?.findings ?? [];
-  const uniqueTechniques = useMemo(() => getUniqueTechniques(findings), [findings]);
-  const sharedIndicatorCount = useMemo(() => getSharedIndicatorCount(findings), [findings]);
+  const uniqueTechniques = useMemo(
+    () => getUniqueTechniques(findings),
+    [findings],
+  );
+  const sharedIndicatorCount = useMemo(
+    () => getSharedIndicatorCount(findings),
+    [findings],
+  );
   const timelineSpan = useMemo(() => getTimelineSpan(findings), [findings]);
   const uniqueSources = useMemo(() => getUniqueSources(findings), [findings]);
   const pirCoverage = useMemo(() => getPirCoverage(findings), [findings]);
@@ -743,7 +761,9 @@ export default function AnalysisPrototypeView() {
           Draft Analysis
         </p>
         <div className="rounded-[24px] border border-border bg-surface px-5 py-6">
-          <p className="text-sm text-text-secondary">Loading analysis draft...</p>
+          <p className="text-sm text-text-secondary">
+            Loading analysis draft...
+          </p>
         </div>
       </div>
     );
@@ -771,7 +791,8 @@ export default function AnalysisPrototypeView() {
     );
   }
 
-  const { processing_result: processingResult, analysis_draft: analysisDraft } = data;
+  const { processing_result: processingResult, analysis_draft: analysisDraft } =
+    data;
   const averageConfidence = getAverageConfidence(processingResult.findings);
   const analysisHeading = getAnalysisHeading(
     activeConversation?.title,
@@ -779,14 +800,16 @@ export default function AnalysisPrototypeView() {
   );
   const orderedPerspectiveEntries = PERSPECTIVE_ORDER.filter(
     (key) => key in analysisDraft.per_perspective_implications,
-  ).map((key) => [key, analysisDraft.per_perspective_implications[key]] as const);
+  ).map(
+    (key) => [key, analysisDraft.per_perspective_implications[key]] as const,
+  );
   const councilRuntimeIssue = getCouncilRuntimeIssue(councilNote);
   const activeParticipantView =
     activeCouncilView === COUNCIL_SUMMARY_VIEW
       ? null
-      : councilParticipantViews.find(
+      : (councilParticipantViews.find(
           (view) => view.participant === activeCouncilView,
-        ) ?? null;
+        ) ?? null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-8">
@@ -827,7 +850,9 @@ export default function AnalysisPrototypeView() {
                 Avg confidence
               </p>
               <div className="mt-1.5 flex items-center gap-2">
-                <p className={`text-2xl font-semibold ${getConfidenceTextColor(averageConfidence)}`}>
+                <p
+                  className={`text-2xl font-semibold ${getConfidenceTextColor(averageConfidence)}`}
+                >
                   {averageConfidence}%
                 </p>
                 <div className="h-2 w-12 overflow-hidden rounded-full bg-border/40">
@@ -853,7 +878,9 @@ export default function AnalysisPrototypeView() {
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">
                 {sharedIndicatorCount}
                 {sharedIndicatorCount > 0 && (
-                  <span className="ml-1.5 text-xs font-normal text-warning">cross-linked</span>
+                  <span className="ml-1.5 text-xs font-normal text-warning">
+                    cross-linked
+                  </span>
                 )}
               </p>
             </div>
@@ -889,16 +916,21 @@ export default function AnalysisPrototypeView() {
                 .sort(([a], [b]) => a.localeCompare(b))
                 .map(([pir, count]) => (
                   <div key={pir} className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-text-secondary">{pir}</span>
+                    <span className="text-xs font-medium text-text-secondary">
+                      {pir}
+                    </span>
                     <div className="flex gap-0.5">
-                      {Array.from({ length: processingResult.findings.length }, (_, i) => (
-                        <div
-                          key={i}
-                          className={`h-2.5 w-2.5 rounded-sm ${
-                            i < count ? "bg-primary" : "bg-border/30"
-                          }`}
-                        />
-                      ))}
+                      {Array.from(
+                        { length: processingResult.findings.length },
+                        (_, i) => (
+                          <div
+                            key={i}
+                            className={`h-2.5 w-2.5 rounded-sm ${
+                              i < count ? "bg-primary" : "bg-border/30"
+                            }`}
+                          />
+                        ),
+                      )}
                     </div>
                     <span className="text-[11px] text-text-muted">{count}</span>
                   </div>
@@ -915,7 +947,10 @@ export default function AnalysisPrototypeView() {
           </p>
           <ol className="mt-4 space-y-3">
             {analysisDraft.key_judgments.map((judgment, index) => (
-              <li key={judgment} className="flex gap-3 text-sm leading-6 text-text-primary">
+              <li
+                key={judgment}
+                className="flex gap-3 text-sm leading-6 text-text-primary"
+              >
                 <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted text-[11px] font-semibold text-text-secondary">
                   {index + 1}
                 </span>
@@ -1017,11 +1052,15 @@ export default function AnalysisPrototypeView() {
                           style={{ width: `${finding.confidence}%` }}
                         />
                       </div>
-                      <span className={`text-sm font-semibold tabular-nums ${getConfidenceTextColor(finding.confidence)}`}>
+                      <span
+                        className={`text-sm font-semibold tabular-nums ${getConfidenceTextColor(finding.confidence)}`}
+                      >
                         {finding.confidence}%
                       </span>
                     </div>
-                    <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">&#9654;</span>
+                    <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">
+                      &#9654;
+                    </span>
                   </div>
                 </div>
               </summary>
@@ -1162,7 +1201,9 @@ export default function AnalysisPrototypeView() {
                 <h3 className="text-sm font-semibold text-text-primary">
                   {formatPerspectiveLabel(key)}
                 </h3>
-                <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">&#9654;</span>
+                <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">
+                  &#9654;
+                </span>
               </summary>
               {implications.length > 0 && (
                 <p className="mt-2 text-sm leading-6 text-text-secondary group-open:hidden">
@@ -1194,7 +1235,9 @@ export default function AnalysisPrototypeView() {
           </p>
           <form className="mt-4 space-y-4" onSubmit={handleCouncilSubmit}>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-text-primary">Perspectives</p>
+              <p className="text-sm font-medium text-text-primary">
+                Perspectives
+              </p>
               <div className="flex flex-wrap gap-2">
                 {PERSPECTIVE_ORDER.map((perspective) => {
                   const isSelected = selectedPerspectives.includes(perspective);
@@ -1216,8 +1259,9 @@ export default function AnalysisPrototypeView() {
                 })}
               </div>
               <p className="text-xs text-text-secondary">
-                Runtime: {settings.councilSettings.mode}, {settings.councilSettings.rounds}{" "}
-                round{settings.councilSettings.rounds === 1 ? "" : "s"}, timeout{" "}
+                Runtime: {settings.councilSettings.mode},{" "}
+                {settings.councilSettings.rounds} round
+                {settings.councilSettings.rounds === 1 ? "" : "s"}, timeout{" "}
                 {settings.councilSettings.timeoutSeconds}s, vote retry{" "}
                 {settings.councilSettings.voteRetryEnabled
                   ? `${settings.councilSettings.voteRetryAttempts}x`
@@ -1310,13 +1354,16 @@ export default function AnalysisPrototypeView() {
 
           {!councilNote ? (
             <p className="mt-4 text-sm leading-6 text-text-secondary">
-              Run a council deliberation to generate a separate advisory note for this assessment.
+              Run a council deliberation to generate a separate advisory note
+              for this assessment.
             </p>
           ) : (
             <div className="mt-4 space-y-4">
               {councilRuntimeIssue ? (
                 <div className="rounded-[18px] border border-error bg-error-subtle px-4 py-3">
-                  <p className="text-sm text-error-text">{councilRuntimeIssue}</p>
+                  <p className="text-sm text-error-text">
+                    {councilRuntimeIssue}
+                  </p>
                 </div>
               ) : null}
 
@@ -1346,8 +1393,12 @@ export default function AnalysisPrototypeView() {
                   <button
                     key={participantView.participant}
                     type="button"
-                    onClick={() => setActiveCouncilView(participantView.participant)}
-                    aria-pressed={activeCouncilView === participantView.participant}
+                    onClick={() =>
+                      setActiveCouncilView(participantView.participant)
+                    }
+                    aria-pressed={
+                      activeCouncilView === participantView.participant
+                    }
                     className={
                       activeCouncilView === participantView.participant
                         ? "rounded-[10px] bg-surface px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm"
@@ -1360,7 +1411,9 @@ export default function AnalysisPrototypeView() {
               </div>
 
               {activeParticipantView ? (
-                <CouncilParticipantPanel participantView={activeParticipantView} />
+                <CouncilParticipantPanel
+                  participantView={activeParticipantView}
+                />
               ) : (
                 <CouncilSummaryPanel councilNote={councilNote} />
               )}
@@ -1371,8 +1424,12 @@ export default function AnalysisPrototypeView() {
                   onClick={() => setIsTranscriptExpanded((current) => !current)}
                   className="inline-flex items-center gap-2 rounded-[12px] border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted"
                 >
-                  <span className="text-xs text-text-muted">{isTranscriptExpanded ? "▾" : "▸"}</span>
-                  {isTranscriptExpanded ? "Hide full debate" : "Show full debate"}
+                  <span className="text-xs text-text-muted">
+                    {isTranscriptExpanded ? "▾" : "▸"}
+                  </span>
+                  {isTranscriptExpanded
+                    ? "Hide full debate"
+                    : "Show full debate"}
                 </button>
                 {councilNote.transcript_path ? (
                   <p className="text-[11px] text-text-muted">
@@ -1381,9 +1438,9 @@ export default function AnalysisPrototypeView() {
                 ) : null}
               </div>
 
-                {isTranscriptExpanded ? (
-                  <div className="space-y-3">
-                    {councilNote.full_debate.map((entry, index) => (
+              {isTranscriptExpanded ? (
+                <div className="space-y-3">
+                  {councilNote.full_debate.map((entry, index) => (
                     <article
                       key={`${entry.round}-${entry.participant}-${index}`}
                       className="rounded-[18px] border border-border bg-surface-muted/60 px-4 py-4"

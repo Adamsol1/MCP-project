@@ -15,8 +15,8 @@ import {
   loadConversationStore,
   saveConversationStore,
   createConversation,
-} from "../../services/conversationStorage";
-import { deleteSessionArtifacts } from "../../services/upload";
+} from "../../services/conversationStorage/conversationStorage";
+import { deleteSessionArtifacts } from "../../services/upload/upload";
 
 /**
  * The value exposed by ConversationContext to any consuming component.
@@ -149,7 +149,10 @@ function conversationReducer(
 
           // Auto-set the title from the first user message (max 50 chars).
           let newTitle = conv.title;
-          if (message.sender === "user" && (conv.title === "" || conv.title === "New conversation")) {
+          if (
+            message.sender === "user" &&
+            (conv.title === "" || conv.title === "New conversation")
+          ) {
             newTitle =
               message.text.length > 50
                 ? message.text.slice(0, 50) + "..."
@@ -270,7 +273,9 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteAllConversations = useCallback(() => {
-    state.conversations.forEach((c) => void deleteSessionArtifacts(c.sessionId));
+    state.conversations.forEach(
+      (c) => void deleteSessionArtifacts(c.sessionId),
+    );
     dispatch({ type: "DELETE_ALL_CONVERSATIONS" });
   }, [state.conversations]);
 
