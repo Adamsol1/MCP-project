@@ -22,6 +22,7 @@ import {
   useWorkspace,
 } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
+import StageTracker from "./components/StageTracker/StageTracker";
 import { getWorkspacePhaseForDialogueStage } from "./services/workspace/workspacePhase";
 import { canReuseConversationForAnalysisDemo } from "./utils/analysisDemo";
 
@@ -286,6 +287,7 @@ function AppShell() {
         />
 
         <main className="flex-1 flex flex-col bg-surface-elevated overflow-hidden">
+          <StageTracker activePhase={activePhase} />
           <ChatWindow
             messages={messages}
             onSendMessage={sendMessage}
