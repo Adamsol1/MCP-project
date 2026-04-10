@@ -167,15 +167,31 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
       {/* Structured steps — shown when the AI returns step breakdown */}
       {planData.steps && planData.steps.length > 0 ? (
         <div className="space-y-2">
-          {planData.steps.map((step: CollectionPlanStep, index: number) => (
-            <div
-              key={index}
-              className="rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-0.5"
-            >
-              <p className="text-xs font-semibold text-text-primary">{step.title}</p>
-              <p className="text-xs text-text-secondary">{step.description}</p>
-            </div>
-          ))}
+          {planData.steps.map((step: CollectionPlanStep, index: number) => {
+            // Split "Title (PIR N)" into title + optional tag
+            const tagMatch = step.title.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+            const displayTitle = tagMatch ? tagMatch[1].trim() : step.title;
+            const tag = tagMatch ? tagMatch[2] : null;
+            return (
+              <div
+                key={index}
+                className="rounded-lg border border-border-muted bg-surface px-3 py-2.5 space-y-1"
+              >
+                <div className="flex items-center gap-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                    {index + 1}
+                  </span>
+                  <p className="text-sm font-semibold text-text-primary leading-tight">{displayTitle}</p>
+                  {tag && (
+                    <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-medium bg-surface-muted text-text-muted">
+                      {tag}
+                    </span>
+                  )}
+                </div>
+                <p className="pl-7 text-xs text-text-secondary leading-relaxed">{step.description}</p>
+              </div>
+            );
+          })}
         </div>
       ) : (
         /* Fallback to plain text if no steps */
@@ -298,17 +314,22 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Processing Results</h3>
-      <p className="text-sm text-text-secondary whitespace-pre-wrap">{data.processing_summary}</p>
       <details className="group">
         <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
-          {data.entities.length} entities <Chevron />
+          {data.findings.length} findings <Chevron />
         </summary>
         <div className="mt-2 space-y-2">
-          {data.entities.map((e) => (
-            <div key={e.id} className="rounded border border-border-muted bg-surface px-3 py-2 text-sm">
-              <p className="font-medium text-text-primary">{e.name}</p>
-              <p className="text-xs text-text-muted mt-0.5">{e.categories.join(", ")} · confidence {e.confidence}% · {e.relevant_to.join(", ")}</p>
-              <p className="text-xs text-text-secondary mt-1">{e.description}</p>
+          {data.findings.map((f) => (
+            <div key={f.id} className="rounded border border-border-muted bg-surface px-3 py-2 text-sm">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-medium text-text-primary">{f.title}</p>
+                <span className="shrink-0 text-xs text-text-muted">confidence {f.confidence}%</span>
+              </div>
+              <p className="text-xs text-text-secondary mt-1">{f.finding}</p>
+              {f.why_it_matters && (
+                <p className="text-xs text-text-muted mt-1 italic">{f.why_it_matters}</p>
+              )}
+              <p className="text-xs text-text-muted mt-1">{f.relevant_to.join(", ")} · {f.source}</p>
             </div>
           ))}
         </div>
@@ -519,7 +540,7 @@ export default function ChatWindow({
       );
     }
 
-    if (message.type === "processing" && message.data && "entities" in message.data) {
+    if (message.type === "processing" && message.data && "findings" in message.data) {
       return <ProcessingMessage data={message.data as ProcessingData} />;
     }
 
@@ -801,7 +822,7 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2"
+                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2 bg-surface"
               >
                 <textarea
                   ref={textareaRef}

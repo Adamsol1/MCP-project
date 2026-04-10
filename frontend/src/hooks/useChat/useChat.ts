@@ -127,10 +127,24 @@ function parseSourcesFromUnknown(raw: unknown): string[] {
   return deduped;
 }
 
+function parseStepsFromPlanText(plan: string): CollectionPlanStep[] | undefined {
+  // Parse "N. **Title (optional):** Description" markdown numbered list format.
+  const pattern = /\d+\.\s+\*\*([^*]+)\*\*:?\s+([\s\S]+?)(?=\n\d+\.\s+\*\*|\s*$)/g;
+  const steps: CollectionPlanStep[] = [];
+  for (const match of plan.matchAll(pattern)) {
+    const title = match[1].trim().replace(/:$/, "");
+    const description = match[2].trim();
+    if (title && description) {
+      steps.push({ title, description });
+    }
+  }
+  return steps.length > 0 ? steps : undefined;
+}
+
 function parsePlanData(raw: string): CollectionPlanData {
   const parsed = extractJsonObject(raw);
   if (!parsed) {
-    return { plan: raw, suggested_sources: [] };
+    return { plan: raw, steps: parseStepsFromPlanText(raw), suggested_sources: [] };
   }
 
   const planValue = parsed.plan;
@@ -140,7 +154,7 @@ function parsePlanData(raw: string): CollectionPlanData {
       : JSON.stringify(planValue ?? parsed, null, 2);
 
   const rawSteps = parsed.steps;
-  const steps: CollectionPlanStep[] | undefined = Array.isArray(rawSteps)
+  const jsonSteps: CollectionPlanStep[] | undefined = Array.isArray(rawSteps)
     ? (rawSteps as unknown[]).filter(
         (s): s is CollectionPlanStep =>
           typeof (s as CollectionPlanStep)?.title === "string" &&
@@ -148,9 +162,14 @@ function parsePlanData(raw: string): CollectionPlanData {
       )
     : undefined;
 
+  const steps =
+    jsonSteps && jsonSteps.length > 0
+      ? jsonSteps
+      : parseStepsFromPlanText(plan);
+
   return {
     plan,
-    steps: steps && steps.length > 0 ? steps : undefined,
+    steps,
     suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
   };
 }
@@ -173,7 +192,7 @@ function parseSuggestedSources(raw: string): string[] {
 function resolveMessageType(
   response: DialogueApiResponse,
 ): Message["type"] | undefined {
-  return ACTION_TO_MESSAGE_TYPE[response.action];
+  return (ACTION_TO_MESSAGE_TYPE as Record<string, NonNullable<Message["type"]>>)[response.action];
 }
 
 function inferStageFromResponse(
@@ -236,69 +255,73 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     message.type = messageType;
   }
 
-  if (response.action === "start_collecting") {
-    const sources = parseSuggestedSources(response.question);
-    if (sources.length > 0) {
-      message.text = `Collecting from: ${sources.join(", ")}`;
-    } else {
-      message.text = "Collecting from selected sources...";
-    }
-    return message;
-  }
-
-  if (messageType === "summary" || messageType === "pir") {
-    const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
-      response.question,
-    );
-    if (parsed) {
-      message.data = parsed;
-    }
-  }
-
-  if (messageType === "collection") {
-    const parsed = tryParseJson<unknown>(response.question);
-    if (parsed && typeof parsed === "object" && parsed !== null) {
-      if (
-        "collected_data" in parsed &&
-        Array.isArray((parsed as Record<string, unknown>).collected_data)
-      ) {
-        message.data = parsed as CollectionDisplayData;
-      } else if ("sources_used" in parsed) {
-        message.data = parsed as CollectionSummaryData;
+  switch (messageType) {
+    case "question":
+      if (response.action === "start_collecting") {
+        const sources = parseSuggestedSources(response.question);
+        message.text =
+          sources.length > 0
+            ? `Collecting from: ${sources.join(", ")}`
+            : "Collecting from selected sources...";
       }
+      break;
+
+    case "summary":
+    case "pir": {
+      const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
+        response.question,
+      );
+      if (parsed) {
+        message.data = parsed;
+      }
+      break;
     }
-    // Prevent raw JSON dump in chat — if parsing failed or structure didn't match,
-    // create a minimal display payload with parse_error so the component handles it.
-    if (!message.data) {
-      message.data = {
-        collected_data: [],
-        source_summary: [],
-        parse_error: "Collection data could not be parsed for display.",
-      } as CollectionDisplayData;
+
+    case "plan":
+      message.data = parsePlanData(response.question);
+      break;
+
+    case "collection": {
+      const parsed = tryParseJson<unknown>(response.question);
+      if (parsed && typeof parsed === "object" && parsed !== null) {
+        if (
+          "collected_data" in parsed &&
+          Array.isArray((parsed as Record<string, unknown>).collected_data)
+        ) {
+          message.data = parsed as CollectionDisplayData;
+        } else if ("sources_used" in parsed) {
+          message.data = parsed as CollectionSummaryData;
+        }
+      }
+      // Prevent raw JSON dump in chat — if parsing failed or structure didn't match,
+      // create a minimal display payload with parse_error so the component handles it.
+      if (!message.data) {
+        message.data = {
+          collected_data: [],
+          source_summary: [],
+          parse_error: "Collection data could not be parsed for display.",
+        } as CollectionDisplayData;
+      }
+      message.text = "Collection complete";
+      break;
     }
-    message.text = "Collection complete";
-  }
 
-  if (messageType === "processing") {
-    message.text = "Processing complete — results are ready for review.";
-  }
-
-  if (messageType === "plan") {
-    message.data = parsePlanData(response.question);
-  }
-
-  if (messageType === "processing") {
-    const parsed = tryParseJson<ProcessingData>(response.question);
-    if (parsed) {
-      message.data = parsed;
+    case "processing": {
+      message.text = "Processing complete — results are ready for review.";
+      const parsed = extractJsonObject(response.question) as ProcessingData | null;
+      if (parsed && "findings" in parsed) {
+        message.data = parsed;
+      }
+      break;
     }
-  }
 
-  if (messageType === "suggested_sources") {
-    const sources = parseSuggestedSources(response.question);
-    if (sources.length > 0) {
-      message.data = sources as SuggestedSourcesData;
-      message.text = `Suggested sources: ${sources.join(", ")}`;
+    case "suggested_sources": {
+      const sources = parseSuggestedSources(response.question);
+      if (sources.length > 0) {
+        message.data = sources as SuggestedSourcesData;
+        message.text = `Suggested sources: ${sources.join(", ")}`;
+      }
+      break;
     }
   }
 

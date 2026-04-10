@@ -207,25 +207,29 @@ export interface ActivitySummaryItem {
   reviewer_suggestions: string | null;
 }
 
-export interface ProcessingEntity {
+export interface ProcessingFinding {
   id: string;
-  name: string;
-  description: string;
-  categories: string[];
-  sources: string[];
+  title: string;
+  finding: string;
+  evidence_summary: string;
+  source: string;
   confidence: number;
   relevant_to: string[];
-  tags: string[];
-  first_observed?: string;
-  last_updated?: string;
+  why_it_matters: string;
+  uncertainties: string[];
+  supporting_data?: {
+    entities?: string[];
+    timestamps?: string[];
+    locations?: string[];
+    kb_refs?: string[];
+    attack_ids?: string[];
+    domains?: string[];
+  };
 }
 
 export interface ProcessingData {
-  entities: ProcessingEntity[];
+  findings: ProcessingFinding[];
   gaps: string[];
-  processing_summary: string;
-  assessment_changed: boolean;
-  change_summary?: string | null;
 }
 
 /**

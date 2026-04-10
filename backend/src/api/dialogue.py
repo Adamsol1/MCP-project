@@ -269,29 +269,8 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             approved=request.approved,
         )
         _save_session(session)
-        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
-
-
-    # Route to processing phase if already started
-    if session.processing_flow:
-        if request.gather_more:
-            if not session.collection_flow:
-                raise HTTPException(status_code=500, detail="No collection flow found")
-            session.processing_flow = None
-            session.collection_flow.state = CollectionState.REVIEWING
-            _save_session(session)
-            return _convert_to_message_response(
-                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
-                stage=session.collection_flow.state.value,
-            )
-        processing_service = ProcessingService(mcp_client)
-        response = await session.processing_flow.process_user_message(
-            user_message=request.message,
-            processing_service=processing_service,
-            approved=request.approved,
-        )
-        _save_session(session)
-        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
+        processing_stage = "processing" if response.action == DialogueAction.SHOW_PROCESSING else session.processing_flow.state.value
+        return _convert_to_message_response(response, stage=processing_stage)
 
     # Route to collection phase if already started
     if session.collection_flow:
@@ -322,7 +301,8 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
                 reviewer=review_service,
             )
             _save_session(session)
-            return _convert_to_message_response(init_response, stage=session.processing_flow.state.value)
+            init_stage = "processing" if init_response.action == DialogueAction.SHOW_PROCESSING else session.processing_flow.state.value
+            return _convert_to_message_response(init_response, stage=init_stage)
 
         _save_session(session)
         return _convert_to_message_response(response, stage=session.collection_flow.state.value)

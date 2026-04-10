@@ -100,13 +100,17 @@ def _extract_search_urls(raw_data: str) -> list[str]:
 
 
 def _try_parse_json_lenient(s: str) -> dict | None:
-    """Try json.loads; on failure strip trailing commas and retry once."""
+    """Try json.loads; on failure apply common LLM-output repairs and retry."""
     try:
         return json.loads(s)
     except json.JSONDecodeError:
         pass
+    # Remove invalid JSON escape sequences (e.g. \' produced by some LLMs —
+    # only \", \\, \/, \b, \f, \n, \r, \t, \uXXXX are valid in JSON).
+    repaired = re.sub(r"\\([^\"\\\/bfnrtu])", r"\1", s)
+    # Strip trailing commas before ] or }
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
     try:
-        repaired = re.sub(r",\s*([}\]])", r"\1", s)
         return json.loads(repaired)
     except json.JSONDecodeError:
         return None
