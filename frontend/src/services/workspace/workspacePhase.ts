@@ -1,22 +1,23 @@
-import type { Phase } from "../../contexts/WorkspaceContext/WorkspaceContext";
-import type { DialogueStage } from "../../types/dialogue";
+import type { DialoguePhase, DialogueStage } from "../../types/dialogue";
 
 export function getWorkspacePhaseForDialogueStage(
   stage: DialogueStage | undefined,
-): Phase {
+): DialoguePhase {
   switch (stage) {
+    case "processing":
+    case "complete":
+      return "processing";
+    case "planning":
+    case "plan_confirming":
     case "source_selecting":
     case "collecting":
-    case "reviewing":
       return "collection";
-    case "complete":
-      return "analysis";
+    case "reviewing":
+      return "processing";
     case "initial":
     case "gathering":
     case "summary_confirming":
     case "pir_confirming":
-    case "planning":
-    case "plan_confirming":
     default:
       return "direction";
   }

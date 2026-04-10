@@ -16,7 +16,11 @@ import type {
   ProcessingData,
   SuggestedSourcesData,
 } from "../../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
 
@@ -352,6 +356,7 @@ interface ChatWindowProps {
   isConfirming?: boolean;
   isLoading?: boolean;
   stage?: DialogueStage;
+  phase?: DialoguePhase;
   subState?: DialogueSubState;
   onApprove?: () => void;
   onReject?: () => void;
@@ -406,13 +411,12 @@ function SourceSummaryTable({
 }
 
 function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
-  const { setCollectionData, setActivePhase } = useWorkspace();
+  const { setCollectionData } = useWorkspace();
   const t = useT();
 
   useEffect(() => {
     setCollectionData(data);
-    setActivePhase("collection");
-  }, [data, setCollectionData, setActivePhase]);
+  }, [data, setCollectionData]);
 
   if (data.parse_error) {
     return (
@@ -447,6 +451,7 @@ export default function ChatWindow({
   isConfirming = false,
   isLoading = false,
   stage,
+  phase = "direction",
   subState,
   onApprove,
   onReject,
@@ -502,13 +507,18 @@ export default function ChatWindow({
   const hasMessages = messages.length > 0;
   const isAnalysisComplete = stage === "complete";
   const hasConversationContent = hasMessages || isAnalysisComplete;
+  const isEmptyStateComposer = !hasConversationContent;
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
       ? t.placeholderPlanModify
-      : stage === "reviewing" && subState === "awaiting_modifications"
+      : stage === "reviewing" &&
+          phase === "collection" &&
+          subState === "awaiting_modifications"
         ? t.placeholderSummaryModify
-        : stage === "reviewing" && subState === "awaiting_gather_more"
+        : stage === "reviewing" &&
+            phase === "collection" &&
+            subState === "awaiting_gather_more"
           ? t.placeholderGatherMore
           : t.placeholderDefault;
 
@@ -577,7 +587,7 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="flex-1 min-h-0 w-full flex flex-col">
       {hasConversationContent && (
         <div className="flex-1 min-h-0 overflow-y-auto py-4">
           <div className={`${contentWidthClass} flex flex-col`}>
@@ -635,7 +645,11 @@ export default function ChatWindow({
             </p>
           )}
 
-        <div className="w-full max-w-3xl px-6">
+        <div
+          className={`w-full px-6 ${
+            isEmptyStateComposer ? "max-w-4xl" : "max-w-3xl"
+          }`}
+        >
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
@@ -788,7 +802,8 @@ export default function ChatWindow({
                 )}
               </section>
             ) : isConfirming ? (
-              stage === "processing" ? (
+              stage === "processing" ||
+              (stage === "reviewing" && phase === "processing") ? (
                 <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-text-primary">Processing Review</h3>
@@ -805,7 +820,7 @@ export default function ChatWindow({
                     </button>
                   </div>
                 </section>
-              ) : stage === "reviewing" ? (
+              ) : stage === "reviewing" && phase === "collection" ? (
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}
@@ -822,7 +837,11 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2 bg-surface"
+                className={`flex items-center gap-2 border-2 border-border bg-surface shadow-sm ${
+                  isEmptyStateComposer
+                    ? "rounded-[22px] px-5 py-3"
+                    : "rounded-xl px-3 py-2"
+                }`}
               >
                 <textarea
                   ref={textareaRef}
@@ -836,13 +855,17 @@ export default function ChatWindow({
                       submitMessage();
                     }
                   }}
-                  className="flex-1 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                  className={`flex-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64 ${
+                    isEmptyStateComposer ? "py-2 text-base" : "py-1"
+                  }`}
                 />
                 <button
                   type="submit"
                   disabled={inputValue.trim() === ""}
                   aria-label={t.sendMessage}
-                  className={`self-end shrink-0 p-2 rounded-full transition-colors ${
+                  className={`shrink-0 rounded-full transition-colors ${
+                    isEmptyStateComposer ? "self-center p-3" : "self-end p-2"
+                  } ${
                     inputValue.trim() === ""
                       ? "bg-surface-elevated text-text-muted cursor-not-allowed"
                       : "bg-primary text-text-inverse hover:bg-primary-dark"

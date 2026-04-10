@@ -1,13 +1,43 @@
 """Tests for persisted analysis session state."""
 
+import json
+
 from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
+from src.services import processing_prototype_service as processing_service_module
 from src.services.analysis_session_store import AnalysisSessionStore
 from src.services.processing_prototype_service import ProcessingPrototypeService
+
+VALID_PROCESSING_PAYLOAD = {
+    "findings": [
+        {
+            "id": "F-001",
+            "title": "Credential-access activity",
+            "finding": "Repeated authentication attempts targeted privileged accounts.",
+            "evidence_summary": "Login failures were followed by successful access.",
+            "source": "network_telemetry",
+            "confidence": 82,
+            "relevant_to": ["PIR-1"],
+            "supporting_data": {"attack_ids": ["T1078"]},
+            "why_it_matters": "This suggests adversary access development.",
+            "uncertainties": ["The compromised account path is unconfirmed."],
+        }
+    ],
+    "gaps": ["Attribution remains unresolved."],
+}
+
+
+def _write_processed_json(tmp_path, session_id: str) -> None:
+    session_dir = tmp_path / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "processed.json").write_text(
+        json.dumps({"attempts": [json.dumps(VALID_PROCESSING_PAYLOAD)]}),
+        encoding="utf-8",
+    )
 
 
 def _make_draft() -> AnalysisDraft:
     return AnalysisDraft(
-        summary="Demo summary.",
+        summary="Session summary.",
         key_judgments=["Judgment A"],
         per_perspective_implications={"neutral": ["Implication A"]},
         recommended_actions=["Action A"],
@@ -40,10 +70,12 @@ def _make_note() -> CouncilNote:
 class TestAnalysisSessionStore:
     """Test persisted analysis draft and council state."""
 
-    def test_draft_persistence(self, tmp_path):
+    def test_draft_persistence(self, monkeypatch, tmp_path):
         """Saved drafts should be reloaded after a later read."""
-        store = AnalysisSessionStore(sessions_dir=tmp_path)
-        processing_result, _ = ProcessingPrototypeService().get_processing_result(
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-draft")
+        store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
+        processing_result = ProcessingPrototypeService().get_processing_result(
             "session-draft"
         )
         draft = _make_draft()
@@ -57,7 +89,7 @@ class TestAnalysisSessionStore:
 
     def test_council_note_persistence(self, tmp_path):
         """Saved council notes should remain separate from the persisted draft."""
-        store = AnalysisSessionStore(sessions_dir=tmp_path)
+        store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
         note = _make_note()
 
         store.save_council_note("session-council", note)
@@ -67,10 +99,14 @@ class TestAnalysisSessionStore:
         assert reloaded.latest_council_note == note
         assert reloaded.analysis_draft is None
 
-    def test_reload_behavior_preserves_draft_and_latest_note(self, tmp_path):
+    def test_reload_behavior_preserves_draft_and_latest_note(
+        self, monkeypatch, tmp_path
+    ):
         """Reloading should preserve both the draft and the latest council note."""
-        store = AnalysisSessionStore(sessions_dir=tmp_path)
-        processing_result, _ = ProcessingPrototypeService().get_processing_result(
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-reload")
+        store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
+        processing_result = ProcessingPrototypeService().get_processing_result(
             "session-reload"
         )
         draft = _make_draft()
@@ -79,7 +115,9 @@ class TestAnalysisSessionStore:
         store.save_draft("session-reload", processing_result, draft)
         store.save_council_note("session-reload", note)
 
-        reloaded = AnalysisSessionStore(sessions_dir=tmp_path).load("session-reload")
+        reloaded = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions").load(
+            "session-reload"
+        )
 
         assert reloaded is not None
         assert reloaded.analysis_draft == draft

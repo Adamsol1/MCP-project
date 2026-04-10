@@ -3,15 +3,20 @@ import { getWorkspacePhaseForDialogueStage } from "./workspacePhase";
 
 describe("getWorkspacePhaseForDialogueStage", () => {
   it("maps collection-related stages to the collection workspace", () => {
+    expect(getWorkspacePhaseForDialogueStage("planning")).toBe("collection");
+    expect(getWorkspacePhaseForDialogueStage("plan_confirming")).toBe(
+      "collection",
+    );
     expect(getWorkspacePhaseForDialogueStage("source_selecting")).toBe(
       "collection",
     );
     expect(getWorkspacePhaseForDialogueStage("collecting")).toBe("collection");
-    expect(getWorkspacePhaseForDialogueStage("reviewing")).toBe("collection");
   });
 
-  it("maps the complete stage to the analysis workspace", () => {
-    expect(getWorkspacePhaseForDialogueStage("complete")).toBe("analysis");
+  it("maps processing-related stages to the processing workspace", () => {
+    expect(getWorkspacePhaseForDialogueStage("reviewing")).toBe("processing");
+    expect(getWorkspacePhaseForDialogueStage("processing")).toBe("processing");
+    expect(getWorkspacePhaseForDialogueStage("complete")).toBe("processing");
   });
 
   it("maps earlier dialogue stages to the direction workspace", () => {

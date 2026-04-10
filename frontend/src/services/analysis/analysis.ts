@@ -9,7 +9,6 @@ const API_BACKEND_URL = "http://localhost:8000";
 
 export interface GetAnalysisDraftOptions {
   forceRefresh?: boolean;
-  demoDataset?: string;
 }
 
 export async function getAnalysisDraft(
@@ -21,7 +20,6 @@ export async function getAnalysisDraft(
     {
       session_id: sessionId,
       force_refresh: options.forceRefresh ?? false,
-      demo_dataset: options.demoDataset,
     },
   );
 

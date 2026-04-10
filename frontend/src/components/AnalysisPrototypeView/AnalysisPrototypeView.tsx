@@ -617,15 +617,7 @@ export default function AnalysisPrototypeView() {
       try {
         const response = await getAnalysisDraft(sessionId);
         if (!isCancelled) {
-          if (response.data_source === "demo") {
-            console.warn(
-              `[AnalysisView] Using DEMO fallback data for session ${sessionId}. No processed.json found or it could not be parsed as a valid ProcessingResult.`,
-            );
-          } else {
-            console.info(
-              `[AnalysisView] Loaded session data for ${sessionId} (source: ${response.data_source})`,
-            );
-          }
+          console.info(`[AnalysisView] Loaded session data for ${sessionId}.`);
           setData(response);
           setCouncilNote(response.latest_council_note);
         }
@@ -820,11 +812,6 @@ export default function AnalysisPrototypeView() {
               <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
                 Draft Analysis
               </span>
-              {data?.data_source === "demo" && (
-                <span className="rounded-full border border-border bg-white/55 px-3 py-1 text-[11px] text-text-secondary">
-                  Demo-backed assessment
-                </span>
-              )}
             </div>
             <div>
               <h1 className="font-serif text-3xl leading-tight text-text-primary">

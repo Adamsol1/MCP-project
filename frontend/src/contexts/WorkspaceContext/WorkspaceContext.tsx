@@ -3,8 +3,6 @@ import { createContext, useState } from "react";
 import type { CollectionDisplayData, PirData } from "../../types/conversation";
 import React from "react";
 
-export type Phase = "direction" | "collection" | "processing" | "analysis";
-
 export interface WorkspaceContextValue {
   highlightedRef: string | null;
   setHighlightedRef: (ref: string | null) => void;
@@ -12,8 +10,6 @@ export interface WorkspaceContextValue {
   setHighlightedRefs: (refs: string[]) => void;
   pirData: PirData | null;
   setPirData: (pirData: PirData | null) => void;
-  activePhase: Phase;
-  setActivePhase: (phase: Phase) => void;
   collectionData: CollectionDisplayData | null;
   setCollectionData: (data: CollectionDisplayData | null) => void;
 }
@@ -27,7 +23,6 @@ export const WorkspaceContext = createContext<WorkspaceContextValue | null>(
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [highlightedRefs, setHighlightedRefs] = useState<string[]>([]);
   const [pirData, setPirData] = useState<PirData | null>(null);
-  const [activePhase, setActivePhase] = useState<Phase>("direction");
   const [collectionData, setCollectionData] =
     useState<CollectionDisplayData | null>(null);
   const highlightedRef = highlightedRefs[0] ?? null;
@@ -41,8 +36,6 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setHighlightedRefs,
     pirData,
     setPirData,
-    activePhase,
-    setActivePhase,
     collectionData,
     setCollectionData,
   };

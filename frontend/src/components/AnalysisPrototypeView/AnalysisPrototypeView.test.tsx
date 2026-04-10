@@ -132,6 +132,7 @@ const demoResponse: AnalysisDraftResponse = {
     ],
   },
   latest_council_note: null,
+  data_source: "session",
 };
 
 function createWrapper() {
@@ -155,6 +156,7 @@ function seedConversationStore(perspectives = ["US", "NEUTRAL"]) {
         sessionId: "session-1",
         isConfirming: false,
         stage: "complete",
+        phase: "processing",
         subState: null,
         createdAt: 1000,
         updatedAt: 1000,
@@ -196,9 +198,7 @@ describe("AnalysisPrototypeView", () => {
     expect(screen.getByLabelText(/finding f-001/i)).toBeInTheDocument();
     expect(screen.getAllByText("F-001").length).toBeGreaterThan(0);
     expect(screen.getAllByText(/Evidence summary/i).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(/Supporting data/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/attack ids/i)).toBeInTheDocument();
-    expect(screen.getByText(/vpn.nordtel-demo.net/i)).toBeInTheDocument();
+    expect(screen.getByText(/ATT&CK Techniques/i)).toBeInTheDocument();
     expect(screen.getByText(/Perspective Implications/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Review privileged telecom administration accounts/i),
@@ -220,6 +220,7 @@ describe("AnalysisPrototypeView", () => {
           sessionId: "session-1",
           isConfirming: false,
           stage: "complete",
+          phase: "processing",
           subState: null,
           createdAt: 1000,
           updatedAt: 1000,
@@ -253,13 +254,32 @@ describe("AnalysisPrototypeView", () => {
     expect(screen.getByText(/backend unavailable/i)).toBeInTheDocument();
   });
 
+  it("shows the processing-required error when no processed result exists", async () => {
+    vi.mocked(getAnalysisDraft).mockRejectedValue({
+      response: {
+        data: {
+          detail:
+            "No processed result available for this session. Complete processing first.",
+        },
+      },
+    });
+
+    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+
+    expect(
+      await screen.findByText(
+        /No processed result available for this session. Complete processing first./i,
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("renders a finding card with visible confidence", async () => {
     vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
 
     render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
 
     expect(await screen.findByLabelText(/finding f-001/i)).toBeInTheDocument();
-    expect(screen.getByText(/82% confidence/i)).toBeInTheDocument();
+    expect(screen.getByText(/^82%$/i)).toBeInTheDocument();
   });
 
   it("renders finding uncertainties clearly", async () => {

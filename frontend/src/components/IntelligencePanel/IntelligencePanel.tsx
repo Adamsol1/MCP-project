@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import type { DialoguePhase } from "../../types/dialogue";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
@@ -11,6 +12,7 @@ import type { CollectionStatus } from "../../services/dialogue/dialogue";
 const VISIBLE_FILE_COUNT = 3;
 
 interface IntelligencePanelProps {
+  phase: DialoguePhase;
   selectedPerspectives?: string[];
   onPerspectiveChange?: (perspectives: string[]) => void;
   onOpenFileUpload?: () => void;
@@ -21,6 +23,7 @@ interface IntelligencePanelProps {
 }
 
 export default function IntelligencePanel({
+  phase,
   selectedPerspectives = ["NEUTRAL"],
   onPerspectiveChange = () => {},
   onOpenFileUpload = () => {},
@@ -29,7 +32,7 @@ export default function IntelligencePanel({
   isCollecting = false,
   collectionStatus = null,
 }: IntelligencePanelProps) {
-  const { activePhase, collectionData } = useWorkspace();
+  const { collectionData } = useWorkspace();
   const t = useT();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showAllFiles, setShowAllFiles] = useState(false);
@@ -39,10 +42,10 @@ export default function IntelligencePanel({
     : uploadedFiles.slice(0, VISIBLE_FILE_COUNT);
   const hiddenCount = uploadedFiles.length - VISIBLE_FILE_COUNT;
 
-  const phaseLabel = t.phaseLabels[activePhase] ?? activePhase.toUpperCase();
+  const phaseLabel = t.phaseLabels[phase] ?? phase.toUpperCase();
 
   function renderPhaseContent() {
-    switch (activePhase) {
+    switch (phase) {
       case "direction":
         return (
           <>
