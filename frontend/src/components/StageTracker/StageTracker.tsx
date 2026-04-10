@@ -63,49 +63,51 @@ export default function StageTracker({
   const activeIdx = phaseIndex(activePhase);
 
   return (
-    <div className="shrink-0 flex items-center gap-1 px-6 py-3 bg-surface border-b border-border">
-      {STAGES.map((stage, i) => {
-        const isCompleted = i < activeIdx;
-        const isActive = i === activeIdx;
+    <div className="shrink-0 flex justify-center px-6 py-3 bg-surface border-b border-border">
+      <div className="flex items-center gap-1">
+        {STAGES.map((stage, i) => {
+          const isCompleted = i < activeIdx;
+          const isActive = i === activeIdx;
 
-        return (
-          <div key={stage.phase} className="flex items-center gap-1">
-            {i > 0 && (
-              <span className="mx-1">
-                <ChevronRight />
-              </span>
-            )}
+          return (
+            <div key={stage.phase} className="flex items-center gap-1">
+              {i > 0 && (
+                <span className="mx-1">
+                  <ChevronRight />
+                </span>
+              )}
 
-            {/* Circle indicator */}
-            {isCompleted ? (
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-success text-white">
-                <CheckIcon />
-              </span>
-            ) : isActive ? (
-              <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-white text-xs font-bold">
-                {i + 1}
-              </span>
-            ) : (
-              <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-border text-text-muted text-xs font-bold">
-                {i + 1}
-              </span>
-            )}
+              {/* Circle indicator */}
+              {isCompleted ? (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-success text-white">
+                  <CheckIcon />
+                </span>
+              ) : isActive ? (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-white text-xs font-bold">
+                  {i + 1}
+                </span>
+              ) : (
+                <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-border text-text-muted text-xs font-bold">
+                  {i + 1}
+                </span>
+              )}
 
-            {/* Label */}
-            <span
-              className={`text-sm font-medium ${
-                isActive
-                  ? "text-text-primary"
-                  : isCompleted
+              {/* Label */}
+              <span
+                className={`text-sm font-medium ${
+                  isActive
                     ? "text-text-primary"
-                    : "text-text-muted"
-              }`}
-            >
-              {stage.label}
-            </span>
-          </div>
-        );
-      })}
+                    : isCompleted
+                      ? "text-text-primary"
+                      : "text-text-muted"
+                }`}
+              >
+                {stage.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
