@@ -16,7 +16,11 @@ import type {
   ProcessingData,
   SuggestedSourcesData,
 } from "../../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
 
@@ -331,6 +335,7 @@ interface ChatWindowProps {
   isConfirming?: boolean;
   isLoading?: boolean;
   stage?: DialogueStage;
+  phase?: DialoguePhase;
   subState?: DialogueSubState;
   onApprove?: () => void;
   onReject?: () => void;
@@ -385,13 +390,12 @@ function SourceSummaryTable({
 }
 
 function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
-  const { setCollectionData, setActivePhase } = useWorkspace();
+  const { setCollectionData } = useWorkspace();
   const t = useT();
 
   useEffect(() => {
     setCollectionData(data);
-    setActivePhase("collection");
-  }, [data, setCollectionData, setActivePhase]);
+  }, [data, setCollectionData]);
 
   if (data.parse_error) {
     return (
@@ -426,6 +430,7 @@ export default function ChatWindow({
   isConfirming = false,
   isLoading = false,
   stage,
+  phase = "direction",
   subState,
   onApprove,
   onReject,
@@ -486,9 +491,13 @@ export default function ChatWindow({
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
       ? t.placeholderPlanModify
-      : stage === "reviewing" && subState === "awaiting_modifications"
+      : stage === "reviewing" &&
+          phase === "collection" &&
+          subState === "awaiting_modifications"
         ? t.placeholderSummaryModify
-        : stage === "reviewing" && subState === "awaiting_gather_more"
+        : stage === "reviewing" &&
+            phase === "collection" &&
+            subState === "awaiting_gather_more"
           ? t.placeholderGatherMore
           : t.placeholderDefault;
 
@@ -557,7 +566,7 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="h-full w-full flex flex-col">
+    <div className="flex-1 min-h-0 w-full flex flex-col">
       {hasConversationContent && (
         <div className="flex-1 min-h-0 overflow-y-auto py-4">
           <div className={`${contentWidthClass} flex flex-col`}>
@@ -772,7 +781,8 @@ export default function ChatWindow({
                 )}
               </section>
             ) : isConfirming ? (
-              stage === "processing" ? (
+              stage === "processing" ||
+              (stage === "reviewing" && phase === "processing") ? (
                 <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
                   <div className="flex-1 min-w-0">
                     <h3 className="text-sm font-semibold text-text-primary">Processing Review</h3>
@@ -789,7 +799,7 @@ export default function ChatWindow({
                     </button>
                   </div>
                 </section>
-              ) : stage === "reviewing" ? (
+              ) : stage === "reviewing" && phase === "collection" ? (
                 <CollectionReviewPrompt
                   isLoading={isLoading}
                   onAccept={onApprove}

@@ -1,15 +1,20 @@
-import type { Phase } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import type { DialoguePhase } from "../../types/dialogue";
 
-const STAGES: { phase: Phase; label: string }[] = [
+const STAGES: { phase: DialoguePhase; label: string }[] = [
   { phase: "direction", label: "Direction" },
   { phase: "collection", label: "Collection" },
   { phase: "processing", label: "Processing" },
   { phase: "analysis", label: "Analysis" },
 ];
 
-const PHASE_ORDER: Phase[] = ["direction", "collection", "processing", "analysis"];
+const PHASE_ORDER: DialoguePhase[] = [
+  "direction",
+  "collection",
+  "processing",
+  "analysis",
+];
 
-function phaseIndex(phase: Phase): number {
+function phaseIndex(phase: DialoguePhase): number {
   return PHASE_ORDER.indexOf(phase);
 }
 
@@ -50,11 +55,15 @@ function ChevronRight() {
   );
 }
 
-export default function StageTracker({ activePhase }: { activePhase: Phase }) {
+export default function StageTracker({
+  activePhase,
+}: {
+  activePhase: DialoguePhase;
+}) {
   const activeIdx = phaseIndex(activePhase);
 
   return (
-    <div className="flex items-center gap-1 px-6 py-3 bg-surface border-b border-border">
+    <div className="shrink-0 flex items-center gap-1 px-6 py-3 bg-surface border-b border-border">
       {STAGES.map((stage, i) => {
         const isCompleted = i < activeIdx;
         const isActive = i === activeIdx;

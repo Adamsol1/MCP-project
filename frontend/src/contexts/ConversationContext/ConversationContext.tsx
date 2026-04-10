@@ -10,7 +10,11 @@ import type {
   Message,
   ConversationStore,
 } from "../../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../../types/dialogue";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "../../types/dialogue";
 import {
   loadConversationStore,
   saveConversationStore,
@@ -49,7 +53,11 @@ export interface ConversationContextValue {
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
   /** Set canonical backend dialogue stage and optional sub-state. */
-  setStage: (stage: DialogueStage, subState?: DialogueSubState) => void;
+  setStage: (
+    stage: DialogueStage,
+    subState?: DialogueSubState,
+    phase?: DialoguePhase,
+  ) => void;
   /** Replace the geopolitical perspectives of the active conversation. */
   updatePerspectives: (perspectives: string[]) => void;
 }
@@ -71,7 +79,11 @@ type Action =
   | { type: "SET_IS_CONFIRMING"; payload: boolean }
   | {
       type: "SET_STAGE";
-      payload: { stage: DialogueStage; subState: DialogueSubState };
+      payload: {
+        stage: DialogueStage;
+        subState: DialogueSubState;
+        phase?: DialoguePhase;
+      };
     }
   | { type: "UPDATE_PERSPECTIVES"; payload: string[] };
 
@@ -181,6 +193,7 @@ function conversationReducer(
                 ...conv,
                 isConfirming: action.payload,
                 stage,
+                phase: "direction",
                 subState: action.payload ? "awaiting_decision" : null,
               }
             : conv,
@@ -188,12 +201,13 @@ function conversationReducer(
       };
     }
     case "SET_STAGE": {
-      const { stage, subState } = action.payload;
+      const { stage, subState, phase } = action.payload;
       const isConfirming =
         (stage === "summary_confirming" ||
           stage === "pir_confirming" ||
           stage === "plan_confirming" ||
-          stage === "reviewing") &&
+          stage === "reviewing" ||
+          stage === "processing") &&
         subState === "awaiting_decision";
       return {
         ...state,
@@ -202,6 +216,7 @@ function conversationReducer(
             ? {
                 ...conv,
                 stage,
+                phase: phase ?? conv.phase,
                 subState,
                 isConfirming,
               }
@@ -307,8 +322,12 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setStage = useCallback(
-    (stage: DialogueStage, subState: DialogueSubState = null) => {
-      dispatch({ type: "SET_STAGE", payload: { stage, subState } });
+    (
+      stage: DialogueStage,
+      subState: DialogueSubState = null,
+      phase?: DialoguePhase,
+    ) => {
+      dispatch({ type: "SET_STAGE", payload: { stage, subState, phase } });
     },
     [],
   );

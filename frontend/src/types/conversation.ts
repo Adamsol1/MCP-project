@@ -1,4 +1,8 @@
-import type { DialogueStage, DialogueSubState } from "./dialogue";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "./dialogue";
 
 /** A single chat message exchanged between the user and the system. */
 export interface Message {
@@ -55,6 +59,8 @@ export interface Conversation {
   isConfirming: boolean;
   /** Canonical dialogue stage received from backend. */
   stage: DialogueStage;
+  /** Canonical backend phase used for tracker and workspace routing. */
+  phase: DialoguePhase;
   /** Optional under-state for confirm stages, used by devtools/UI behavior. */
   subState: DialogueSubState;
   /** Unix timestamp (ms) when this conversation was created. */

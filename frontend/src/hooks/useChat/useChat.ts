@@ -9,6 +9,7 @@ import {
 } from "../../services/dialogue/dialogue";
 import type {
   DialogueAction,
+  DialoguePhase,
   DialogueStage,
   DialogueSubState,
 } from "../../types/dialogue";
@@ -224,6 +225,37 @@ function inferStageFromResponse(
   return { stage: fallbackStage, subState: fallbackSubState };
 }
 
+function inferPhaseFromResponse(
+  response: DialogueApiResponse,
+  stage: DialogueStage,
+  fallbackPhase: DialoguePhase,
+): DialoguePhase {
+  if (response.phase) {
+    return response.phase;
+  }
+
+  switch (stage) {
+    case "planning":
+    case "plan_confirming":
+    case "source_selecting":
+    case "collecting":
+      return "collection";
+    case "reviewing":
+      return response.action === "show_collection" || response.action === "select_gaps"
+        ? "collection"
+        : "processing";
+    case "processing":
+    case "complete":
+      return "processing";
+    case "initial":
+    case "gathering":
+    case "summary_confirming":
+    case "pir_confirming":
+    default:
+      return fallbackPhase;
+  }
+}
+
 function buildSystemMessage(response: DialogueApiResponse): Message {
   const message: Message = {
     id: crypto.randomUUID(),
@@ -340,6 +372,7 @@ export function useChat() {
     [activeConversation?.messages],
   );
   const stage = activeConversation?.stage ?? "initial";
+  const phase = activeConversation?.phase ?? "direction";
   const subState = activeConversation?.subState ?? null;
   const isConfirming =
     isDecisionStage(stage) &&
@@ -393,6 +426,7 @@ export function useChat() {
     conversationId: string,
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
+    fallbackPhase: DialoguePhase,
   ) => {
     addMessage(buildSystemMessage(response), conversationId);
 
@@ -401,7 +435,8 @@ export function useChat() {
       fallbackStage,
       fallbackSubState,
     );
-    setStage(next.stage, next.subState);
+    const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
+    setStage(next.stage, next.subState, nextPhase);
   };
 
   const sendAndHandle = async (
@@ -412,6 +447,7 @@ export function useChat() {
     options: DialogueSendOptions,
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
+    fallbackPhase: DialoguePhase,
     perspectives: string[],
   ) => {
     const response = await sendMessage(
@@ -424,7 +460,13 @@ export function useChat() {
       options,
     );
 
-    applyResponse(response, conversationId, fallbackStage, fallbackSubState);
+    applyResponse(
+      response,
+      conversationId,
+      fallbackStage,
+      fallbackSubState,
+      fallbackPhase,
+    );
 
     if (response.action !== "start_collecting") {
       return;
@@ -449,9 +491,10 @@ export function useChat() {
         conversationId,
         errorStage,
         "awaiting_decision",
+        "collection",
       );
     } else {
-      applyResponse(collectResponse, conversationId, "collecting", null);
+      applyResponse(collectResponse, conversationId, "collecting", null, "collection");
     }
   };
 
@@ -464,7 +507,11 @@ export function useChat() {
     );
 
     // Intercept gather_more text — store locally and show source selection instead of backend call
-    if (stage === "reviewing" && subState === "awaiting_gather_more") {
+    if (
+      stage === "reviewing" &&
+      phase === "collection" &&
+      subState === "awaiting_gather_more"
+    ) {
       setPendingGatherMoreText(text);
       setLocalSourceContext("gather_more");
       return;
@@ -480,12 +527,13 @@ export function useChat() {
         {},
         stage,
         subState,
+        conversation.phase,
         conversation.perspectives,
       );
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -512,13 +560,14 @@ export function useChat() {
         {},
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
       success("Request approved");
     } catch (e) {
       error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -556,6 +605,7 @@ export function useChat() {
         { gatherMore: true },
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
     } catch (e) {
@@ -568,7 +618,7 @@ export function useChat() {
   };
 
   const gatherMore = () => {
-    if (!activeConversation || stage !== "reviewing") {
+    if (!activeConversation || stage !== "reviewing" || phase !== "collection") {
       return;
     }
 
@@ -620,6 +670,7 @@ export function useChat() {
         options,
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
     } catch (e) {
@@ -629,7 +680,7 @@ export function useChat() {
         }`,
       );
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -654,7 +705,7 @@ export function useChat() {
       },
       conversation.id,
     );
-    setStage("summary_confirming", "awaiting_decision");
+    setStage("summary_confirming", "awaiting_decision", "direction");
   };
 
   const jumpToDevStage = async (
@@ -668,7 +719,11 @@ export function useChat() {
         nextStage,
         nextSubState,
       );
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info(`Moved to stage: ${response.stage}`);
     } catch {
       error("Failed to set dev stage");
@@ -679,7 +734,11 @@ export function useChat() {
     if (!activeConversation) return;
     try {
       const response = await getDevDialogueState(activeConversation.sessionId);
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info(`Synced stage: ${response.stage}`);
     } catch {
       error("Failed to sync dev stage");
@@ -692,7 +751,11 @@ export function useChat() {
       const response = await resetDevDialogueState(
         activeConversation.sessionId,
       );
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info("Reset stage to initial");
     } catch {
       error("Failed to reset dev stage");

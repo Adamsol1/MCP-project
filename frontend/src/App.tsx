@@ -14,7 +14,6 @@ import {
   getCollectionStatus,
   type CollectionStatus,
 } from "./services/dialogue/dialogue";
-import { getAnalysisDraft } from "./services/analysis/analysis";
 import { useChat } from "./hooks/useChat/useChat";
 import { useConversation } from "./hooks/useConversation/useConversation";
 import {
@@ -23,20 +22,16 @@ import {
 } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import StageTracker from "./components/StageTracker/StageTracker";
-import { getWorkspacePhaseForDialogueStage } from "./services/workspace/workspacePhase";
-import { canReuseConversationForAnalysisDemo } from "./utils/analysisDemo";
 
 function WorkspaceResetWatcher({
   conversationId,
 }: {
   conversationId: string | null;
 }) {
-  const { setPirData, setActivePhase, setCollectionData, setHighlightedRefs } =
-    useWorkspace();
+  const { setPirData, setCollectionData, setHighlightedRefs } = useWorkspace();
 
   useEffect(() => {
     setPirData(null);
-    setActivePhase("direction");
     setCollectionData(null);
     setHighlightedRefs([]);
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -44,23 +39,8 @@ function WorkspaceResetWatcher({
   return null;
 }
 
-function WorkspaceStageWatcher({
-  stage,
-}: {
-  stage: ReturnType<typeof useChat>["stage"];
-}) {
-  const { setActivePhase } = useWorkspace();
-
-  useEffect(() => {
-    setActivePhase(getWorkspacePhaseForDialogueStage(stage));
-  }, [stage, setActivePhase]);
-
-  return null;
-}
-
 function AppShell() {
   const { success, error } = useToast();
-  const { activePhase, setActivePhase } = useWorkspace();
   const {
     conversations,
     activeConversation,
@@ -70,7 +50,6 @@ function AppShell() {
     deleteAllConversations,
     renameConversation,
     updatePerspectives,
-    setStage,
   } = useConversation();
   const {
     messages,
@@ -108,18 +87,6 @@ function AppShell() {
     current: number;
     total: number;
   }>({ current: 0, total: 0 });
-
-  const analysisDemoConfig: Record<string, { title: string }> = {
-    demo_processing_result: {
-      title: "Northern Europe telecom access-development assessment",
-    },
-    demo_processing_result_2: {
-      title: "US-Iran crisis access-development assessment",
-    },
-    demo_processing_result_3: {
-      title: "Taiwan contingency access-development assessment",
-    },
-  };
 
   const ensureConversationSession = () => {
     return activeConversation ?? createNewConversation();
@@ -223,46 +190,12 @@ function AppShell() {
     }
   };
 
-  const handleOpenAnalysisDemo = async (dataset: string) => {
-    const config = analysisDemoConfig[dataset];
-    if (!config) {
-      error("Unknown analysis demo dataset");
-      return;
-    }
-
-    let conversation =
-      conversations.find((item) => item.title === config.title) ?? null;
-
-    if (conversation) {
-      switchConversation(conversation.id);
-    } else if (canReuseConversationForAnalysisDemo(activeConversation)) {
-      conversation = activeConversation!;
-      renameConversation(conversation.id, config.title);
-    } else {
-      conversation = createNewConversation();
-      renameConversation(conversation.id, config.title);
-    }
-
-    try {
-      await getAnalysisDraft(conversation.sessionId, {
-        forceRefresh: true,
-        demoDataset: dataset,
-      });
-      setStage("complete", null);
-      setActivePhase("analysis");
-      success(`Loaded ${config.title}`);
-    } catch (loadError) {
-      console.error("Prime analysis demo error:", loadError);
-      error(`Failed to load ${config.title}`);
-    }
-  };
-
+  const activePhase = activeConversation?.phase ?? "direction";
   const isAnalysisPhase = activePhase === "analysis";
 
   return (
     <>
       <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
-      <WorkspaceStageWatcher stage={stage} />
 
       <div className="flex h-screen">
         <Sidebar
@@ -279,20 +212,20 @@ function AppShell() {
             )
           }
           onDevShowCollectionApproval={debugConfirm}
-          onDevOpenAnalysis={handleOpenAnalysisDemo}
           onDevJumpToStage={jumpToDevStage}
           onDevSyncStage={syncDevStage}
           onDevResetStage={resetDevStage}
           onOpenSettings={() => setIsSettingsOpen(true)}
         />
 
-        <main className="flex-1 flex flex-col bg-surface-elevated overflow-hidden">
+        <main className="flex-1 min-h-0 flex flex-col bg-surface-elevated overflow-hidden">
           <StageTracker activePhase={activePhase} />
           <ChatWindow
             messages={messages}
             onSendMessage={sendMessage}
             isConfirming={isConfirming}
             stage={stage}
+            phase={activePhase}
             subState={subState}
             isLoading={isLoading}
             onApprove={approve}
@@ -314,6 +247,7 @@ function AppShell() {
         {!isAnalysisPhase && (
           <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
             <IntelligencePanel
+              phase={activePhase}
               selectedPerspectives={
                 activeConversation?.perspectives ?? ["NEUTRAL"]
               }

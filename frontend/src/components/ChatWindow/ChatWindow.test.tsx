@@ -670,6 +670,22 @@ describe("ChatWindow", () => {
       screen.queryByPlaceholderText(/type anything/i),
     ).not.toBeInTheDocument();
   });
+
+  it("renders processing review when stage is reviewing and phase is processing", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+      />,
+    );
+
+    expect(screen.getByText(/processing review/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/collection review/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /gather more/i })).toBeInTheDocument();
+  });
 });
 
 // ---------- Rationale citation rendering ----------

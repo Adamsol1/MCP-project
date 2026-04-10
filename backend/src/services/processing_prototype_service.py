@@ -1,4 +1,4 @@
-"""Service for loading processing results — session data first, demo fallback."""
+"""Service for loading processing results from session artifacts only."""
 
 import json
 import logging
@@ -8,21 +8,18 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from src.models.analysis import ProcessingResult
+from src.models.processing import ProcessingResult as LegacyProcessingResult
 
 logger = logging.getLogger(__name__)
 
 _SESSIONS_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "sessions"
-_DEMO_PATH = (
-    Path(__file__).resolve().parents[2] / "data" / "outputs" / "demo_processing_result.json"
+PROCESSING_RESULT_UNAVAILABLE_MESSAGE = (
+    "No processed result available for this session. Complete processing first."
 )
 
 
 def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
-    """Attempt to extract a ProcessingResult from raw LLM output.
-
-    Handles both plain JSON and JSON wrapped in markdown code fences.
-    """
-    # Try to extract JSON from markdown code blocks first
+    """Attempt to extract a ProcessingResult from raw LLM output."""
     match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
     candidate = match.group(1) if match else raw.strip()
 
@@ -31,82 +28,97 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
     except json.JSONDecodeError:
         return None
 
-    if not isinstance(payload, dict) or "findings" not in payload:
+    if not isinstance(payload, dict):
         return None
 
-    try:
-        return ProcessingResult.model_validate(payload)
-    except ValidationError:
-        return None
+    if "findings" in payload:
+        try:
+            return ProcessingResult.model_validate(payload)
+        except ValidationError:
+            return None
+
+    if "entities" in payload:
+        try:
+            legacy_result = LegacyProcessingResult.model_validate(payload)
+        except ValidationError:
+            return None
+        return _convert_legacy_processing_result(legacy_result)
+
+    return None
+
+
+def _convert_legacy_processing_result(
+    legacy_result: LegacyProcessingResult,
+) -> ProcessingResult:
+    """Convert the older PMESII processing schema into analysis findings."""
+    findings: list[dict[str, object]] = []
+
+    for entity in legacy_result.entities:
+        categories = [
+            category.value if hasattr(category, "value") else str(category)
+            for category in entity.categories
+        ]
+        sources = [
+            source.value if hasattr(source, "value") else str(source)
+            for source in entity.sources
+        ]
+        timestamps = [
+            value
+            for value in [entity.first_observed, entity.last_updated]
+            if value
+        ]
+
+        supporting_data: dict[str, list[str]] = {
+            "entities": [entity.name],
+            "categories": categories,
+            "sources": sources,
+            "tags": list(entity.tags),
+        }
+        if timestamps:
+            supporting_data["timestamps"] = timestamps
+
+        findings.append(
+            {
+                "id": entity.id,
+                "title": entity.name,
+                "finding": entity.description,
+                "evidence_summary": (
+                    f"Observed in categories {', '.join(categories) or 'unknown'} "
+                    f"from sources {', '.join(sources) or 'unknown'}."
+                ),
+                "source": sources[0] if sources else "manual",
+                "confidence": entity.confidence,
+                "relevant_to": list(entity.relevant_to),
+                "supporting_data": supporting_data,
+                "why_it_matters": (
+                    f"This entity contributes to PIRs {', '.join(entity.relevant_to)}."
+                    if entity.relevant_to
+                    else "This entity contributes to the overall assessment."
+                ),
+                "uncertainties": [],
+            }
+        )
+
+    return ProcessingResult(findings=findings, gaps=list(legacy_result.gaps))
 
 
 class ProcessingPrototypeService:
-    """Loads a processing result from session data, falling back to demo."""
+    """Loads a processing result from a session's processed.json."""
 
-    DEFAULT_DATASET = "demo_processing_result"
-    DATASET_PATTERN = re.compile(r"^demo_processing_result(?:_\d+)?$")
-
-    def __init__(
-        self,
-        prototype_path: str | Path | None = None,
-        dataset_name: str | None = None,
-    ):
-        if prototype_path is None:
-            prototype_path = self._resolve_dataset_path(
-                dataset_name or self.DEFAULT_DATASET
-            )
-        self.prototype_path = Path(prototype_path)
-
-    @classmethod
-    def _outputs_dir(cls) -> Path:
-        return Path(__file__).resolve().parents[2] / "data" / "outputs"
-
-    @classmethod
-    def _normalize_dataset_name(cls, dataset_name: str) -> str:
-        cleaned = dataset_name.strip()
-        if cleaned.endswith(".json"):
-            cleaned = cleaned[:-5]
-
-        if not cls.DATASET_PATTERN.fullmatch(cleaned):
-            raise ValueError(f"Unknown demo dataset '{dataset_name}'")
-
-        return cleaned
-
-    @classmethod
-    def _resolve_dataset_path(cls, dataset_name: str) -> Path:
-        normalized_name = cls._normalize_dataset_name(dataset_name)
-        path = cls._outputs_dir() / f"{normalized_name}.json"
-        if not path.exists():
-            raise ValueError(f"Unknown demo dataset '{dataset_name}'")
-        return path
-
-    def get_processing_result(self, session_id: str) -> tuple[ProcessingResult, str]:
-        """Load and validate the prototype processing result.
-
-        Returns a tuple of (ProcessingResult, data_source) where data_source
-        is "session" or "demo".
-
-        Priority:
-        1. Session processed.json (last attempt, parsed as ProcessingResult)
-        2. Demo/prototype fallback from self.prototype_path
-        """
-        session_result = self._try_load_session(session_id)
-        if session_result is not None:
-            logger.info(
-                "Loaded processing result from session %s processed.json", session_id
-            )
-            return session_result, "session"
+    def get_processing_result(self, session_id: str) -> ProcessingResult:
+        """Load and validate the session processing result."""
+        processed_path = _SESSIONS_DATA_DIR / session_id / "processed.json"
+        result = self._try_load_session(processed_path)
+        if result is None:
+            raise ValueError(PROCESSING_RESULT_UNAVAILABLE_MESSAGE)
 
         logger.info(
-            "No session data for %s, falling back to demo at %s",
-            session_id,
-            self.prototype_path,
+            "Loaded processing result from session %s processed.json", session_id
         )
-        return self._load_demo(), "demo"
+        return result
 
-    def _try_load_session(self, session_id: str) -> ProcessingResult | None:
-        """Try to load a ProcessingResult from the session's processed.json."""
-        processed_path = _SESSIONS_DATA_DIR / session_id / "processed.json"
+    def _try_load_session(self, processed_path: Path) -> ProcessingResult | None:
+        """Try to load a ProcessingResult from a session processed.json file."""
         if not processed_path.exists():
             return None
 
@@ -120,7 +132,6 @@ class ProcessingPrototypeService:
         if not attempts:
             return None
 
-        # Try the last attempt first (most recent), then earlier ones
         for attempt in reversed(attempts):
             if not isinstance(attempt, str):
                 continue
@@ -130,26 +141,3 @@ class ProcessingPrototypeService:
 
         logger.info("No valid ProcessingResult found in %s attempts", len(attempts))
         return None
-
-    def _load_demo(self) -> ProcessingResult:
-        """Load and validate the demo/prototype processing result."""
-        try:
-            raw_payload = self.prototype_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            raise ValueError(
-                f"Failed to load processing result from {self.prototype_path}"
-            ) from exc
-
-        try:
-            payload = json.loads(raw_payload)
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                f"Failed to parse processing result JSON from {self.prototype_path}"
-            ) from exc
-
-        try:
-            return ProcessingResult.model_validate(payload)
-        except ValidationError as exc:
-            raise ValueError(
-                f"Failed to validate processing result from {self.prototype_path}"
-            ) from exc

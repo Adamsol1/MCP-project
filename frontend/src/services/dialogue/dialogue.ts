@@ -1,6 +1,7 @@
 import axios from "axios";
 import type {
   DialogueAction,
+  DialoguePhase,
   DialogueStage,
   DialogueSubState,
 } from "../types/dialogue";
@@ -12,6 +13,7 @@ export interface DialogueApiResponse {
   question: string;
   action: DialogueAction;
   stage?: DialogueStage;
+  phase?: DialoguePhase;
   sub_state?: DialogueSubState;
 }
 
@@ -23,6 +25,7 @@ export interface DialogueSendOptions {
 export interface DialogueDevStateResponse {
   session_id: string;
   stage: DialogueStage;
+  phase: DialoguePhase;
   sub_state: DialogueSubState;
   question_count: number;
   max_questions: number;

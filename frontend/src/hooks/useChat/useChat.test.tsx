@@ -37,6 +37,7 @@ function seedConversation(overrides: Record<string, unknown> = {}) {
     sessionId: "test-session-123",
     isConfirming: false,
     stage: "initial",
+    phase: "direction",
     subState: null,
     createdAt: 1000,
     updatedAt: 1000,

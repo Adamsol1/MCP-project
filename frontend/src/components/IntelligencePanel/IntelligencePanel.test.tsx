@@ -1,146 +1,49 @@
-/**
- * IntelligencePanel — generic persistent shell hosting phase-specific views.
- *
- * Reads activePhase from WorkspaceContext and renders the correct view.
- * Knows nothing about PIR data, citations, or sources directly.
- *
- * Run with: cd frontend && npx vitest IntelligencePanel.test
- */
-
-import { render, screen, act } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import { useEffect } from "react";
 import IntelligencePanel from "./IntelligencePanel";
-import {
-  WorkspaceProvider,
-  useWorkspace,
-} from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import type { DialoguePhase } from "../../types/dialogue";
 
-// ── Seeder helpers ────────────────────────────────────────────────────────────
-
-type Phase = "direction" | "collection" | "processing" | "analysis";
-
-function PhaseSeeder({ phase }: { phase: Phase }) {
-  const { setActivePhase } = useWorkspace();
-  useEffect(() => {
-    setActivePhase(phase);
-  }, [phase, setActivePhase]);
-  return null;
+function renderPanel(phase: DialoguePhase) {
+  return render(
+    <SettingsProvider>
+      <ConversationProvider>
+        <WorkspaceProvider>
+          <IntelligencePanel phase={phase} />
+        </WorkspaceProvider>
+      </ConversationProvider>
+    </SettingsProvider>,
+  );
 }
 
-// ── Group 1: Phase label header ───────────────────────────────────────────────
-
-describe("IntelligencePanel — phase label", () => {
-  it("displays the current phase label in the header", () => {
-    // Default phase is 'direction' — no seeder needed.
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
+describe("IntelligencePanel", () => {
+  it("renders the direction header and view", () => {
+    renderPanel("direction");
 
     expect(screen.getByRole("heading", { name: /direction/i })).toBeInTheDocument();
-  });
-
-  it("updates the phase label when activePhase changes", async () => {
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <PhaseSeeder phase="collection" />
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
-
-    // After the seeder's useEffect fires, the h2 should reflect "COLLECTION".
-    await act(async () => {});
-
-    expect(screen.getByRole("heading", { name: /collection/i })).toBeInTheDocument();
-  });
-});
-
-// ── Group 2: Phase view routing ───────────────────────────────────────────────
-
-describe("IntelligencePanel — phase view routing", () => {
-  it("renders the Direction view (PirSourcesView) when activePhase is 'direction'", () => {
-    // Default phase is 'direction'. PirSourcesView renders "No sources available."
-    // when pirData is null — use that as the signal it is mounted.
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
-
     expect(screen.getByText(/no sources/i)).toBeInTheDocument();
   });
 
-  it("renders a placeholder for the 'collection' phase", async () => {
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <PhaseSeeder phase="collection" />
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
+  it("renders the collection header and hides the direction view", () => {
+    renderPanel("collection");
 
-    await act(async () => {});
-
-    // Header reflects the phase, PirSourcesView is not mounted.
     expect(screen.getByRole("heading", { name: /collection/i })).toBeInTheDocument();
     expect(screen.queryByText(/no sources available/i)).not.toBeInTheDocument();
   });
 
-  it("renders a placeholder for the 'processing' phase", async () => {
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <PhaseSeeder phase="processing" />
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
-
-    await act(async () => {});
+  it("renders the processing header", () => {
+    renderPanel("processing");
 
     expect(screen.getByRole("heading", { name: /processing/i })).toBeInTheDocument();
-    expect(screen.queryByText(/no sources available/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/processing artifacts/i)).toBeInTheDocument();
   });
 
-  it("renders the analysis prototype view for the 'analysis' phase", async () => {
-    render(
-      <SettingsProvider>
-      <ConversationProvider>
-      <WorkspaceProvider>
-        <PhaseSeeder phase="analysis" />
-        <IntelligencePanel />
-      </WorkspaceProvider>
-      </ConversationProvider>
-      </SettingsProvider>
-    );
-
-    await act(async () => {});
+  it("renders the analysis header", () => {
+    renderPanel("analysis");
 
     expect(screen.getByRole("heading", { name: /analysis/i })).toBeInTheDocument();
-    expect(screen.queryByText(/no sources/i)).not.toBeInTheDocument();
-    expect(
-      screen.getByText(/analysis outputs will appear here/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/analysis outputs/i)).toBeInTheDocument();
   });
 });

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from src.services.processing_service import ProcessingService
 from src.services.state_machines.processing_flow import ProcessingFlow
 from src.mcp_client.client import MCPClient
-from src.models.dialogue import DialogueAction, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.dialogue_service import DialogueService
@@ -124,12 +124,14 @@ class DialogueMessageResponse(BaseModel):
     question: str
     action: DialogueAction
     stage: str
+    phase: str
     sub_state: str | None = None
 
 
 class DialogueDevStateResponse(BaseModel):
     session_id: str
     stage: str
+    phase: str
     sub_state: str | None = None
     question_count: int
     max_questions: int
@@ -167,6 +169,7 @@ def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
 def _convert_to_message_response(
     response: DialogueResponse,
     stage: str,
+    phase: Phase,
     sub_state: str | None = None,
 ) -> DialogueMessageResponse:
     """
@@ -186,6 +189,7 @@ def _convert_to_message_response(
         question=response.content,
         action=action,
         stage=stage,
+        phase=phase.value,
         sub_state=sub_state,
     )
     return result
@@ -204,11 +208,21 @@ def _get_or_create_session(session_id: str) -> IntelligenceSession:
     return _sessions[session_id]
 
 
+def _get_active_stage_and_phase(session: IntelligenceSession) -> tuple[str, Phase]:
+    if session.processing_flow:
+        return session.processing_flow.state.value, Phase.PROCESSING
+    if session.collection_flow:
+        return session.collection_flow.state.value, Phase.COLLECTION
+    return session.direction_flow.state.value, Phase.DIRECTION
+
+
 def _build_dev_state_response(session_id: str, session: IntelligenceSession) -> DialogueDevStateResponse:
+    active_stage, active_phase = _get_active_stage_and_phase(session)
     state = session.direction_flow.get_debug_state()
     return DialogueDevStateResponse(
         session_id=session_id,
-        stage=state["stage"],
+        stage=active_stage,
+        phase=active_phase.value,
         sub_state=state["sub_state"],
         question_count=state["question_count"],
         max_questions=state["max_questions"],
@@ -261,6 +275,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             return _convert_to_message_response(
                 DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
                 stage=session.collection_flow.state.value,
+                phase=Phase.COLLECTION,
             )
         processing_service = ProcessingService(mcp_client)
         response = await session.processing_flow.process_user_message(
@@ -269,7 +284,11 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             approved=request.approved,
         )
         _save_session(session)
-        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
+        return _convert_to_message_response(
+            response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
+        )
 
 
     # Route to processing phase if already started
@@ -283,6 +302,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             return _convert_to_message_response(
                 DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
                 stage=session.collection_flow.state.value,
+                phase=Phase.COLLECTION,
             )
         processing_service = ProcessingService(mcp_client)
         response = await session.processing_flow.process_user_message(
@@ -291,7 +311,11 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             approved=request.approved,
         )
         _save_session(session)
-        return _convert_to_message_response(response, stage=session.processing_flow.state.value)
+        return _convert_to_message_response(
+            response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
+        )
 
     # Route to collection phase if already started
     if session.collection_flow:
@@ -322,10 +346,18 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
                 reviewer=review_service,
             )
             _save_session(session)
-            return _convert_to_message_response(init_response, stage=session.processing_flow.state.value)
+            return _convert_to_message_response(
+                init_response,
+                stage=session.processing_flow.state.value,
+                phase=Phase.PROCESSING,
+            )
 
         _save_session(session)
-        return _convert_to_message_response(response, stage=session.collection_flow.state.value)
+        return _convert_to_message_response(
+            response,
+            stage=session.collection_flow.state.value,
+            phase=Phase.COLLECTION,
+        )
 
     # Direction phase
     direction_flow = session.direction_flow
@@ -355,7 +387,11 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         )
         init_response = await session.collection_flow.initialize(collection_service)
         _save_session(session)
-        return _convert_to_message_response(init_response, stage=session.collection_flow.state.value)
+        return _convert_to_message_response(
+            init_response,
+            stage=session.collection_flow.state.value,
+            phase=Phase.COLLECTION,
+        )
 
     # Convert internal response to API format and return
     default_sub_state = (
@@ -367,6 +403,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     return _convert_to_message_response(
         response,
         stage=direction_flow.state.value,
+        phase=Phase.DIRECTION,
         sub_state=direction_flow.sub_state or default_sub_state,
     )
 

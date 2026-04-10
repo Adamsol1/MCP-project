@@ -43,6 +43,7 @@ describe("ConversationContext", () => {
             sessionId: "session-1",
             isConfirming: false,
             stage: "initial",
+            phase: "direction",
             subState: null,
             createdAt: 1000,
             updatedAt: 2000,
