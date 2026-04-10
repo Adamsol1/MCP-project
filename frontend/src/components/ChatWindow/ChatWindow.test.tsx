@@ -42,6 +42,24 @@ describe("ChatWindow", () => {
     expect(input).toBeInTheDocument();
   });
 
+  it("renders the empty-state composer on a themed surface", () => {
+    renderWithToast(<ChatWindow />);
+
+    const input = screen.getByPlaceholderText(/type anything/i);
+    expect(input.closest("form")).toHaveClass("bg-surface", "rounded-[22px]");
+  });
+
+  it("keeps the in-conversation composer more compact", () => {
+    renderWithToast(
+      <ChatWindow
+        messages={[{ id: "1", text: "Hello", sender: "system" as const }]}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(/type anything/i);
+    expect(input.closest("form")).toHaveClass("rounded-xl");
+  });
+
   it("renders send button", () => {
     renderWithToast(<ChatWindow />);
 

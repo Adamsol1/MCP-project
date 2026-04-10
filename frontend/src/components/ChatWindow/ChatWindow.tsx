@@ -481,6 +481,7 @@ export default function ChatWindow({
   const hasMessages = messages.length > 0;
   const isAnalysisComplete = stage === "complete";
   const hasConversationContent = hasMessages || isAnalysisComplete;
+  const isEmptyStateComposer = !hasConversationContent;
 
   const inputPlaceholder =
     stage === "plan_confirming" && subState === "awaiting_modifications"
@@ -614,7 +615,11 @@ export default function ChatWindow({
             </p>
           )}
 
-        <div className="w-full max-w-3xl px-6">
+        <div
+          className={`w-full px-6 ${
+            isEmptyStateComposer ? "max-w-4xl" : "max-w-3xl"
+          }`}
+        >
           <div className="relative">
             <ToastContainer position="above-input" />
             {isSourceSelecting ? (
@@ -801,7 +806,11 @@ export default function ChatWindow({
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="flex items-center gap-2 border-2 border-border rounded-xl px-3 py-2"
+                className={`flex items-center gap-2 border-2 border-border bg-surface shadow-sm ${
+                  isEmptyStateComposer
+                    ? "rounded-[22px] px-5 py-3"
+                    : "rounded-xl px-3 py-2"
+                }`}
               >
                 <textarea
                   ref={textareaRef}
@@ -815,13 +824,17 @@ export default function ChatWindow({
                       submitMessage();
                     }
                   }}
-                  className="flex-1 py-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64"
+                  className={`flex-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64 ${
+                    isEmptyStateComposer ? "py-2 text-base" : "py-1"
+                  }`}
                 />
                 <button
                   type="submit"
                   disabled={inputValue.trim() === ""}
                   aria-label={t.sendMessage}
-                  className={`self-end shrink-0 p-2 rounded-full transition-colors ${
+                  className={`shrink-0 rounded-full transition-colors ${
+                    isEmptyStateComposer ? "self-center p-3" : "self-end p-2"
+                  } ${
                     inputValue.trim() === ""
                       ? "bg-surface-elevated text-text-muted cursor-not-allowed"
                       : "bg-primary text-text-inverse hover:bg-primary-dark"
