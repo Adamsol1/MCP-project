@@ -43,7 +43,6 @@ function Chevron() {
   );
 }
 
-
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
   const t = useT();
@@ -73,9 +72,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">
-        {t.pirHeader}
-      </h3>
+      <h3 className="font-semibold">{t.pirHeader}</h3>
       {pirData.pir_text && (
         <div className="text-sm text-text-secondary leading-relaxed">
           <CitationText
@@ -93,14 +90,18 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             className="rounded-lg border border-border-muted bg-surface-muted/50 p-3 space-y-1.5"
           >
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-text-muted">PIR-{i + 1}</span>
+              <span className="text-xs font-semibold text-text-muted">
+                PIR-{i + 1}
+              </span>
               <span
                 className={`text-xs font-semibold uppercase tracking-wide ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"}`}
               >
                 {PRIORITY_LABEL[pir.priority] ?? pir.priority}
               </span>
             </div>
-            <p className="font-medium text-sm leading-snug text-text-primary">{pir.question}</p>
+            <p className="font-medium text-sm leading-snug text-text-primary">
+              {pir.question}
+            </p>
             <details className="group">
               <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center">
                 {t.rationale}
@@ -141,7 +142,10 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           </summary>
           <ol className="mt-2 space-y-3 bg-surface-muted rounded-md p-3 list-none">
             {reasoningPoints.map((point, i) => (
-              <li key={i} className="text-sm text-text-secondary leading-relaxed flex gap-2">
+              <li
+                key={i}
+                className="text-sm text-text-secondary leading-relaxed flex gap-2"
+              >
                 <span className="shrink-0 w-5 h-5 rounded-full bg-border/60 flex items-center justify-center text-[10px] font-bold text-text-muted mt-0.5">
                   {i + 1}
                 </span>
@@ -185,21 +189,27 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {index + 1}
                   </span>
-                  <p className="text-sm font-semibold text-text-primary leading-tight">{displayTitle}</p>
+                  <p className="text-sm font-semibold text-text-primary leading-tight">
+                    {displayTitle}
+                  </p>
                   {tag && (
                     <span className="ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-medium bg-surface-muted text-text-muted">
                       {tag}
                     </span>
                   )}
                 </div>
-                <p className="pl-7 text-xs text-text-secondary leading-relaxed">{step.description}</p>
+                <p className="pl-7 text-xs text-text-secondary leading-relaxed">
+                  {step.description}
+                </p>
               </div>
             );
           })}
         </div>
       ) : (
         /* Fallback to plain text if no steps */
-        <p className="whitespace-pre-wrap text-sm text-text-primary">{planData.plan}</p>
+        <p className="whitespace-pre-wrap text-sm text-text-primary">
+          {planData.plan}
+        </p>
       )}
 
       {planData.suggested_sources.length > 0 && (
@@ -318,22 +328,31 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Processing Results</h3>
-      <details className="group">
+      <details className="group" open>
         <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
           {data.findings.length} findings <Chevron />
         </summary>
         <div className="mt-2 space-y-2">
           {data.findings.map((f) => (
-            <div key={f.id} className="rounded border border-border-muted bg-surface px-3 py-2 text-sm">
+            <div
+              key={f.id}
+              className="rounded border border-border-muted bg-surface px-3 py-2 text-sm"
+            >
               <div className="flex items-center justify-between gap-2">
                 <p className="font-medium text-text-primary">{f.title}</p>
-                <span className="shrink-0 text-xs text-text-muted">confidence {f.confidence}%</span>
+                <span className="shrink-0 text-xs text-text-muted">
+                  confidence {f.confidence}%
+                </span>
               </div>
               <p className="text-xs text-text-secondary mt-1">{f.finding}</p>
               {f.why_it_matters && (
-                <p className="text-xs text-text-muted mt-1 italic">{f.why_it_matters}</p>
+                <p className="text-xs text-text-muted mt-1 italic">
+                  {f.why_it_matters}
+                </p>
               )}
-              <p className="text-xs text-text-muted mt-1">{f.relevant_to.join(", ")} · {f.source}</p>
+              <p className="text-xs text-text-muted mt-1">
+                {f.relevant_to.join(", ")} · {f.source}
+              </p>
             </div>
           ))}
         </div>
@@ -342,7 +361,9 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Gaps</p>
           <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
-            {data.gaps.map((gap, i) => <li key={i}>{gap}</li>)}
+            {data.gaps.map((gap, i) => (
+              <li key={i}>{gap}</li>
+            ))}
           </ul>
         </div>
       )}
@@ -422,9 +443,7 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
     return (
       <div className="space-y-2">
         <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
-        <p className="text-sm text-error-text">
-          {t.couldNotParseCollection}
-        </p>
+        <p className="text-sm text-error-text">{t.couldNotParseCollection}</p>
         <details className="group">
           <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
             {t.rawOutput} <Chevron />
@@ -550,7 +569,11 @@ export default function ChatWindow({
       );
     }
 
-    if (message.type === "processing" && message.data && "findings" in message.data) {
+    if (
+      message.type === "processing" &&
+      message.data &&
+      "findings" in message.data
+    ) {
       return <ProcessingMessage data={message.data as ProcessingData} />;
     }
 
@@ -645,248 +668,279 @@ export default function ChatWindow({
             </p>
           )}
 
-        <div
-          className={`w-full px-6 ${
-            isEmptyStateComposer ? "max-w-4xl" : "max-w-3xl"
-          }`}
-        >
-          <div className="relative">
-            <ToastContainer position="above-input" />
-            {isSourceSelecting ? (
-              <section className="rounded-lg border border-border bg-surface p-4">
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {t.selectSourcesHeader}
-                </h3>
-                <p className="mt-0.5 text-xs text-text-secondary">
-                  {t.selectSourcesSubtitle}
-                </p>
-
-                {availableSources.length === 0 ? (
-                  <p className="mt-3 text-xs text-text-secondary">
-                    {t.noSourceSuggestionsAvailable}
+          <div
+            className={`w-full px-6 ${
+              isEmptyStateComposer ? "max-w-4xl" : "max-w-3xl"
+            }`}
+          >
+            <div className="relative">
+              <ToastContainer position="above-input" />
+              {isSourceSelecting ? (
+                <section className="rounded-lg border border-border bg-surface p-4">
+                  <h3 className="text-sm font-semibold text-text-primary">
+                    {t.selectSourcesHeader}
+                  </h3>
+                  <p className="mt-0.5 text-xs text-text-secondary">
+                    {t.selectSourcesSubtitle}
                   </p>
-                ) : (
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    {[...availableSources]
-                      .sort((a, b) => a.localeCompare(b))
-                      .map((source) => {
-                        const isActive = selectedSources.includes(source);
-                        const displayName = t.sourceNames[source] ?? source;
-                        const description = t.sourceDescriptions[source];
-                        return (
-                          <button
-                            key={source}
-                            type="button"
-                            onClick={() => onToggleSourceSelection?.(source)}
-                            disabled={isLoading}
-                            aria-pressed={isActive}
-                            className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
-                              isActive
-                                ? "border-primary bg-primary-subtle hover:border-primary-dark hover:bg-primary-subtle"
-                                : "border-border bg-surface hover:border-primary hover:bg-primary-subtle/40"
-                            }`}
-                          >
-                            <span className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
-                              isActive
-                                ? "border-primary bg-primary text-text-inverse"
-                                : "border-border bg-surface"
-                            }`}>
-                              {isActive && (
-                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                                  <path d="M1.5 5L4 7.5L8.5 2.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                </svg>
-                              )}
-                            </span>
-                            <span className="min-w-0">
-                              <span className={`block text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}>
-                                {displayName}
-                              </span>
-                              {description && (
-                                <span className={`mt-0.5 block text-xs leading-tight ${isActive ? "text-primary/70" : "text-text-secondary"}`}>
-                                  {description}
-                                </span>
-                              )}
-                            </span>
-                          </button>
-                        );
-                      })}
-                  </div>
-                )}
 
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => onSubmitSourceSelection?.()}
-                    disabled={
-                      isLoading ||
-                      availableSources.length === 0 ||
-                      selectedSources.length === 0
-                    }
-                    className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
-                  >
-                    {t.startCollecting}
-                  </button>
-                </div>
-              </section>
-            ) : isCollecting ? (
-              <section className="rounded-lg border border-border bg-surface p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
-                  {t.collecting}
-                </p>
-                {collectionStatus ? (
-                  <ul className="flex flex-col gap-2">
-                    {Object.entries(collectionStatus.sources).map(
-                      ([source, info]) => {
-                        const isActive =
-                          collectionStatus.current_source === source;
-                        const isDone = info.call_count > 0 && !isActive;
-                        const showActivity =
-                          isActive && collectionStatus.current_activity;
-                        return (
-                          <li key={source} className="flex flex-col gap-1">
-                            <div className="flex items-center gap-3 text-sm">
+                  {availableSources.length === 0 ? (
+                    <p className="mt-3 text-xs text-text-secondary">
+                      {t.noSourceSuggestionsAvailable}
+                    </p>
+                  ) : (
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      {[...availableSources]
+                        .sort((a, b) => a.localeCompare(b))
+                        .map((source) => {
+                          const isActive = selectedSources.includes(source);
+                          const displayName = t.sourceNames[source] ?? source;
+                          const description = t.sourceDescriptions[source];
+                          return (
+                            <button
+                              key={source}
+                              type="button"
+                              onClick={() => onToggleSourceSelection?.(source)}
+                              disabled={isLoading}
+                              aria-pressed={isActive}
+                              className={`flex items-start gap-3 rounded-lg border p-3 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 ${
+                                isActive
+                                  ? "border-primary bg-primary-subtle hover:border-primary-dark hover:bg-primary-subtle"
+                                  : "border-border bg-surface hover:border-primary hover:bg-primary-subtle/40"
+                              }`}
+                            >
                               <span
-                                className={`shrink-0 w-4 text-center font-medium ${
-                                  isDone
-                                    ? "text-success"
-                                    : isActive
-                                      ? "text-primary"
-                                      : "text-text-muted"
+                                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                                  isActive
+                                    ? "border-primary bg-primary text-text-inverse"
+                                    : "border-border bg-surface"
                                 }`}
                               >
-                                {isDone ? "✓" : isActive ? "●" : "○"}
+                                {isActive && (
+                                  <svg
+                                    width="10"
+                                    height="10"
+                                    viewBox="0 0 10 10"
+                                    fill="none"
+                                  >
+                                    <path
+                                      d="M1.5 5L4 7.5L8.5 2.5"
+                                      stroke="currentColor"
+                                      strokeWidth="1.5"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
+                                )}
                               </span>
-                              <span
-                                className={
-                                  isDone
-                                    ? "text-text-secondary"
-                                    : isActive
-                                      ? "text-text-primary font-medium"
-                                      : "text-text-muted"
-                                }
-                              >
-                                {source}
-                              </span>
-                              <span className="ml-auto text-xs text-text-muted tabular-nums">
-                                {info.call_count > 0
-                                  ? `${info.call_count} ${info.call_count !== 1 ? t.resultPlural : t.resultSingular}`
-                                  : "—"}
-                              </span>
-                              {isActive && !showActivity && (
-                                <span className="flex gap-0.5">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
-                                  <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                              <span className="min-w-0">
+                                <span
+                                  className={`block text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}
+                                >
+                                  {displayName}
                                 </span>
-                              )}
-                            </div>
-                            {showActivity && (
-                              <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
-                                <span>{collectionStatus.current_activity}</span>
-                                <span className="flex gap-0.5">
-                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
-                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
-                                  <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
-                                </span>
-                              </div>
-                            )}
-                          </li>
-                        );
-                      },
-                    )}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-text-secondary">
-                    {t.startingCollection}
-                  </p>
-                )}
-              </section>
-            ) : isConfirming ? (
-              stage === "processing" ||
-              (stage === "reviewing" && phase === "processing") ? (
-                <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-semibold text-text-primary">Processing Review</h3>
-                    <p className="text-sm text-text-secondary">Accept the analysis or go back to collect more data.</p>
-                  </div>
-                  <div className="shrink-0 flex items-center gap-2">
-                    <button type="button" onClick={() => onApprove?.()} disabled={isLoading}
-                      className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50">
-                      Accept
-                    </button>
-                    <button type="button" onClick={() => onGatherMoreFromProcessing?.()} disabled={isLoading}
-                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50">
-                      Gather More
+                                {description && (
+                                  <span
+                                    className={`mt-0.5 block text-xs leading-tight ${isActive ? "text-primary/70" : "text-text-secondary"}`}
+                                  >
+                                    {description}
+                                  </span>
+                                )}
+                              </span>
+                            </button>
+                          );
+                        })}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => onSubmitSourceSelection?.()}
+                      disabled={
+                        isLoading ||
+                        availableSources.length === 0 ||
+                        selectedSources.length === 0
+                      }
+                      className="rounded-lg bg-primary px-5 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-40 transition-colors"
+                    >
+                      {t.startCollecting}
                     </button>
                   </div>
                 </section>
-              ) : stage === "reviewing" && phase === "collection" ? (
-                <CollectionReviewPrompt
-                  isLoading={isLoading}
-                  onAccept={onApprove}
-                  onGatherMore={onGatherMore}
-                />
+              ) : isCollecting ? (
+                <section className="rounded-lg border border-border bg-surface p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-3">
+                    {t.collecting}
+                  </p>
+                  {collectionStatus ? (
+                    <ul className="flex flex-col gap-2">
+                      {Object.entries(collectionStatus.sources).map(
+                        ([source, info]) => {
+                          const isActive =
+                            collectionStatus.current_source === source;
+                          const isDone = info.call_count > 0 && !isActive;
+                          const showActivity =
+                            isActive && collectionStatus.current_activity;
+                          return (
+                            <li key={source} className="flex flex-col gap-1">
+                              <div className="flex items-center gap-3 text-sm">
+                                <span
+                                  className={`shrink-0 w-4 text-center font-medium ${
+                                    isDone
+                                      ? "text-success"
+                                      : isActive
+                                        ? "text-primary"
+                                        : "text-text-muted"
+                                  }`}
+                                >
+                                  {isDone ? "✓" : isActive ? "●" : "○"}
+                                </span>
+                                <span
+                                  className={
+                                    isDone
+                                      ? "text-text-secondary"
+                                      : isActive
+                                        ? "text-text-primary font-medium"
+                                        : "text-text-muted"
+                                  }
+                                >
+                                  {source}
+                                </span>
+                                <span className="ml-auto text-xs text-text-muted tabular-nums">
+                                  {info.call_count > 0
+                                    ? `${info.call_count} ${info.call_count !== 1 ? t.resultPlural : t.resultSingular}`
+                                    : "—"}
+                                </span>
+                                {isActive && !showActivity && (
+                                  <span className="flex gap-0.5">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:0ms]" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:150ms]" />
+                                    <span className="w-1.5 h-1.5 rounded-full bg-primary animate-bounce [animation-delay:300ms]" />
+                                  </span>
+                                )}
+                              </div>
+                              {showActivity && (
+                                <div className="flex items-center gap-2 pl-7 text-xs text-text-muted">
+                                  <span>
+                                    {collectionStatus.current_activity}
+                                  </span>
+                                  <span className="flex gap-0.5">
+                                    <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:0ms]" />
+                                    <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:150ms]" />
+                                    <span className="w-1 h-1 rounded-full bg-text-muted animate-bounce [animation-delay:300ms]" />
+                                  </span>
+                                </div>
+                              )}
+                            </li>
+                          );
+                        },
+                      )}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-text-secondary">
+                      {t.startingCollection}
+                    </p>
+                  )}
+                </section>
+              ) : isConfirming ? (
+                stage === "processing" ||
+                (stage === "reviewing" && phase === "processing") ? (
+                  <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-text-primary">
+                        Processing Review
+                      </h3>
+                      <p className="text-sm text-text-secondary">
+                        Accept the analysis or go back to collect more data.
+                      </p>
+                    </div>
+                    <div className="shrink-0 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => onApprove?.()}
+                        disabled={isLoading}
+                        className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onGatherMoreFromProcessing?.()}
+                        disabled={isLoading}
+                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Gather More
+                      </button>
+                    </div>
+                  </section>
+                ) : stage === "reviewing" && phase === "collection" ? (
+                  <CollectionReviewPrompt
+                    isLoading={isLoading}
+                    onAccept={onApprove}
+                    onGatherMore={onGatherMore}
+                  />
+                ) : (
+                  <ApprovalPrompt
+                    isLoading={isLoading}
+                    stage={stage}
+                    onApproveContinue={onApprove}
+                    onRejectWithFeedback={() => onReject?.()}
+                  />
+                )
               ) : (
-                <ApprovalPrompt
-                  isLoading={isLoading}
-                  stage={stage}
-                  onApproveContinue={onApprove}
-                  onRejectWithFeedback={() => onReject?.()}
-                />
-              )
-            ) : (
-              <form
-                onSubmit={handleSubmit}
-                className={`flex items-center gap-2 border-2 border-border bg-surface shadow-sm ${
-                  isEmptyStateComposer
-                    ? "rounded-[22px] px-5 py-3"
-                    : "rounded-xl px-3 py-2"
-                }`}
-              >
-                <textarea
-                  ref={textareaRef}
-                  rows={1}
-                  placeholder={inputPlaceholder}
-                  value={inputValue}
-                  onChange={(event) => setInputValue(event.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      submitMessage();
-                    }
-                  }}
-                  className={`flex-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64 ${
-                    isEmptyStateComposer ? "py-2 text-base" : "py-1"
-                  }`}
-                />
-                <button
-                  type="submit"
-                  disabled={inputValue.trim() === ""}
-                  aria-label={t.sendMessage}
-                  className={`shrink-0 rounded-full transition-colors ${
-                    isEmptyStateComposer ? "self-center p-3" : "self-end p-2"
-                  } ${
-                    inputValue.trim() === ""
-                      ? "bg-surface-elevated text-text-muted cursor-not-allowed"
-                      : "bg-primary text-text-inverse hover:bg-primary-dark"
+                <form
+                  onSubmit={handleSubmit}
+                  className={`flex items-center gap-2 border-2 border-border bg-surface shadow-sm ${
+                    isEmptyStateComposer
+                      ? "rounded-[22px] px-5 py-3"
+                      : "rounded-xl px-3 py-2"
                   }`}
                 >
-                  <svg
-                    width="20"
-                    height="20"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    aria-hidden="true"
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    placeholder={inputPlaceholder}
+                    value={inputValue}
+                    onChange={(event) => setInputValue(event.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        submitMessage();
+                      }
+                    }}
+                    className={`flex-1 outline-none bg-transparent text-text-primary resize-none overflow-y-auto max-h-64 ${
+                      isEmptyStateComposer ? "py-2 text-base" : "py-1"
+                    }`}
+                  />
+                  <button
+                    type="submit"
+                    disabled={inputValue.trim() === ""}
+                    aria-label={t.sendMessage}
+                    className={`shrink-0 rounded-full transition-colors ${
+                      isEmptyStateComposer ? "self-center p-3" : "self-end p-2"
+                    } ${
+                      inputValue.trim() === ""
+                        ? "bg-surface-elevated text-text-muted cursor-not-allowed"
+                        : "bg-primary text-text-inverse hover:bg-primary-dark"
+                    }`}
                   >
-                    <path d="M12 19V5M5 12l7-7 7 7" />
-                  </svg>
-                </button>
-              </form>
-            )}
+                    <svg
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M12 19V5M5 12l7-7 7 7" />
+                    </svg>
+                  </button>
+                </form>
+              )}
             </div>
           </div>
         </div>

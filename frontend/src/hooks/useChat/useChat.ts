@@ -129,16 +129,32 @@ function parseSourcesFromUnknown(raw: unknown): string[] {
 }
 
 function parseStepsFromPlanText(plan: string): CollectionPlanStep[] | undefined {
-  // Parse "N. **Title (optional):** Description" markdown numbered list format.
-  const pattern = /\d+\.\s+\*\*([^*]+)\*\*:?\s+([\s\S]+?)(?=\n\d+\.\s+\*\*|\s*$)/g;
+  // Split on numbered list boundaries: "N." at the start of a line
+  const chunks = plan.split(/(?=^\d+\.[ \t])/m).map((s) => s.trim()).filter(Boolean);
+  if (chunks.length < 2) return undefined;
+
   const steps: CollectionPlanStep[] = [];
-  for (const match of plan.matchAll(pattern)) {
-    const title = match[1].trim().replace(/:$/, "");
-    const description = match[2].trim();
-    if (title && description) {
-      steps.push({ title, description });
-    }
+  for (const chunk of chunks) {
+    // Extract bold title: "N. **Title:**"
+    const boldMatch = chunk.match(/^\d+\.\s+\*\*([^*]+?)\*\*:?\s*([\s\S]*)$/);
+    // Extract plain title: "N. Title:"  (colon required to avoid false positives)
+    const plainMatch = chunk.match(/^\d+\.\s+([^\n:]{3,80}):\s*([\s\S]*)$/);
+
+    const m = boldMatch ?? plainMatch;
+    if (!m) continue;
+
+    const title = m[1].trim().replace(/:$/, "");
+    // Flatten sub-bullets into a single readable description
+    const rawDesc = m[2].trim();
+    const description = rawDesc
+      .replace(/\*\*([^*]+)\*\*/g, "$1")   // strip bold markers
+      .replace(/^\s*[\*\-]\s+/gm, "")       // strip bullet chars
+      .replace(/\n+/g, " ")                  // collapse newlines
+      .trim();
+
+    if (title && description) steps.push({ title, description });
   }
+
   return steps.length > 0 ? steps : undefined;
 }
 
