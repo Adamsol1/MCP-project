@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CollectionStatsView from "./CollectionStatsView";
 import type { CollectionDisplayData } from "../../types/conversation";
+import { renderWithSettings } from "../../test/renderWithProviders";
 
 // ---------------------------------------------------------------------------
 // Minimal fixture data
@@ -32,7 +33,7 @@ describe("CollectionStatsView", () => {
   // --- Empty / no-data state ---
 
   it("renders an empty state when collectionData is null", () => {
-    render(<CollectionStatsView collectionData={null} onOpenModal={vi.fn()} />);
+    renderWithSettings(<CollectionStatsView collectionData={null} onOpenModal={vi.fn()} />);
 
     expect(screen.getByText(/no collection data/i)).toBeInTheDocument();
   });
@@ -40,7 +41,7 @@ describe("CollectionStatsView", () => {
   // --- Summary numbers ---
 
   it("shows the total number of items collected", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={vi.fn()}
@@ -52,7 +53,7 @@ describe("CollectionStatsView", () => {
   });
 
   it("shows the number of sources queried", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={vi.fn()}
@@ -66,7 +67,7 @@ describe("CollectionStatsView", () => {
   // --- Source bars ---
 
   it("renders a bar or label for each source", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={vi.fn()}
@@ -79,7 +80,7 @@ describe("CollectionStatsView", () => {
   });
 
   it("marks sources with no content as empty", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={vi.fn()}
@@ -93,7 +94,7 @@ describe("CollectionStatsView", () => {
   // --- Modal trigger ---
 
   it("renders a 'View Raw Data' button", () => {
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={vi.fn()}
@@ -109,7 +110,7 @@ describe("CollectionStatsView", () => {
     const onOpenModal = vi.fn();
     const user = userEvent.setup();
 
-    render(
+    renderWithSettings(
       <CollectionStatsView
         collectionData={COLLECTION_DATA}
         onOpenModal={onOpenModal}

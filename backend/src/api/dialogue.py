@@ -8,15 +8,17 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
-from src.models.dialogue import DialogueAction, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
+from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
-from src.services.state_machines.collection_flow import CollectionFlow
+from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
+from src.services.state_machines.processing_flow import ProcessingFlow
 
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
@@ -43,8 +45,11 @@ class IntelligenceSession:
     def __init__(self, session_id: str, research_logger):
         self.session_id = session_id
         self.research_logger = research_logger
-        self.direction_flow = DirectionFlow(session_id=session_id, research_logger=research_logger)
+        self.direction_flow = DirectionFlow(
+            session_id=session_id, research_logger=research_logger
+        )
         self.collection_flow: CollectionFlow | None = None
+        self.processing_flow: ProcessingFlow | None = None
 
 
 _sessions: dict[str, IntelligenceSession] = {}
@@ -55,7 +60,12 @@ def _save_session(session: IntelligenceSession) -> None:
     data = {
         "session_id": session.session_id,
         "direction_flow": session.direction_flow.to_dict(),
-        "collection_flow": session.collection_flow.to_dict() if session.collection_flow else None,
+        "collection_flow": session.collection_flow.to_dict()
+        if session.collection_flow
+        else None,
+        "processing_flow": session.processing_flow.to_dict()
+        if session.processing_flow
+        else None,
     }
     path = _SESSIONS_DIR / f"{session.session_id}.json"
     path.write_text(json.dumps(data), encoding="utf-8")
@@ -70,10 +80,21 @@ def _load_session(session_id: str, research_logger) -> IntelligenceSession | Non
     session = IntelligenceSession.__new__(IntelligenceSession)
     session.session_id = session_id
     session.research_logger = research_logger
-    session.direction_flow = DirectionFlow.from_dict(data["direction_flow"], research_logger=research_logger)
+    session.direction_flow = DirectionFlow.from_dict(
+        data["direction_flow"], research_logger=research_logger
+    )
     session.collection_flow = (
-        CollectionFlow.from_dict(data["collection_flow"], research_logger=research_logger)
+        CollectionFlow.from_dict(
+            data["collection_flow"], research_logger=research_logger
+        )
         if data.get("collection_flow")
+        else None
+    )
+    session.processing_flow = (
+        ProcessingFlow.from_dict(
+            data["processing_flow"], research_logger=research_logger
+        )
+        if data.get("processing_flow")
         else None
     )
     logger.info(f"[Session {session_id}] Restored from disk")
@@ -112,12 +133,14 @@ class DialogueMessageResponse(BaseModel):
     question: str
     action: DialogueAction
     stage: str
+    phase: str
     sub_state: str | None = None
 
 
 class DialogueDevStateResponse(BaseModel):
     session_id: str
     stage: str
+    phase: str
     sub_state: str | None = None
     question_count: int
     max_questions: int
@@ -155,6 +178,7 @@ def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
 def _convert_to_message_response(
     response: DialogueResponse,
     stage: str,
+    phase: Phase,
     sub_state: str | None = None,
 ) -> DialogueMessageResponse:
     """
@@ -174,6 +198,7 @@ def _convert_to_message_response(
         question=response.content,
         action=action,
         stage=stage,
+        phase=phase.value,
         sub_state=sub_state,
     )
     return result
@@ -188,15 +213,29 @@ def _get_or_create_session(session_id: str) -> IntelligenceSession:
     if session_id not in _sessions:
         research_logger = ResearchLogger(session_id=session_id)
         loaded = _load_session(session_id, research_logger)
-        _sessions[session_id] = loaded if loaded else IntelligenceSession(session_id, research_logger)
+        _sessions[session_id] = (
+            loaded if loaded else IntelligenceSession(session_id, research_logger)
+        )
     return _sessions[session_id]
 
 
-def _build_dev_state_response(session_id: str, session: IntelligenceSession) -> DialogueDevStateResponse:
+def _get_active_stage_and_phase(session: IntelligenceSession) -> tuple[str, Phase]:
+    if session.processing_flow:
+        return session.processing_flow.state.value, Phase.PROCESSING
+    if session.collection_flow:
+        return session.collection_flow.state.value, Phase.COLLECTION
+    return session.direction_flow.state.value, Phase.DIRECTION
+
+
+def _build_dev_state_response(
+    session_id: str, session: IntelligenceSession
+) -> DialogueDevStateResponse:
+    active_stage, active_phase = _get_active_stage_and_phase(session)
     state = session.direction_flow.get_debug_state()
     return DialogueDevStateResponse(
         session_id=session_id,
-        stage=state["stage"],
+        stage=active_stage,
+        phase=active_phase.value,
         sub_state=state["sub_state"],
         question_count=state["question_count"],
         max_questions=state["max_questions"],
@@ -239,6 +278,56 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         generator_model="gemini-2.5-flash",
         reviewer_model="gemini-2.5-flash",
     )
+    if session.processing_flow:
+        if request.gather_more:
+            if not session.collection_flow:
+                raise HTTPException(status_code=500, detail="No collection flow found")
+            session.processing_flow = None
+            session.collection_flow.state = CollectionState.REVIEWING
+            _save_session(session)
+            return _convert_to_message_response(
+                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
+                stage=session.collection_flow.state.value,
+                phase=Phase.COLLECTION,
+            )
+        processing_service = ProcessingService(mcp_client)
+        response = await session.processing_flow.process_user_message(
+            user_message=request.message,
+            processing_service=processing_service,
+            approved=request.approved,
+        )
+        _save_session(session)
+        return _convert_to_message_response(
+            response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
+        )
+
+    # Route to processing phase if already started
+    if session.processing_flow:
+        if request.gather_more:
+            if not session.collection_flow:
+                raise HTTPException(status_code=500, detail="No collection flow found")
+            session.processing_flow = None
+            session.collection_flow.state = CollectionState.REVIEWING
+            _save_session(session)
+            return _convert_to_message_response(
+                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
+                stage=session.collection_flow.state.value,
+                phase=Phase.COLLECTION,
+            )
+        processing_service = ProcessingService(mcp_client)
+        response = await session.processing_flow.process_user_message(
+            user_message=request.message,
+            processing_service=processing_service,
+            approved=request.approved,
+        )
+        _save_session(session)
+        return _convert_to_message_response(
+            response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
+        )
 
     # Route to collection phase if already started
     if session.collection_flow:
@@ -255,8 +344,34 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
             reviewer=review_service,
             gather_more=request.gather_more,
         )
+        if (
+            session.collection_flow.state == CollectionState.COMPLETE
+            and session.processing_flow is None
+        ):
+            processing_service = ProcessingService(mcp_client)
+            session.processing_flow = ProcessingFlow(
+                session_id=request.session_id,
+                pir=session.collection_flow.pir,
+                direction_context=session.collection_flow.direction_context,
+                research_logger=session.research_logger,
+            )
+            init_response = await session.processing_flow.initialize(
+                processing_service=processing_service,
+                orchestrator=orchestrator,
+                reviewer=review_service,
+            )
+            _save_session(session)
+            init_stage = "processing" if init_response.action == DialogueAction.SHOW_PROCESSING else session.processing_flow.state.value
+            return _convert_to_message_response(
+                init_response, stage=init_stage, phase=Phase.PROCESSING
+            )
+
         _save_session(session)
-        return _convert_to_message_response(response, stage=session.collection_flow.state.value)
+        return _convert_to_message_response(
+            response,
+            stage=session.collection_flow.state.value,
+            phase=Phase.COLLECTION,
+        )
 
     # Direction phase
     direction_flow = session.direction_flow
@@ -276,7 +391,11 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     )
 
     # Transition: DirectionFlow COMPLETE → start CollectionFlow
-    if direction_flow.state == DirectionState.COMPLETE and session.collection_flow is None and direction_flow.current_pir:
+    if (
+        direction_flow.state == DirectionState.COMPLETE
+        and session.collection_flow is None
+        and direction_flow.current_pir
+    ):
         collection_service = CollectionService(mcp_client)
         session.collection_flow = CollectionFlow(
             session_id=request.session_id,
@@ -286,18 +405,24 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
         )
         init_response = await session.collection_flow.initialize(collection_service)
         _save_session(session)
-        return _convert_to_message_response(init_response, stage=session.collection_flow.state.value)
+        return _convert_to_message_response(
+            init_response,
+            stage=session.collection_flow.state.value,
+            phase=Phase.COLLECTION,
+        )
 
     # Convert internal response to API format and return
     default_sub_state = (
         "awaiting_decision"
-        if direction_flow.state in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
+        if direction_flow.state
+        in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
         else None
     )
     _save_session(session)
     return _convert_to_message_response(
         response,
         stage=direction_flow.state.value,
+        phase=Phase.DIRECTION,
         sub_state=direction_flow.sub_state or default_sub_state,
     )
 
@@ -311,6 +436,7 @@ async def get_collection_status(session_id: str):
     Returns 404 if no status file exists yet for the session.
     """
     from src.services.collection_status import CollectionStatusTracker
+
     status = CollectionStatusTracker.read(session_id)
     if status is None:
         raise HTTPException(status_code=404, detail="No collection status found")

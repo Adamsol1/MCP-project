@@ -18,7 +18,7 @@ export default function SourceList({
   if (sources.length === 0) return <ul></ul>;   // empty but still a DOM node
 
   return (
-    <ul className="space-y-0 divide-y divide-border-muted">
+    <ul className="space-y-0.5">
       {sources.map((source) => {
         const isHighlighted = activeHighlightedRefs.includes(source.ref);
         const citation = source.citation;
@@ -27,10 +27,10 @@ export default function SourceList({
           <li
             key={source.id}
             className={[
-              "flex items-baseline gap-2 py-1.5 text-xs transition-colors cursor-default",
+              "flex items-baseline gap-2 py-1.5 px-2 rounded text-xs transition-colors cursor-default",
               isHighlighted
-                ? "text-primary"
-                : "text-text-secondary hover:text-text-primary",
+                ? "bg-primary/20 text-primary"
+                : "text-text-secondary hover:bg-primary/10 hover:text-text-primary",
             ].join(" ")}
             onMouseEnter={() => onSourceHover(source.ref)}
             onMouseLeave={() => onSourceHover(null)}

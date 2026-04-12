@@ -3,9 +3,9 @@
  * and bidirectional hover highlighting.
  *
  * Props:
- *   sources        — list of Source objects with citation metadata
- *   highlightedRef — the ref currently hovered elsewhere (e.g. "[1]"), or null
- *   onSourceHover  — called with source.ref on enter, null on leave
+ *   sources         — list of Source objects with citation metadata
+ *   highlightedRefs — the refs currently hovered elsewhere (e.g. ["[1]"]), or []
+ *   onSourceHover   — called with [source.ref] on enter, [] on leave
  *
  * Run with: cd frontend && npx vitest SourceList.test
  */
@@ -49,12 +49,11 @@ describe("SourceList — APA7th formatting", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
-    // The full formatted string (minus the italic title) appears in the card
     expect(
       screen.getByText(/Threat Intelligence System\. \(2025\)\./)
     ).toBeInTheDocument();
@@ -65,12 +64,11 @@ describe("SourceList — APA7th formatting", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
-    // Title must be inside an <em> element for proper APA7th formatting
     const em = document.querySelector("em");
     expect(em).toBeInTheDocument();
     expect(em).toHaveTextContent("Norwegian-Russian Geopolitical Relations");
@@ -80,9 +78,9 @@ describe("SourceList — APA7th formatting", () => {
     render(
       <SourceList
         sources={[sourceNorway, sourceEnergy]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     expect(
@@ -97,9 +95,9 @@ describe("SourceList — APA7th formatting", () => {
     const { container } = render(
       <SourceList
         sources={[]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     expect(container.firstChild).toBeEmptyDOMElement();
@@ -113,9 +111,9 @@ describe("SourceList — type badge", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("[kb]")).toBeInTheDocument();
@@ -125,9 +123,9 @@ describe("SourceList — type badge", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.getByText("[1]")).toBeInTheDocument();
@@ -137,16 +135,16 @@ describe("SourceList — type badge", () => {
 // ── Group 3: Hover interactions ───────────────────────────────────────────────
 
 describe("SourceList — hover", () => {
-  it("hovering a source card calls onSourceHover with its ref", async () => {
+  it("hovering a source card calls onSourceHover with [ref]", async () => {
     const user = userEvent.setup();
     const onSourceHover = vi.fn();
 
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={onSourceHover}
-      />
+      />,
     );
 
     const card = screen.getByRole("listitem");
@@ -155,16 +153,16 @@ describe("SourceList — hover", () => {
     expect(onSourceHover).toHaveBeenCalledWith("[1]");
   });
 
-  it("mouse leave on a source card calls onSourceHover(null)", async () => {
+  it("mouse leave on a source card calls onSourceHover with null", async () => {
     const user = userEvent.setup();
     const onSourceHover = vi.fn();
 
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={onSourceHover}
-      />
+      />,
     );
 
     const card = screen.getByRole("listitem");
@@ -178,26 +176,26 @@ describe("SourceList — hover", () => {
 // ── Group 4: Highlight state ──────────────────────────────────────────────────
 
 describe("SourceList — highlight state", () => {
-  it("source card is highlighted when highlightedRef matches its ref", () => {
+  it("source card is highlighted when highlightedRefs includes its ref", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef="[1]"
+        highlightedRefs={["[1]"]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     const card = screen.getByRole("listitem");
     expect(card).toHaveClass("text-primary");
   });
 
-  it("source card is not highlighted when highlightedRef is null", () => {
+  it("source card is not highlighted when highlightedRefs is empty", () => {
     render(
       <SourceList
         sources={[sourceNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     const card = screen.getByRole("listitem");
@@ -208,9 +206,9 @@ describe("SourceList — highlight state", () => {
     render(
       <SourceList
         sources={[sourceNorway, sourceEnergy]}
-        highlightedRef="[1]"
+        highlightedRefs={["[1]"]}
         onSourceHover={vi.fn()}
-      />
+      />,
     );
 
     const cards = screen.getAllByRole("listitem");

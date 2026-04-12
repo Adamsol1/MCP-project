@@ -56,6 +56,7 @@ export interface AnalysisDraftResponse {
   processing_result: ProcessingResult;
   analysis_draft: AnalysisDraft;
   latest_council_note: CouncilNote | null;
+  data_source: "session";
 }
 
 export interface RunAnalysisCouncilRequest {

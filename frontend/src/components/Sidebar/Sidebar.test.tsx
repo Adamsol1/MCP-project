@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
+import { renderWithSettings } from "../../test/renderWithProviders";
 
 // Helper: creates a minimal conversation object for testing
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
@@ -14,6 +15,7 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
     sessionId: crypto.randomUUID(),
     isConfirming: false,
     stage: "initial",
+    phase: "direction",
     subState: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -26,7 +28,7 @@ function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
 function renderSidebar(
   props: Partial<React.ComponentProps<typeof Sidebar>> = {},
 ) {
-  return render(
+  return renderWithSettings(
     <Sidebar
       conversations={[]}
       activeConversationId={null}
@@ -132,30 +134,6 @@ describe("Sidebar", () => {
     );
 
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
-  });
-
-  it("renders the analysis demo dev button when callback is provided", async () => {
-    const user = userEvent.setup();
-    renderSidebar({ onDevOpenAnalysis: vi.fn() });
-
-    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
-
-    expect(
-      screen.getByRole("button", { name: /open analysis demo/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("calls onDevOpenAnalysis when clicked", async () => {
-    const user = userEvent.setup();
-    const onDevOpenAnalysis = vi.fn();
-
-    renderSidebar({ onDevOpenAnalysis });
-    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
-    await user.click(
-      screen.getByRole("button", { name: /open analysis demo/i }),
-    );
-
-    expect(onDevOpenAnalysis).toHaveBeenCalledOnce();
   });
 
   it("starts with direction phase minimized", async () => {

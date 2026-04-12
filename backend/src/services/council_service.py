@@ -1,7 +1,6 @@
 """Analysis-stage council wrapper using app runtime defaults."""
 
 import sys
-from shutil import which
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -15,12 +14,12 @@ from src.models.analysis import (
 )
 from src.models.dialogue import Perspective
 from src.services.council_personas import get_council_persona
+from src.services.gemini_deliberation_adapter import GeminiDeliberationAdapter
 
 COUNCIL_MCP_DIR = Path(__file__).resolve().parents[3] / "council_mcp"
 if str(COUNCIL_MCP_DIR) not in sys.path:
     sys.path.insert(0, str(COUNCIL_MCP_DIR))
 
-from adapters.gemini import GeminiAdapter  # type: ignore  # noqa: E402
 from deliberation.engine import DeliberationEngine  # type: ignore  # noqa: E402
 from deliberation.transcript import TranscriptManager  # type: ignore  # noqa: E402
 from models.schema import DeliberateRequest, Participant  # type: ignore  # noqa: E402
@@ -188,12 +187,7 @@ class CouncilService:
         )
 
     def _build_engine(self, runtime_profile: CouncilRuntimeProfile):
-        command_path = self._resolve_gemini_command()
-        adapter = GeminiAdapter(
-            command=command_path,
-            args=["-m", "{model}", "-p", "{prompt}"],
-            timeout=180,
-        )
+        adapter = GeminiDeliberationAdapter(timeout=180)
         adapters = {self.DEFAULT_ADAPTER: adapter}
         config = SimpleNamespace(
             defaults=SimpleNamespace(
@@ -233,17 +227,6 @@ class CouncilService:
         engine.tool_execution_history = []
         return engine
 
-    def _resolve_gemini_command(self) -> str:
-        candidates = ["gemini.cmd", "gemini.exe", "gemini"]
-        for candidate in candidates:
-            resolved = which(candidate)
-            if resolved:
-                return resolved
-
-        raise RuntimeError(
-            "Gemini CLI not found. Install the Gemini CLI and ensure `gemini.cmd` is available in PATH."
-        )
-
     def _raise_if_runtime_failed(self, result) -> None:
         responses = list(result.full_debate)
         if not responses:
@@ -253,9 +236,9 @@ class CouncilService:
             return
 
         first_error = responses[0].response.strip("[]")
-        if "FileNotFoundError" in first_error:
+        if "API key" in first_error or "api key" in first_error:
             raise RuntimeError(
-                "Council runtime failed: Gemini CLI could not be launched. Ensure `gemini.cmd` is installed and available to the backend process."
+                "Council runtime failed: Gemini API access is not configured correctly for the backend process."
             )
         raise RuntimeError(f"Council runtime failed: {first_error}")
 

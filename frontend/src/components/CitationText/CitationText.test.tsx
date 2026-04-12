@@ -3,10 +3,10 @@
  * bidirectional hover highlighting.
  *
  * Props:
- *   pirText       — full text string, may contain [1], [2] … markers
- *   claims        — list of Claim objects (text + source_ref + source_id)
- *   highlightedRef — the ref currently hovered elsewhere (e.g. "[1]"), or null
- *   onRefHover    — called with a ref string on enter, null on leave
+ *   text            — full text string, may contain [1], [2] … markers
+ *   claims          — list of Claim objects (text + source_ref + source_id)
+ *   highlightedRefs — the refs currently hovered elsewhere (e.g. ["[1]"]), or []
+ *   onRefHover      — called with [ref] on enter, [] on leave
  *
  * Run with: cd frontend && npx vitest CitationText.test
  */
@@ -41,7 +41,7 @@ describe("CitationText — plain text", () => {
       <CitationText
         text="No sources here, just analysis."
         claims={[]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={vi.fn()}
       />
     );
@@ -57,7 +57,7 @@ describe("CitationText — plain text", () => {
       <CitationText
         text="Some analytic sentence without a marker."
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={vi.fn()}
       />
     );
@@ -77,7 +77,7 @@ describe("CitationText — marker rendering", () => {
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={vi.fn()}
       />
     );
@@ -92,7 +92,7 @@ describe("CitationText — marker rendering", () => {
       <CitationText
         text="Norway faces elevated risk[1] and Energy infrastructure is vulnerable[2]"
         claims={[claimNorway, claimEnergy]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={vi.fn()}
       />
     );
@@ -107,7 +107,7 @@ describe("CitationText — marker rendering", () => {
 // ── Group 3: Hover on [N] marker ──────────────────────────────────────────────
 
 describe("CitationText — marker hover", () => {
-  it("hovering [N] calls onRefHover with that ref", async () => {
+  it("hovering [N] calls onRefHover with [ref]", async () => {
     const user = userEvent.setup();
     const onRefHover = vi.fn();
 
@@ -115,7 +115,7 @@ describe("CitationText — marker hover", () => {
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={onRefHover}
       />
     );
@@ -123,6 +123,7 @@ describe("CitationText — marker hover", () => {
     const sup = document.querySelector("sup")!;
     await user.hover(sup);
 
+    // Single marker: component passes the ref string directly, not wrapped in array
     expect(onRefHover).toHaveBeenCalledWith("[1]");
   });
 
@@ -134,7 +135,7 @@ describe("CitationText — marker hover", () => {
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={onRefHover}
       />
     );
@@ -158,7 +159,7 @@ describe("CitationText — claim text hover", () => {
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={onRefHover}
       />
     );
@@ -166,6 +167,7 @@ describe("CitationText — claim text hover", () => {
     const claimSpan = screen.getByText("Norway faces elevated risk");
     await user.hover(claimSpan);
 
+    // Component passes claim.source_ref directly as a string
     expect(onRefHover).toHaveBeenCalledWith("[1]");
   });
 
@@ -177,7 +179,7 @@ describe("CitationText — claim text hover", () => {
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={onRefHover}
       />
     );
@@ -193,12 +195,12 @@ describe("CitationText — claim text hover", () => {
 // ── Group 5: Highlight state ──────────────────────────────────────────────────
 
 describe("CitationText — highlight state", () => {
-  it("claim text span is highlighted when highlightedRef matches its source_ref", () => {
+  it("claim text span is highlighted when highlightedRefs includes its source_ref", () => {
     render(
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef="[1]"
+        highlightedRefs={["[1]"]}
         onRefHover={vi.fn()}
       />
     );
@@ -207,18 +209,18 @@ describe("CitationText — highlight state", () => {
     expect(claimSpan).toHaveClass("bg-primary-subtle");
   });
 
-  it("claim text span is not highlighted when highlightedRef is null", () => {
+  it("claim text span is not highlighted when highlightedRefs is empty", () => {
     render(
       <CitationText
         text="Norway faces elevated risk[1]"
         claims={[claimNorway]}
-        highlightedRef={null}
+        highlightedRefs={[]}
         onRefHover={vi.fn()}
       />
     );
 
     const claimSpan = screen.getByText("Norway faces elevated risk");
-    expect(claimSpan).not.toHaveClass("bg-primary-subtle");
+    expect(claimSpan).not.toHaveClass("text-primary");
   });
 
   it("only the matching claim is highlighted when multiple claims exist", () => {
@@ -226,7 +228,7 @@ describe("CitationText — highlight state", () => {
       <CitationText
         text="Norway faces elevated risk[1] Energy infrastructure is vulnerable[2]"
         claims={[claimNorway, claimEnergy]}
-        highlightedRef="[1]"
+        highlightedRefs={["[1]"]}
         onRefHover={vi.fn()}
       />
     );

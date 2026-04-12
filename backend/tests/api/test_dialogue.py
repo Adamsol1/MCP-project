@@ -76,6 +76,7 @@ def test_dialogue_message_returns_question():
     assert "question" in data
     assert "action" in data
     assert "stage" in data
+    assert "phase" in data
     assert "type" not in data
     assert "is_final" not in data
 
@@ -102,6 +103,7 @@ def test_dev_state_endpoint_returns_stage_snapshot():
     data = response.json()
     assert data["session_id"] == session_id
     assert data["stage"] == "initial"
+    assert data["phase"] == "direction"
     assert "missing_context_fields" in data
 
 
@@ -120,6 +122,7 @@ def test_dev_state_can_force_stage():
     assert response.status_code == 200
     data = response.json()
     assert data["stage"] == "summary_confirming"
+    assert data["phase"] == "direction"
     assert data["sub_state"] == "awaiting_decision"
     assert data["awaiting_user_decision"] is True
 
@@ -142,3 +145,4 @@ def test_dev_reset_sets_stage_initial():
     assert reset_response.status_code == 200
     data = reset_response.json()
     assert data["stage"] == "initial"
+    assert data["phase"] == "direction"

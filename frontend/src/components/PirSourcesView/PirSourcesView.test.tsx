@@ -1,23 +1,24 @@
 /**
  * PirSourcesView — Direction phase view inside IntelligencePanel.
  *
- * Reads pirData and highlightedRef from WorkspaceContext and renders
+ * Reads pirData and highlightedRefs from WorkspaceContext and renders
  * SourceList. Owns no state — the panel is a pure projection of context.
  *
  * Run with: cd frontend && npx vitest PirSourcesView.test
  */
 
-import { render, screen } from "@testing-library/react";
+import { screen, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import PirSourcesView from "./PirSourcesView";
 import { WorkspaceProvider, useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { renderWithSettings } from "../../test/renderWithProviders";
 import type { PirData } from "../../types/conversation";
 
-// ── Seeder helper ─────────────────────────────────────────────────────────────
-// Sets pirData (or highlightedRef) in context on mount so tests can start
-// with a pre-populated state without needing a button click.
+// ── Seeder helpers ─────────────────────────────────────────────────────────────
+// Sets pirData or highlightedRefs in context on mount so tests can start
+// with pre-populated state without needing a button click.
 
 function PirDataSeeder({ pirData }: { pirData: PirData }) {
   const { setPirData } = useWorkspace();
@@ -29,6 +30,12 @@ function HighlightSeeder({ ref }: { ref: string }) {
   const { setHighlightedRef } = useWorkspace();
   useEffect(() => { setHighlightedRef(ref); }, [ref, setHighlightedRef]);
   return null;
+}
+
+// Displays the current highlightedRefs as a comma-joined string (or "empty").
+function HighlightedRefsDisplay() {
+  const { highlightedRefs } = useWorkspace();
+  return <span data-testid="refs">{highlightedRefs.join(",") || "empty"}</span>;
 }
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -76,25 +83,24 @@ const pirDataNoSources: PirData = {
 
 describe("PirSourcesView — empty state", () => {
   it("shows a placeholder when pirData is null (no PIR generated yet)", () => {
-    // pirData starts as null in WorkspaceProvider — no Seeder needed.
-    render(
+    renderWithSettings(
       <WorkspaceProvider>
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
 
-    // Exact text is up to you — the test just checks something appears
-    // so the panel isn't blank and confusing.
     expect(screen.getByText(/no sources/i)).toBeInTheDocument();
   });
 
-  it("shows a placeholder when pirData has no sources", () => {
-    render(
+  it("shows a placeholder when pirData has no sources", async () => {
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataNoSources} />
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     expect(screen.getByText(/no sources/i)).toBeInTheDocument();
   });
@@ -103,13 +109,15 @@ describe("PirSourcesView — empty state", () => {
 // ── Group 2: Source rendering ─────────────────────────────────────────────────
 
 describe("PirSourcesView — source rendering", () => {
-  it("renders sources from context pirData in APA7th format", () => {
-    render(
+  it("renders sources from context pirData in APA7th format", async () => {
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     expect(
       screen.getByText(/Norwegian-Russian Geopolitical Relations/)
@@ -119,13 +127,15 @@ describe("PirSourcesView — source rendering", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the ref marker for each source", () => {
-    render(
+  it("renders the ref marker for each source", async () => {
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     expect(screen.getByText("[1]")).toBeInTheDocument();
     expect(screen.getByText("[2]")).toBeInTheDocument();
@@ -135,46 +145,39 @@ describe("PirSourcesView — source rendering", () => {
 // ── Group 3: Hover updates context ────────────────────────────────────────────
 
 describe("PirSourcesView — hover updates context", () => {
-  it("hovering a source card sets highlightedRef in context", async () => {
+  it("hovering a source card sets highlightedRefs in context", async () => {
     const user = userEvent.setup();
 
-    // ContextDisplay reads highlightedRef so we can assert on it.
-    function HighlightedRefDisplay() {
-      const { highlightedRef } = useWorkspace();
-      return <span data-testid="ref">{highlightedRef ?? "null"}</span>;
-    }
-
-    render(
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <PirSourcesView />
-        <HighlightedRefDisplay />
-      </WorkspaceProvider>
+        <HighlightedRefsDisplay />
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
     await user.hover(sourceCard);
 
-    expect(screen.getByTestId("ref")).toHaveTextContent("[1]");
+    expect(screen.getByTestId("refs")).toHaveTextContent("[1]");
   });
 
-  it("mouse leave on a source card clears highlightedRef in context", async () => {
+  it("mouse leave on a source card clears highlightedRefs in context", async () => {
     const user = userEvent.setup();
 
-    function HighlightedRefDisplay() {
-      const { highlightedRef } = useWorkspace();
-      return <span data-testid="ref">{highlightedRef ?? "null"}</span>;
-    }
-
-    render(
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <PirSourcesView />
-        <HighlightedRefDisplay />
-      </WorkspaceProvider>
+        <HighlightedRefsDisplay />
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
@@ -182,21 +185,23 @@ describe("PirSourcesView — hover updates context", () => {
     await user.hover(sourceCard);
     await user.unhover(sourceCard);
 
-    expect(screen.getByTestId("ref")).toHaveTextContent("null");
+    expect(screen.getByTestId("refs")).toHaveTextContent("empty");
   });
 });
 
 // ── Group 4: Highlight driven by context ─────────────────────────────────────
 
 describe("PirSourcesView — highlight state from context", () => {
-  it("source card is highlighted when context highlightedRef matches its ref", () => {
-    render(
+  it("source card is highlighted when context highlightedRefs includes its ref", async () => {
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <HighlightSeeder ref="[1]" />
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
@@ -204,14 +209,16 @@ describe("PirSourcesView — highlight state from context", () => {
     expect(sourceCard).toHaveClass("text-primary");
   });
 
-  it("only the matching card is highlighted when multiple sources exist", () => {
-    render(
+  it("only the matching card is highlighted when multiple sources exist", async () => {
+    renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
         <HighlightSeeder ref="[1]" />
         <PirSourcesView />
-      </WorkspaceProvider>
+      </WorkspaceProvider>,
     );
+
+    await act(async () => {});
 
     const card1 = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)

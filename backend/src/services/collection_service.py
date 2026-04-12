@@ -28,7 +28,7 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
     "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
-    "Web Search": ["google_search", "google_news_search"],
+    "Web Search": ["google_search"],
 }
 
 
@@ -76,11 +76,22 @@ TOOL_TO_DISPLAY_NAME: dict[str, str] = {
 
 
 def _extract_search_urls(raw_data: str) -> list[str]:
-    """Extract unique URLs from google_search and google_news_search tool results."""
-    found = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    """Extract unique URLs from google_search and google_news_search tool results.
+
+    Handles two output formats:
+    - Legacy / partial copy: tool text includes "URL: https://..." lines
+    - Current format: model puts URL in "resource_id" JSON field
+    Both are searched so the second-pass fetch runs regardless of which format
+    the model used.
+    """
+    # Format 1 — legacy text: "URL: https://..."
+    text_urls = re.findall(r"URL:\s*(https?://\S+)", raw_data)
+    # Format 2 — JSON resource_id field containing an HTTP URL
+    resource_ids = re.findall(r'"resource_id"\s*:\s*"(https?://[^"]+)"', raw_data)
+
     seen: set[str] = set()
     unique: list[str] = []
-    for url in found:
+    for url in text_urls + resource_ids:
         url = url.rstrip(".,)")
         if url not in seen:
             seen.add(url)
@@ -88,17 +99,63 @@ def _extract_search_urls(raw_data: str) -> list[str]:
     return unique
 
 
+def _try_parse_json_lenient(s: str) -> dict | None:
+    """Try json.loads; on failure apply common LLM-output repairs and retry."""
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+    # Remove invalid JSON escape sequences (e.g. \' produced by some LLMs —
+    # only \", \\, \/, \b, \f, \n, \r, \t, \uXXXX are valid in JSON).
+    repaired = re.sub(r"\\([^\"\\\/bfnrtu])", r"\1", s)
+    # Strip trailing commas before ] or }
+    repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
+
+
+_SEARCH_SNIPPET_SOURCES = {"google_search", "google_news_search"}
+
+
+def _strip_search_snippet_items(raw_data: str) -> str:
+    """Remove google_search snippet items from collected_data.
+
+    After the url_context fetch pass, the Serper snippets are no longer needed —
+    only the fetch_page summaries carry real intelligence value.
+    Returns the modified JSON string, or the original if parsing fails.
+    """
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+    json_str = fence.group(1).strip() if fence else raw_data.strip()
+
+    parsed = _try_parse_json_lenient(json_str)
+    if parsed is None:
+        return raw_data
+
+    original_count = len(parsed.get("collected_data", []))
+    parsed["collected_data"] = [
+        item for item in parsed.get("collected_data", [])
+        if item.get("source") not in _SEARCH_SNIPPET_SOURCES
+    ]
+    stripped_count = original_count - len(parsed["collected_data"])
+    if stripped_count:
+        logger.info(f"[CollectionService] Stripped {stripped_count} Serper snippet items from collected_data")
+    return json.dumps(parsed, ensure_ascii=False)
+
+
 def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
     """Insert additional items into the collected_data list in raw_data JSON."""
-    try:
-        fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
-        json_str = fence.group(1).strip() if fence else raw_data.strip()
-        parsed = json.loads(json_str)
+    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw_data, re.IGNORECASE)
+    json_str = fence.group(1).strip() if fence else raw_data.strip()
+
+    parsed = _try_parse_json_lenient(json_str)
+    if parsed is not None:
         parsed["collected_data"] = parsed.get("collected_data", []) + extra_items
         return json.dumps(parsed, ensure_ascii=False)
-    except Exception:
-        # Fallback: append as a separate JSON block the AI can still read
-        return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
+
+    logger.warning("[CollectionService] _append_to_collected_data: could not parse base JSON, appending separately")
+    return raw_data + "\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
 
 
 class CollectionService:
@@ -178,18 +235,6 @@ class CollectionService:
                 deduped.append(normalized)
         return deduped
 
-    @staticmethod
-    def _try_parse_json_lenient(s: str) -> dict | None:
-        """Try json.loads; on failure strip trailing commas and retry once."""
-        try:
-            return json.loads(s)
-        except json.JSONDecodeError:
-            pass
-        try:
-            repaired = re.sub(r",\s*([}\]])", r"\1", s)
-            return json.loads(repaired)
-        except json.JSONDecodeError:
-            return None
 
     @staticmethod
     def parse_collected_data(raw_data: str) -> dict[str, Any]:
@@ -212,26 +257,29 @@ class CollectionService:
                 items = []
                 for seg in segments:
                     fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
-                    seg = fence.group(1).strip() if fence else seg
-                    seg_parsed = CollectionService._try_parse_json_lenient(seg) if seg else None
+                    seg_text = fence.group(1).strip() if fence else seg
+                    seg_parsed = _try_parse_json_lenient(seg_text) if seg_text else None
+                    # If fence regex failed (e.g. closing ``` split away), extract by braces
+                    if seg_parsed is None:
+                        start, end = seg.find("{"), seg.rfind("}")
+                        if 0 <= start < end:
+                            seg_parsed = _try_parse_json_lenient(seg[start : end + 1])
                     if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
                         items.extend(seg_parsed["collected_data"])
             else:
                 fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
                 if fence_match:
                     stripped = fence_match.group(1).strip()
-                parsed = CollectionService._try_parse_json_lenient(stripped) if stripped else {}
+                parsed = _try_parse_json_lenient(stripped) if stripped else {}
                 if parsed is None:
                     # Last resort: extract largest {...} block
                     start, end = stripped.find("{"), stripped.rfind("}")
                     if 0 <= start < end:
-                        parsed = CollectionService._try_parse_json_lenient(stripped[start:end + 1])
+                        parsed = _try_parse_json_lenient(stripped[start:end + 1])
                 if not parsed:
                     raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
                 items = parsed.get("collected_data", [])
 
-            if not isinstance(items, list):
-                raise ValueError("collected_data is not a list")
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
 
@@ -418,15 +466,18 @@ class CollectionService:
 
         # Second pass: summarize full page content via Gemini url_context (no scraping).
         # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        # We pass up to 25 URLs (buffer) because some pages will be inaccessible and get
+        # filtered out inside fetch_url_summaries, so we need extras to hit the ~15 target.
         if "Web Search" in selected_sources:
             urls = _extract_search_urls(raw_data)
             if urls:
                 url_agent = GeminiAgent(self.mcp_client)
+                _url_buffer = min(len(urls), 25)
                 logger.info(
-                    f"[CollectionService] url_context: fetching {min(len(urls), 15)} of {len(urls)} URLs"
+                    f"[CollectionService] url_context: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
                 )
                 summaries = await url_agent.fetch_url_summaries(
-                    urls=urls[:15],
+                    urls=urls[:_url_buffer],
                     pir=pir,
                     perspectives=perspectives or [],
                 )
@@ -435,6 +486,8 @@ class CollectionService:
                     logger.info(
                         f"[CollectionService] url_context: added {len(summaries)} page summaries"
                     )
+
+            raw_data = _strip_search_snippet_items(raw_data)
 
         return raw_data
 

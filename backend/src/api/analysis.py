@@ -1,6 +1,7 @@
 """API router for prototype analysis endpoints."""
 
 from datetime import UTC, datetime
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
@@ -14,7 +15,10 @@ from src.models.analysis import (
 from src.services.analysis_prototype_service import AnalysisPrototypeService
 from src.services.analysis_session_store import AnalysisSessionStore
 from src.services.council_service import CouncilService
-from src.services.processing_prototype_service import ProcessingPrototypeService
+from src.services.processing_prototype_service import (
+    PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
+    ProcessingPrototypeService,
+)
 from src.services.reasearch_logger import ResearchLogger
 
 router = APIRouter(prefix="/api/analysis")
@@ -33,6 +37,7 @@ class AnalysisDraftResponse(BaseModel):
     processing_result: ProcessingResult
     analysis_draft: AnalysisDraft
     latest_council_note: CouncilNote | None = None
+    data_source: Literal["session"] = "session"
 
 
 class AnalysisCouncilRequest(BaseModel):
@@ -97,10 +102,17 @@ async def _build_draft(
     analysis_service = analysis_service or AnalysisPrototypeService()
 
     state = store.get_or_create(session_id)
-    if force_refresh or state.processing_result is None or state.analysis_draft is None:
-        processing_result = processing_service.get_processing_result(session_id)
+    processing_result = processing_service.get_processing_result(session_id)
+    processing_changed = state.processing_result != processing_result
+
+    if (
+        force_refresh
+        or state.processing_result is None
+        or state.analysis_draft is None
+        or processing_changed
+    ):
         analysis_draft = await analysis_service.generate_draft(processing_result)
-        if force_refresh:
+        if force_refresh or processing_changed:
             state.session_id = session_id
             state.processing_result = processing_result
             state.analysis_draft = analysis_draft
@@ -113,6 +125,7 @@ async def _build_draft(
         processing_result=state.processing_result,
         analysis_draft=state.analysis_draft,
         latest_council_note=state.latest_council_note,
+        data_source="session",
     )
 
 
@@ -130,7 +143,12 @@ async def create_analysis_draft(
             force_refresh=request.force_refresh,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        status_code = (
+            409
+            if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
+            else 500
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
 @router.post("/council", response_model=CouncilNote)
@@ -143,9 +161,17 @@ async def create_analysis_council(
     research_logger = ResearchLogger(session_id=request.session_id)
 
     try:
-        draft_response = await _build_draft(request.session_id, store)
+        draft_response = await _build_draft(
+            request.session_id,
+            store,
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        status_code = (
+            409
+            if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
+            else 500
+        )
+        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     available_finding_ids = {
         finding.id for finding in draft_response.processing_result.findings

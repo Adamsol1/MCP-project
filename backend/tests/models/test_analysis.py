@@ -1,42 +1,72 @@
 """Tests for analysis-phase models."""
 
-import json
-from pathlib import Path
-
 import pytest
 from pydantic import ValidationError
 
 from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
 
 
-def _load_demo_processing_result() -> dict:
-    demo_path = (
-        Path(__file__).resolve().parents[2]
-        / "data"
-        / "outputs"
-        / "demo_processing_result.json"
-    )
-    return json.loads(demo_path.read_text(encoding="utf-8"))
+def _make_processing_payload() -> dict:
+    return {
+        "findings": [
+            {
+                "id": "F-001",
+                "title": "Credential-access activity",
+                "finding": "Repeated authentication attempts targeted privileged accounts.",
+                "evidence_summary": "Login failures were followed by successful access.",
+                "source": "network_telemetry",
+                "confidence": 82,
+                "relevant_to": ["PIR-1"],
+                "supporting_data": {"attack_ids": ["T1078"]},
+                "why_it_matters": "This suggests adversary access development.",
+                "uncertainties": ["The compromised account path is unconfirmed."],
+            },
+            {
+                "id": "F-002",
+                "title": "Phishing staging",
+                "finding": "Lookalike domains appear staged for credential theft.",
+                "evidence_summary": "Passive DNS and hosting overlap support staging.",
+                "source": "osint",
+                "confidence": 76,
+                "relevant_to": ["PIR-2"],
+                "supporting_data": {"domains": ["example-phish.test"]},
+                "why_it_matters": "This supports a parallel intrusion path.",
+                "uncertainties": ["Delivery infrastructure remains incomplete."],
+            },
+        ],
+        "gaps": [
+            "Attribution remains unresolved.",
+            "Victimology requires confirmation.",
+        ],
+    }
 
 
 class TestProcessingResult:
     """Test ProcessingResult model."""
 
     def test_valid_processing_result_payload(self):
-        """Demo processing result should load successfully."""
-        payload = _load_demo_processing_result()
+        """Session processing result payload should validate successfully."""
+        payload = _make_processing_payload()
 
         result = ProcessingResult.model_validate(payload)
 
-        assert len(result.findings) == 4
-        assert len(result.gaps) == 4
+        assert len(result.findings) == 2
+        assert len(result.gaps) == 2
         assert result.findings[0].id == "F-001"
         assert result.findings[0].confidence == 82
 
     def test_invalid_confidence_fails_validation(self):
         """Confidence outside 0-100 should fail validation."""
-        payload = _load_demo_processing_result()
+        payload = _make_processing_payload()
         payload["findings"][0]["confidence"] = 101
+
+        with pytest.raises(ValidationError):
+            ProcessingResult.model_validate(payload)
+
+    def test_processing_result_requires_findings_shape(self):
+        """Malformed findings should fail validation."""
+        payload = _make_processing_payload()
+        payload["findings"][1] = {"id": "F-002"}
 
         with pytest.raises(ValidationError):
             ProcessingResult.model_validate(payload)
@@ -48,7 +78,7 @@ class TestAnalysisDraft:
     def test_valid_analysis_draft_payload(self):
         """AnalysisDraft should validate and serialize correctly."""
         draft = AnalysisDraft(
-            summary="Demo analysis assesses a coordinated access-development campaign against Nordic telecom infrastructure.",
+            summary="Assessment of a coordinated access-development campaign against Nordic telecom infrastructure.",
             key_judgments=[
                 "The activity is consistent with targeted credential access and phishing preparation.",
                 "Infrastructure overlap suggests a repeatable intrusion playbook rather than isolated noise.",
@@ -73,7 +103,7 @@ class TestAnalysisDraft:
 
         serialized = draft.model_dump()
 
-        assert serialized["summary"].startswith("Demo analysis assesses")
+        assert serialized["summary"].startswith("Assessment of")
         assert len(serialized["key_judgments"]) == 2
         assert serialized["per_perspective_implications"]["NOR"]
         assert len(serialized["recommended_actions"]) == 2

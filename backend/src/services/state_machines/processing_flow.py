@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from src.models.dialogue import DialogueContext, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
@@ -134,30 +134,61 @@ class ProcessingFlow(BasePhaseFlow):
         )
         return flow
 
-    async def initialize(self, processing_service) -> DialogueResponse:
+    async def initialize(
+        self,
+        processing_service,
+        orchestrator=None,
+        reviewer=None,
+    ) -> DialogueResponse:
         """Start processing: read collected data, run agent, write processed.json, go to REVIEWING."""
+        if not self.session_id:
+            return DialogueResponse(action=DialogueAction.ERROR, content="No session ID set.")
+
         collected = _read_collected(self.session_id)
         if not collected:
             return DialogueResponse(
-                action="error",
+                action=DialogueAction.ERROR,
                 content="No collected data found. Complete the Collection phase first.",
             )
 
         raw_collected = "\n\n---\n\n".join(collected.get("attempts", []))
 
         try:
-            raw_result = await processing_service.process(
-                collected_data=raw_collected,
-                pir=self.pir,
-            )
+            if orchestrator and reviewer:
+                raw_result = await orchestrator.process_and_review(
+                    collected_data=raw_collected,
+                    pir=self.pir,
+                    processing_service=processing_service,
+                    reviewer=reviewer,
+                    session_id=self.session_id,
+                )
+                retry_count = len(orchestrator.attempts) - 1
+                self.pending_reasoning_log = ReasoningLog(
+                    session_id=self.session_id,
+                    phase="processing",
+                    model_used=orchestrator.generator_model,
+                    dialogue_turns=[],
+                    generated_content_attempts=orchestrator.attempts,
+                    review_reasoning=orchestrator.review_results,
+                    retry_explanation=orchestrator.retry_explanations,
+                    final_approved_content=None,
+                    timestamps={"processing_performed": datetime.now().isoformat()},
+                    retry_triggered=retry_count > 0,
+                    retry_count=retry_count,
+                )
+            else:
+                raw_result = await processing_service.process(
+                    collected_data=raw_collected,
+                    pir=self.pir,
+                )
         except Exception as e:
             logger.error(f"[ProcessingFlow] Processing failed for {self.session_id}: {e}")
-            return DialogueResponse(action="error", content=f"Processing failed: {e}")
+            return DialogueResponse(action=DialogueAction.ERROR, content=f"Processing failed: {e}")
 
         self.state = ProcessingState.REVIEWING
         _write_processed(self.session_id, self.pir, raw_result)
 
-        return DialogueResponse(action="show_processing", content=raw_result)
+        return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
 
     async def process_user_message(
         self,
@@ -168,7 +199,7 @@ class ProcessingFlow(BasePhaseFlow):
         if self.state == ProcessingState.REVIEWING:
             return await self.handle_reviewing(user_message, processing_service, approved)
         else:
-            return DialogueResponse(action="complete", content="Processing phase completed")
+            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase completed")
 
     async def handle_reviewing(
         self,
@@ -196,7 +227,7 @@ class ProcessingFlow(BasePhaseFlow):
                 )
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = ProcessingState.COMPLETE
-            return DialogueResponse(action="complete", content="Processing phase complete")
+            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase complete")
 
         else:
             self._log_user_action(
@@ -210,4 +241,4 @@ class ProcessingFlow(BasePhaseFlow):
             )
             modified = await processing_service.modify_processing(last_result, user_message)
             _write_processed(self.session_id, self.pir, modified)
-            return DialogueResponse(action="show_processing", content=modified)
+            return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=modified)

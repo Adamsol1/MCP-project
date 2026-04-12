@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import ChatWindow from "./ChatWindow";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 
 vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
   default: () => <div>Inline analysis view</div>,
@@ -14,9 +15,11 @@ vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
 // calls useWorkspace (needs WorkspaceProvider).
 function renderWithToast(ui: ReactNode) {
   return render(
-    <WorkspaceProvider>
-      <ToastProvider>{ui}</ToastProvider>
-    </WorkspaceProvider>
+    <SettingsProvider>
+      <WorkspaceProvider>
+        <ToastProvider>{ui}</ToastProvider>
+      </WorkspaceProvider>
+    </SettingsProvider>
   );
 }
 
@@ -35,8 +38,26 @@ describe("ChatWindow", () => {
   it("renders a message input field", () => {
     renderWithToast(<ChatWindow />); // Render component
 
-    const input = screen.getByPlaceholderText(/ask anything/i);
+    const input = screen.getByPlaceholderText(/type anything/i);
     expect(input).toBeInTheDocument();
+  });
+
+  it("renders the empty-state composer on a themed surface", () => {
+    renderWithToast(<ChatWindow />);
+
+    const input = screen.getByPlaceholderText(/type anything/i);
+    expect(input.closest("form")).toHaveClass("bg-surface", "rounded-[22px]");
+  });
+
+  it("keeps the in-conversation composer more compact", () => {
+    renderWithToast(
+      <ChatWindow
+        messages={[{ id: "1", text: "Hello", sender: "system" as const }]}
+      />,
+    );
+
+    const input = screen.getByPlaceholderText(/type anything/i);
+    expect(input.closest("form")).toHaveClass("rounded-xl");
   });
 
   it("renders send button", () => {
@@ -65,7 +86,7 @@ describe("ChatWindow", () => {
     const user = userEvent.setup();
     renderWithToast(<ChatWindow />);
 
-    const input = screen.getByPlaceholderText(/ask anything/i);
+    const input = screen.getByPlaceholderText(/type anything/i);
     // user.type() simulates typing character by character, just like a real user
     await user.type(input, "Hello");
 
@@ -82,7 +103,7 @@ describe("ChatWindow", () => {
     const handleSend = vi.fn();
     renderWithToast(<ChatWindow onSendMessage={handleSend} />);
 
-    const input = screen.getByPlaceholderText(/ask anything/i);
+    const input = screen.getByPlaceholderText(/type anything/i);
     await user.type(input, "Investigate recent APT activity");
 
     const sendButton = screen.getByRole("button", { name: /send/i });
@@ -97,7 +118,7 @@ describe("ChatWindow", () => {
     const user = userEvent.setup();
     renderWithToast(<ChatWindow onSendMessage={vi.fn()} />);
 
-    const input = screen.getByPlaceholderText(/ask anything/i);
+    const input = screen.getByPlaceholderText(/type anything/i);
     await user.type(input, "Hello");
 
     const sendButton = screen.getByRole("button", { name: /send/i });
@@ -112,7 +133,7 @@ describe("ChatWindow", () => {
     const handleSend = vi.fn();
     renderWithToast(<ChatWindow onSendMessage={handleSend} />);
 
-    const input = screen.getByPlaceholderText(/ask anything/i);
+    const input = screen.getByPlaceholderText(/type anything/i);
     // {Enter} is userEvent syntax for pressing the Enter key
     await user.type(input, "Test message{Enter}");
 
@@ -380,9 +401,12 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    expect(screen.getByText(/1\. High/)).toBeInTheDocument();
-    expect(screen.getByText(/2\. Medium/)).toBeInTheDocument();
-    expect(screen.getByText(/3\. Low/)).toBeInTheDocument();
+    expect(screen.getByText("PIR-1")).toBeInTheDocument();
+    expect(screen.getByText("PIR-2")).toBeInTheDocument();
+    expect(screen.getByText("PIR-3")).toBeInTheDocument();
+    expect(screen.getByText("High")).toBeInTheDocument();
+    expect(screen.getByText("Medium")).toBeInTheDocument();
+    expect(screen.getByText("Low")).toBeInTheDocument();
   });
 
   it("shows a 'Rationale' toggle for each PIR item", () => {
@@ -477,8 +501,8 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    const boldEl = screen.getByText("Scope");
-    expect(boldEl.tagName).toBe("STRONG");
+    // CitationText renders plain text — **bold** markers are not processed as HTML
+    expect(screen.getByText(/\*\*Scope\*\*/)).toBeInTheDocument();
   });
 
   it("renders a 'Show reasoning' toggle for PIR messages", () => {
@@ -570,10 +594,11 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    // Each numbered point should appear as its own element in the DOM
-    expect(screen.getByText(/1\. First point here/)).toBeInTheDocument();
-    expect(screen.getByText(/2\. Second point here/)).toBeInTheDocument();
-    expect(screen.getByText(/3\. Third point here/)).toBeInTheDocument();
+    // Each point is split into its own list item; the number prefix is stripped
+    // and replaced with a badge — check the text content directly
+    expect(screen.getByText(/First point here/)).toBeInTheDocument();
+    expect(screen.getByText(/Second point here/)).toBeInTheDocument();
+    expect(screen.getByText(/Third point here/)).toBeInTheDocument();
   });
 
   it("falls back to plain text for 'question' type messages", () => {
@@ -617,7 +642,7 @@ describe("ChatWindow", () => {
     renderWithToast(<ChatWindow isConfirming={true} />);
 
     expect(
-      screen.queryByPlaceholderText(/ask anything/i),
+      screen.queryByPlaceholderText(/type anything/i),
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /send/i }),
@@ -628,7 +653,7 @@ describe("ChatWindow", () => {
     // Normal state: the user can type and send messages
     renderWithToast(<ChatWindow isConfirming={false} />);
 
-    expect(screen.getByPlaceholderText(/ask anything/i)).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(/type anything/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /send/i })).toBeInTheDocument();
   });
 
@@ -642,8 +667,24 @@ describe("ChatWindow", () => {
     expect(screen.getByText("Analysis complete.")).toBeInTheDocument();
     expect(screen.getByText("Inline analysis view")).toBeInTheDocument();
     expect(
-      screen.queryByPlaceholderText(/ask anything/i),
+      screen.queryByPlaceholderText(/type anything/i),
     ).not.toBeInTheDocument();
+  });
+
+  it("renders processing review when stage is reviewing and phase is processing", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+      />,
+    );
+
+    expect(screen.getByText(/processing review/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText(/collection review/i),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /gather more/i })).toBeInTheDocument();
   });
 });
 

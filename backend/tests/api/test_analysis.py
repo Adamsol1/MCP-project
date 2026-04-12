@@ -1,18 +1,95 @@
 """Tests for the analysis prototype API."""
 
+import json
+
 from fastapi.testclient import TestClient
 
 from src.api import analysis as analysis_api
 from src.api.main import app
 from src.models.analysis import AnalysisDraft, CouncilNote
 from src.services.analysis_session_store import AnalysisSessionStore
+from src.services.processing_prototype_service import (
+    PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
+)
+
+VALID_PROCESSING_PAYLOAD = {
+    "findings": [
+        {
+            "id": "F-001",
+            "title": "Credential-access activity",
+            "finding": "Repeated authentication attempts targeted privileged accounts.",
+            "evidence_summary": "Login failures were followed by successful access.",
+            "source": "network_telemetry",
+            "confidence": 82,
+            "relevant_to": ["PIR-1"],
+            "supporting_data": {"attack_ids": ["T1078"]},
+            "why_it_matters": "This suggests adversary access development.",
+            "uncertainties": ["The compromised account path is unconfirmed."],
+        },
+        {
+            "id": "F-002",
+            "title": "Phishing staging",
+            "finding": "Lookalike domains appear staged for credential theft.",
+            "evidence_summary": "Passive DNS and hosting overlap support staging.",
+            "source": "osint",
+            "confidence": 76,
+            "relevant_to": ["PIR-2"],
+            "supporting_data": {"domains": ["example-phish.test"]},
+            "why_it_matters": "This supports a parallel intrusion path.",
+            "uncertainties": ["Delivery infrastructure remains incomplete."],
+        },
+    ],
+    "gaps": [
+        "Attribution remains unresolved.",
+        "Victimology requires confirmation.",
+    ],
+}
+
+LEGACY_PROCESSING_PAYLOAD = {
+    "entities": [
+        {
+            "id": "E-001",
+            "name": "Storebrand privileged access exposure",
+            "description": "Privileged access pathways remain exposed through remote administration workflows.",
+            "categories": ["infrastructure", "information"],
+            "sources": ["manual", "otx"],
+            "confidence": 78,
+            "relevant_to": ["PIR-1", "PIR-2"],
+            "tags": ["access", "storebrand"],
+            "first_observed": "2026-04-01",
+            "last_updated": "2026-04-10",
+        }
+    ],
+    "gaps": ["Victimology remains incomplete."],
+    "processing_summary": "Legacy PMESII summary.",
+    "assessment_changed": False,
+    "change_summary": None,
+}
+
+
+def _write_processed_json(tmp_path, session_id: str) -> None:
+    session_dir = tmp_path / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "processed.json").write_text(
+        json.dumps({"attempts": [json.dumps(VALID_PROCESSING_PAYLOAD)]}),
+        encoding="utf-8",
+    )
+
+
+def _write_legacy_processed_json(tmp_path, session_id: str) -> None:
+    session_dir = tmp_path / session_id
+    session_dir.mkdir(parents=True, exist_ok=True)
+    (session_dir / "processed.json").write_text(
+        json.dumps({"attempts": [json.dumps(LEGACY_PROCESSING_PAYLOAD)]}),
+        encoding="utf-8",
+    )
 
 
 class _FakeAnalysisPrototypeService:
     async def generate_draft(self, processing_result, selected_perspectives=None):
         del selected_perspectives
         return AnalysisDraft(
-            summary="Live-style analysis summary grounded in the demo processing result.",
+            summary="Live-style analysis summary grounded in the session processing result.",
             key_judgments=[
                 "Credential access and phishing staging indicate a coordinated access-development pattern."
             ],
@@ -87,7 +164,7 @@ class _FakeResearchLogger:
 
 
 def _configure_analysis_dependencies(monkeypatch, tmp_path):
-    store = AnalysisSessionStore(sessions_dir=tmp_path / "sessions")
+    store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
     logger = _FakeResearchLogger()
 
     def logger_factory(session_id=None):
@@ -102,6 +179,16 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(analysis_api, "CouncilService", lambda: _FakeCouncilService())
     monkeypatch.setattr(analysis_api, "ResearchLogger", logger_factory)
+    monkeypatch.setattr(
+        analysis_api,
+        "_SESSIONS_DATA_DIR",
+        tmp_path,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "src.services.processing_prototype_service._SESSIONS_DATA_DIR",
+        tmp_path,
+    )
 
     return store, logger
 
@@ -109,6 +196,7 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
 def test_analysis_draft_happy_path(monkeypatch, tmp_path):
     """POST /api/analysis/draft should return processing, draft, and council slot."""
     _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-123")
     client = TestClient(app)
 
     response = client.post(
@@ -122,6 +210,7 @@ def test_analysis_draft_happy_path(monkeypatch, tmp_path):
     assert "analysis_draft" in data
     assert "latest_council_note" in data
     assert data["latest_council_note"] is None
+    assert data["data_source"] == "session"
 
 
 def test_analysis_draft_requires_session_id(monkeypatch, tmp_path):
@@ -140,6 +229,7 @@ def test_analysis_draft_requires_session_id(monkeypatch, tmp_path):
 def test_analysis_draft_response_shape_is_valid(monkeypatch, tmp_path):
     """Response should expose a stable, typed shape for frontend use."""
     _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-456")
     client = TestClient(app)
 
     response = client.post(
@@ -154,8 +244,8 @@ def test_analysis_draft_response_shape_is_valid(monkeypatch, tmp_path):
     analysis_draft = data["analysis_draft"]
 
     assert set(processing_result.keys()) == {"findings", "gaps"}
-    assert len(processing_result["findings"]) == 4
-    assert len(processing_result["gaps"]) == 4
+    assert len(processing_result["findings"]) == 2
+    assert len(processing_result["gaps"]) == 2
 
     assert set(analysis_draft.keys()) == {
         "summary",
@@ -175,9 +265,46 @@ def test_analysis_draft_response_shape_is_valid(monkeypatch, tmp_path):
     }
 
 
+def test_analysis_draft_requires_real_processed_result(monkeypatch, tmp_path):
+    """Draft requests should fail clearly when processing artifacts are absent."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/draft",
+        json={
+            "session_id": "analysis-session-missing-processed",
+            "force_refresh": True,
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
+
+
+def test_analysis_draft_accepts_legacy_processing_schema(monkeypatch, tmp_path):
+    """Older PMESII processing output should still be usable by analysis."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_legacy_processed_json(tmp_path, "analysis-session-legacy")
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/draft",
+        json={"session_id": "analysis-session-legacy"},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["processing_result"]["findings"][0]["id"] == "E-001"
+    assert data["processing_result"]["findings"][0]["title"] == (
+        "Storebrand privileged access exposure"
+    )
+
+
 def test_analysis_council_happy_path(monkeypatch, tmp_path):
     """Valid council requests should return a structured CouncilNote."""
     _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-council")
     client = TestClient(app)
 
     response = client.post(
@@ -229,6 +356,7 @@ def test_analysis_council_requires_two_perspectives(monkeypatch, tmp_path):
 def test_analysis_council_rejects_invalid_finding_ids(monkeypatch, tmp_path):
     """finding_ids must exist in the current processing result."""
     _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-council")
     client = TestClient(app)
 
     response = client.post(
@@ -263,9 +391,28 @@ def test_analysis_council_requires_debate_input(monkeypatch, tmp_path):
     assert response.status_code == 422
 
 
+def test_analysis_council_requires_real_processed_result(monkeypatch, tmp_path):
+    """Council requests should fail clearly when processing artifacts are absent."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/council",
+        json={
+            "session_id": "analysis-session-no-processed",
+            "debate_point": "Assess the findings.",
+            "selected_perspectives": ["us", "neutral"],
+        },
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
+
+
 def test_analysis_council_logs_successful_runs(monkeypatch, tmp_path):
     """Successful council runs should emit an analysis-specific research log entry."""
     _, logger = _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-logging")
     client = TestClient(app)
 
     response = client.post(
@@ -273,7 +420,7 @@ def test_analysis_council_logs_successful_runs(monkeypatch, tmp_path):
         json={
             "session_id": "analysis-session-logging",
             "debate_point": "Assess whether disruption intent is likely.",
-            "finding_ids": ["F-004"],
+            "finding_ids": ["F-002"],
             "selected_perspectives": ["us", "neutral"],
         },
     )
@@ -281,5 +428,5 @@ def test_analysis_council_logs_successful_runs(monkeypatch, tmp_path):
     assert response.status_code == 200
     assert len(logger.entries) == 1
     assert logger.entries[0]["phase"] == "analysis_council"
-    assert logger.entries[0]["finding_ids"] == ["F-004"]
+    assert logger.entries[0]["finding_ids"] == ["F-002"]
     assert logger.entries[0]["council_summary"].strip() != ""

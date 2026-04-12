@@ -1,4 +1,8 @@
-import type { DialogueStage, DialogueSubState } from "./dialogue";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "./dialogue";
 
 /** A single chat message exchanged between the user and the system. */
 export interface Message {
@@ -15,6 +19,7 @@ export interface Message {
     | "plan"
     | "suggested_sources"
     | "collection"
+    | "processing"
     | "error"
     | "complete";
   data?:
@@ -23,7 +28,8 @@ export interface Message {
     | CollectionPlanData
     | SuggestedSourcesData
     | CollectionSummaryData
-    | CollectionDisplayData;
+    | CollectionDisplayData
+    | ProcessingData;
 }
 
 /**
@@ -53,6 +59,8 @@ export interface Conversation {
   isConfirming: boolean;
   /** Canonical dialogue stage received from backend. */
   stage: DialogueStage;
+  /** Canonical backend phase used for tracker and workspace routing. */
+  phase: DialoguePhase;
   /** Optional under-state for confirm stages, used by devtools/UI behavior. */
   subState: DialogueSubState;
   /** Unix timestamp (ms) when this conversation was created. */
@@ -203,6 +211,31 @@ export interface ActivitySummaryItem {
   reviewer_approved: boolean;
   /** Reviewer suggestions for improvement, or null if approved with no comments. */
   reviewer_suggestions: string | null;
+}
+
+export interface ProcessingFinding {
+  id: string;
+  title: string;
+  finding: string;
+  evidence_summary: string;
+  source: string;
+  confidence: number;
+  relevant_to: string[];
+  why_it_matters: string;
+  uncertainties: string[];
+  supporting_data?: {
+    entities?: string[];
+    timestamps?: string[];
+    locations?: string[];
+    kb_refs?: string[];
+    attack_ids?: string[];
+    domains?: string[];
+  };
+}
+
+export interface ProcessingData {
+  findings: ProcessingFinding[];
+  gaps: string[];
 }
 
 /**

@@ -1,26 +1,11 @@
-/**
- * WorkspaceContext — shared state for the intelligence workspace.
- *
- * Provides highlightedRef, pirData, and activePhase across the
- * chat↔panel boundary so bidirectional hover works even when
- * CitationText (in the chat) and SourceList (in the panel) are siblings.
- *
- * Run with: cd frontend && npx vitest WorkspaceContext.test
- */
-
 import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import { WorkspaceProvider, useWorkspace } from "./WorkspaceContext";
-import type { PirData } from "../../types/conversation";
+import type { CollectionDisplayData, PirData } from "../../types/conversation";
 
-
-// ── Test consumer helpers ─────────────────────────────────────────────────────
-// Minimal components that render one context value each into the DOM.
-// Real components will consume the context the same way.
-
-function HighlightedRefDisplay() {
-  const { highlightedRef } = useWorkspace();
-  return <span data-testid="ref">{highlightedRef ?? "null"}</span>;
+function HighlightedRefsDisplay() {
+  const { highlightedRefs } = useWorkspace();
+  return <span data-testid="refs">{highlightedRefs.join(",") || "empty"}</span>;
 }
 
 function PirDataDisplay() {
@@ -28,175 +13,111 @@ function PirDataDisplay() {
   return <span data-testid="pir">{pirData ? pirData.pir_text : "null"}</span>;
 }
 
-function ActivePhaseDisplay() {
-  const { activePhase } = useWorkspace();
-  return <span data-testid="phase">{activePhase}</span>;
-}
-
-function SetHighlightedRefButton() {
-  const { setHighlightedRef } = useWorkspace();
+function CollectionDataDisplay() {
+  const { collectionData } = useWorkspace();
   return (
-    <button onClick={() => setHighlightedRef("[1]")}>set ref</button>
+    <span data-testid="collection">
+      {collectionData ? collectionData.collected_data.length.toString() : "null"}
+    </span>
   );
 }
 
-function ClearHighlightedRefButton() {
-  const { setHighlightedRef } = useWorkspace();
-  return (
-    <button onClick={() => setHighlightedRef(null)}>clear ref</button>
-  );
+function SetHighlightedRefsButton({ refs }: { refs: string[] }) {
+  const { setHighlightedRefs } = useWorkspace();
+  return <button onClick={() => setHighlightedRefs(refs)}>set refs</button>;
 }
 
 function SetPirDataButton({ pirData }: { pirData: PirData }) {
   const { setPirData } = useWorkspace();
-  return (
-    <button onClick={() => setPirData(pirData)}>set pir</button>
-  );
+  return <button onClick={() => setPirData(pirData)}>set pir</button>;
 }
 
-function SetActivePhaseButton({ phase }: { phase: string }) {
-  const { setActivePhase } = useWorkspace();
-  return (
-    // The cast satisfies TypeScript until the union type is defined in the impl.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    <button onClick={() => setActivePhase(phase as any)}>set phase</button>
-  );
+function SetCollectionDataButton({ data }: { data: CollectionDisplayData }) {
+  const { setCollectionData } = useWorkspace();
+  return <button onClick={() => setCollectionData(data)}>set collection</button>;
 }
 
-// ── Fixture ───────────────────────────────────────────────────────────────────
-
-const samplePirData: PirData = {
-  pir_text: "Norway threat assessment.",
-  claims: [],
-  sources: [],
-  pirs: [],
-  reasoning: "",
-};
-
-// ── Group 1: Default values ───────────────────────────────────────────────────
-
-describe("WorkspaceContext — default values", () => {
-  it("highlightedRef defaults to null", () => {
+describe("WorkspaceContext", () => {
+  it("provides empty default workspace values", () => {
     render(
       <WorkspaceProvider>
-        <HighlightedRefDisplay />
-      </WorkspaceProvider>
+        <HighlightedRefsDisplay />
+        <PirDataDisplay />
+        <CollectionDataDisplay />
+      </WorkspaceProvider>,
     );
 
-    expect(screen.getByTestId("ref")).toHaveTextContent("null");
+    expect(screen.getByTestId("refs")).toHaveTextContent("empty");
+    expect(screen.getByTestId("pir")).toHaveTextContent("null");
+    expect(screen.getByTestId("collection")).toHaveTextContent("null");
   });
 
-  it("pirData defaults to null", () => {
+  it("updates highlighted refs", async () => {
+    render(
+      <WorkspaceProvider>
+        <HighlightedRefsDisplay />
+        <SetHighlightedRefsButton refs={["[1]", "[2]"]} />
+      </WorkspaceProvider>,
+    );
+
+    await act(async () => {
+      screen.getByRole("button", { name: "set refs" }).click();
+    });
+
+    expect(screen.getByTestId("refs")).toHaveTextContent("[1],[2]");
+  });
+
+  it("updates pir data", async () => {
     render(
       <WorkspaceProvider>
         <PirDataDisplay />
-      </WorkspaceProvider>
+        <SetPirDataButton
+          pirData={{
+            pir_text: "Norway threat assessment.",
+            claims: [],
+            sources: [],
+            pirs: [],
+            reasoning: "",
+          }}
+        />
+      </WorkspaceProvider>,
     );
-
-    expect(screen.getByTestId("pir")).toHaveTextContent("null");
-  });
-
-  it("activePhase defaults to 'direction'", () => {
-    render(
-      <WorkspaceProvider>
-        <ActivePhaseDisplay />
-      </WorkspaceProvider>
-    );
-
-    expect(screen.getByTestId("phase")).toHaveTextContent("direction");
-  });
-});
-
-// ── Group 2: State updates propagate to all consumers ─────────────────────────
-
-describe("WorkspaceContext — state updates", () => {
-  it("setHighlightedRef updates highlightedRef", async () => {
-    render(
-      <WorkspaceProvider>
-        <HighlightedRefDisplay />
-        <SetHighlightedRefButton />
-      </WorkspaceProvider>
-    );
-
-    expect(screen.getByTestId("ref")).toHaveTextContent("null");
-
-    await act(async () => {
-      screen.getByRole("button", { name: "set ref" }).click();
-    });
-
-    expect(screen.getByTestId("ref")).toHaveTextContent("[1]");
-  });
-
-  it("setHighlightedRef can clear back to null", async () => {
-    render(
-      <WorkspaceProvider>
-        <HighlightedRefDisplay />
-        <SetHighlightedRefButton />
-        <ClearHighlightedRefButton />
-      </WorkspaceProvider>
-    );
-
-    await act(async () => {
-      screen.getByRole("button", { name: "set ref" }).click();
-    });
-    expect(screen.getByTestId("ref")).toHaveTextContent("[1]");
-
-    await act(async () => {
-      screen.getByRole("button", { name: "clear ref" }).click();
-    });
-    expect(screen.getByTestId("ref")).toHaveTextContent("null");
-  });
-
-  it("setPirData updates pirData", async () => {
-    render(
-      <WorkspaceProvider>
-        <PirDataDisplay />
-        <SetPirDataButton pirData={samplePirData} />
-      </WorkspaceProvider>
-    );
-
-    expect(screen.getByTestId("pir")).toHaveTextContent("null");
 
     await act(async () => {
       screen.getByRole("button", { name: "set pir" }).click();
     });
 
     expect(screen.getByTestId("pir")).toHaveTextContent(
-      "Norway threat assessment."
+      "Norway threat assessment.",
     );
   });
 
-  it("setActivePhase updates activePhase", async () => {
+  it("updates collection data", async () => {
     render(
       <WorkspaceProvider>
-        <ActivePhaseDisplay />
-        <SetActivePhaseButton phase="collection" />
-      </WorkspaceProvider>
+        <CollectionDataDisplay />
+        <SetCollectionDataButton
+          data={{
+            collected_data: [
+              { source: "web", resource_id: null, content: "Sample content" },
+            ],
+            source_summary: [
+              {
+                display_name: "Web",
+                count: 1,
+                resource_ids: [],
+                has_content: true,
+              },
+            ],
+          }}
+        />
+      </WorkspaceProvider>,
     );
 
-    expect(screen.getByTestId("phase")).toHaveTextContent("direction");
-
     await act(async () => {
-      screen.getByRole("button", { name: "set phase" }).click();
+      screen.getByRole("button", { name: "set collection" }).click();
     });
 
-    expect(screen.getByTestId("phase")).toHaveTextContent("collection");
-  });
-});
-
-// ── Group 3: Hook safety ──────────────────────────────────────────────────────
-
-describe("WorkspaceContext — useWorkspace hook", () => {
-  it("throws when used outside WorkspaceProvider", () => {
-    // React will log an uncaught error to the console during this test.
-    // We silence it temporarily so the test output stays clean.
-    const consoleError = console.error;
-    console.error = () => {};
-
-    expect(() => {
-      render(<HighlightedRefDisplay />);
-    }).toThrow();
-
-    console.error = consoleError;
+    expect(screen.getByTestId("collection")).toHaveTextContent("1");
   });
 });

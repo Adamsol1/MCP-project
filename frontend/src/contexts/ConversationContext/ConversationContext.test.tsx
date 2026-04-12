@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { useConversation } from "../../hooks/useConversation";
+import { useConversation } from "../../hooks/useConversation/useConversation";
 import { ConversationProvider } from "./ConversationContext";
 import type { ConversationStore } from "../../types/conversation";
 
@@ -43,6 +43,7 @@ describe("ConversationContext", () => {
             sessionId: "session-1",
             isConfirming: false,
             stage: "initial",
+            phase: "direction",
             subState: null,
             createdAt: 1000,
             updatedAt: 2000,
@@ -213,8 +214,8 @@ describe("ConversationContext", () => {
         result.current.createNewConversation();
       });
 
-      // Title should be default before any messages
-      expect(result.current.activeConversation?.title).toBe("New conversation");
+      // Title starts empty before any user messages
+      expect(result.current.activeConversation?.title).toBe("");
 
       act(() => {
         result.current.addMessage({
@@ -272,8 +273,8 @@ describe("ConversationContext", () => {
         });
       });
 
-      // Title should still be the default since only user messages set the title
-      expect(result.current.activeConversation?.title).toBe("New conversation");
+      // Title should still be empty since only user messages set the title
+      expect(result.current.activeConversation?.title).toBe("");
     });
 
     it("does not update title on subsequent user messages", () => {
