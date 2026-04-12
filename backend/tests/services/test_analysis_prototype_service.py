@@ -4,7 +4,8 @@ import json
 
 import pytest
 
-from src.models.analysis import AnalysisDraft
+from src.models.analysis import AnalysisDraft, ProcessingResult
+from src.models.confidence import AssertionConfidence, PerspectiveAssertion
 from src.services import processing_prototype_service as processing_service_module
 from src.services.analysis_prototype_service import AnalysisPrototypeService
 from src.services.processing_prototype_service import ProcessingPrototypeService
@@ -38,20 +39,41 @@ def _write_processed_json(tmp_path, session_id: str) -> None:
 
 
 class _FakeLLMService:
+    """Fake LLM service that returns PerspectiveAssertion-shaped implications."""
+
     async def generate_json(self, prompt: str) -> dict:
         assert "Processed findings" in prompt
+        assert "supporting_finding_ids" in prompt  # new prompt shape
         return {
             "summary": "Gemini-generated assessment of the processed findings.",
             "key_judgments": [
                 "Credential-access activity and phishing staging reinforce a coordinated access-development assessment."
             ],
             "per_perspective_implications": {
-                "us": ["US implication A", "US implication B"],
-                "norway": ["Norway implication A", "Norway implication B"],
-                "china": ["China implication A", "China implication B"],
-                "eu": ["EU implication A", "EU implication B"],
-                "russia": ["Russia implication A", "Russia implication B"],
-                "neutral": ["Neutral implication A", "Neutral implication B"],
+                "us": [
+                    {"assertion": "US implication A", "supporting_finding_ids": ["F-001"]},
+                    {"assertion": "US implication B", "supporting_finding_ids": []},
+                ],
+                "norway": [
+                    {"assertion": "Norway implication A", "supporting_finding_ids": ["F-001"]},
+                    {"assertion": "Norway implication B", "supporting_finding_ids": []},
+                ],
+                "china": [
+                    {"assertion": "China implication A", "supporting_finding_ids": []},
+                    {"assertion": "China implication B", "supporting_finding_ids": []},
+                ],
+                "eu": [
+                    {"assertion": "EU implication A", "supporting_finding_ids": []},
+                    {"assertion": "EU implication B", "supporting_finding_ids": []},
+                ],
+                "russia": [
+                    {"assertion": "Russia implication A", "supporting_finding_ids": []},
+                    {"assertion": "Russia implication B", "supporting_finding_ids": []},
+                ],
+                "neutral": [
+                    {"assertion": "Neutral implication A", "supporting_finding_ids": ["F-001"]},
+                    {"assertion": "Neutral implication B", "supporting_finding_ids": []},
+                ],
             },
             "recommended_actions": [
                 "Review telecom administrator exposure and related phishing infrastructure."
@@ -60,6 +82,46 @@ class _FakeLLMService:
                 "Attribution remains unresolved.",
                 "Victimology requires confirmation.",
             ],
+        }
+
+
+class _FakeLLMServiceWithHallucinatedIds:
+    """Returns implications with hallucinated finding IDs that should be stripped."""
+
+    async def generate_json(self, prompt: str) -> dict:
+        return {
+            "summary": "Summary.",
+            "key_judgments": ["Judgment."],
+            "per_perspective_implications": {
+                "us": [
+                    {
+                        "assertion": "US claim with bad ID",
+                        "supporting_finding_ids": ["F-001", "HALLUCINATED-99"],
+                    }
+                ],
+                "norway": [],
+                "china": [],
+                "eu": [],
+                "russia": [],
+                "neutral": [],
+            },
+            "recommended_actions": [],
+            "information_gaps": [],
+        }
+
+
+class _FakeLLMServiceOldStringFormat:
+    """Simulates an LLM that returns old string-list format (should fall back gracefully)."""
+
+    async def generate_json(self, prompt: str) -> dict:
+        return {
+            "summary": "Summary.",
+            "key_judgments": [],
+            "per_perspective_implications": {
+                "us": ["This is a plain string, not a dict"],
+            },
+            "recommended_actions": [],
+            "information_gaps": [],
         }
 
 
@@ -77,7 +139,7 @@ class TestAnalysisPrototypeService:
             "session-123"
         )
 
-        draft = await AnalysisPrototypeService(
+        draft, _ = await AnalysisPrototypeService(
             llm_service=_FakeLLMService()
         ).generate_draft(processing_result)
 
@@ -96,7 +158,7 @@ class TestAnalysisPrototypeService:
             "session-456"
         )
 
-        draft = await AnalysisPrototypeService(
+        draft, _ = await AnalysisPrototypeService(
             llm_service=_FakeLLMService()
         ).generate_draft(processing_result)
 
@@ -111,7 +173,7 @@ class TestAnalysisPrototypeService:
             "session-789"
         )
 
-        draft = await AnalysisPrototypeService(
+        draft, _ = await AnalysisPrototypeService(
             llm_service=_FakeLLMService()
         ).generate_draft(processing_result)
 
@@ -128,7 +190,7 @@ class TestAnalysisPrototypeService:
             "session-999"
         )
 
-        draft = await AnalysisPrototypeService(
+        draft, _ = await AnalysisPrototypeService(
             llm_service=_FakeLLMService()
         ).generate_draft(processing_result)
 
@@ -140,3 +202,86 @@ class TestAnalysisPrototypeService:
             "russia",
             "neutral",
         }
+
+    @pytest.mark.asyncio
+    async def test_per_perspective_implications_are_perspective_assertion_objects(
+        self, monkeypatch, tmp_path
+    ):
+        """Each implication must be a PerspectiveAssertion with a confidence."""
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-asserts")
+        processing_result = ProcessingPrototypeService().get_processing_result(
+            "session-asserts"
+        )
+
+        draft, _ = await AnalysisPrototypeService(
+            llm_service=_FakeLLMService()
+        ).generate_draft(processing_result)
+
+        for perspective, assertions in draft.per_perspective_implications.items():
+            for assertion in assertions:
+                assert isinstance(assertion, PerspectiveAssertion), (
+                    f"{perspective}: expected PerspectiveAssertion, got {type(assertion)}"
+                )
+                assert assertion.confidence is not None, (
+                    f"{perspective}: confidence should be set after enrichment"
+                )
+                assert isinstance(assertion.confidence, AssertionConfidence)
+
+    @pytest.mark.asyncio
+    async def test_hallucinated_finding_ids_stripped(self, monkeypatch, tmp_path):
+        """Finding IDs not in ProcessingResult must be stripped without crash."""
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-hallucinated")
+        processing_result = ProcessingPrototypeService().get_processing_result(
+            "session-hallucinated"
+        )
+
+        draft, _ = await AnalysisPrototypeService(
+            llm_service=_FakeLLMServiceWithHallucinatedIds()
+        ).generate_draft(processing_result)
+
+        us_assertions = draft.per_perspective_implications.get("us", [])
+        if us_assertions:
+            fids = us_assertions[0].supporting_finding_ids
+            assert "HALLUCINATED-99" not in fids
+
+    @pytest.mark.asyncio
+    async def test_enriched_processing_result_has_computed_confidence(
+        self, monkeypatch, tmp_path
+    ):
+        """generate_draft should return an enriched ProcessingResult with computed_confidence set."""
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-enriched")
+        processing_result = ProcessingPrototypeService().get_processing_result(
+            "session-enriched"
+        )
+
+        _, enriched = await AnalysisPrototypeService(
+            llm_service=_FakeLLMService()
+        ).generate_draft(processing_result)
+
+        assert isinstance(enriched, ProcessingResult)
+        for finding in enriched.findings:
+            assert finding.computed_confidence is not None, (
+                f"Finding {finding.id} should have computed_confidence set"
+            )
+
+    @pytest.mark.asyncio
+    async def test_fallback_used_when_llm_returns_old_string_format(
+        self, monkeypatch, tmp_path
+    ):
+        """Old string-format implications should trigger fallback, not a crash."""
+        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
+        _write_processed_json(tmp_path, "session-old-format")
+        processing_result = ProcessingPrototypeService().get_processing_result(
+            "session-old-format"
+        )
+
+        draft, _ = await AnalysisPrototypeService(
+            llm_service=_FakeLLMServiceOldStringFormat()
+        ).generate_draft(processing_result)
+
+        # Should fall back to fallback_draft — summary must still be non-empty
+        assert isinstance(draft, AnalysisDraft)
+        assert draft.summary.strip() != ""

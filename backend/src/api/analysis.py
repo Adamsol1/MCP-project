@@ -1,6 +1,9 @@
 """API router for prototype analysis endpoints."""
 
+import json
+import logging
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Literal
 
 from fastapi import APIRouter, HTTPException
@@ -12,14 +15,20 @@ from src.models.analysis import (
     CouncilRunSettings,
     ProcessingResult,
 )
+from src.models.confidence import CollectionCoverageResult
 from src.services.analysis_prototype_service import AnalysisPrototypeService
 from src.services.analysis_session_store import AnalysisSessionStore
+from src.services.confidence.collection_coverage import compute_collection_coverage
 from src.services.council_service import CouncilService
 from src.services.processing_prototype_service import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
     ProcessingPrototypeService,
 )
 from src.services.reasearch_logger import ResearchLogger
+
+logger = logging.getLogger(__name__)
+
+_SESSIONS_DIR = Path(__file__).resolve().parents[2] / "sessions"
 
 router = APIRouter(prefix="/api/analysis")
 
@@ -31,12 +40,36 @@ class AnalysisDraftRequest(BaseModel):
     force_refresh: bool = False
 
 
+def _load_pirs_for_session(session_id: str) -> list[dict]:
+    """Load the approved PIR list from the direction-phase session JSON.
+
+    Returns an empty list if the file is missing or malformed — coverage
+    will still compute (all PIRs will be LOW), so callers never crash.
+    """
+    session_path = _SESSIONS_DIR / f"{session_id}.json"
+    if not session_path.exists():
+        logger.debug("Session file not found for PIR loading: %s", session_path)
+        return []
+    try:
+        data = json.loads(session_path.read_text(encoding="utf-8"))
+        current_pir_raw = data.get("direction_flow", {}).get("current_pir")
+        if not current_pir_raw:
+            return []
+        pir_data = json.loads(current_pir_raw)
+        pirs: list[dict] = pir_data.get("pirs", [])
+        return [p for p in pirs if isinstance(p, dict) and "question" in p]
+    except (OSError, json.JSONDecodeError, AttributeError):
+        logger.warning("Failed to load PIRs from session %s", session_id)
+        return []
+
+
 class AnalysisDraftResponse(BaseModel):
     """Response body containing both processing and analysis prototype data."""
 
     processing_result: ProcessingResult
     analysis_draft: AnalysisDraft
     latest_council_note: CouncilNote | None = None
+    collection_coverage: CollectionCoverageResult | None = None
     data_source: Literal["session"] = "session"
 
 
@@ -111,20 +144,33 @@ async def _build_draft(
         or state.analysis_draft is None
         or processing_changed
     ):
-        analysis_draft = await analysis_service.generate_draft(processing_result)
+        analysis_draft, enriched_processing_result = await analysis_service.generate_draft(
+            processing_result
+        )
         if force_refresh or processing_changed:
             state.session_id = session_id
-            state.processing_result = processing_result
+            state.processing_result = enriched_processing_result
             state.analysis_draft = analysis_draft
             state.latest_council_note = None
             state = store.save(state)
         else:
-            state = store.save_draft(session_id, processing_result, analysis_draft)
+            state = store.save_draft(
+                session_id, enriched_processing_result, analysis_draft
+            )
+        processing_result = enriched_processing_result
+
+    pirs = _load_pirs_for_session(session_id)
+    coverage = compute_collection_coverage(
+        findings=processing_result.findings,
+        gaps=processing_result.gaps,
+        pirs=pirs,
+    )
 
     return AnalysisDraftResponse(
         processing_result=state.processing_result,
         analysis_draft=state.analysis_draft,
         latest_council_note=state.latest_council_note,
+        collection_coverage=coverage,
         data_source="session",
     )
 

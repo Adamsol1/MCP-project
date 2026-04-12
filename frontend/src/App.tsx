@@ -51,6 +51,10 @@ function AppShell() {
     renameConversation,
     updatePerspectives,
   } = useConversation();
+  const [pendingPerspectives, setPendingPerspectives] = useState<string[]>([
+    "NEUTRAL",
+  ]);
+
   const {
     messages,
     sendMessage,
@@ -75,7 +79,7 @@ function AppShell() {
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
-  } = useChat();
+  } = useChat(pendingPerspectives);
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -87,9 +91,8 @@ function AppShell() {
     current: number;
     total: number;
   }>({ current: 0, total: 0 });
-
   const ensureConversationSession = () => {
-    return activeConversation ?? createNewConversation();
+    return activeConversation ?? createNewConversation(pendingPerspectives);
   };
 
   useEffect(() => {
@@ -249,9 +252,13 @@ function AppShell() {
             <IntelligencePanel
               phase={activePhase}
               selectedPerspectives={
-                activeConversation?.perspectives ?? ["NEUTRAL"]
+                activeConversation?.perspectives ?? pendingPerspectives
               }
-              onPerspectiveChange={updatePerspectives}
+              onPerspectiveChange={
+                activeConversation
+                  ? updatePerspectives
+                  : setPendingPerspectives
+              }
               onOpenFileUpload={() => setIsFileUploadOpen(true)}
               uploadedFiles={visibleUploadedFiles}
               onFileRemove={handleFileRemove}

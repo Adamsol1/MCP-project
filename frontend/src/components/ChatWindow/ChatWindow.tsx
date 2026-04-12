@@ -83,31 +83,31 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           />
         </div>
       )}
-      <div className="space-y-4 mt-2">
+      <div className="space-y-2 mt-2">
         {pirData.pirs.map((pir, i) => (
           <div
             key={i}
-            className="rounded-lg border border-border-muted bg-surface-muted/50 p-3 space-y-1.5"
+            className="rounded-lg border border-border-muted bg-surface px-3 py-2.5 space-y-1"
           >
             <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-text-muted">
-                PIR-{i + 1}
+              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                {i + 1}
               </span>
+              <p className="text-sm font-semibold text-text-primary leading-tight flex-1">
+                {pir.question}
+              </p>
               <span
-                className={`text-xs font-semibold uppercase tracking-wide ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"}`}
+                className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold uppercase ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"} bg-surface-muted`}
               >
                 {PRIORITY_LABEL[pir.priority] ?? pir.priority}
               </span>
             </div>
-            <p className="font-medium text-sm leading-snug text-text-primary">
-              {pir.question}
-            </p>
             <details className="group">
-              <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center">
+              <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center pl-7">
                 {t.rationale}
                 <Chevron />
               </summary>
-              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-2 border-l-2 border-border-muted ml-0.5">
+              <div className="mt-1.5 text-xs text-text-secondary leading-relaxed pl-7">
                 <CitationText
                   text={pir.rationale}
                   claims={pirData.claims}
@@ -324,6 +324,150 @@ function CollectionReviewPrompt({
   );
 }
 
+type ConfidenceTier = "low" | "moderate" | "high" | "assessed";
+
+function confidenceTierFromInt(score: number): ConfidenceTier {
+  if (score >= 80) return "assessed";
+  if (score >= 60) return "high";
+  if (score >= 40) return "moderate";
+  return "low";
+}
+
+const FINDING_TIER_STYLES: Record<ConfidenceTier, string> = {
+  assessed: "bg-purple-600 text-white",
+  high:     "bg-emerald-600 text-white",
+  moderate: "bg-amber-500 text-white",
+  low:      "bg-red-600 text-white",
+};
+
+const SOURCE_DISPLAY_NAMES: Record<string, string> = {
+  knowledge_bank: "Internal Knowledge Bank",
+  otx:            "AlienVault OTX",
+  web_gov:        "Government / Official",
+  web_think_tank: "Think Tank",
+  web_news:       "News",
+  web_search:     "Web Search",
+  web_other:      "Web",
+  pretrained:     "Pretrained Knowledge",
+  osint:          "OSINT",
+};
+
+function FindingConfidenceBadge({ f }: { f: ProcessingData["findings"][number] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const tier = confidenceTierFromInt(f.confidence);
+  const tierStyle = FINDING_TIER_STYLES[tier];
+  const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
+
+  const sd = f.supporting_data ?? {};
+  const hasDetails =
+    (sd.kb_refs?.length ?? 0) > 0 ||
+    (sd.attack_ids?.length ?? 0) > 0 ||
+    (sd.entities?.length ?? 0) > 0 ||
+    (sd.domains?.length ?? 0) > 0 ||
+    (f.uncertainties?.length ?? 0) > 0;
+
+  return (
+    <div className="relative shrink-0" ref={ref}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold cursor-pointer transition-opacity hover:opacity-80 ${tierStyle}`}
+        title="Click for source details"
+      >
+        <span>{tier.toUpperCase()}</span>
+        <span className="opacity-70 font-normal">{f.confidence}%</span>
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg border border-border bg-surface shadow-xl p-3 space-y-2.5 text-xs">
+          <p className="font-semibold text-text-primary text-sm">Confidence Details</p>
+
+          <div className="flex items-center justify-between">
+            <span className="text-text-muted">AI confidence</span>
+            <span className="font-medium">{f.confidence}%</span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-text-muted">Source type</span>
+            <span className="font-medium">{sourceLabel}</span>
+          </div>
+
+          {hasDetails && (
+            <div className="border-t border-border-muted pt-2 space-y-2">
+              {(sd.kb_refs?.length ?? 0) > 0 && (
+                <div>
+                  <p className="font-medium text-text-secondary mb-0.5">Knowledge base refs</p>
+                  <div className="flex flex-wrap gap-1">
+                    {sd.kb_refs!.map((r) => (
+                      <span key={r} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(sd.attack_ids?.length ?? 0) > 0 && (
+                <div>
+                  <p className="font-medium text-text-secondary mb-0.5">ATT&CK techniques</p>
+                  <div className="flex flex-wrap gap-1">
+                    {sd.attack_ids!.map((id) => (
+                      <span key={id} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">
+                        {id}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(sd.entities?.length ?? 0) > 0 && (
+                <div>
+                  <p className="font-medium text-text-secondary mb-0.5">Entities</p>
+                  <p className="text-text-primary">{sd.entities!.join(", ")}</p>
+                </div>
+              )}
+              {(sd.domains?.length ?? 0) > 0 && (
+                <div>
+                  <p className="font-medium text-text-secondary mb-0.5">Domains</p>
+                  <div className="flex flex-wrap gap-1">
+                    {sd.domains!.map((d) => (
+                      <span key={d} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">
+                        {d}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {(f.uncertainties?.length ?? 0) > 0 && (
+                <div>
+                  <p className="font-medium text-text-secondary mb-0.5">Uncertainties</p>
+                  <ul className="list-disc pl-3 space-y-0.5 text-text-primary">
+                    {f.uncertainties.map((u, i) => (
+                      <li key={i}>{u}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+
+          <p className="border-t border-border-muted pt-2 text-text-muted italic">
+            Full source breakdown (OTX, web) available in the Analysis view after processing.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function ProcessingMessage({ data }: { data: ProcessingData }) {
   return (
     <div className="space-y-3">
@@ -338,11 +482,9 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
               key={f.id}
               className="rounded border border-border-muted bg-surface px-3 py-2 text-sm"
             >
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-medium text-text-primary">{f.title}</p>
-                <span className="shrink-0 text-xs text-text-muted">
-                  confidence {f.confidence}%
-                </span>
+              <div className="flex items-start justify-between gap-2">
+                <p className="font-medium text-text-primary leading-snug">{f.title}</p>
+                <FindingConfidenceBadge f={f} />
               </div>
               <p className="text-xs text-text-secondary mt-1">{f.finding}</p>
               {f.why_it_matters && (

@@ -36,7 +36,7 @@ export interface ConversationContextValue {
   /** The currently selected conversation, or null when none exist. */
   activeConversation: Conversation | null;
   /** Create a brand-new conversation, make it active, and return it. */
-  createNewConversation: () => Conversation;
+  createNewConversation: (initialPerspectives?: string[]) => Conversation;
   /** Switch the active conversation to the one with the given id. */
   switchConversation: (id: string) => void;
   /** Permanently delete the conversation with the given id. */
@@ -266,11 +266,14 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     state.conversations.find((c) => c.id === state.activeConversationId) ??
     null;
 
-  const createNewConversation = useCallback((): Conversation => {
-    const newConversation = createConversation();
-    dispatch({ type: "CREATE_CONVERSATION", payload: newConversation });
-    return newConversation;
-  }, []);
+  const createNewConversation = useCallback(
+    (initialPerspectives?: string[]): Conversation => {
+      const newConversation = createConversation(initialPerspectives);
+      dispatch({ type: "CREATE_CONVERSATION", payload: newConversation });
+      return newConversation;
+    },
+    [],
+  );
 
   const switchConversation = useCallback((id: string) => {
     dispatch({ type: "SWITCH_CONVERSATION", payload: id });

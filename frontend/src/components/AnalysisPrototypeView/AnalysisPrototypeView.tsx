@@ -7,10 +7,14 @@ import {
 } from "../../services/analysis/analysis";
 import type {
   AnalysisDraftResponse,
+  AssertionConfidence,
+  ConfidenceTier,
   CouncilNote,
   CouncilTranscriptEntry,
+  PerspectiveAssertion,
   ProcessingFinding,
 } from "../../types/analysis";
+import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverageView";
 
 const PERSPECTIVE_ORDER = ["us", "norway", "china", "eu", "russia", "neutral"];
 const COUNCIL_SUMMARY_VIEW = "council-summary";
@@ -564,6 +568,140 @@ function CouncilParticipantPanel({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Assertion confidence rendering helpers
+// ---------------------------------------------------------------------------
+
+const ASSERTION_TIER_STYLES: Record<
+  ConfidenceTier,
+  { bg: string; text: string; border: string; label: string }
+> = {
+  low: { bg: "bg-error-subtle", text: "text-error-text", border: "border-error/30", label: "Low" },
+  moderate: { bg: "bg-warning-subtle", text: "text-warning-text", border: "border-warning/30", label: "Moderate" },
+  high: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "High" },
+  assessed: { bg: "bg-[#edf6f0]", text: "text-[#1a6640]", border: "border-[#1a6640]/20", label: "Assessed" },
+};
+
+function AssertionTierBadge({ confidence }: { confidence: AssertionConfidence | null }) {
+  const [showScore, setShowScore] = useState(false);
+  if (!confidence) return null;
+  const styles = ASSERTION_TIER_STYLES[confidence.tier];
+  return (
+    <span
+      title={`Score: ${confidence.score.toFixed(2)} | Authority: ${confidence.authority.toFixed(2)} | Corroboration: ${confidence.corroboration.toFixed(2)} | Independence: ${confidence.independence.toFixed(2)}`}
+      onMouseEnter={() => setShowScore(true)}
+      onMouseLeave={() => setShowScore(false)}
+      className={`inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest transition-all ${styles.bg} ${styles.text} ${styles.border}`}
+    >
+      {showScore ? confidence.score.toFixed(2) : styles.label}
+    </span>
+  );
+}
+
+function AssertionBreakdown({
+  assertion,
+  allFindings,
+}: {
+  assertion: PerspectiveAssertion;
+  allFindings: ProcessingFinding[];
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const conf = assertion.confidence;
+
+  return (
+    <li className="rounded-[14px] border border-border bg-surface/60 px-3 py-2.5">
+      {/* Header row: badge + text */}
+      <div className="flex items-start gap-2">
+        <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-border" />
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <AssertionTierBadge confidence={conf} />
+            {conf?.circular_flag && (
+              <span className="text-[10px] font-medium text-warning-text">⚠ Circular</span>
+            )}
+          </div>
+          <p className="text-sm leading-6 text-text-secondary">{assertion.assertion}</p>
+        </div>
+        {conf && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={`shrink-0 text-[10px] text-text-muted transition-transform ${expanded ? "rotate-90" : ""}`}
+            aria-label="Toggle confidence breakdown"
+          >
+            ▶
+          </button>
+        )}
+      </div>
+
+      {/* Expanded breakdown */}
+      {expanded && conf && (
+        <div className="mt-2 ml-3.5 space-y-2">
+          {/* Component bars */}
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                ["Authority", conf.authority],
+                ["Corroboration", conf.corroboration],
+                ["Independence", conf.independence],
+              ] as [string, number][]
+            ).map(([label, value]) => (
+              <div key={label}>
+                <p className="text-[9px] font-medium uppercase tracking-widest text-text-muted">
+                  {label}
+                </p>
+                <div className="mt-0.5 flex items-center gap-1">
+                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-border/40">
+                    <div
+                      className="h-full rounded-full bg-primary/60"
+                      style={{ width: `${Math.round(value * 100)}%` }}
+                    />
+                  </div>
+                  <span className="text-[9px] tabular-nums text-text-muted">
+                    {value.toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Source types */}
+          {assertion.source_types.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {assertion.source_types.map((st) => (
+                <span
+                  key={st}
+                  className="rounded-full border border-border bg-surface px-1.5 py-0.5 text-[9px] text-text-muted"
+                >
+                  {st.replace(/_/g, " ")}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Supporting finding IDs */}
+          {assertion.supporting_finding_ids.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {assertion.supporting_finding_ids.map((fid) => {
+                const finding = allFindings.find((f) => f.id === fid);
+                return (
+                  <span
+                    key={fid}
+                    title={finding?.title}
+                    className="rounded border border-primary/30 bg-primary-subtle/20 px-1.5 py-0.5 text-[9px] font-mono text-primary/70"
+                  >
+                    {fid}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </li>
+  );
+}
+
 export default function AnalysisPrototypeView() {
   const { activeConversation } = useConversation();
   const { settings } = useSettings();
@@ -927,6 +1065,10 @@ export default function AnalysisPrototypeView() {
         )}
       </section>
 
+      {data.collection_coverage && (
+        <CollectionCoverageView coverage={data.collection_coverage} />
+      )}
+
       <section className="grid gap-4 grid-cols-1 xl:grid-cols-3">
         <article className="rounded-[24px] border border-border bg-surface px-5 py-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
@@ -1179,39 +1321,48 @@ export default function AnalysisPrototypeView() {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {orderedPerspectiveEntries.map(([key, implications]) => (
-            <details
-              key={key}
-              className="group rounded-[22px] border border-border bg-surface px-4 py-4 shadow-sm"
-            >
-              <summary className="flex cursor-pointer items-center justify-between list-none">
-                <h3 className="text-sm font-semibold text-text-primary">
-                  {formatPerspectiveLabel(key)}
-                </h3>
-                <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">
-                  &#9654;
-                </span>
-              </summary>
-              {implications.length > 0 && (
-                <p className="mt-2 text-sm leading-6 text-text-secondary group-open:hidden">
-                  {implications[0].length > 120
-                    ? `${implications[0].slice(0, 120)}...`
-                    : implications[0]}
-                </p>
-              )}
-              <ul className="mt-3 space-y-2">
-                {implications.map((implication) => (
-                  <li
-                    key={implication}
-                    className="flex gap-2.5 text-sm leading-6 text-text-secondary"
-                  >
-                    <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-border" />
-                    <span>{implication}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ))}
+          {orderedPerspectiveEntries.map(([key, implications]) => {
+            const firstAssertion = implications[0] ?? null;
+            const preview = firstAssertion
+              ? firstAssertion.assertion.length > 120
+                ? `${firstAssertion.assertion.slice(0, 120)}...`
+                : firstAssertion.assertion
+              : null;
+            return (
+              <details
+                key={key}
+                className="group rounded-[22px] border border-border bg-surface px-4 py-4 shadow-sm"
+              >
+                <summary className="flex cursor-pointer items-center justify-between list-none">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-semibold text-text-primary">
+                      {formatPerspectiveLabel(key)}
+                    </h3>
+                    {firstAssertion?.confidence && (
+                      <AssertionTierBadge confidence={firstAssertion.confidence} />
+                    )}
+                  </div>
+                  <span className="text-xs text-text-muted group-open:rotate-90 transition-transform">
+                    &#9654;
+                  </span>
+                </summary>
+                {preview && (
+                  <p className="mt-2 text-sm leading-6 text-text-secondary group-open:hidden">
+                    {preview}
+                  </p>
+                )}
+                <ul className="mt-3 space-y-2">
+                  {implications.map((assertion, idx) => (
+                    <AssertionBreakdown
+                      key={idx}
+                      assertion={assertion}
+                      allFindings={processingResult.findings}
+                    />
+                  ))}
+                </ul>
+              </details>
+            );
+          })}
         </div>
       </section>
 

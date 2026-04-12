@@ -2,6 +2,8 @@
 
 from pydantic import BaseModel, Field
 
+from src.models.confidence import FindingConfidence, PerspectiveAssertion
+
 
 class FindingModel(BaseModel):
     """A structured finding extracted during the processing phase."""
@@ -12,7 +14,7 @@ class FindingModel(BaseModel):
     evidence_summary: str = Field(..., description="Concise evidence summary")
     source: str = Field(..., description="Source category for the finding")
     confidence: int = Field(
-        ..., ge=0, le=100, description="Finding confidence from 0 to 100"
+        ..., ge=0, le=100, description="AI-generated confidence (legacy, 0–100)"
     )
     relevant_to: list[str] = Field(
         default_factory=list, description="Related PIR identifiers"
@@ -23,6 +25,10 @@ class FindingModel(BaseModel):
     why_it_matters: str = Field(..., description="Analytical significance of finding")
     uncertainties: list[str] = Field(
         default_factory=list, description="Known uncertainties or unresolved questions"
+    )
+    computed_confidence: FindingConfidence | None = Field(
+        default=None,
+        description="Algorithm-computed confidence breakdown (None until enrichment pass)",
     )
 
 
@@ -44,9 +50,9 @@ class AnalysisDraft(BaseModel):
     key_judgments: list[str] = Field(
         default_factory=list, description="Primary analytical judgments"
     )
-    per_perspective_implications: dict[str, list[str]] = Field(
+    per_perspective_implications: dict[str, list[PerspectiveAssertion]] = Field(
         default_factory=dict,
-        description="Implications grouped by analytical perspective",
+        description="Implications grouped by analytical perspective, with evidence trace",
     )
     recommended_actions: list[str] = Field(
         default_factory=list, description="Recommended follow-up actions"

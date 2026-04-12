@@ -139,7 +139,7 @@ export default function IntelligencePanel({
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <header className="border-b border-border-muted px-3 py-2">
+      <header className="h-14 border-b border-border-muted px-3 flex flex-col justify-center">
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
           {t.intelligenceWorkspace}
         </p>

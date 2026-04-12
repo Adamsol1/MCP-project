@@ -389,7 +389,7 @@ function getFeedbackPrompt(stage: DialogueStage): string {
   return "What should be modified in the collected summary?";
 }
 
-export function useChat() {
+export function useChat(initialPerspectives?: string[]) {
   const { activeConversation, createNewConversation, addMessage, setStage } =
     useConversation();
   const { settings } = useSettings();
@@ -499,15 +499,18 @@ export function useChat() {
       options,
     );
 
-    applyResponse(
-      response,
-      conversationId,
-      fallbackStage,
-      fallbackSubState,
-      fallbackPhase,
-    );
-
-    if (response.action !== "start_collecting") {
+    if (response.action === "start_collecting") {
+      // Skip the "Collecting from: ..." message — the Collection Results card
+      // already shows the sources used.  Just advance the stage.
+      setStage("collecting", null, "collection");
+    } else {
+      applyResponse(
+        response,
+        conversationId,
+        fallbackStage,
+        fallbackSubState,
+        fallbackPhase,
+      );
       return;
     }
 
@@ -538,7 +541,8 @@ export function useChat() {
   };
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
 
     addMessage(
       { id: crypto.randomUUID(), text, sender: "user" },
@@ -735,7 +739,8 @@ export function useChat() {
   };
 
   const debugConfirm = () => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
     addMessage(
       {
         id: crypto.randomUUID(),
