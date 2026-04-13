@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { ConversationContext } from "../contexts/ConversationContext/ConversationContext";
+import { ConversationContext } from "../../contexts/ConversationContext/ConversationContext";
 
 /**
  * Convenience hook for reading from and writing to ConversationContext.

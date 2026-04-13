@@ -2,14 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { useChat } from "./useChat";
-import { ConversationProvider } from "../contexts/ConversationContext/ConversationContext";
-import { ToastProvider } from "../contexts/Toast/ToastContext";
-import { SettingsProvider } from "../contexts/SettingsContext/SettingsContext";
-import type { ConversationStore } from "../types/conversation";
+import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
+import { ToastProvider } from "../../contexts/Toast/ToastContext";
+import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import type { ConversationStore } from "../../types/conversation";
 
 // Mock the dialogue service so we don't make real API calls
-vi.mock("../services/dialogue");
-import { sendMessage } from "../services/dialogue";
+vi.mock("../../services/dialogue/dialogue");
+import { sendMessage } from "../../services/dialogue/dialogue";
 
 const STORAGE_KEY = "mcp-conversations";
 
@@ -37,6 +37,7 @@ function seedConversation(overrides: Record<string, unknown> = {}) {
     sessionId: "test-session-123",
     isConfirming: false,
     stage: "initial",
+    phase: "direction",
     subState: null,
     createdAt: 1000,
     updatedAt: 1000,
@@ -135,7 +136,7 @@ describe("useChat", () => {
       undefined,
       "en",
       "",
-      { gatherMore: false },
+      {},
     );
   });
 
@@ -320,7 +321,9 @@ describe("useChat", () => {
   });
 
   it("hides confirmation immediately while approve request is pending", async () => {
-    let resolveApprove: ((value: { question: string; action: "complete" }) => void) | null = null;
+    let resolveApprove:
+      | ((value: { question: string; action: "complete" }) => void)
+      | null = null;
 
     vi.mocked(sendMessage)
       .mockResolvedValueOnce({
@@ -330,7 +333,10 @@ describe("useChat", () => {
       .mockImplementationOnce(
         () =>
           new Promise((resolve) => {
-            resolveApprove = resolve as (value: { question: string; action: "complete" }) => void;
+            resolveApprove = resolve as (value: {
+              question: string;
+              action: "complete";
+            }) => void;
           }),
       );
 

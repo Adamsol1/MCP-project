@@ -2,7 +2,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.api.dialogue import _convert_to_message_response
-from src.models.dialogue import DialogueAction, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 
 
 @pytest.mark.parametrize(
@@ -21,15 +21,18 @@ def test_convert_to_message_response_keeps_canonical_action(action: DialogueActi
     converted = _convert_to_message_response(
         response=response,
         stage="gathering",
+        phase=Phase.DIRECTION,
     )
 
     assert converted.question == "payload"
     assert converted.action == action
     assert converted.stage == "gathering"
+    assert converted.phase == "direction"
     assert set(converted.model_dump().keys()) == {
         "question",
         "action",
         "stage",
+        "phase",
         "sub_state",
     }
 
@@ -44,7 +47,11 @@ def test_convert_to_message_response_raises_for_unknown_action():
     response.action = "invalid_action_name"  # type: ignore[assignment]
 
     with pytest.raises(HTTPException) as exc_info:
-        _convert_to_message_response(response=response, stage="gathering")
+        _convert_to_message_response(
+            response=response,
+            stage="gathering",
+            phase=Phase.DIRECTION,
+        )
 
     assert exc_info.value.status_code == 500
     assert "Internal error: invalid dialogue action" in exc_info.value.detail

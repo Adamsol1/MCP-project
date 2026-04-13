@@ -23,8 +23,6 @@ interface SidebarProps {
   onDevSendMessage: () => void;
   /** DEV: Forces chat into confirmation mode to preview approval UI. */
   onDevShowCollectionApproval?: () => void;
-  /** DEV: Open the analysis prototype directly using the selected demo-backed flow. */
-  onDevOpenAnalysis?: (dataset: string) => void;
   /** DEV: Force the backend/session to a specific stage. */
   onDevJumpToStage?: (stage: DialogueStage) => void;
   /** DEV: Pull latest stage snapshot from backend. */
@@ -34,22 +32,6 @@ interface SidebarProps {
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
 }
-
-
-const ANALYSIS_DEMO_ACTIONS = [
-  {
-    dataset: "demo_processing_result",
-    label: "Open analysis demo 1",
-  },
-  {
-    dataset: "demo_processing_result_2",
-    label: "Open analysis demo 2",
-  },
-  {
-    dataset: "demo_processing_result_3",
-    label: "Open analysis demo 3",
-  },
-];
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
@@ -84,7 +66,6 @@ export function Sidebar({
   onDeleteAllConversations,
   onDevSendMessage,
   onDevShowCollectionApproval,
-  onDevOpenAnalysis,
   onDevJumpToStage,
   onDevSyncStage,
   onDevResetStage,
@@ -381,19 +362,6 @@ export function Sidebar({
                 >
                   {t.showCollectionApproval}
                 </button>
-              )}
-              {onDevOpenAnalysis && (
-                <div className="mt-1">
-                  {ANALYSIS_DEMO_ACTIONS.map((item) => (
-                    <button
-                      key={item.dataset}
-                      onClick={() => onDevOpenAnalysis(item.dataset)}
-                      className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
               )}
               {onDevJumpToStage && (
                 <div className="mt-1">

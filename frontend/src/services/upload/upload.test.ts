@@ -121,7 +121,10 @@ describe("listUploadedFiles", () => {
   });
 
   it("unwraps the files array from the response envelope", async () => {
-    const twoFiles = [baseFileRecord, { ...baseFileRecord, file_upload_id: "upload-2" }];
+    const twoFiles = [
+      baseFileRecord,
+      { ...baseFileRecord, file_upload_id: "upload-2" },
+    ];
     vi.mocked(axios.get).mockResolvedValue({
       data: { status: "success", session_id: "session-123", files: twoFiles },
     });
@@ -164,9 +167,9 @@ describe("deleteUploadedFile", () => {
   it("throws when the API call fails", async () => {
     vi.mocked(axios.delete).mockRejectedValue(new Error("Not found"));
 
-    await expect(
-      deleteUploadedFile("session-123", "upload-1"),
-    ).rejects.toThrow("Not found");
+    await expect(deleteUploadedFile("session-123", "upload-1")).rejects.toThrow(
+      "Not found",
+    );
   });
 });
 
@@ -195,12 +198,16 @@ describe("deleteSessionArtifacts", () => {
     vi.mocked(axios.delete).mockRejectedValue(new Error("Backend unreachable"));
 
     // Should not throw — errors are swallowed so the frontend deletion can proceed.
-    await expect(deleteSessionArtifacts("session-123")).resolves.toBeUndefined();
+    await expect(
+      deleteSessionArtifacts("session-123"),
+    ).resolves.toBeUndefined();
   });
 
   it("silently succeeds when the session never had any backend artifacts (404)", async () => {
     vi.mocked(axios.delete).mockRejectedValue({ response: { status: 404 } });
 
-    await expect(deleteSessionArtifacts("session-123")).resolves.toBeUndefined();
+    await expect(
+      deleteSessionArtifacts("session-123"),
+    ).resolves.toBeUndefined();
   });
 });

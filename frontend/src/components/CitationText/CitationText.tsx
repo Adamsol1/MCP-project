@@ -45,13 +45,18 @@ export default function CitationText({
   onRefHover,
 }: CitationTextProps) {
   const activeHighlightedRefs = highlightedRefs ?? (highlightedRef ? [highlightedRef] : []);
-  const parts = text.split(/(\[\d+\])/g);
+  const parts = text.split(/(\[\d+\]|\*\*[^*]+\*\*)/g);
   const markerGroups = buildMarkerGroups(parts);
 
   return (
     <span>
       {parts.map((part, i) => {
         if (part === "") return null; // Skip empty segments
+
+        // **bold** markdown
+        if (/^\*\*[^*]+\*\*$/.test(part)) {
+          return <strong key={i}>{part.slice(2, -2)}</strong>;
+        }
 
         // [N] marker — emit its full group on hover
         if (/^\[\d+\]$/.test(part)) {

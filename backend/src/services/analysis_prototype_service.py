@@ -2,8 +2,15 @@
 
 import logging
 
-from src.models.analysis import AnalysisDraft, ProcessingResult
+from src.models.analysis import AnalysisDraft, FindingModel, ProcessingResult
+from src.models.confidence import (
+    ConfidenceTier,
+    FindingConfidence,
+    PerspectiveAssertion,
+)
 from src.models.dialogue import Perspective
+from src.services.confidence.assertion_enrichment import enrich_assertions, validate_finding_ids
+from src.services.confidence.scoring import compute_confidence
 from src.services.llm_service import LLMService
 
 logger = logging.getLogger("app")
@@ -22,18 +29,28 @@ class AnalysisPrototypeService:
         self,
         processing_result: ProcessingResult,
         selected_perspectives: list[str] | None = None,
-    ) -> AnalysisDraft:
-        """Create an analysis draft grounded in processed findings."""
+    ) -> tuple[AnalysisDraft, ProcessingResult]:
+        """Create an analysis draft grounded in processed findings.
+
+        Returns:
+            (AnalysisDraft, ProcessingResult) — the draft has per-assertion
+            confidence attached; the ProcessingResult has computed_confidence
+            on each FindingModel.
+        """
         normalized_perspectives = self._normalize_perspectives(selected_perspectives)
+
+        # Layer 2: compute finding-level confidence before generating the draft
+        enriched_processing_result = self._enrich_findings(processing_result)
+
         fallback_draft = self._generate_fallback_draft(
-            processing_result=processing_result,
+            processing_result=enriched_processing_result,
             selected_perspectives=normalized_perspectives,
         )
 
         try:
             payload = await self.llm_service.generate_json(
                 self._build_prompt(
-                    processing_result=processing_result,
+                    processing_result=enriched_processing_result,
                     selected_perspectives=normalized_perspectives,
                 )
             )
@@ -42,7 +59,19 @@ class AnalysisPrototypeService:
                 "[AnalysisPrototypeService] Gemini draft generation failed, using fallback draft: %s",
                 exc,
             )
-            return fallback_draft
+            return fallback_draft, enriched_processing_result
+
+        # Validate and strip hallucinated finding IDs before model parsing
+        valid_ids = {f.id for f in enriched_processing_result.findings}
+        raw_implications = payload.get("per_perspective_implications", {})
+        for perspective_key, assertion_list in raw_implications.items():
+            if isinstance(assertion_list, list):
+                raw_assertions = [
+                    a if isinstance(a, dict) else {"assertion": str(a), "supporting_finding_ids": []}
+                    for a in assertion_list
+                ]
+                raw_implications[perspective_key] = validate_finding_ids(raw_assertions, valid_ids)
+        payload["per_perspective_implications"] = raw_implications
 
         try:
             llm_draft = AnalysisDraft.model_validate(payload)
@@ -51,12 +80,66 @@ class AnalysisPrototypeService:
                 "[AnalysisPrototypeService] Gemini returned invalid draft payload, using fallback draft: %s",
                 exc,
             )
-            return fallback_draft
+            return fallback_draft, enriched_processing_result
 
-        return self._merge_with_fallback(
+        merged = self._merge_with_fallback(
             llm_draft=llm_draft,
             fallback_draft=fallback_draft,
         )
+
+        # Layer 3: compute assertion-level confidence for each perspective
+        enriched_draft = self._enrich_draft_assertions(merged, enriched_processing_result)
+        return enriched_draft, enriched_processing_result
+
+    # ------------------------------------------------------------------
+    # Finding-level confidence (Layer 2)
+    # ------------------------------------------------------------------
+
+    def _enrich_findings(self, processing_result: ProcessingResult) -> ProcessingResult:
+        """Return a new ProcessingResult where each finding has computed_confidence set."""
+        enriched_findings: list[FindingModel] = []
+        for finding in processing_result.findings:
+            source_types = [finding.source]
+            source_urls = list(finding.supporting_data.get("source_refs", []))
+            breakdown = compute_confidence(
+                source_types=source_types,
+                source_urls=source_urls if source_urls else None,
+            )
+            fc = FindingConfidence(
+                tier=ConfidenceTier(breakdown.tier),
+                score=breakdown.raw_score,
+                authority=round(breakdown.authority, 4),
+                corroboration=round(breakdown.corroboration, 4),
+                independence=round(breakdown.independence, 4),
+                circular_flag=breakdown.circular_flag,
+                source_types=breakdown.source_types,
+            )
+            enriched_findings.append(finding.model_copy(update={"computed_confidence": fc}))
+        return ProcessingResult(
+            findings=enriched_findings,
+            gaps=processing_result.gaps,
+        )
+
+    # ------------------------------------------------------------------
+    # Assertion-level confidence (Layer 3)
+    # ------------------------------------------------------------------
+
+    def _enrich_draft_assertions(
+        self,
+        draft: AnalysisDraft,
+        processing_result: ProcessingResult,
+    ) -> AnalysisDraft:
+        """Attach AssertionConfidence to every PerspectiveAssertion in the draft."""
+        enriched_implications: dict[str, list[PerspectiveAssertion]] = {}
+        for perspective, assertions in draft.per_perspective_implications.items():
+            enriched_implications[perspective] = enrich_assertions(
+                assertions, processing_result.findings
+            )
+        return draft.model_copy(update={"per_perspective_implications": enriched_implications})
+
+    # ------------------------------------------------------------------
+    # Prompt building
+    # ------------------------------------------------------------------
 
     def _normalize_perspectives(
         self,
@@ -101,6 +184,7 @@ class AnalysisPrototypeService:
         )
         gaps_text = "\n".join(f"- {gap}" for gap in processing_result.gaps) or "- None"
         perspectives_text = ", ".join(selected_perspectives)
+        finding_ids_list = ", ".join(f.id for f in findings) or "none"
 
         return f"""
 You are drafting an intelligence-analysis summary for an analyst UI.
@@ -111,12 +195,17 @@ Return only valid JSON matching this exact structure:
   "summary": "string",
   "key_judgments": ["string"],
   "per_perspective_implications": {{
-    "us": ["string"],
-    "norway": ["string"],
-    "china": ["string"],
-    "eu": ["string"],
-    "russia": ["string"],
-    "neutral": ["string"]
+    "us": [
+      {{
+        "assertion": "string — analytical implication",
+        "supporting_finding_ids": ["F-001"]
+      }}
+    ],
+    "norway": [...],
+    "china": [...],
+    "eu": [...],
+    "russia": [...],
+    "neutral": [...]
   }},
   "recommended_actions": ["string"],
   "information_gaps": ["string"]
@@ -127,7 +216,9 @@ Requirements:
 - Do not mention being an AI.
 - Summary must be 2-4 sentences.
 - Key judgments must be distinct and substantive.
-- For each perspective, provide 2 concise implications.
+- For each perspective, provide 2 concise implications as objects with "assertion" and "supporting_finding_ids".
+- supporting_finding_ids must only contain IDs from this list: {finding_ids_list}
+- If an implication is not directly traceable to a specific finding, use an empty array [].
 - Recommended actions should be actionable and analyst-relevant.
 - information_gaps must reflect the provided gaps.
 - Supported perspectives in this session: {perspectives_text}
@@ -138,6 +229,10 @@ Processed findings:
 Information gaps:
 {gaps_text}
 """.strip()
+
+    # ------------------------------------------------------------------
+    # Fallback draft generation (no LLM)
+    # ------------------------------------------------------------------
 
     def _generate_fallback_draft(
         self,
@@ -170,7 +265,7 @@ Information gaps:
         llm_draft: AnalysisDraft,
         fallback_draft: AnalysisDraft,
     ) -> AnalysisDraft:
-        merged_implications: dict[str, list[str]] = {}
+        merged_implications: dict[str, list[PerspectiveAssertion]] = {}
         for key in self.DEFAULT_PERSPECTIVES:
             llm_values = llm_draft.per_perspective_implications.get(key, [])
             merged_implications[key] = llm_values or fallback_draft.per_perspective_implications.get(
@@ -214,35 +309,71 @@ Information gaps:
 
     def _build_perspective_implications(
         self, findings, gaps: list[str]
-    ) -> dict[str, list[str]]:
+    ) -> dict[str, list[PerspectiveAssertion]]:
+        """Build fallback implications as PerspectiveAssertion objects.
+
+        Uses the first finding's ID where possible to seed supporting_finding_ids.
+        Confidence will be computed by the enrichment pass.
+        """
+        first_id = findings[0].id if findings else None
         titles = [finding.title for finding in findings]
         title_text = "; ".join(titles[:4]) if titles else "limited processed reporting"
         first_gap = gaps[0] if gaps else "Attribution remains unresolved."
 
+        def _a(text: str, fids: list[str] | None = None) -> PerspectiveAssertion:
+            return PerspectiveAssertion(
+                assertion=text,
+                supporting_finding_ids=fids or ([first_id] if first_id else []),
+            )
+
         return {
             "us": [
-                "The combination of credential-access activity and phishing staging is relevant to allied telecom providers and shared vendor-access pathways.",
-                f"US analysts should track whether the pattern seen in {title_text} reflects a reusable access-development model against critical infrastructure.",
+                _a(
+                    "The combination of credential-access activity and phishing staging is relevant to allied telecom providers and shared vendor-access pathways."
+                ),
+                _a(
+                    f"US analysts should track whether the pattern seen in {title_text} reflects a reusable access-development model against critical infrastructure."
+                ),
             ],
             "norway": [
-                "The findings are directly relevant to Norwegian telecom and emergency communications operators because the scenario centers on Northern European resilience functions.",
-                "Norwegian stakeholders should prioritize privileged-access review around network operations, identity services, and trusted third-party connectivity.",
+                _a(
+                    "The findings are directly relevant to Norwegian telecom and emergency communications operators because the scenario centers on Northern European resilience functions."
+                ),
+                _a(
+                    "Norwegian stakeholders should prioritize privileged-access review around network operations, identity services, and trusted third-party connectivity."
+                ),
             ],
             "china": [
-                "The infrastructure-overlap and campaign-intent findings provide a comparative baseline for state-style telecom targeting without establishing attribution.",
-                f"From a China-focused analytical lens, {first_gap.lower()} should limit any premature actor-specific conclusion.",
+                _a(
+                    "The infrastructure-overlap and campaign-intent findings provide a comparative baseline for state-style telecom targeting without establishing attribution."
+                ),
+                _a(
+                    f"From a China-focused analytical lens, {first_gap.lower()} should limit any premature actor-specific conclusion."
+                ),
             ],
             "eu": [
-                "Cross-border telecom dependencies increase the regional significance of credential theft, phishing staging, and vendor-access compromise.",
-                "EU-level coordination would be relevant if the observed access activity affects shared carriers, interconnection partners, or continuity planning.",
+                _a(
+                    "Cross-border telecom dependencies increase the regional significance of credential theft, phishing staging, and vendor-access compromise."
+                ),
+                _a(
+                    "EU-level coordination would be relevant if the observed access activity affects shared carriers, interconnection partners, or continuity planning."
+                ),
             ],
             "russia": [
-                "The focus on Northern European telecom resilience and subsea or interconnection-adjacent functions intersects with regional critical-infrastructure threat scenarios often assessed in relation to Russia.",
-                f"The current record still requires caution because {first_gap.lower()}",
+                _a(
+                    "The focus on Northern European telecom resilience and subsea or interconnection-adjacent functions intersects with regional critical-infrastructure threat scenarios often assessed in relation to Russia."
+                ),
+                _a(
+                    f"The current record still requires caution because {first_gap.lower()}"
+                ),
             ],
             "neutral": [
-                "Taken together, the findings support a cautious assessment of coordinated access development rather than isolated opportunistic events.",
-                "The available evidence is stronger on targeting patterns and access preparation than on final intent or actor identity.",
+                _a(
+                    "Taken together, the findings support a cautious assessment of coordinated access development rather than isolated opportunistic events."
+                ),
+                _a(
+                    "The available evidence is stronger on targeting patterns and access preparation than on final intent or actor identity."
+                ),
             ],
         }
 

@@ -4,7 +4,7 @@ import {
   saveConversationStore,
   createConversation,
 } from "./conversationStorage";
-import type { ConversationStore } from "../types/conversation";
+import type { ConversationStore } from "../../types/conversation";
 
 const STORAGE_KEY = "mcp-conversations";
 
@@ -36,6 +36,7 @@ describe("conversationStorage", () => {
             sessionId: "session-456",
             isConfirming: false,
             stage: "initial",
+            phase: "direction",
             subState: null,
             createdAt: 1000,
             updatedAt: 2000,
@@ -97,6 +98,7 @@ describe("conversationStorage", () => {
             sessionId: "s1",
             isConfirming: false,
             stage: "initial",
+            phase: "direction",
             subState: null,
             createdAt: 1000,
             updatedAt: 1000,
@@ -165,6 +167,11 @@ describe("conversationStorage", () => {
     it("creates a conversation with stage set to initial", () => {
       const conv = createConversation();
       expect(conv.stage).toBe("initial");
+    });
+
+    it("creates a conversation with phase set to direction", () => {
+      const conv = createConversation();
+      expect(conv.phase).toBe("direction");
     });
 
     it("creates a conversation with subState set to null", () => {

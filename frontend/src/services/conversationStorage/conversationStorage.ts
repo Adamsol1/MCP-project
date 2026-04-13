@@ -1,5 +1,9 @@
-import type { Conversation, ConversationStore } from "../types/conversation";
-import type { DialogueStage, DialogueSubState } from "../types/dialogue";
+import type { Conversation, ConversationStore } from "../../types/conversation";
+import type {
+  DialoguePhase,
+  DialogueStage,
+  DialogueSubState,
+} from "../../types/dialogue";
 
 /**
  * Single localStorage key under which the entire ConversationStore is stored
@@ -21,13 +25,54 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
     rawStage === "pir_confirming" ||
     rawStage === "planning" ||
     rawStage === "plan_confirming" ||
+    rawStage === "source_selecting" ||
     rawStage === "collecting" ||
     rawStage === "reviewing" ||
+    rawStage === "processing" ||
     rawStage === "complete"
   ) {
     return rawStage;
   }
   return isConfirming ? "summary_confirming" : "initial";
+}
+
+function inferPhaseFromConversation(raw: Conversation, stage: DialogueStage): DialoguePhase {
+  switch (stage) {
+    case "planning":
+    case "plan_confirming":
+    case "source_selecting":
+    case "collecting":
+      return "collection";
+    case "reviewing":
+      return raw.messages.some((message) => message.type === "collection")
+        ? "collection"
+        : "processing";
+    case "processing":
+    case "complete":
+      return "processing";
+    case "initial":
+    case "gathering":
+    case "summary_confirming":
+    case "pir_confirming":
+    default:
+      return "direction";
+  }
+}
+
+function coercePhase(
+  rawPhase: unknown,
+  rawConversation: Conversation,
+  stage: DialogueStage,
+): DialoguePhase {
+  if (
+    rawPhase === "direction" ||
+    rawPhase === "collection" ||
+    rawPhase === "processing" ||
+    rawPhase === "analysis"
+  ) {
+    return rawPhase;
+  }
+  return inferPhaseFromConversation(rawConversation, stage);
 }
 
 function coerceSubState(rawSubState: unknown): DialogueSubState {
@@ -43,16 +88,19 @@ function coerceSubState(rawSubState: unknown): DialogueSubState {
 
 function normalizeConversation(raw: Conversation): Conversation {
   const stage = coerceStage(raw.stage, raw.isConfirming);
+  const phase = coercePhase(raw.phase, raw, stage);
   const subState = coerceSubState(raw.subState);
   return {
     ...raw,
     stage,
+    phase,
     subState,
     isConfirming:
       (stage === "summary_confirming" ||
         stage === "pir_confirming" ||
         stage === "plan_confirming" ||
-        stage === "reviewing") &&
+        stage === "reviewing" ||
+        stage === "processing") &&
       subState === "awaiting_decision",
   };
 }
@@ -115,6 +163,7 @@ export function createConversation(perspectives?: string[]): Conversation {
     sessionId: crypto.randomUUID(), // Separate UUID used to identify this session on the backend.
     isConfirming: false,
     stage: "initial",
+    phase: "direction",
     subState: null,
     createdAt: timeNow,
     updatedAt: timeNow, // Same as createdAt on creation; updated on every mutation.

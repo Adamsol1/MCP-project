@@ -1,3 +1,9 @@
+export type DialoguePhase =
+  | "direction"
+  | "collection"
+  | "processing"
+  | "analysis";
+
 export type DialogueStage =
   | "initial"
   | "gathering"

@@ -6,14 +6,15 @@ import {
   setDevDialogueState,
   type DialogueApiResponse,
   type DialogueSendOptions,
-} from "../services/dialogue";
+} from "../../services/dialogue/dialogue";
 import type {
   DialogueAction,
+  DialoguePhase,
   DialogueStage,
   DialogueSubState,
-} from "../types/dialogue";
-import { useConversation } from "./useConversation";
-import { useToast } from "./useToast";
+} from "../../types/dialogue";
+import { useConversation } from "../useConversation/useConversation";
+import { useToast } from "../useToast/useToast";
 import type {
   CollectionPlanData,
   CollectionPlanStep,
@@ -24,8 +25,8 @@ import type {
   ProcessingData,
   SuggestedSourcesData,
   SummaryData,
-} from "../types/conversation";
-import { useSettings } from "../contexts/SettingsContext/SettingsContext";
+} from "../../types/conversation";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
@@ -127,10 +128,40 @@ function parseSourcesFromUnknown(raw: unknown): string[] {
   return deduped;
 }
 
+function parseStepsFromPlanText(plan: string): CollectionPlanStep[] | undefined {
+  // Split on numbered list boundaries: "N." at the start of a line
+  const chunks = plan.split(/(?=^\d+\.[ \t])/m).map((s) => s.trim()).filter(Boolean);
+  if (chunks.length < 2) return undefined;
+
+  const steps: CollectionPlanStep[] = [];
+  for (const chunk of chunks) {
+    // Extract bold title: "N. **Title:**"
+    const boldMatch = chunk.match(/^\d+\.\s+\*\*([^*]+?)\*\*:?\s*([\s\S]*)$/);
+    // Extract plain title: "N. Title:"  (colon required to avoid false positives)
+    const plainMatch = chunk.match(/^\d+\.\s+([^\n:]{3,80}):\s*([\s\S]*)$/);
+
+    const m = boldMatch ?? plainMatch;
+    if (!m) continue;
+
+    const title = m[1].trim().replace(/:$/, "");
+    // Flatten sub-bullets into a single readable description
+    const rawDesc = m[2].trim();
+    const description = rawDesc
+      .replace(/\*\*([^*]+)\*\*/g, "$1")   // strip bold markers
+      .replace(/^\s*[\*\-]\s+/gm, "")       // strip bullet chars
+      .replace(/\n+/g, " ")                  // collapse newlines
+      .trim();
+
+    if (title && description) steps.push({ title, description });
+  }
+
+  return steps.length > 0 ? steps : undefined;
+}
+
 function parsePlanData(raw: string): CollectionPlanData {
   const parsed = extractJsonObject(raw);
   if (!parsed) {
-    return { plan: raw, suggested_sources: [] };
+    return { plan: raw, steps: parseStepsFromPlanText(raw), suggested_sources: [] };
   }
 
   const planValue = parsed.plan;
@@ -140,18 +171,22 @@ function parsePlanData(raw: string): CollectionPlanData {
       : JSON.stringify(planValue ?? parsed, null, 2);
 
   const rawSteps = parsed.steps;
-  const steps: CollectionPlanStep[] | undefined =
-    Array.isArray(rawSteps)
-      ? (rawSteps as unknown[]).filter(
-          (s): s is CollectionPlanStep =>
-            typeof (s as CollectionPlanStep)?.title === "string" &&
-            typeof (s as CollectionPlanStep)?.description === "string",
-        )
-      : undefined;
+  const jsonSteps: CollectionPlanStep[] | undefined = Array.isArray(rawSteps)
+    ? (rawSteps as unknown[]).filter(
+        (s): s is CollectionPlanStep =>
+          typeof (s as CollectionPlanStep)?.title === "string" &&
+          typeof (s as CollectionPlanStep)?.description === "string",
+      )
+    : undefined;
+
+  const steps =
+    jsonSteps && jsonSteps.length > 0
+      ? jsonSteps
+      : parseStepsFromPlanText(plan);
 
   return {
     plan,
-    steps: steps && steps.length > 0 ? steps : undefined,
+    steps,
     suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
   };
 }
@@ -174,7 +209,7 @@ function parseSuggestedSources(raw: string): string[] {
 function resolveMessageType(
   response: DialogueApiResponse,
 ): Message["type"] | undefined {
-  return ACTION_TO_MESSAGE_TYPE[response.action];
+  return (ACTION_TO_MESSAGE_TYPE as Record<string, NonNullable<Message["type"]>>)[response.action];
 }
 
 function inferStageFromResponse(
@@ -225,6 +260,37 @@ function inferStageFromResponse(
   return { stage: fallbackStage, subState: fallbackSubState };
 }
 
+function inferPhaseFromResponse(
+  response: DialogueApiResponse,
+  stage: DialogueStage,
+  fallbackPhase: DialoguePhase,
+): DialoguePhase {
+  if (response.phase) {
+    return response.phase;
+  }
+
+  switch (stage) {
+    case "planning":
+    case "plan_confirming":
+    case "source_selecting":
+    case "collecting":
+      return "collection";
+    case "reviewing":
+      return response.action === "show_collection" || response.action === "select_gaps"
+        ? "collection"
+        : "processing";
+    case "processing":
+    case "complete":
+      return "processing";
+    case "initial":
+    case "gathering":
+    case "summary_confirming":
+    case "pir_confirming":
+    default:
+      return fallbackPhase;
+  }
+}
+
 function buildSystemMessage(response: DialogueApiResponse): Message {
   const message: Message = {
     id: crypto.randomUUID(),
@@ -237,69 +303,73 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     message.type = messageType;
   }
 
-  if (response.action === "start_collecting") {
-    const sources = parseSuggestedSources(response.question);
-    if (sources.length > 0) {
-      message.text = `Collecting from: ${sources.join(", ")}`;
-    } else {
-      message.text = "Collecting from selected sources...";
-    }
-    return message;
-  }
-
-  if (messageType === "summary" || messageType === "pir") {
-    const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
-      response.question,
-    );
-    if (parsed) {
-      message.data = parsed;
-    }
-  }
-
-  if (messageType === "collection") {
-    const parsed = tryParseJson<unknown>(response.question);
-    if (parsed && typeof parsed === "object" && parsed !== null) {
-      if (
-        "collected_data" in parsed &&
-        Array.isArray((parsed as Record<string, unknown>).collected_data)
-      ) {
-        message.data = parsed as CollectionDisplayData;
-      } else if ("sources_used" in parsed) {
-        message.data = parsed as CollectionSummaryData;
+  switch (messageType) {
+    case "question":
+      if (response.action === "start_collecting") {
+        const sources = parseSuggestedSources(response.question);
+        message.text =
+          sources.length > 0
+            ? `Collecting from: ${sources.join(", ")}`
+            : "Collecting from selected sources...";
       }
+      break;
+
+    case "summary":
+    case "pir": {
+      const parsed = tryParseJson<SummaryData | PirData | CollectionSummaryData>(
+        response.question,
+      );
+      if (parsed) {
+        message.data = parsed;
+      }
+      break;
     }
-    // Prevent raw JSON dump in chat — if parsing failed or structure didn't match,
-    // create a minimal display payload with parse_error so the component handles it.
-    if (!message.data) {
-      message.data = {
-        collected_data: [],
-        source_summary: [],
-        parse_error: "Collection data could not be parsed for display.",
-      } as CollectionDisplayData;
+
+    case "plan":
+      message.data = parsePlanData(response.question);
+      break;
+
+    case "collection": {
+      const parsed = tryParseJson<unknown>(response.question);
+      if (parsed && typeof parsed === "object" && parsed !== null) {
+        if (
+          "collected_data" in parsed &&
+          Array.isArray((parsed as Record<string, unknown>).collected_data)
+        ) {
+          message.data = parsed as CollectionDisplayData;
+        } else if ("sources_used" in parsed) {
+          message.data = parsed as CollectionSummaryData;
+        }
+      }
+      // Prevent raw JSON dump in chat — if parsing failed or structure didn't match,
+      // create a minimal display payload with parse_error so the component handles it.
+      if (!message.data) {
+        message.data = {
+          collected_data: [],
+          source_summary: [],
+          parse_error: "Collection data could not be parsed for display.",
+        } as CollectionDisplayData;
+      }
+      message.text = "Collection complete";
+      break;
     }
-    message.text = "Collection complete";
-  }
 
-  if (messageType === "processing") {
-    message.text = "Processing complete — results are ready for review.";
-  }
-
-  if (messageType === "plan") {
-    message.data = parsePlanData(response.question);
-  }
-
-  if (messageType === "processing") {
-    const parsed = tryParseJson<ProcessingData>(response.question);
-    if (parsed) {
-      message.data = parsed;
+    case "processing": {
+      message.text = "Processing complete — results are ready for review.";
+      const parsed = extractJsonObject(response.question) as ProcessingData | null;
+      if (parsed && "findings" in parsed) {
+        message.data = parsed;
+      }
+      break;
     }
-  }
 
-  if (messageType === "suggested_sources") {
-    const sources = parseSuggestedSources(response.question);
-    if (sources.length > 0) {
-      message.data = sources as SuggestedSourcesData;
-      message.text = `Suggested sources: ${sources.join(", ")}`;
+    case "suggested_sources": {
+      const sources = parseSuggestedSources(response.question);
+      if (sources.length > 0) {
+        message.data = sources as SuggestedSourcesData;
+        message.text = `Suggested sources: ${sources.join(", ")}`;
+      }
+      break;
     }
   }
 
@@ -319,7 +389,7 @@ function getFeedbackPrompt(stage: DialogueStage): string {
   return "What should be modified in the collected summary?";
 }
 
-export function useChat() {
+export function useChat(initialPerspectives?: string[]) {
   const { activeConversation, createNewConversation, addMessage, setStage } =
     useConversation();
   const { settings } = useSettings();
@@ -329,14 +399,19 @@ export function useChat() {
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
-  const [localSourceContext, setLocalSourceContext] = useState<"plan" | "gather_more" | null>(null);
-  const [pendingGatherMoreText, setPendingGatherMoreText] = useState<string | null>(null);
+  const [localSourceContext, setLocalSourceContext] = useState<
+    "plan" | "gather_more" | null
+  >(null);
+  const [pendingGatherMoreText, setPendingGatherMoreText] = useState<
+    string | null
+  >(null);
 
   const messages = useMemo(
     () => activeConversation?.messages ?? [],
     [activeConversation?.messages],
   );
   const stage = activeConversation?.stage ?? "initial";
+  const phase = activeConversation?.phase ?? "direction";
   const subState = activeConversation?.subState ?? null;
   const isConfirming =
     isDecisionStage(stage) &&
@@ -351,7 +426,11 @@ export function useChat() {
       if (message.type === "suggested_sources" && Array.isArray(message.data)) {
         return message.data as SuggestedSourcesData;
       }
-      if (message.type === "plan" && message.data && "suggested_sources" in message.data) {
+      if (
+        message.type === "plan" &&
+        message.data &&
+        "suggested_sources" in message.data
+      ) {
         return (message.data as CollectionPlanData).suggested_sources;
       }
     }
@@ -386,6 +465,7 @@ export function useChat() {
     conversationId: string,
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
+    fallbackPhase: DialoguePhase,
   ) => {
     addMessage(buildSystemMessage(response), conversationId);
 
@@ -394,7 +474,8 @@ export function useChat() {
       fallbackStage,
       fallbackSubState,
     );
-    setStage(next.stage, next.subState);
+    const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
+    setStage(next.stage, next.subState, nextPhase);
   };
 
   const sendAndHandle = async (
@@ -405,6 +486,7 @@ export function useChat() {
     options: DialogueSendOptions,
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
+    fallbackPhase: DialoguePhase,
     perspectives: string[],
   ) => {
     const response = await sendMessage(
@@ -417,9 +499,18 @@ export function useChat() {
       options,
     );
 
-    applyResponse(response, conversationId, fallbackStage, fallbackSubState);
-
-    if (response.action !== "start_collecting") {
+    if (response.action === "start_collecting") {
+      // Skip the "Collecting from: ..." message — the Collection Results card
+      // already shows the sources used.  Just advance the stage.
+      setStage("collecting", null, "collection");
+    } else {
+      applyResponse(
+        response,
+        conversationId,
+        fallbackStage,
+        fallbackSubState,
+        fallbackPhase,
+      );
       return;
     }
 
@@ -442,14 +533,16 @@ export function useChat() {
         conversationId,
         errorStage,
         "awaiting_decision",
+        "collection",
       );
     } else {
-      applyResponse(collectResponse, conversationId, "collecting", null);
+      applyResponse(collectResponse, conversationId, "collecting", null, "collection");
     }
   };
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
 
     addMessage(
       { id: crypto.randomUUID(), text, sender: "user" },
@@ -457,7 +550,11 @@ export function useChat() {
     );
 
     // Intercept gather_more text — store locally and show source selection instead of backend call
-    if (stage === "reviewing" && subState === "awaiting_gather_more") {
+    if (
+      stage === "reviewing" &&
+      phase === "collection" &&
+      subState === "awaiting_gather_more"
+    ) {
       setPendingGatherMoreText(text);
       setLocalSourceContext("gather_more");
       return;
@@ -473,12 +570,13 @@ export function useChat() {
         {},
         stage,
         subState,
+        conversation.phase,
         conversation.perspectives,
       );
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -505,13 +603,14 @@ export function useChat() {
         {},
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
       success("Request approved");
     } catch (e) {
       error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -549,17 +648,20 @@ export function useChat() {
         { gatherMore: true },
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
     } catch (e) {
-      error(`Gather more failed: ${e instanceof Error ? e.message : String(e)}`);
+      error(
+        `Gather more failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
   const gatherMore = () => {
-    if (!activeConversation || stage !== "reviewing") {
+    if (!activeConversation || stage !== "reviewing" || phase !== "collection") {
       return;
     }
 
@@ -611,6 +713,7 @@ export function useChat() {
         options,
         stage,
         subState,
+        activeConversation.phase,
         activeConversation.perspectives,
       );
     } catch (e) {
@@ -620,7 +723,7 @@ export function useChat() {
         }`,
       );
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision");
+        setStage("plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -636,7 +739,8 @@ export function useChat() {
   };
 
   const debugConfirm = () => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
     addMessage(
       {
         id: crypto.randomUUID(),
@@ -645,7 +749,7 @@ export function useChat() {
       },
       conversation.id,
     );
-    setStage("summary_confirming", "awaiting_decision");
+    setStage("summary_confirming", "awaiting_decision", "direction");
   };
 
   const jumpToDevStage = async (
@@ -659,7 +763,11 @@ export function useChat() {
         nextStage,
         nextSubState,
       );
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info(`Moved to stage: ${response.stage}`);
     } catch {
       error("Failed to set dev stage");
@@ -670,7 +778,11 @@ export function useChat() {
     if (!activeConversation) return;
     try {
       const response = await getDevDialogueState(activeConversation.sessionId);
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info(`Synced stage: ${response.stage}`);
     } catch {
       error("Failed to sync dev stage");
@@ -683,7 +795,11 @@ export function useChat() {
       const response = await resetDevDialogueState(
         activeConversation.sessionId,
       );
-      setStage(response.stage, response.sub_state);
+      setStage(
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
       info("Reset stage to initial");
     } catch {
       error("Failed to reset dev stage");

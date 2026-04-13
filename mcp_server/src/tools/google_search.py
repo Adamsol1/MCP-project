@@ -14,7 +14,11 @@ logger = logging.getLogger("app")
 _SERPER_SEARCH_URL = "https://google.serper.dev/search"
 _SERPER_NEWS_URL = "https://google.serper.dev/news"
 
+# Domains appended to every Serper query as -site: exclusions.
+# Serper evaluates these server-side, so they cost no extra results slots.
+# Add to this list whenever low-quality domains recur in raw collected_data.
 _NOISE_SITES = [
+    # Social media
     "reddit.com",
     "x.com",
     "twitter.com",
@@ -24,6 +28,33 @@ _NOISE_SITES = [
     "youtube.com",
     "quora.com",
     "pinterest.com",
+    "linkedin.com",
+    # Wiki / user-generated encyclopaedias (non-Wikipedia)
+    "namu.wiki",
+    "fandom.com",
+    "wikia.com",
+    # Generic blog / personal page platforms
+    "blogspot.com",
+    "wordpress.com",
+    "medium.com",
+    "substack.com",
+    "github.io",
+    # Job boards and career sites
+    "indeed.com",
+    "glassdoor.com",
+    # Financial / market noise
+    "stocktitan.net",
+    "seekingalpha.com",
+    "zerohedge.com",
+    # Shopping and e-commerce
+    "amazon.com",
+    "ebay.com",
+    "alibaba.com",
+    # Low-signal aggregators and link farms
+    "researchandmarkets.com",
+    "globenewswire.com",
+    "prnewswire.com",
+    "businesswire.com",
 ]
 _SITE_EXCLUSION = " ".join(f"-site:{s}" for s in _NOISE_SITES)
 
@@ -71,14 +102,17 @@ def _handle_serper_error(e: Exception) -> str | None:
 
 def google_search(
     query: str,
-    num_results: int = 5,
+    num_results: int = 10,
     date_restrict: str | None = None,
     region: str | None = None,
     language: str | None = None,
 ) -> str:
     """Search Google for open-source threat intelligence via Serper.
 
-    Returns titles, URLs, and snippets as formatted plain text.
+    Returns URLs and snippets as formatted plain text for URL discovery only.
+    The backend will fetch and summarise the full content of each page separately —
+    do NOT treat snippets as final intelligence. Focus on targeted queries that
+    surface relevant, authoritative source URLs.
     Social media and noise sites (Reddit, X, Facebook, etc.) are excluded automatically.
     Source authority: LOWER than OTX — use for recent events or when OTX is sparse.
 
@@ -88,7 +122,7 @@ def google_search(
                "APT29 Norway perspective recent activity"
                "Russia GPS jamming Nordic region 2025"
                "China economic reaction US Iran attack"
-    - num_results: Number of results to return (1-10, default 5).
+    - num_results: Number of results to return (1-10, default 10).
     - date_restrict: Restrict results to a time window:
                      "d1" = last day, "w1" = last week, "m1" = last month,
                      "m3" = last 3 months, "m6" = last 6 months, "y1" = last year.
@@ -194,4 +228,3 @@ def google_news_search(
 
 def register_google_search_tools(mcp) -> None:
     mcp.tool(google_search)
-    mcp.tool(google_news_search)

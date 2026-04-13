@@ -12,7 +12,7 @@ SOURCE_TOOL_MAP: dict[str, list[str]] = {
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
-    "Web Search": ["google_search", "google_news_search"],
+    "Web Search": ["google_search"],
 }
 
 

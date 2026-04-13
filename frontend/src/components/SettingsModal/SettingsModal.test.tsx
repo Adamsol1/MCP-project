@@ -61,9 +61,9 @@ describe("SettingsModal", () => {
 
     it("renders all four nav categories", () => {
       renderModal();
-      // The modal has two sections: "general" and "parameters"
+      // The modal nav sections: "appearance", "parameters", "council"
       expect(
-        screen.getByRole("button", { name: /general/i }),
+        screen.getByRole("button", { name: /appearance/i }),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: /parameters/i }),
@@ -114,7 +114,7 @@ describe("SettingsModal", () => {
       renderModal();
 
       await user.click(screen.getByRole("button", { name: /parameters/i }));
-      await user.click(screen.getByRole("button", { name: /^general$/i }));
+      await user.click(screen.getByRole("button", { name: /^appearance$/i }));
 
       expect(screen.getByText(/^language$/i)).toBeInTheDocument();
     });

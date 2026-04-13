@@ -257,9 +257,21 @@ class GeminiAgent:
                         logger.error(f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}")
                         raise e.exceptions[0] from e
                     raise
+                # Gemini can return a response with no candidates or with a candidate
+                # whose content is None — this happens when the response is blocked by
+                # safety filters, hits a rate limit, or the model declines to answer.
+                # Accessing .content.parts on a None candidate raises AttributeError,
+                # so we guard here and skip the batch rather than crashing the whole pass.
+                candidate = response.candidates[0] if response.candidates else None
+                if candidate is None or candidate.content is None:
+                    logger.warning(
+                        f"[GeminiAgent] url_context batch {i // batch_size + 1}: "
+                        f"empty or blocked response (finish_reason={getattr(candidate, 'finish_reason', 'N/A')}), skipping"
+                    )
+                    continue
                 text = "".join(
                     part.text
-                    for part in response.candidates[0].content.parts
+                    for part in candidate.content.parts
                     if part.text is not None
                 )
                 fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)

@@ -196,6 +196,7 @@ describe("getDevDialogueState", () => {
   const mockDevState: DialogueDevStateResponse = {
     session_id: "session-1",
     stage: "gathering",
+    phase: "direction",
     sub_state: null,
     question_count: 3,
     max_questions: 10,
@@ -232,6 +233,7 @@ describe("setDevDialogueState", () => {
   const mockDevState: DialogueDevStateResponse = {
     session_id: "session-1",
     stage: "summary_confirming",
+    phase: "direction",
     sub_state: "awaiting_decision",
     question_count: 5,
     max_questions: 10,
@@ -311,6 +313,7 @@ describe("resetDevDialogueState", () => {
   const mockResetResponse: DialogueDevStateResponse = {
     session_id: "session-1",
     stage: "initial",
+    phase: "direction",
     sub_state: null,
     question_count: 0,
     max_questions: 10,

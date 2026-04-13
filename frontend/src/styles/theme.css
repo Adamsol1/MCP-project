@@ -25,8 +25,8 @@
   --color-text-on-inverse: #71717a; /* zinc-500 — secondary on sidebar    */
 
   /* ─── Borders — Light mode ──────────────────────────────────── */
-  --color-border: #e4e4e7; /* zinc-200 */
-  --color-border-muted: #f4f4f5; /* zinc-100 */
+  --color-border: #d4d4d8; /* zinc-300 */
+  --color-border-muted: #e4e4e7; /* zinc-200 */
   --color-border-inverse: #3f3f46; /* zinc-700 */
 
   /* ─── Status: Success ───────────────────────────────────────── */
