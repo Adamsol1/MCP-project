@@ -4,13 +4,16 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from src.models.dialogue import DialogueContext, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
 from src.models.reasoning import ReasoningLog
 from src.services.collection_service import CollectionService
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
+# TODO: DB migration — _SESSIONS_DATA_DIR, _collected_path, _read_collected, _write_collected
+# all persist collected data to JSON files on disk. Replace with a DB write/read
+# (e.g. CollectedData table keyed on session_id) when sessions.db is in place.
 _SESSIONS_DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions"
 
 
@@ -67,9 +70,13 @@ class CollectionFlow(BasePhaseFlow):
         self.state = CollectionState.PLANNING
         self.collection_plan: str | None = None
         self.selected_sources: list[str] = []
+        # TODO: DB migration — pending_reasoning_log written to disk on approval.
+        # Replace with a ReasoningLog table insert when DB is in place.
         self.pending_reasoning_log: ReasoningLog | None = None
         self.gather_more_feedback: str | None = None
 
+    # TODO: DB migration — to_dict and from_dict replace with SQLAlchemy model read/write.
+    # CollectionFlow state (pir, plan, state, sources) becomes columns in a sessions table.
     def to_dict(self) -> dict:
         """Serialize session state to a plain dict for JSON persistence.
         Note: research_logger is excluded — it is reconstructed on load.
@@ -109,16 +116,17 @@ class CollectionFlow(BasePhaseFlow):
         return flow
 
     async def initialize(self, collection_service) -> DialogueResponse:
-        # Generer innsamlingsplan basert på self.pir
-        # Sett state til PLAN_CONFIRMING
-        # Returner DialogueResponse med action="show_plan"
-        self.collection_plan = await collection_service.generate_collection_plan(self.pir)
+        # Generate collection plan based on self.pir
+        # Set state to PLAN_CONFIRMING
+        # Return DialogueResponse with action="show_plan"
+        try:
+            self.collection_plan = await collection_service.generate_collection_plan(self.pir)
+        except Exception as e:
+            logger.error(f"[Session {self.session_id}] Failed to generate collection plan: {e}")
+            return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate collection plan")
 
         self.state = CollectionState.PLAN_CONFIRMING
-
-        dialogue_response = DialogueResponse(action="show_plan", content=self.collection_plan)
-
-        return dialogue_response
+        return DialogueResponse(action=DialogueAction.SHOW_PLAN, content=self.collection_plan or "")
 
     async def process_user_message(self, user_message, collection_service, approved=None, selected_sources: list[str] | None = None, orchestrator=None, reviewer=None, gather_more: bool = False) -> DialogueResponse:
         #PLAN PHASE
@@ -132,7 +140,7 @@ class CollectionFlow(BasePhaseFlow):
             return await self.handle_reviewing(user_message, collection_service, approved, gather_more, selected_sources)
         #COMPLETE
         else:
-            return DialogueResponse(action="complete", content="collection phase completed")
+            return DialogueResponse(action=DialogueAction.COMPLETE, content="Collection phase completed")
 
     async def handle_plan_confirming(self, user_message, collection_service, approved, selected_sources: list[str] | None = None) -> DialogueResponse:
         """
@@ -151,7 +159,7 @@ class CollectionFlow(BasePhaseFlow):
             self.selected_sources = selected_sources or []
             self.state = CollectionState.COLLECTING
 
-            dialogue_response.action = "start_collecting"
+            dialogue_response.action = DialogueAction.START_COLLECTING
             dialogue_response.content = json.dumps(self.selected_sources)
 
             return dialogue_response
@@ -161,7 +169,7 @@ class CollectionFlow(BasePhaseFlow):
 
             self.collection_plan = await collection_service.generate_collection_plan(self.pir, user_message)
 
-            dialogue_response.action = "show_plan"
+            dialogue_response.action = DialogueAction.SHOW_PLAN
             dialogue_response.content = self.collection_plan
 
             return dialogue_response
@@ -174,14 +182,11 @@ class CollectionFlow(BasePhaseFlow):
 
 
     async def handle_collecting(
-            self,
-            collection_service,
-            orchestrator=None,
-            reviewer=None,
-                                ) -> DialogueResponse:
-
-    #Collect information
-
+        self,
+        collection_service,
+        orchestrator=None,
+        reviewer=None,
+    ) -> DialogueResponse:
         timeframe = self.direction_context.timeframe if self.direction_context else ""
         perspectives = (
             [p.value for p in self.direction_context.perspectives]
@@ -214,23 +219,23 @@ class CollectionFlow(BasePhaseFlow):
         except Exception as e:
             logger.error(f"[Session {self.session_id}] Collection failed: {e}")
             self.state = CollectionState.PLAN_CONFIRMING
-            return DialogueResponse(action="error", content=f"Collection failed: {e}")
+            return DialogueResponse(action=DialogueAction.ERROR, content="Collection failed")
 
         if orchestrator:
-                retry_count = len(orchestrator.attempts) - 1
-                self.pending_reasoning_log = ReasoningLog(
-                    session_id=self.session_id,
-                    phase="collection",
-                    model_used=orchestrator.generator_model,
-                    dialogue_turns=[],
-                    generated_content_attempts=orchestrator.attempts,
-                    review_reasoning=orchestrator.review_results,
-                    retry_explanation=orchestrator.retry_explanations,
-                    final_approved_content=None,
-                    timestamps={"collection performed": datetime.now().isoformat()},
-                    retry_triggered=retry_count > 0,
-                    retry_count=retry_count,
-                )
+            retry_count = len(orchestrator.attempts) - 1
+            self.pending_reasoning_log = ReasoningLog(
+                session_id=self.session_id,
+                phase="collection",
+                model_used=orchestrator.generator_model,
+                dialogue_turns=[],
+                generated_content_attempts=orchestrator.attempts,
+                review_reasoning=orchestrator.review_results,
+                retry_explanation=orchestrator.retry_explanations,
+                final_approved_content=None,
+                timestamps={"collection performed": datetime.now().isoformat()},
+                retry_triggered=retry_count > 0,
+                retry_count=retry_count,
+            )
 
         self.state = CollectionState.REVIEWING
         _write_collected(self.session_id, self.pir, collection_summary)
@@ -248,7 +253,7 @@ class CollectionFlow(BasePhaseFlow):
                 for i, review in enumerate(orchestrator.review_results)
             ]
 
-        return DialogueResponse(action="show_collection", content=json.dumps(display_payload, ensure_ascii=False))
+        return DialogueResponse(action=DialogueAction.SHOW_COLLECTION, content=json.dumps(display_payload, ensure_ascii=False))
 
 
 
@@ -268,7 +273,7 @@ class CollectionFlow(BasePhaseFlow):
                 self.pending_reasoning_log.timestamps["collection_approved"] = datetime.now().isoformat()
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = CollectionState.COMPLETE
-            return DialogueResponse(action="complete", content="Collection phase complete")
+            return DialogueResponse(action=DialogueAction.COMPLETE, content="Collection phase complete")
 
         elif gather_more:
             self._log_user_action(action="gather_more", phase="reviewing", modifications=user_message, perspectives=None)
@@ -277,15 +282,19 @@ class CollectionFlow(BasePhaseFlow):
             # else: keep existing selected_sources from the previous collection run
             self.gather_more_feedback = user_message or None
             self.state = CollectionState.COLLECTING
-            return DialogueResponse(action="start_collecting", content=json.dumps(self.selected_sources))
+            return DialogueResponse(action=DialogueAction.START_COLLECTING, content=json.dumps(self.selected_sources))
 
         else:
             self._log_user_action(action="modify", phase="reviewing", modifications=user_message, perspectives=None)
             collected = _read_collected(self.session_id)
             raw = collected["attempts"][-1] if collected and collected.get("attempts") else ""
-            modified = await collection_service.modify_summary(raw, user_message)
+            try:
+                modified = await collection_service.modify_summary(raw, user_message)
+            except Exception as e:
+                logger.error(f"[Session {self.session_id}] Failed to modify summary: {e}")
+                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to modify collection summary")
             _write_collected(self.session_id, self.pir, modified)
             display_payload = CollectionService.parse_collected_data(modified)
-            return DialogueResponse(action="show_collection", content=json.dumps(display_payload, ensure_ascii=False))
+            return DialogueResponse(action=DialogueAction.SHOW_COLLECTION, content=json.dumps(display_payload, ensure_ascii=False))
 
 

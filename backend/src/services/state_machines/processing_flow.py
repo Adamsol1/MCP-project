@@ -22,6 +22,11 @@ from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
+_PHASE_PROCESSING = "processing"
+
+# TODO: DB migration — _SESSIONS_DATA_DIR, _collected_path, _processed_path,
+# _read_collected, _read_processed, _write_processed all persist data to JSON files on disk.
+# Replace with DB reads/writes when sessions.db is in place.
 _SESSIONS_DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions"
 
 
@@ -83,6 +88,12 @@ class ProcessingState(str, Enum):
 
 
 class ProcessingFlow(BasePhaseFlow):
+    """State machine for the Processing phase.
+
+    States: PROCESSING -> REVIEWING -> COMPLETE
+
+    Each state has a dedicated handler. All state transitions happen in these handlers.
+    """
 
     def __init__(
         self,
@@ -95,8 +106,12 @@ class ProcessingFlow(BasePhaseFlow):
         self.pir = pir
         self.direction_context = direction_context
         self.state = ProcessingState.PROCESSING
+        # TODO: DB migration — pending_reasoning_log written to DB on approval.
+        # Replace with a ReasoningLog table insert when DB is in place.
         self.pending_reasoning_log: ReasoningLog | None = None
 
+    # TODO: DB migration — to_dict and from_dict replace with SQLAlchemy model read/write.
+    # ProcessingFlow state (pir, state, direction_context) becomes columns in a sessions table.
     def to_dict(self) -> dict:
         """Serialize session state to a plain dict for JSON persistence."""
         return {
@@ -153,6 +168,13 @@ class ProcessingFlow(BasePhaseFlow):
 
         raw_collected = "\n\n---\n\n".join(collected.get("attempts", []))
 
+        previous = _read_processed(self.session_id)
+        previous_result = (
+            previous["attempts"][-1]
+            if previous and previous.get("attempts")
+            else None
+        )
+
         try:
             if orchestrator and reviewer:
                 raw_result = await orchestrator.process_and_review(
@@ -161,11 +183,12 @@ class ProcessingFlow(BasePhaseFlow):
                     processing_service=processing_service,
                     reviewer=reviewer,
                     session_id=self.session_id,
+                    previous_result=previous_result,
                 )
                 retry_count = len(orchestrator.attempts) - 1
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
-                    phase="processing",
+                    phase=_PHASE_PROCESSING,
                     model_used=orchestrator.generator_model,
                     dialogue_turns=[],
                     generated_content_attempts=orchestrator.attempts,
@@ -181,11 +204,12 @@ class ProcessingFlow(BasePhaseFlow):
                     collected_data=raw_collected,
                     pir=self.pir,
                 )
-        except Exception as e:
-            logger.error(f"[ProcessingFlow] Processing failed for {self.session_id}: {e}")
-            return DialogueResponse(action=DialogueAction.ERROR, content=f"Processing failed: {e}")
+        except Exception:
+            logger.error(f"[ProcessingFlow] Processing failed for {self.session_id}", exc_info=True)
+            return DialogueResponse(action=DialogueAction.ERROR, content="Processing failed")
 
         self.state = ProcessingState.REVIEWING
+        logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         _write_processed(self.session_id, self.pir, raw_result)
 
         return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
@@ -196,6 +220,7 @@ class ProcessingFlow(BasePhaseFlow):
         processing_service,
         approved=None,
     ) -> DialogueResponse:
+        """Route the incoming message to the correct state handler."""
         if self.state == ProcessingState.REVIEWING:
             return await self.handle_reviewing(user_message, processing_service, approved)
         else:
@@ -215,8 +240,9 @@ class ProcessingFlow(BasePhaseFlow):
         """
         if approved:
             self._log_user_action(
-                action="approve", phase="reviewing", modifications=None
+                action="approve", phase=self.state.value, modifications=None
             )
+            # TODO: DB migration — replace write_reasoning_log with a ReasoningLog table insert.
             if self.pending_reasoning_log and self.research_logger:
                 processed = _read_processed(self.session_id)
                 self.pending_reasoning_log.final_approved_content = (
@@ -227,11 +253,12 @@ class ProcessingFlow(BasePhaseFlow):
                 )
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = ProcessingState.COMPLETE
+            logger.info(f"[Session {self.session_id}] State: REVIEWING -> COMPLETE. Processing phase finished")
             return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase complete")
 
         else:
             self._log_user_action(
-                action="modify", phase="reviewing", modifications=user_message
+                action="modify", phase=self.state.value, modifications=user_message
             )
             processed = _read_processed(self.session_id)
             last_result = (
@@ -239,6 +266,10 @@ class ProcessingFlow(BasePhaseFlow):
                 if processed and processed.get("attempts")
                 else ""
             )
-            modified = await processing_service.modify_processing(last_result, user_message)
+            try:
+                modified = await processing_service.modify_processing(last_result, user_message)
+            except Exception:
+                logger.error(f"[ProcessingFlow] Failed to modify processing result for {self.session_id}", exc_info=True)
+                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to modify processing result")
             _write_processed(self.session_id, self.pir, modified)
             return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=modified)

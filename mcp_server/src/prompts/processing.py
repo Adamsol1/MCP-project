@@ -5,38 +5,88 @@ def build_processing_prompt(
     pir: str,
     collected_data: str,
     feedback: str | None = None,
+    previous_result: str | None = None,
 ) -> str:
     feedback_section = (
         f"\n## Analyst Feedback from Previous Attempt\n{feedback}\nAddress this feedback in your processing."
         if feedback else ""
     )
+    previous_section = (
+        f"\n## Previous Processing Result\nThis is the analysis from the previous collection run.\n"
+        f"Compare your new findings against it. Set `assessment_changed: true` and write a `change_summary`\n"
+        f"if your conclusions about the PIRs differ materially (new threats identified, confidence shifts,\n"
+        f"gaps filled, or prior findings contradicted). Set `assessment_changed: false` if the new data\n"
+        f"only adds minor detail without changing the overall picture.\n\n{previous_result}\n"
+        if previous_result else ""
+    )
 
-    return f"""You are a professional threat intelligence analyst in the Processing phase of the intelligence cycle. Your task is to transform raw collected intelligence data into structured, analytical findings.
+    return f"""You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
 
 ## Priority Intelligence Requirements
 {pir}
 
 ## Collected Intelligence Data
 {collected_data}
-{feedback_section}
+{previous_section}{feedback_section}
 
-## Instructions
-1. Analyse the collected data against the PIRs
-2. Produce discrete findings — each finding should capture one analytical point
-3. For each finding, identify:
-   - A short descriptive title
-   - A detailed analytical narrative (the "finding" field)
-   - A concise evidence summary
-   - The source category — use exactly one of: "knowledge_bank" (internal KB), "otx" (AlienVault OTX), "web_search" (general web/Google results), "web_gov" (government/official sites), "web_news" (news outlets), "web_think_tank" (research institutes), "web_other" (other web), "network_telemetry", "malware_analysis", "pretrained" (no external source used)
-   - A confidence score from 0 to 100 based on source reliability and corroboration
-   - Which PIRs it addresses
-   - Supporting data: IOCs, MITRE ATT&CK IDs, entities, domains, timestamps, locations, KB references — as applicable
-   - Why it matters analytically
-   - Any uncertainties or limitations
-4. Respect the timeframe specified in the PIRs. Only include timestamps in supporting_data that fall within (or are directly relevant to) that timeframe. Historical events may be referenced in the finding narrative for context, but supporting_data.timestamps should reflect the analytical window, not distant historical dates.
-5. Use the knowledge base tools to enrich your analysis with background context
-6. Use web search tools to verify or supplement findings where needed
-7. Identify analytical gaps — what the PIRs require but the data does not support
+## Your Task
+Work through four steps:
+
+**Step 1 — Normalize**
+Extract all meaningful entities from the collected data:
+- Cyber IoCs: IP addresses, domains, hashes, CVEs
+- Threat actors: APT groups, state-sponsored groups, criminal organizations
+- Countries, regions, military units
+- Organizations (government, military, corporate, NGO)
+- Events and incidents
+- Infrastructure (physical or digital)
+
+**Step 2 — Enrich**
+For each extracted entity, use available tools to gather additional context:
+- For IoCs: call lookup_indicator_otx(indicator_type, value)
+- For threat actors, countries, organizations: call list_knowledge_base() then read_knowledge_base(resource_id)
+- For recent events: call google_search or google_news_search
+Limit IoC lookups to 12 maximum.
+
+**Step 3 — Correlate**
+Identify patterns across enriched entities:
+- Same entity confirmed by multiple sources → higher confidence
+- Multiple IoCs linked to same actor or campaign
+- Entities active within the PIR timeframe
+- State or group attribution chains
+
+**Step 4 — Synthesize**
+Convert findings into PMESIIEntity objects. One entity per meaningful observation.
+Keep descriptions narrow and factual. Use tags broadly for relations and context.
+
+## PMESII Categories
+Assign one or more categories per entity:
+- political: governance, diplomacy, policy, elections
+- military: armed forces, weapons, operations, doctrine
+- economic: trade, sanctions, energy, finance
+- social: population, culture, ideology, public opinion
+- information: media, cyber, propaganda, signals
+- infrastructure: physical systems, networks, utilities, transport
+
+## Valid Source Values
+otx, knowledge_base, web_search, csv_upload, pdf_upload, txt_upload, json_upload
+
+## Confidence Scoring
+- 40-55: Single source, unverified
+- 60-70: Single reliable source (OTX or KB) with reasonable support
+- 70-80: Confirmed by OTX with multiple pulses, or two independent sources
+- 80-90: Confirmed by multiple independent sources
+- 90+: Three or more sources with consistent attribution
+
+## Processing Summary Format
+Write one line per PIR with status and key entities found:
+PIR-1 (short description): Answered
+  → EntityA, EntityB (high confidence). N entities.
+PIR-2 (short description): Gap
+  → No data found after 2023.
+PIR-3 (short description): Partially answered
+  → EntityC (low confidence). Key gap: X unknown.
+
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
@@ -97,6 +147,7 @@ def processing_process(
     pir: str,
     collected_data: str,
     feedback: str = "",
+    previous_result: str = "",
 ) -> str:
     """Prompt for processing raw collected data into structured PMESII entities.
 
@@ -104,11 +155,14 @@ def processing_process(
         pir: The approved PIRs from the Direction phase (JSON string).
         collected_data: Raw data JSON returned by the collection agent.
         feedback: Optional reviewer feedback from a previous rejected attempt.
+        previous_result: Optional JSON string of the previous processing result.
+                         When provided, the LLM compares findings and sets assessment_changed.
     """
     return build_processing_prompt(
         pir=pir,
         collected_data=collected_data,
         feedback=feedback or None,
+        previous_result=previous_result or None,
     )
 
 

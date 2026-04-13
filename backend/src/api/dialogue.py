@@ -1,16 +1,26 @@
+"""
+API router for the dialogue flow.
+
+Handles incoming messages from the frontend, routes them through
+the dialogue state machine (DirectionFlow), and returns structured responses.
+
+Sessions are stored in memory in `_sessions`.
+"""
+
 import json
 import logging
 import os
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
+from src.services.collection_status import CollectionStatusTracker
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
 from src.services.processing_service import ProcessingService
@@ -20,29 +30,38 @@ from src.services.state_machines.collection_flow import CollectionFlow, Collecti
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 from src.services.state_machines.processing_flow import ProcessingFlow
 
+#Global values used in the file
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
 
-"""
-API router for the dialogue flow.
-
-Handles incoming messages from the frontend, routes them through
-the dialogue state machine (DirectionFlow), and returns structured responses.
-
-Sessions are stored in memory in `_sessions`
-"""
+_GEMINI_MODEL = "gemini-2.5-flash"
+_GATHER_MORE_CONTENT = "What gaps would you like to fill? Describe what additional information to gather."
+_SUB_STATE_GATHER_MORE = "awaiting_gather_more"
+_SUB_STATE_AWAITING_DECISION = "awaiting_decision"
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
 
 _SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
-_SESSIONS_DIR.mkdir(exist_ok=True)
+
+
+def ensure_sessions_dir() -> None:
+    _SESSIONS_DIR.mkdir(exist_ok=True)
 
 
 class IntelligenceSession:
-    """Holds all phase flows for a single research session."""
+    """
+    Holds all phase flows for a single intelligence session.
+    The session is created upon session start, and will be continously written to disk by each state.
 
-    def __init__(self, session_id: str, research_logger):
+    Args:
+        Session_id : Identifer of the session
+        research_logger: Logger for this session
+
+
+    """
+
+    def __init__(self, session_id: str, research_logger: ResearchLogger):
         self.session_id = session_id
         self.research_logger = research_logger
         self.direction_flow = DirectionFlow(
@@ -56,7 +75,13 @@ _sessions: dict[str, IntelligenceSession] = {}
 
 
 def _save_session(session: IntelligenceSession) -> None:
-    """Persist session state to disk so it survives server restarts."""
+    """
+    Persist session state to disk so it survives server restarts.
+
+    Args:
+        session: The active session to save
+    """
+    #Data to be saved
     data = {
         "session_id": session.session_id,
         "direction_flow": session.direction_flow.to_dict(),
@@ -68,21 +93,42 @@ def _save_session(session: IntelligenceSession) -> None:
         else None,
     }
     path = _SESSIONS_DIR / f"{session.session_id}.json"
-    path.write_text(json.dumps(data), encoding="utf-8")
+    #Attempt to write data to file. If failed throw error
+    try:
+        path.write_text(json.dumps(data), encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Failed to save session {session.session_id} to disk") from exc
 
 
 def _load_session(session_id: str, research_logger) -> IntelligenceSession | None:
-    """Load a previously persisted session from disk. Returns None if not found."""
+    """
+    Load a previously persisted session from disk.
+    Returns None if not found.
+
+    Args:
+        session: The active session to save
+    '"""
+
     path = _SESSIONS_DIR / f"{session_id}.json"
+
     if not path.exists():
         return None
-    data = json.loads(path.read_text(encoding="utf-8"))
+
+    #Attempt to save. If failed, call error
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        raise RuntimeError(f"Failed to load session {session_id} from disk") from exc
+
+    #Reconstruct session from saved data
     session = IntelligenceSession.__new__(IntelligenceSession)
     session.session_id = session_id
     session.research_logger = research_logger
-    session.direction_flow = DirectionFlow.from_dict(
-        data["direction_flow"], research_logger=research_logger
-    )
+
+    #Retrieve direction phase data
+    session.direction_flow = DirectionFlow.from_dict(data["direction_flow"], research_logger=research_logger)
+
+    #Retrieve collecion phase data
     session.collection_flow = (
         CollectionFlow.from_dict(
             data["collection_flow"], research_logger=research_logger
@@ -137,6 +183,7 @@ class DialogueMessageResponse(BaseModel):
     sub_state: str | None = None
 
 
+
 class DialogueDevStateResponse(BaseModel):
     session_id: str
     stage: str
@@ -159,14 +206,34 @@ class DialogueDevStateRequest(BaseModel):
 
 
 def evict_session(session_id: str) -> None:
-    """Remove a session from the in-memory cache and delete its state file."""
+    """
+    Remove a session from the in-memory cache and delete its state file.
+
+    Args:
+        session_id : session_id
+    """
     _sessions.pop(session_id, None)
     state_file = _SESSIONS_DIR / f"{session_id}.json"
     if state_file.exists():
         state_file.unlink()
+    logger.info(f"[Session {session_id}] Evicted from cache")
 
 
 def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
+    """
+    Create a string og enum to a DialogueAction
+    This is needed as return values from state machien can be both strings or finished enums
+
+    Args:
+        Dialogueaction enum og string
+
+    Retruns:
+        The dialogueaction enum
+
+    Raises:
+        Valuerror if string does not match legal action
+    """
+
     if isinstance(action, DialogueAction):
         return action
     try:
@@ -183,16 +250,30 @@ def _convert_to_message_response(
 ) -> DialogueMessageResponse:
     """
     Converts internal DialogueRespone to the API respone format
+
+    Args:
+        Response: reponse object from state machine
+        Stage: current state machine phase
+        sub_state_ optional stage information
+
+    Returns:
+        DialoguemessageResponse that can be sent to frontend
+
+    Raises:
+        Httpexceptin 500 if recieved response contains illegal action
+
     Example:
         Input:  DialogueResponse(action="ask_question", content="What is the scope?")
         Output: DialogueMessageResponse(question="What is the scope?", action="ask_question")
+
+
 
     """
     try:
         action = _normalize_dialogue_action(response.action)
     except ValueError as exc:
         logger.error("Failed to convert dialogue response action: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=500, detail="Internal error: invalid dialogue action") from exc
 
     result = DialogueMessageResponse(
         question=response.content,
@@ -203,19 +284,31 @@ def _convert_to_message_response(
     )
     return result
 
-
+#Temp
 def _ensure_dev_tools_enabled():
     if not DEV_TOOLS_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
 
 
 def _get_or_create_session(session_id: str) -> IntelligenceSession:
+    """
+    Get or create session. Will retrieved from disk if session exists. Else create new session.
+
+    Args:
+        session_id: Unique identifier of session
+
+    Returns:
+        the retrieved or new IntelligencecSession
+    """
+    #Create session if id not found
     if session_id not in _sessions:
         research_logger = ResearchLogger(session_id=session_id)
         loaded = _load_session(session_id, research_logger)
-        _sessions[session_id] = (
-            loaded if loaded else IntelligenceSession(session_id, research_logger)
-        )
+        if loaded:
+            _sessions[session_id] = loaded
+        else:
+            logger.info(f"[Session {session_id}] Creating new session")
+            _sessions[session_id] = IntelligenceSession(session_id, research_logger)
     return _sessions[session_id]
 
 
@@ -246,139 +339,168 @@ def _build_dev_state_response(
     )
 
 
-@router.post("/message")
-async def send_message(request: DialogueMessageRequest) -> DialogueMessageResponse:
+def _get_mcp_client() -> MCPClient:
+    return MCPClient()
+
+
+def _get_review_service() -> ReviewService:
+    llm = LLMService(model=_GEMINI_MODEL)
+    review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
+    return ReviewService(llm, review_mcp_client)
+
+
+def _build_orchestrator(session: IntelligenceSession) -> AIOrchestrator:
     """
-    Process a user message and continue the flow in the dialogue state machine.
-
-    If the session_id does not exist, a new session will be created
-
+    Builds AIorchestrator for the given session. Will use LLM model stated as global value
 
     Args:
-        request DialogueMessageRequest:
-            - usermessage : The message the user sent
-            - session_id : The session id for the given session
-            - Perspectives : What perspectives the user have chosen
-            - Approved status: If the user approves or rejects ai output. Is only used when the user is given a choice.
+        session: The active session
 
     Returns:
-        A response with the next question or summary and canonical action/state metadata.
-
-    Raises:
-        Any exception given by DirectionFlow or MCPClient
+        An instance of AI orchestrator
     """
-    session = _get_or_create_session(request.session_id)
-
-    llm = LLMService(model="gemini-2.5-flash")
-    mcp_client = MCPClient()
-    review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
-    review_service = ReviewService(llm, review_mcp_client)
-    orchestrator = AIOrchestrator(
+    return AIOrchestrator(
         research_logger=session.research_logger,
-        generator_model="gemini-2.5-flash",
-        reviewer_model="gemini-2.5-flash",
+        generator_model=_GEMINI_MODEL,
+        reviewer_model=_GEMINI_MODEL,
     )
-    if session.processing_flow:
-        if request.gather_more:
-            if not session.collection_flow:
-                raise HTTPException(status_code=500, detail="No collection flow found")
-            session.processing_flow = None
-            session.collection_flow.state = CollectionState.REVIEWING
-            _save_session(session)
-            return _convert_to_message_response(
-                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
-                stage=session.collection_flow.state.value,
-                phase=Phase.COLLECTION,
-            )
-        processing_service = ProcessingService(mcp_client)
-        response = await session.processing_flow.process_user_message(
-            user_message=request.message,
-            processing_service=processing_service,
-            approved=request.approved,
-        )
+
+
+async def _handle_processing_phase(
+    session: IntelligenceSession,
+    request: DialogueMessageRequest,
+    mcp_client: MCPClient,
+) -> DialogueMessageResponse:
+    """
+    handles messages during the processing phase of the investigation.
+
+    The messages can be sent to different state if "gather_more" is true for additional information
+
+    Args:
+        session: current session
+        request: message from the frontend
+        mcp_client: client used to start processing serbice
+
+    Returns:
+        response to the frontend
+    """
+    assert session.processing_flow is not None
+    logger.info(
+        f"[Session {request.session_id}] Message received — state={session.processing_flow.state}, approved={request.approved}"
+    )
+    #If user wants to gather more, we reset current state and shift to collection phase
+    if request.gather_more:
+        if not session.collection_flow:
+            raise HTTPException(status_code=400, detail="No collection flow found")
+        session.processing_flow = None
+        session.collection_flow.state = CollectionState.REVIEWING
         _save_session(session)
         return _convert_to_message_response(
-            response,
-            stage=session.processing_flow.state.value,
-            phase=Phase.PROCESSING,
-        )
-
-    # Route to processing phase if already started
-    if session.processing_flow:
-        if request.gather_more:
-            if not session.collection_flow:
-                raise HTTPException(status_code=500, detail="No collection flow found")
-            session.processing_flow = None
-            session.collection_flow.state = CollectionState.REVIEWING
-            _save_session(session)
-            return _convert_to_message_response(
-                DialogueResponse(action=DialogueAction.SELECT_GAPS, content=""),
-                stage=session.collection_flow.state.value,
-                phase=Phase.COLLECTION,
-            )
-        processing_service = ProcessingService(mcp_client)
-        response = await session.processing_flow.process_user_message(
-            user_message=request.message,
-            processing_service=processing_service,
-            approved=request.approved,
-        )
-        _save_session(session)
-        return _convert_to_message_response(
-            response,
-            stage=session.processing_flow.state.value,
-            phase=Phase.PROCESSING,
-        )
-
-    # Route to collection phase if already started
-    if session.collection_flow:
-        collection_service = CollectionService(mcp_client)
-        logger.info(
-            f"[Session {request.session_id}] Message received — state={session.collection_flow.state}, approved={request.approved}"
-        )
-        response = await session.collection_flow.process_user_message(
-            user_message=request.message,
-            collection_service=collection_service,
-            approved=request.approved,
-            selected_sources=request.selected_sources,
-            orchestrator=orchestrator,
-            reviewer=review_service,
-            gather_more=request.gather_more,
-        )
-        if (
-            session.collection_flow.state == CollectionState.COMPLETE
-            and session.processing_flow is None
-        ):
-            processing_service = ProcessingService(mcp_client)
-            session.processing_flow = ProcessingFlow(
-                session_id=request.session_id,
-                pir=session.collection_flow.pir,
-                direction_context=session.collection_flow.direction_context,
-                research_logger=session.research_logger,
-            )
-            init_response = await session.processing_flow.initialize(
-                processing_service=processing_service,
-                orchestrator=orchestrator,
-                reviewer=review_service,
-            )
-            _save_session(session)
-            init_stage = "processing" if init_response.action == DialogueAction.SHOW_PROCESSING else session.processing_flow.state.value
-            return _convert_to_message_response(
-                init_response, stage=init_stage, phase=Phase.PROCESSING
-            )
-
-        _save_session(session)
-        return _convert_to_message_response(
-            response,
+            DialogueResponse(action=DialogueAction.SELECT_GAPS, content=_GATHER_MORE_CONTENT),
             stage=session.collection_flow.state.value,
             phase=Phase.COLLECTION,
+            sub_state=_SUB_STATE_GATHER_MORE,
+        )
+    processing_service = ProcessingService(mcp_client)
+
+    #Process user message in state machine
+    response = await session.processing_flow.process_user_message(
+        user_message=request.message,
+        processing_service=processing_service,
+        approved=request.approved,
+    )
+    #Save current session and return message
+    _save_session(session)
+    return _convert_to_message_response(response, stage=session.processing_flow.state.value, phase=Phase.PROCESSING)
+
+
+async def _handle_collection_phase(
+    session: IntelligenceSession,
+    request: DialogueMessageRequest,
+    mcp_client: MCPClient,
+    orchestrator: AIOrchestrator,
+    review_service: ReviewService,
+) -> DialogueMessageResponse:
+    """
+    Handles incoming messages during the collection phase
+    All messages will be used in collection flow. If the phase ends, we initizalize processing phase automatically.
+
+    Args:
+        session: The active session
+        Requets: The incoming request from frontend
+        mcp_client: client used to initialize collection
+        orchestator: AI orchestrator used to controll dual AI instance
+        review_service: Service for handling reviewing
+    """
+    assert session.collection_flow is not None
+    collection_service = CollectionService(mcp_client)
+    logger.info(
+        f"[Session {request.session_id}] Message received — state={session.collection_flow.state}, approved={request.approved}"
+    )
+    #Process user message in state machine
+    response = await session.collection_flow.process_user_message(
+        user_message=request.message,
+        collection_service=collection_service,
+        approved=request.approved,
+        selected_sources=request.selected_sources,
+        orchestrator=orchestrator,
+        reviewer=review_service,
+        gather_more=request.gather_more,
+    )
+    #Initialize processing state if finished with collection
+    if session.collection_flow.state == CollectionState.COMPLETE and session.processing_flow is None:
+        processing_service = ProcessingService(mcp_client)
+        session.processing_flow = ProcessingFlow(
+            session_id=request.session_id,
+            pir=session.collection_flow.pir,
+            direction_context=session.collection_flow.direction_context,
+            research_logger=session.research_logger,
+        )
+        init_response = await session.processing_flow.initialize(
+            processing_service=processing_service,
+            orchestrator=orchestrator,
+            reviewer=review_service,
+        )
+        _save_session(session)
+        return _convert_to_message_response(
+            init_response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
         )
 
-    # Direction phase
+    _save_session(session)
+    return _convert_to_message_response(
+        response,
+        stage=session.collection_flow.state.value,
+        phase=Phase.COLLECTION,
+    )
+
+
+async def _handle_direction_phase(
+    session: IntelligenceSession,
+    request: DialogueMessageRequest,
+    mcp_client: MCPClient,
+    orchestrator: AIOrchestrator,
+    review_service: ReviewService,
+) -> DialogueMessageResponse:
+    """
+    Handles incoming messages during the direction phase
+    All messages will be used in direction flow.
+
+    Args:
+        session: The active session
+        Requets: The incoming request from frontend
+        mcp_client: client used to initialize collection
+        orchestator: AI orchestrator used to controll dual AI instance
+        review_service: Service for handling reviewing
+    """
     direction_flow = session.direction_flow
     logger.info(
         f"[Session {request.session_id}] Message received — state={direction_flow.state}, perspectives={request.perspectives}, approved={request.approved}"
     )
     service = DialogueService(mcp_client, None)
+
+    #Process user message in state machine
     response = await direction_flow.process_user_message(
         request.message,
         service,
@@ -413,7 +535,7 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
 
     # Convert internal response to API format and return
     default_sub_state = (
-        "awaiting_decision"
+        _SUB_STATE_AWAITING_DECISION
         if direction_flow.state
         in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
         else None
@@ -427,6 +549,42 @@ async def send_message(request: DialogueMessageRequest) -> DialogueMessageRespon
     )
 
 
+@router.post("/message")
+async def send_message(
+    request: DialogueMessageRequest,
+    mcp_client: MCPClient = Depends(_get_mcp_client),
+    review_service: ReviewService = Depends(_get_review_service),
+) -> DialogueMessageResponse:
+    """
+    Process a user message and continue the flow in the dialogue state machine.
+
+    If the session_id does not exist, a new session will be created
+
+
+    Args:
+        request DialogueMessageRequest:
+            - usermessage : The message the user sent
+            - session_id : The session id for the given session
+            - Perspectives : What perspectives the user have chosen
+            - Approved status: If the user approves or rejects ai output. Is only used when the user is given a choice.
+
+    Returns:
+        A response with the next question or summary and canonical action/state metadata.
+
+    Raises:
+        Any exception given by DirectionFlow or MCPClient
+    """
+    session = _get_or_create_session(request.session_id)
+    orchestrator = _build_orchestrator(session)
+    #Current state is processing
+    if session.processing_flow:
+        return await _handle_processing_phase(session, request, mcp_client)
+    #Current state is collection
+    if session.collection_flow:
+        return await _handle_collection_phase(session, request, mcp_client, orchestrator, review_service)
+    return await _handle_direction_phase(session, request, mcp_client, orchestrator, review_service)
+
+
 @router.get("/collection-status/{session_id}")
 async def get_collection_status(session_id: str):
     """Return the live collection tool-call status for a session.
@@ -435,8 +593,6 @@ async def get_collection_status(session_id: str):
     the per-source progress indicator in the IntelligencePanel.
     Returns 404 if no status file exists yet for the session.
     """
-    from src.services.collection_status import CollectionStatusTracker
-
     status = CollectionStatusTracker.read(session_id)
     if status is None:
         raise HTTPException(status_code=404, detail="No collection status found")

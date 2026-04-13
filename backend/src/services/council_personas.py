@@ -71,7 +71,7 @@ def get_council_persona(
 
     try:
         return _COUNCIL_PERSONAS[normalized]
-    except KeyError as exc:  # pragma: no cover - defensive path
+    except KeyError as exc:
         raise ValueError(f"Unsupported perspective: {perspective}") from exc
 
 
