@@ -1,9 +1,12 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api import main
 from src.api.main import app
 from src.api import dialogue as dialogue_api
 from src.models.dialogue import ClarifyingQuestion, PIRReview, QuestionResult, ReviewResult
+from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
+from src.services.state_machines.processing_flow import ProcessingFlow
 
 
 class _FakeDialogueService:
@@ -122,6 +125,113 @@ def test_dev_state_can_force_stage():
     assert data["stage"] == "summary_confirming"
     assert data["sub_state"] == "awaiting_decision"
     assert data["awaiting_user_decision"] is True
+
+
+def test_gather_more_resets_processing_to_collection():
+    """gather_more=True during processing phase should reset back to collection."""
+    # Arrange
+    client = TestClient(app)
+    session_id = "test-gather-more-resets"
+    session = dialogue_api._get_or_create_session(session_id)
+    session.collection_flow = CollectionFlow(session_id=session_id)
+    session.processing_flow = ProcessingFlow(session_id=session_id)
+
+    # Act
+    response = client.post(
+        "/api/dialogue/message",
+        json={"message": "", "session_id": session_id, "gather_more": True},
+    )
+
+    # Assert
+    assert response.status_code == 200
+    assert response.json()["action"] == "select_gaps"
+    assert session.processing_flow is None
+    assert session.collection_flow.state == CollectionState.REVIEWING
+
+
+def test_gather_more_without_collection_flow_returns_400():
+    """gather_more=True with no collection flow should return 400."""
+    # Arrange
+    client = TestClient(app)
+    session_id = "test-gather-more-no-collection"
+    session = dialogue_api._get_or_create_session(session_id)
+    session.processing_flow = ProcessingFlow(session_id=session_id)
+    session.collection_flow = None
+
+    # Act
+    response = client.post(
+        "/api/dialogue/message",
+        json={"message": "", "session_id": session_id, "gather_more": True},
+    )
+
+    # Assert
+    assert response.status_code == 400
+
+
+def test_dev_set_state_with_invalid_stage_returns_400():
+    # Arrange
+    client = TestClient(app)
+
+    # Act
+    response = client.post(
+        "/api/dialogue/dev/state",
+        json={"session_id": "dev-invalid-stage", "stage": "not_a_real_stage"},
+    )
+
+    # Assert
+    assert response.status_code == 400
+    assert "not_a_real_stage" in response.json()["detail"]
+
+
+def test_get_collection_status_returns_404_when_no_status():
+    # Arrange
+    client = TestClient(app)
+
+    # Act
+    response = client.get("/api/dialogue/collection-status/nonexistent-session-id")
+
+    # Assert
+    assert response.status_code == 404
+
+
+@pytest.fixture
+def mock_upload_path(tmp_path, monkeypatch):
+    monkeypatch.setattr(main, "UPLOADS_ROOT", tmp_path)
+    return tmp_path
+
+
+def test_health_returns_200():
+    # Arrange
+    client = TestClient(app)
+
+    # Act
+    response = client.get("/health")
+
+    # Assert
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_delete_session_returns_204(mock_upload_path):  # noqa: ARG001
+    # Arrange
+    client = TestClient(app)
+
+    # Act
+    response = client.delete("/api/sessions/test-delete-session")
+
+    # Assert
+    assert response.status_code == 204
+
+
+def test_delete_nonexistent_session_returns_204(mock_upload_path):  # noqa: ARG001
+    # Arrange
+    client = TestClient(app)
+
+    # Act
+    response = client.delete("/api/sessions/does-not-exist")
+
+    # Assert
+    assert response.status_code == 204
 
 
 def test_dev_reset_sets_stage_initial():

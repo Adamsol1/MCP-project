@@ -253,12 +253,14 @@ class AIOrchestrator:
         processing_service,
         reviewer,
         session_id: str,
+        previous_result: str | None = None,
     ) -> str:
         async def process_fn(feedback=None):
             return await processing_service.process(
                 collected_data=collected_data,
                 pir=pir,
                 feedback=feedback,
+                previous_result=previous_result,
             )
 
         from src.models.dialogue import ProcessingContext

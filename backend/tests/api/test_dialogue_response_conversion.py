@@ -47,4 +47,4 @@ def test_convert_to_message_response_raises_for_unknown_action():
         _convert_to_message_response(response=response, stage="gathering")
 
     assert exc_info.value.status_code == 500
-    assert "Unsupported dialogue action" in exc_info.value.detail
+    assert "Internal error: invalid dialogue action" in exc_info.value.detail

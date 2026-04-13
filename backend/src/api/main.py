@@ -7,7 +7,7 @@ from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadF
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
-from src.api.dialogue import evict_session
+from src.api.dialogue import evict_session, ensure_sessions_dir
 from src.api.dialogue import router as dialogue_router
 from src.importers.session_uploads import (
     default_uploads_root,
@@ -36,6 +36,7 @@ async def lifespan(_app: FastAPI):
 
     Does not have any input of output
     """
+    ensure_sessions_dir()
     logger.info("Application started")
     yield
     logger.info("Application stopped")
@@ -109,7 +110,9 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"[upload_file] Failed to save upload for session {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to save uploaded file") from e
+    logger.info(f"[upload_file] Saved '{file.filename}' for session {session_id}")
     return {"status": "success", **result}
 
 
@@ -121,7 +124,8 @@ async def list_uploaded_files(session_id: str = Query(...)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"[list_uploaded_files] Failed to list uploads for session {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to list uploaded files") from e
 
     return {
         "status": "success",
@@ -142,10 +146,12 @@ async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"[delete_uploaded_file] Failed to delete {file_upload_id} for session {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to delete uploaded file") from e
 
     if not deleted:
         raise HTTPException(status_code=404, detail="Upload not found")
+    logger.info(f"[delete_uploaded_file] Deleted {file_upload_id} for session {session_id}")
     return Response(status_code=204)
 
 
@@ -182,6 +188,8 @@ async def delete_session(session_id: str):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(f"[delete_session] Failed to delete session {session_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to delete session") from e
 
+    logger.info(f"[delete_session] Deleted session {session_id}")
     return Response(status_code=204)

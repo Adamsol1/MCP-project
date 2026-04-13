@@ -30,7 +30,7 @@ class TestSessionScopedUploads:
         assert data["status"] == "success"
         assert data["session_id"] == "session-a"
         assert data["file_upload_id"]
-        assert data["stored_path"]
+        assert data["path"]
 
     @pytest.mark.parametrize(
         "file_name, content",
@@ -67,7 +67,7 @@ class TestSessionScopedUploads:
             files={"file": ("test.txt", b"hello", "text/plain")},
         )
         payload = response.json()
-        saved_path = Path(payload["stored_path"])
+        saved_path = Path(payload["path"])
 
         assert saved_path.exists()
         assert saved_path.read_bytes() == b"hello"
@@ -80,7 +80,7 @@ class TestSessionScopedUploads:
             files={"file": ("empty.txt", b"", "text/plain")},
         )
         payload = response.json()
-        saved_file = Path(payload["stored_path"])
+        saved_file = Path(payload["path"])
 
         assert response.status_code == 200
         assert saved_file.exists()
@@ -130,7 +130,7 @@ class TestSessionScopedUploads:
         )
         payload = upload_response.json()
         file_upload_id = payload["file_upload_id"]
-        saved_path = Path(payload["stored_path"])
+        saved_path = Path(payload["path"])
         assert saved_path.exists()
 
         delete_response = client.delete(

@@ -23,6 +23,7 @@ class ProcessingService:
         collected_data: str,
         pir: str,
         feedback: str | None = None,
+        previous_result: str | None = None,
     ) -> str:
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
@@ -31,6 +32,7 @@ class ProcessingService:
                     "pir": pir,
                     "collected_data": collected_data,
                     "feedback": feedback or "",
+                    "previous_result": previous_result or "",
                 },
             )
             agent = GeminiAgent(self.mcp_client)
