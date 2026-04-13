@@ -1105,7 +1105,7 @@ export default function AnalysisPrototypeView() {
           </ul>
         </article>
 
-        <article className="rounded-[24px] border border-border bg-surface px-5 py-5 shadow-sm">
+        <article className="rounded-3xl border border-border bg-surface px-5 py-5 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
             Information Gaps
           </p>

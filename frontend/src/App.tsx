@@ -204,7 +204,7 @@ function AppShell() {
         <Sidebar
           conversations={conversations}
           activeConversationId={activeConversation?.id ?? null}
-          onNewChat={createNewConversation}
+          onNewChat={() => createNewConversation(pendingPerspectives)}
           onSwitchConversation={switchConversation}
           onDeleteConversation={deleteConversation}
           onRenameConversation={renameConversation}
