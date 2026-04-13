@@ -510,7 +510,7 @@ function FindingDetailModal({
   );
 }
 
-function ProcessingMessage({ data, onGapCollect }: { data: ProcessingData; onGapCollect?: (gap: string) => void }) {
+function ProcessingMessage({ data }: { data: ProcessingData }) {
   const [selectedFinding, setSelectedFinding] = useState<ProcessingData["findings"][number] | null>(null);
 
   return (
@@ -559,23 +559,11 @@ function ProcessingMessage({ data, onGapCollect }: { data: ProcessingData; onGap
         </div>
       </details>
       {data.gaps.length > 0 && (
-        <div className="border-t border-border pt-2 space-y-2">
+        <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Gaps</p>
-          <ul className="mt-1 space-y-2">
+          <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
             {data.gaps.map((gap, i) => (
-              <li key={i} className="flex items-start gap-2">
-                <span className="mt-0.5 shrink-0 text-text-muted">•</span>
-                <span className="flex-1 text-sm text-text-muted">{gap}</span>
-                {onGapCollect && (
-                  <button
-                    type="button"
-                    onClick={() => onGapCollect(gap)}
-                    className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium bg-primary-subtle text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
-                  >
-                    Collect more
-                  </button>
-                )}
-              </li>
+              <li key={i}>{gap}</li>
             ))}
           </ul>
         </div>
@@ -832,7 +820,7 @@ export default function ChatWindow({
       message.data &&
       "findings" in message.data
     ) {
-      return <ProcessingMessage data={message.data as ProcessingData} onGapCollect={onGapCollect} />;
+      return <ProcessingMessage data={message.data as ProcessingData} />;
     }
 
     if (
