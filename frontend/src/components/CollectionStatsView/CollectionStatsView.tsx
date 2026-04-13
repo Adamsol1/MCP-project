@@ -4,11 +4,13 @@ import { useT } from "../../i18n/useT";
 interface CollectionStatsViewProps {
   collectionData: CollectionDisplayData | null;
   onOpenModal: () => void;
+  onOpenActivityModal?: (attempt: number) => void;
 }
 
 export default function CollectionStatsView({
   collectionData,
   onOpenModal,
+  onOpenActivityModal,
 }: CollectionStatsViewProps) {
   const t = useT();
 
@@ -32,21 +34,31 @@ export default function CollectionStatsView({
             Collection Activity
           </p>
           {activity.map((item: ActivitySummaryItem) => (
-            <div key={item.attempt} className="rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-1">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-                Attempt {item.attempt}
-              </p>
-              <p className="text-xs text-text-secondary">
+            <button
+              key={item.attempt}
+              type="button"
+              onClick={() => onOpenActivityModal?.(item.attempt)}
+              className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-1 text-left transition-colors hover:border-primary hover:bg-primary-subtle"
+            >
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                  Attempt {item.attempt}
+                </p>
+                <span
+                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                    item.reviewer_approved
+                      ? "bg-success-subtle text-success-text"
+                      : "bg-error-subtle text-error-text"
+                  }`}
+                >
+                  {item.reviewer_approved ? "Approved" : "Rejected"}
+                </span>
+              </div>
+              <p className="text-xs text-text-secondary truncate">
                 <span className="font-medium text-text-primary">Collector: </span>
                 {item.collector_sources.join(", ")}
               </p>
-              <p className="text-xs text-text-secondary">
-                <span className="font-medium text-text-primary">Reviewer: </span>
-                {item.reviewer_approved
-                  ? "Approved ✓"
-                  : item.reviewer_suggestions ?? "Rejected"}
-              </p>
-            </div>
+            </button>
           ))}
         </div>
       )}

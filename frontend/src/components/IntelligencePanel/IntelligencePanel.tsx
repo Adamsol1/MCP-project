@@ -5,6 +5,7 @@ import type { DialoguePhase } from "../../types/dialogue";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
+import CollectionActivityModal from "../CollectionActivityModal/CollectionActivityModal";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
 import type { UploadedFileRecord } from "../../services/upload/upload";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
@@ -35,6 +36,8 @@ export default function IntelligencePanel({
   const { collectionData } = useWorkspace();
   const t = useT();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [activityModalOpen, setActivityModalOpen] = useState(false);
+  const [activityFocusAttempt, setActivityFocusAttempt] = useState<number | undefined>(undefined);
   const [showAllFiles, setShowAllFiles] = useState(false);
 
   const visibleFiles = showAllFiles
@@ -85,6 +88,10 @@ export default function IntelligencePanel({
               <CollectionStatsView
                 collectionData={collectionData}
                 onOpenModal={() => setIsModalOpen(true)}
+                onOpenActivityModal={(attempt) => {
+                  setActivityFocusAttempt(attempt);
+                  setActivityModalOpen(true);
+                }}
               />
             </section>
           </>
@@ -156,6 +163,12 @@ export default function IntelligencePanel({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         collectionData={collectionData}
+      />
+      <CollectionActivityModal
+        isOpen={activityModalOpen}
+        onClose={() => setActivityModalOpen(false)}
+        activity={collectionData?.activity_summary ?? []}
+        focusAttempt={activityFocusAttempt}
       />
     </div>
   );

@@ -93,6 +93,7 @@ export interface SummaryData {
 export interface CollectionPlanStep {
   title: string;
   description: string;
+  suggested_sources?: string[];
 }
 
 /**

@@ -79,6 +79,9 @@ function AppShell() {
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
+    inputPrefill,
+    prefillGapPrompt,
+    clearInputPrefill,
   } = useChat(pendingPerspectives);
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
@@ -244,6 +247,9 @@ function AppShell() {
             onSubmitSourceSelection={submitSourceSelection}
             devPrefill={devPrefill}
             onDevPrefillConsumed={clearDevPrefill}
+            inputPrefill={inputPrefill}
+            onInputPrefillConsumed={clearInputPrefill}
+            onGapCollect={prefillGapPrompt}
           />
         </main>
 

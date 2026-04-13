@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ToastContainer } from "../Toast";
 import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
@@ -119,21 +119,25 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           </div>
         ))}
       </div>
-      {pirData.sources && pirData.sources.length > 0 && (
-        <details className="group mt-3 border-t border-border pt-2" open>
-          <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
-            Sources ({pirData.sources.length})
-            <Chevron />
-          </summary>
-          <div className="mt-1.5">
+      <details className="group mt-3 border-t border-border pt-2" open>
+        <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
+          Sources ({pirData.sources?.length ?? 0})
+          <Chevron />
+        </summary>
+        <div className="mt-1.5">
+          {pirData.sources && pirData.sources.length > 0 ? (
             <SourceList
               sources={pirData.sources}
               highlightedRefs={highlightedRefs}
               onSourceHover={handleHoveredRefs}
             />
-          </div>
-        </details>
-      )}
+          ) : (
+            <p className="text-xs text-text-muted italic px-2">
+              No knowledge bank sources used — PIRs generated from the conversation context.
+            </p>
+          )}
+        </div>
+      </details>
       {reasoningPoints.length > 0 && (
         <details className="group mt-3 border-t border-border pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
@@ -201,6 +205,23 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
                 <p className="pl-7 text-xs text-text-secondary leading-relaxed">
                   {step.description}
                 </p>
+                {step.suggested_sources && step.suggested_sources.length > 0 && (
+                  <div className="pl-7 pt-1.5 space-y-1">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                      Suggested Sources
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                    {step.suggested_sources.map((src) => (
+                      <span
+                        key={src}
+                        className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary"
+                      >
+                        {src}
+                      </span>
+                    ))}
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -210,19 +231,6 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
         <p className="whitespace-pre-wrap text-sm text-text-primary">
           {planData.plan}
         </p>
-      )}
-
-      {planData.suggested_sources.length > 0 && (
-        <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">
-            {t.suggestedSources}
-          </p>
-          <ul className="mt-1 list-disc pl-5 text-sm text-text-secondary">
-            {planData.suggested_sources.map((source) => (
-              <li key={source}>{source}</li>
-            ))}
-          </ul>
-        </div>
       )}
     </div>
   );
@@ -284,10 +292,14 @@ function CollectionReviewPrompt({
   isLoading,
   onAccept,
   onGatherMore,
+  gapsPrefill,
+  onGapCollect,
 }: {
   isLoading: boolean;
   onAccept?: () => void;
   onGatherMore?: () => void;
+  gapsPrefill?: string | null;
+  onGapCollect?: (gap: string) => void;
 }) {
   const t = useT();
   return (
@@ -313,7 +325,10 @@ function CollectionReviewPrompt({
 
         <button
           type="button"
-          onClick={() => onGatherMore?.()}
+          onClick={() => {
+            if (gapsPrefill) onGapCollect?.(gapsPrefill);
+            onGatherMore?.();
+          }}
           disabled={isLoading}
           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
         >
@@ -352,123 +367,152 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   osint:          "OSINT",
 };
 
-function FindingConfidenceBadge({ f }: { f: ProcessingData["findings"][number] }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
+function FindingDetailModal({
+  finding,
+  onClose,
+}: {
+  finding: ProcessingData["findings"][number] | null;
+  onClose: () => void;
+}) {
   useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    if (!finding) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
     };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [finding, onClose]);
 
-  const tier = confidenceTierFromInt(f.confidence);
+  if (!finding) return null;
+
+  const tier = confidenceTierFromInt(finding.confidence);
   const tierStyle = FINDING_TIER_STYLES[tier];
-  const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
-
-  const sd = f.supporting_data ?? {};
-  const hasDetails =
-    (sd.kb_refs?.length ?? 0) > 0 ||
-    (sd.attack_ids?.length ?? 0) > 0 ||
-    (sd.entities?.length ?? 0) > 0 ||
-    (sd.domains?.length ?? 0) > 0 ||
-    (f.uncertainties?.length ?? 0) > 0;
+  const sourceLabel = SOURCE_DISPLAY_NAMES[finding.source] ?? finding.source;
+  const sd = finding.supporting_data ?? {};
 
   return (
-    <div className="relative shrink-0" ref={ref}>
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className={`flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-semibold cursor-pointer transition-opacity hover:opacity-80 ${tierStyle}`}
-        title="Click for source details"
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      onClick={onClose}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        className="relative w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
       >
-        <span>{tier.toUpperCase()}</span>
-        <span className="opacity-70 font-normal">{f.confidence}%</span>
-      </button>
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
+          <p className="text-sm font-semibold text-text-primary leading-snug flex-1">{finding.title}</p>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${tierStyle}`}>
+              {tier.toUpperCase()} {finding.confidence}%
+            </span>
+            <button
+              aria-label="close"
+              onClick={onClose}
+              className="rounded p-1 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
 
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-64 rounded-lg border border-border bg-surface shadow-xl p-3 space-y-2.5 text-xs">
-          <p className="font-semibold text-text-primary text-sm">Confidence Details</p>
-
-          <div className="flex items-center justify-between">
-            <span className="text-text-muted">AI confidence</span>
-            <span className="font-medium">{f.confidence}%</span>
+        {/* Body */}
+        <div className="px-5 py-4 space-y-4 text-sm">
+          {/* Finding */}
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Finding</p>
+            <p className="text-text-secondary leading-relaxed">{finding.finding}</p>
           </div>
 
-          <div className="flex items-center justify-between">
-            <span className="text-text-muted">Source type</span>
-            <span className="font-medium">{sourceLabel}</span>
+          {/* Why it matters */}
+          {finding.why_it_matters && (
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Why It Matters</p>
+              <p className="text-text-muted italic leading-relaxed">{finding.why_it_matters}</p>
+            </div>
+          )}
+
+          {/* Meta row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Source</p>
+              <p className="text-text-secondary">{sourceLabel}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Relevant To</p>
+              <p className="text-text-secondary">{finding.relevant_to.join(", ")}</p>
+            </div>
           </div>
 
-          {hasDetails && (
-            <div className="border-t border-border-muted pt-2 space-y-2">
+          {/* Supporting data */}
+          {((sd.kb_refs?.length ?? 0) > 0 ||
+            (sd.attack_ids?.length ?? 0) > 0 ||
+            (sd.entities?.length ?? 0) > 0 ||
+            (sd.domains?.length ?? 0) > 0) && (
+            <div className="border-t border-border-muted pt-3 space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Supporting Data</p>
               {(sd.kb_refs?.length ?? 0) > 0 && (
                 <div>
-                  <p className="font-medium text-text-secondary mb-0.5">Knowledge base refs</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">Knowledge base refs</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.kb_refs!.map((r) => (
-                      <span key={r} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">
-                        {r}
-                      </span>
+                      <span key={r} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{r}</span>
                     ))}
                   </div>
                 </div>
               )}
               {(sd.attack_ids?.length ?? 0) > 0 && (
                 <div>
-                  <p className="font-medium text-text-secondary mb-0.5">ATT&CK techniques</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">ATT&amp;CK techniques</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.attack_ids!.map((id) => (
-                      <span key={id} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">
-                        {id}
-                      </span>
+                      <span key={id} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{id}</span>
                     ))}
                   </div>
                 </div>
               )}
               {(sd.entities?.length ?? 0) > 0 && (
                 <div>
-                  <p className="font-medium text-text-secondary mb-0.5">Entities</p>
-                  <p className="text-text-primary">{sd.entities!.join(", ")}</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">Entities</p>
+                  <p className="text-xs text-text-primary">{sd.entities!.join(", ")}</p>
                 </div>
               )}
               {(sd.domains?.length ?? 0) > 0 && (
                 <div>
-                  <p className="font-medium text-text-secondary mb-0.5">Domains</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">Domains</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.domains!.map((d) => (
-                      <span key={d} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">
-                        {d}
-                      </span>
+                      <span key={d} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">{d}</span>
                     ))}
                   </div>
-                </div>
-              )}
-              {(f.uncertainties?.length ?? 0) > 0 && (
-                <div>
-                  <p className="font-medium text-text-secondary mb-0.5">Uncertainties</p>
-                  <ul className="list-disc pl-3 space-y-0.5 text-text-primary">
-                    {f.uncertainties.map((u, i) => (
-                      <li key={i}>{u}</li>
-                    ))}
-                  </ul>
                 </div>
               )}
             </div>
           )}
 
-          <p className="border-t border-border-muted pt-2 text-text-muted italic">
-            Full source breakdown (OTX, web) available in the Analysis view after processing.
-          </p>
+          {/* Uncertainties */}
+          {(finding.uncertainties?.length ?? 0) > 0 && (
+            <div className="border-t border-border-muted pt-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Uncertainties</p>
+              <ul className="list-disc pl-4 space-y-0.5 text-xs text-text-muted">
+                {finding.uncertainties.map((u, i) => (
+                  <li key={i}>{u}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
 
-function ProcessingMessage({ data }: { data: ProcessingData }) {
+function ProcessingMessage({ data, onGapCollect }: { data: ProcessingData; onGapCollect?: (gap: string) => void }) {
+  const [selectedFinding, setSelectedFinding] = useState<ProcessingData["findings"][number] | null>(null);
+
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Processing Results</h3>
@@ -476,39 +520,67 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
         <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
           {data.findings.length} findings <Chevron />
         </summary>
-        <div className="mt-2 space-y-2">
-          {data.findings.map((f) => (
-            <div
-              key={f.id}
-              className="rounded border border-border-muted bg-surface px-3 py-2 text-sm"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <p className="font-medium text-text-primary leading-snug">{f.title}</p>
-                <FindingConfidenceBadge f={f} />
-              </div>
-              <p className="text-xs text-text-secondary mt-1">{f.finding}</p>
-              {f.why_it_matters && (
-                <p className="text-xs text-text-muted mt-1 italic">
-                  {f.why_it_matters}
-                </p>
-              )}
-              <p className="text-xs text-text-muted mt-1">
-                {f.relevant_to.join(", ")} · {f.source}
-              </p>
-            </div>
-          ))}
+        <div className="mt-2 overflow-x-auto rounded border border-border-muted">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-surface-muted text-text-muted">
+                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted">Title</th>
+                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Source</th>
+                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Confidence</th>
+                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Relevant To</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-muted">
+              {data.findings.map((f) => {
+                const tier = confidenceTierFromInt(f.confidence);
+                const tierStyle = FINDING_TIER_STYLES[tier];
+                const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
+                return (
+                  <tr
+                    key={f.id}
+                    onClick={() => setSelectedFinding(f)}
+                    className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
+                  >
+                    <td className="px-3 py-2 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[22ch] truncate">
+                      {f.title}
+                    </td>
+                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{sourceLabel}</td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tierStyle}`}>
+                        {tier.toUpperCase()} {f.confidence}%
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{f.relevant_to.join(", ")}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       </details>
       {data.gaps.length > 0 && (
-        <div className="border-t border-border pt-2">
+        <div className="border-t border-border pt-2 space-y-2">
           <p className="text-sm font-medium text-text-secondary">Gaps</p>
-          <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
+          <ul className="mt-1 space-y-2">
             {data.gaps.map((gap, i) => (
-              <li key={i}>{gap}</li>
+              <li key={i} className="flex items-start gap-2">
+                <span className="mt-0.5 shrink-0 text-text-muted">•</span>
+                <span className="flex-1 text-sm text-text-muted">{gap}</span>
+                {onGapCollect && (
+                  <button
+                    type="button"
+                    onClick={() => onGapCollect(gap)}
+                    className="shrink-0 rounded px-2 py-0.5 text-[11px] font-medium bg-primary-subtle text-primary hover:bg-primary/20 transition-colors whitespace-nowrap"
+                  >
+                    Collect more
+                  </button>
+                )}
+              </li>
             ))}
           </ul>
         </div>
       )}
+      <FindingDetailModal finding={selectedFinding} onClose={() => setSelectedFinding(null)} />
     </div>
   );
 }
@@ -534,6 +606,9 @@ interface ChatWindowProps {
   onSubmitSourceSelection?: () => void;
   devPrefill?: string | null;
   onDevPrefillConsumed?: () => void;
+  inputPrefill?: string | null;
+  onInputPrefillConsumed?: () => void;
+  onGapCollect?: (gap: string) => void;
 }
 
 function SourceSummaryTable({
@@ -627,6 +702,9 @@ export default function ChatWindow({
   onSubmitSourceSelection,
   devPrefill,
   onDevPrefillConsumed,
+  inputPrefill,
+  onInputPrefillConsumed,
+  onGapCollect,
 }: ChatWindowProps) {
   const t = useT();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
@@ -653,6 +731,34 @@ export default function ChatWindow({
     }, 80);
     return () => clearTimeout(id);
   }, [devPrefill, onDevPrefillConsumed, onSendMessage]);
+
+  useEffect(() => {
+    if (!inputPrefill) return;
+    onInputPrefillConsumed?.();
+    setInputValue(inputPrefill);
+    setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [inputPrefill, onInputPrefillConsumed]);
+
+  // Build a pre-fill prompt from the gaps in the last collection summary message.
+  // Shown when the user clicks "Collect More Data" so they can review/edit before sending.
+  const lastCollectionGapsPrefill = useMemo(() => {
+    for (let i = (messages ?? []).length - 1; i >= 0; i--) {
+      const msg = (messages ?? [])[i];
+      if (
+        msg.type === "collection" &&
+        msg.data &&
+        typeof msg.data === "object" &&
+        "sources_used" in msg.data
+      ) {
+        const gaps = (msg.data as CollectionSummaryData).gaps;
+        if (gaps) {
+          return `Please collect additional intelligence to address the following gaps identified in the collection summary:\n\n${gaps}`;
+        }
+        return null;
+      }
+    }
+    return null;
+  }, [messages]);
 
   const submitMessage = () => {
     if (inputValue.trim() === "") return;
@@ -690,7 +796,17 @@ export default function ChatWindow({
       typeof message.data === "object" &&
       "summary" in message.data
     ) {
-      return <p>{message.data.summary}</p>;
+      return (
+        <div className="space-y-2">
+          <h3 className="font-semibold">Direction Summary</h3>
+          <p className="text-sm text-text-secondary leading-relaxed">
+            {(message.data as { summary: string }).summary}
+          </p>
+          <p className="text-xs text-text-muted italic">
+            Review this summary and approve to continue to PIR generation, or reject to refine.
+          </p>
+        </div>
+      );
     }
 
     if (message.type === "pir" && message.data && "pir_text" in message.data) {
@@ -716,7 +832,7 @@ export default function ChatWindow({
       message.data &&
       "findings" in message.data
     ) {
-      return <ProcessingMessage data={message.data as ProcessingData} />;
+      return <ProcessingMessage data={message.data as ProcessingData} onGapCollect={onGapCollect} />;
     }
 
     if (

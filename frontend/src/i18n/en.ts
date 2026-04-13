@@ -157,16 +157,16 @@ export const en = {
   timeframePlaceholder: "e.g. Last 30 days",
 
   // ApprovalPrompt
-  approvalDefault: "Approval Prompt",
-  approvalDefaultSubtitle: "Review the generated output before continuing.",
-  approvalSummary: "Summary Approval Prompt",
+  approvalDefault: "Ready to continue?",
+  approvalDefaultSubtitle: "Review the output above before continuing.",
+  approvalSummary: "Does this capture your intent?",
   approvalSummarySubtitle:
-    "Review the generated summary before continuing to PIR.",
-  approvalPir: "PIR Approval Prompt",
-  approvalPirSubtitle: "Review the generated PIR before completing Direction.",
-  approvalPlan: "Collection Plan Approval Prompt",
+    "Approve to generate your Priority Intelligence Requirements, or reject to refine the summary.",
+  approvalPir: "Do these PIRs look correct?",
+  approvalPirSubtitle: "Approve to move to collection planning, or reject to adjust the requirements.",
+  approvalPlan: "Ready to start collection?",
   approvalPlanSubtitle:
-    "Review the generated collection plan before selecting sources.",
+    "Approve to select sources and begin collecting intelligence, or reject to adjust the plan.",
   approveContinue: "Approve \u0026 Continue",
   rejectWithFeedback: "Reject with Feedback",
 };

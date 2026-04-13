@@ -27,7 +27,7 @@ def build_processing_prompt(
    - A short descriptive title
    - A detailed analytical narrative (the "finding" field)
    - A concise evidence summary
-   - The source category (e.g. "osint", "knowledge_bank", "network_telemetry", "malware_analysis", "web_search")
+   - The source category — use exactly one of: "knowledge_bank" (internal KB), "otx" (AlienVault OTX), "web_search" (general web/Google results), "web_gov" (government/official sites), "web_news" (news outlets), "web_think_tank" (research institutes), "web_other" (other web), "network_telemetry", "malware_analysis", "pretrained" (no external source used)
    - A confidence score from 0 to 100 based on source reliability and corroboration
    - Which PIRs it addresses
    - Supporting data: IOCs, MITRE ATT&CK IDs, entities, domains, timestamps, locations, KB references — as applicable
@@ -48,7 +48,7 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
       "title": "Short finding title",
       "finding": "Detailed analytical narrative of the finding",
       "evidence_summary": "Concise summary of the supporting evidence",
-      "source": "source_category",
+      "source": "web_search",
       "confidence": 75,
       "relevant_to": ["PIR-0", "PIR-1"],
       "supporting_data": {{

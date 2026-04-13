@@ -65,20 +65,58 @@ function PieChart({ slices }: { slices: SliceData[] }) {
 // ── Article type classification ───────────────────────────────────────────────
 
 const NEWS_DOMAINS = new Set([
-  "reuters.com", "bloomberg.com", "bbc.com", "bbc.co.uk", "nytimes.com",
-  "theguardian.com", "washingtonpost.com", "apnews.com", "cnn.com",
-  "aljazeera.com", "cbsnews.com", "pbs.org", "foxbusiness.com", "rte.ie",
-  "time.com", "thehill.com", "wsj.com", "ft.com", "thetimes.com",
-  "independent.co.uk", "euobserver.com", "iranintl.com", "moderndiplomacy.eu",
+  // Global wire services
+  "reuters.com", "apnews.com", "afp.com",
+  // US outlets
+  "bloomberg.com", "nytimes.com", "washingtonpost.com", "wsj.com",
+  "cnn.com", "foxnews.com", "foxbusiness.com", "msnbc.com", "nbcnews.com",
+  "abcnews.go.com", "cbsnews.com", "pbs.org", "npr.org", "axios.com",
+  "politico.com", "thehill.com", "time.com", "newsweek.com",
+  "usatoday.com", "latimes.com", "nypost.com", "chron.com",
+  "vox.com", "businessinsider.com", "thedailybeast.com",
+  // UK / Europe
+  "bbc.com", "bbc.co.uk", "theguardian.com", "independent.co.uk",
+  "thetimes.com", "telegraph.co.uk", "ft.com", "sky.com",
+  "dailymail.co.uk", "euractiv.com", "euobserver.com", "rte.ie",
+  "dw.com", "france24.com", "lemonde.fr", "lefigaro.fr",
+  "spiegel.de", "dn.no", "vg.no", "aftenposten.no", "dagbladet.no",
+  "svt.se", "thelocal.se", "yle.fi", "helsinkitimes.fi",
+  // Asia / Pacific
+  "scmp.com", "straitstimes.com", "channelnewsasia.com",
+  "thehindu.com", "ndtv.com", "hindustantimes.com", "dawn.com",
+  "abc.net.au", "smh.com.au",
+  // Middle East / Africa
+  "aljazeera.com", "iranintl.com", "haaretz.com", "timesofisrael.com",
+  "middleeasteye.net", "arabnews.com",
+  // Russia / Eastern Europe / China (state/independent)
+  "kyivpost.com", "kyivindependent.com", "meduza.io",
+  "globaltimes.cn", "xinhuanet.com", "tass.com",
+  // Other
+  "moderndiplomacy.eu", "defenseone.com", "defensenews.com",
+  "militarytimes.com", "breakingdefense.com", "janes.com",
 ]);
 
 const ANALYSIS_DOMAINS = new Set([
+  // Major think tanks
   "chathamhouse.org", "csis.org", "rand.org", "brookings.edu", "cfr.org",
   "atlanticcouncil.org", "carnegieendowment.org", "iiss.org", "rusi.org",
-  "hstoday.us", "orfonline.org", "isdglobal.org", "fpri.org", "sldinfo.com",
+  "stimson.org", "wilsoncenter.org", "sipri.org", "ecfr.eu",
+  "gmfus.org", "lowyinstitute.org", "auspi.org",
+  // Security & defence
   "foreignaffairs.com", "foreignpolicy.com", "thediplomat.com",
+  "warontherocks.com", "lawfaremedia.org", "justsecurity.org",
+  "c4isrnet.com", "fpri.org", "sldinfo.com",
+  // Cyber & threat intel
+  "bellingcat.com", "recordedfuture.com", "crowdstrike.com",
+  "mandiant.com", "secureworks.com", "unit42.paloaltonetworks.com",
+  "krebsonsecurity.com", "therecord.media", "cyberscoop.com",
+  "darkreading.com", "securityweek.com",
+  // Policy & area studies
+  "hstoday.us", "orfonline.org", "isdglobal.org",
   "energypolicy.columbia.edu", "crisisgroup.org", "pacforum.org",
   "instituteofgeoeconomics.org", "nextcenturyfoundation.org",
+  "heritage.org", "aei.org", "fdd.org", "defenddemocracy.org",
+  "thebulletin.org", "nsi.org",
 ]);
 
 type ArticleLabel = "News" | "Analysis" | "Report" | "Official" | "Article";
@@ -374,15 +412,24 @@ function ItemCard({ item }: { item: CollectedItem }) {
               {label}
             </span>
           )}
-          <a
-            href={item.resource_id}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text hover:underline max-w-[60ch] truncate inline-block"
-            title={item.resource_id}
-          >
-            {displayTitle}
-          </a>
+          {isKb ? (
+            <span
+              className="rounded bg-surface-muted px-1.5 py-0.5 text-[11px] font-medium text-text-muted max-w-[60ch] truncate inline-block"
+              title={item.resource_id}
+            >
+              {displayTitle}
+            </span>
+          ) : (
+            <a
+              href={item.resource_id}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded bg-primary-subtle px-1.5 py-0.5 text-[11px] font-medium text-info-text hover:underline max-w-[60ch] truncate inline-block"
+              title={item.resource_id}
+            >
+              {displayTitle}
+            </a>
+          )}
         </div>
       )}
       {isOtx ? (

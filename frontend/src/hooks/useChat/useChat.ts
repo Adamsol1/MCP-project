@@ -184,10 +184,19 @@ function parsePlanData(raw: string): CollectionPlanData {
       ? jsonSteps
       : parseStepsFromPlanText(plan);
 
+  // Aggregate suggested_sources: prefer per-step sources (deduplicated union),
+  // fall back to top-level suggested_sources for legacy payloads.
+  const stepSources: string[] =
+    steps && steps.some((s) => s.suggested_sources && s.suggested_sources.length > 0)
+      ? [...new Set(steps.flatMap((s) => s.suggested_sources ?? []))]
+      : [];
+  const globalSources = parseSourcesFromUnknown(parsed.suggested_sources);
+  const suggested_sources = stepSources.length > 0 ? stepSources : globalSources;
+
   return {
     plan,
     steps,
-    suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
+    suggested_sources,
   };
 }
 
@@ -397,6 +406,7 @@ export function useChat(initialPerspectives?: string[]) {
   const [isLoading, setIsLoading] = useState(false);
   const [isDecisionPending, setIsDecisionPending] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
+  const [inputPrefill, setInputPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [localSourceContext, setLocalSourceContext] = useState<
@@ -475,7 +485,7 @@ export function useChat(initialPerspectives?: string[]) {
       fallbackSubState,
     );
     const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
-    setStage(next.stage, next.subState, nextPhase);
+    setStage(conversationId, next.stage, next.subState, nextPhase);
   };
 
   const sendAndHandle = async (
@@ -502,7 +512,7 @@ export function useChat(initialPerspectives?: string[]) {
     if (response.action === "start_collecting") {
       // Skip the "Collecting from: ..." message — the Collection Results card
       // already shows the sources used.  Just advance the stage.
-      setStage("collecting", null, "collection");
+      setStage(conversationId, "collecting", null, "collection");
     } else {
       applyResponse(
         response,
@@ -543,10 +553,11 @@ export function useChat(initialPerspectives?: string[]) {
   const handleSendMessage = async (text: string, approved?: boolean) => {
     const conversation =
       activeConversation ?? createNewConversation(initialPerspectives);
+    const conversationId = conversation.id;
 
     addMessage(
       { id: crypto.randomUUID(), text, sender: "user" },
-      conversation.id,
+      conversationId,
     );
 
     // Intercept gather_more text — store locally and show source selection instead of backend call
@@ -563,7 +574,7 @@ export function useChat(initialPerspectives?: string[]) {
     setIsLoading(true);
     try {
       await sendAndHandle(
-        conversation.id,
+        conversationId,
         conversation.sessionId,
         text,
         approved,
@@ -576,7 +587,7 @@ export function useChat(initialPerspectives?: string[]) {
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+        setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -585,6 +596,7 @@ export function useChat(initialPerspectives?: string[]) {
 
   const approve = async () => {
     if (!activeConversation) return;
+    const conversationId = activeConversation.id;
 
     // For plan_confirming: show local source selection instead of calling backend
     if (stage === "plan_confirming") {
@@ -596,7 +608,7 @@ export function useChat(initialPerspectives?: string[]) {
     setIsLoading(true);
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         "approve",
         true,
@@ -606,11 +618,16 @@ export function useChat(initialPerspectives?: string[]) {
         activeConversation.phase,
         activeConversation.perspectives,
       );
-      success("Request approved");
+      // Only show toast if the user is still viewing the same conversation
+      if (activeConversation?.id === conversationId) {
+        success("Request approved");
+      }
     } catch (e) {
-      error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
-      if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+      if (activeConversation?.id === conversationId) {
+        error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
+        if (activeConversation.stage === "collecting") {
+          setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
+        }
       }
     } finally {
       setIsLoading(false);
@@ -632,7 +649,7 @@ export function useChat(initialPerspectives?: string[]) {
       activeConversation.id,
     );
 
-    setStage(stage, "awaiting_modifications");
+    setStage(activeConversation.id, stage, "awaiting_modifications");
     info("Add your feedback in chat.");
   };
 
@@ -673,7 +690,7 @@ export function useChat(initialPerspectives?: string[]) {
       },
       activeConversation.id,
     );
-    setStage("reviewing", "awaiting_gather_more");
+    setStage(activeConversation.id, "reviewing", "awaiting_gather_more");
     info("Describe what to gather more on.");
   };
 
@@ -723,7 +740,7 @@ export function useChat(initialPerspectives?: string[]) {
         }`,
       );
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+        setStage(activeConversation.id, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
       setIsLoading(false);
@@ -738,6 +755,16 @@ export function useChat(initialPerspectives?: string[]) {
     setDevPrefill(null);
   };
 
+  const prefillGapPrompt = (gap: string) => {
+    setInputPrefill(
+      `Please collect additional intelligence to address the following gap:\n\n${gap}`,
+    );
+  };
+
+  const clearInputPrefill = () => {
+    setInputPrefill(null);
+  };
+
   const debugConfirm = () => {
     const conversation =
       activeConversation ?? createNewConversation(initialPerspectives);
@@ -749,7 +776,7 @@ export function useChat(initialPerspectives?: string[]) {
       },
       conversation.id,
     );
-    setStage("summary_confirming", "awaiting_decision", "direction");
+    setStage(conversation.id, "summary_confirming", "awaiting_decision", "direction");
   };
 
   const jumpToDevStage = async (
@@ -764,6 +791,7 @@ export function useChat(initialPerspectives?: string[]) {
         nextSubState,
       );
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -779,6 +807,7 @@ export function useChat(initialPerspectives?: string[]) {
     try {
       const response = await getDevDialogueState(activeConversation.sessionId);
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -796,6 +825,7 @@ export function useChat(initialPerspectives?: string[]) {
         activeConversation.sessionId,
       );
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -830,5 +860,8 @@ export function useChat(initialPerspectives?: string[]) {
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
+    inputPrefill,
+    prefillGapPrompt,
+    clearInputPrefill,
   };
 }
