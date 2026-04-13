@@ -1137,6 +1137,8 @@ export default function ChatWindow({
                     isLoading={isLoading}
                     onAccept={onApprove}
                     onGatherMore={onGatherMore}
+                    gapsPrefill={lastCollectionGapsPrefill}
+                    onGapCollect={onGapCollect}
                   />
                 ) : (
                   <ApprovalPrompt
