@@ -339,8 +339,6 @@ def _build_dev_state_response(
     )
 
 
-@router.post("/message")
-async def send_message(request: DialogueMessageRequest) -> DialogueMessageResponse:
 def _get_mcp_client() -> MCPClient:
     return MCPClient()
 
@@ -400,6 +398,7 @@ async def _handle_processing_phase(
         return _convert_to_message_response(
             DialogueResponse(action=DialogueAction.SELECT_GAPS, content=_GATHER_MORE_CONTENT),
             stage=session.collection_flow.state.value,
+            phase=Phase.COLLECTION,
             sub_state=_SUB_STATE_GATHER_MORE,
         )
     processing_service = ProcessingService(mcp_client)
@@ -412,7 +411,7 @@ async def _handle_processing_phase(
     )
     #Save current session and return message
     _save_session(session)
-    return _convert_to_message_response(response, stage=session.processing_flow.state.value)
+    return _convert_to_message_response(response, stage=session.processing_flow.state.value, phase=Phase.PROCESSING)
 
 
 async def _handle_collection_phase(
@@ -433,6 +432,7 @@ async def _handle_collection_phase(
         orchestator: AI orchestrator used to controll dual AI instance
         review_service: Service for handling reviewing
     """
+    assert session.collection_flow is not None
     collection_service = CollectionService(mcp_client)
     logger.info(
         f"[Session {request.session_id}] Message received — state={session.collection_flow.state}, approved={request.approved}"
@@ -456,19 +456,24 @@ async def _handle_collection_phase(
             direction_context=session.collection_flow.direction_context,
             research_logger=session.research_logger,
         )
-        #save response from processing creation and return
         init_response = await session.processing_flow.initialize(
             processing_service=processing_service,
             orchestrator=orchestrator,
             reviewer=review_service,
         )
-
         _save_session(session)
         return _convert_to_message_response(
-            response,
-            stage=session.collection_flow.state.value,
-            phase=Phase.COLLECTION,
+            init_response,
+            stage=session.processing_flow.state.value,
+            phase=Phase.PROCESSING,
         )
+
+    _save_session(session)
+    return _convert_to_message_response(
+        response,
+        stage=session.collection_flow.state.value,
+        phase=Phase.COLLECTION,
+    )
 
 
 async def _handle_direction_phase(
@@ -541,21 +546,6 @@ async def _handle_direction_phase(
         stage=direction_flow.state.value,
         phase=Phase.DIRECTION,
         sub_state=direction_flow.sub_state or default_sub_state,
-    )
-
-
-def _build_dev_state_response(session_id: str, session: IntelligenceSession) -> DialogueDevStateResponse:
-    state = session.direction_flow.get_debug_state()
-    return DialogueDevStateResponse(
-        session_id=session_id,
-        stage=state["stage"],
-        sub_state=state["sub_state"],
-        question_count=state["question_count"],
-        max_questions=state["max_questions"],
-        missing_context_fields=state["missing_context_fields"],
-        has_sufficient_context=state["has_sufficient_context"],
-        awaiting_user_decision=state["awaiting_user_decision"],
-        has_modifications=state["has_modifications"],
     )
 
 
