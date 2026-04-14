@@ -246,6 +246,39 @@ class AIOrchestrator:
             session_id=session_id,
         )
 
+    async def analyse_and_review(
+        self,
+        processing_result,
+        analysis_service,
+        reviewer,
+        session_id: str,
+        pir: str = "",
+    ) -> tuple:
+        from src.models.analysis import AnalysisDraft, ProcessingResult
+        from src.models.dialogue import AnalysisContext
+
+        async def analyse_fn(_=None):
+            draft, enriched = await analysis_service.generate_draft(processing_result)
+            return {
+                "analysis_draft": draft.model_dump(),
+                "processing_result": enriched.model_dump(),
+            }
+
+        result = await self._run_with_review(
+            generate_fn=analyse_fn,
+            reviewer=reviewer,
+            context=AnalysisContext(
+                pir=pir,
+                processing_result=processing_result.model_dump(),
+            ),
+            phase="analysis",
+            session_id=session_id,
+        )
+
+        analysis_draft = AnalysisDraft.model_validate(result["analysis_draft"])
+        enriched_result = ProcessingResult.model_validate(result["processing_result"])
+        return analysis_draft, enriched_result
+
     async def process_and_review(
         self,
         collected_data: str,

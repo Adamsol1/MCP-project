@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
+from src.models.analysis import CouncilRunSettings
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
@@ -26,7 +27,9 @@ from src.services.llm_service import LLMService
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
+from src.services.state_machines.analysis_flow import AnalysisFlow
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
+from src.services.state_machines.council_flow import CouncilFlow
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
 from src.services.state_machines.processing_flow import ProcessingFlow
 
@@ -69,6 +72,8 @@ class IntelligenceSession:
         )
         self.collection_flow: CollectionFlow | None = None
         self.processing_flow: ProcessingFlow | None = None
+        self.analysis_flow: AnalysisFlow | None = None
+        self.council_flow: CouncilFlow | None = None
 
 
 _sessions: dict[str, IntelligenceSession] = {}
@@ -90,6 +95,12 @@ def _save_session(session: IntelligenceSession) -> None:
         else None,
         "processing_flow": session.processing_flow.to_dict()
         if session.processing_flow
+        else None,
+        "analysis_flow": session.analysis_flow.to_dict()
+        if session.analysis_flow
+        else None,
+        "council_flow": session.council_flow.to_dict()
+        if session.council_flow
         else None,
     }
     path = _SESSIONS_DIR / f"{session.session_id}.json"
@@ -143,6 +154,20 @@ def _load_session(session_id: str, research_logger) -> IntelligenceSession | Non
         if data.get("processing_flow")
         else None
     )
+    session.analysis_flow = (
+        AnalysisFlow.from_dict(
+            data["analysis_flow"], research_logger=research_logger
+        )
+        if data.get("analysis_flow")
+        else None
+    )
+    session.council_flow = (
+        CouncilFlow.from_dict(
+            data["council_flow"], research_logger=research_logger
+        )
+        if data.get("council_flow")
+        else None
+    )
     logger.info(f"[Session {session_id}] Restored from disk")
     return session
 
@@ -168,6 +193,14 @@ class DialogueMessageRequest(BaseModel):
     """Sources selected by the user in the collection phase."""
     gather_more: bool = False
     """True when the user wants to gather more data instead of approving the collection."""
+    council_debate_point: str = ""
+    """Debate point entered by the user when triggering a council run."""
+    council_finding_ids: list[str] = []
+    """Finding IDs selected by the user to scope the council deliberation."""
+    council_perspectives: list[str] = []
+    """Perspectives selected for the council run. Falls back to session perspectives if empty."""
+    council_settings: CouncilRunSettings | None = None
+    """Runtime settings for the council run (mode, rounds, timeout, vote retry)."""
 
 
 # Response Model

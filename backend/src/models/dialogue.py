@@ -29,6 +29,10 @@ class DialogueAction(str, Enum):
     # Processing phase
     SHOW_PROCESSING = "show_processing"
     SELECT_GAPS = "select_gaps"
+    # Analysis phase
+    SHOW_ANALYSIS = "show_analysis"
+    # Council phase
+    SHOW_COUNCIL = "show_council"
     # Shared
     COMPLETE = "complete"
 
@@ -69,6 +73,13 @@ class ProcessingContext(BaseModel):
 
     pir: str
     collected_data: str
+
+
+class AnalysisContext(BaseModel):
+    """Context passed to the reviewer during the analysis phase."""
+
+    pir: str
+    processing_result: dict
 
 
 class DialogueResponse(BaseModel):

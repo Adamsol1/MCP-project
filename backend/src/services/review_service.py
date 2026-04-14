@@ -59,7 +59,7 @@ class ReviewService:
         Raises:
             ValueError: If phase is not a recognized value.
         """
-        valid_phases = {"direction", "collection", "processing"}
+        valid_phases = {"direction", "collection", "processing", "analysis"}
         if phase not in valid_phases:
             raise ValueError(
                 f"[ReviewService] Unknown phase: '{phase}'. Valid: {list(valid_phases)}"
