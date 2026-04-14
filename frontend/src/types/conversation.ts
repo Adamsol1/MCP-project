@@ -1,3 +1,4 @@
+import type { AnalysisDraftResponse, CouncilNote } from "./analysis";
 import type {
   DialoguePhase,
   DialogueStage,
@@ -20,6 +21,8 @@ export interface Message {
     | "suggested_sources"
     | "collection"
     | "processing"
+    | "analysis"
+    | "council"
     | "error"
     | "complete";
   data?:
@@ -29,7 +32,9 @@ export interface Message {
     | SuggestedSourcesData
     | CollectionSummaryData
     | CollectionDisplayData
-    | ProcessingData;
+    | ProcessingData
+    | AnalysisDraftResponse
+    | CouncilNote;
 }
 
 /**

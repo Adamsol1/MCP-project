@@ -666,7 +666,7 @@ export default function ChatWindow({
   };
 
   const hasMessages = messages.length > 0;
-  const isAnalysisComplete = stage === "complete";
+  const isAnalysisComplete = phase === "analysis" || stage === "complete";
   const hasConversationContent = hasMessages || isAnalysisComplete;
   const isEmptyStateComposer = !hasConversationContent;
 

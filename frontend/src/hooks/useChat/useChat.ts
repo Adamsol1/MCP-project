@@ -4,6 +4,7 @@ import {
   resetDevDialogueState,
   sendMessage,
   setDevDialogueState,
+  type CouncilRunSettings,
   type DialogueApiResponse,
   type DialogueSendOptions,
 } from "../../services/dialogue/dialogue";
@@ -26,6 +27,7 @@ import type {
   SuggestedSourcesData,
   SummaryData,
 } from "../../types/conversation";
+import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 
 const DECISION_STAGES: DialogueStage[] = [
@@ -48,6 +50,8 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   start_collecting: "question",
   show_collection: "collection",
   show_processing: "processing",
+  show_analysis: "analysis",
+  show_council: "council",
   select_gaps: "question",
   error: "error",
   complete: "complete",
@@ -248,6 +252,12 @@ function inferStageFromResponse(
   if (response.action === "show_processing") {
     return { stage: "processing", subState: "awaiting_decision" };
   }
+  if (response.action === "show_analysis") {
+    return { stage: "pending", subState: null };
+  }
+  if (response.action === "show_council") {
+    return { stage: "idle", subState: null };
+  }
   if (response.action === "select_gaps") {
     return { stage: "reviewing", subState: "awaiting_gather_more" };
   }
@@ -360,6 +370,24 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       if (parsed && "findings" in parsed) {
         message.data = parsed;
       }
+      break;
+    }
+
+    case "analysis": {
+      const parsed = tryParseJson<AnalysisDraftResponse>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Analysis complete";
+      break;
+    }
+
+    case "council": {
+      const parsed = tryParseJson<CouncilNote>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Council deliberation complete";
       break;
     }
 
@@ -806,9 +834,39 @@ export function useChat(initialPerspectives?: string[]) {
     }
   };
 
+  const sendCouncilRequest = async (params: {
+    debatePoint: string;
+    findingIds: string[];
+    perspectives: string[];
+    councilSettings: CouncilRunSettings;
+  }) => {
+    if (!activeConversation) return;
+    setIsLoading(true);
+    try {
+      const response = await sendMessage(
+        "",
+        activeConversation.sessionId,
+        activeConversation.perspectives,
+        undefined,
+        settings.aiLanguage,
+        "",
+        {
+          councilDebatePoint: params.debatePoint,
+          councilFindingIds: params.findingIds,
+          councilPerspectives: params.perspectives,
+          councilSettings: params.councilSettings,
+        },
+      );
+      applyResponse(response, activeConversation.id, "idle", null, "analysis");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return {
     messages,
     sendMessage: handleSendMessage,
+    sendCouncilRequest,
     isConfirming,
     stage,
     subState,

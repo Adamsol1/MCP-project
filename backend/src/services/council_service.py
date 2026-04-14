@@ -1,9 +1,11 @@
 """Analysis-stage council wrapper using app runtime defaults."""
 
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+from src.mcp_client.client import MCPClient
 from src.models.analysis import (
     AnalysisDraft,
     CouncilNote,
@@ -13,8 +15,18 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.council_personas import get_council_persona
 from src.services.gemini_deliberation_adapter import GeminiDeliberationAdapter
+
+_COUNCIL_MCP_URL = os.getenv("COUNCIL_MCP_URL", "http://127.0.0.1:8003/sse")
+
+_DISPLAY_NAMES: dict[Perspective, str] = {
+    Perspective.US: "US Strategic Analyst",
+    Perspective.NORWAY: "Norway Security Analyst",
+    Perspective.CHINA: "China Strategic Analyst",
+    Perspective.EU: "EU Policy Analyst",
+    Perspective.RUSSIA: "Russia Strategic Analyst",
+    Perspective.NEUTRAL: "Neutral Evidence Analyst",
+}
 
 COUNCIL_MCP_DIR = Path(__file__).resolve().parents[3] / "council_mcp"
 if str(COUNCIL_MCP_DIR) not in sys.path:
@@ -38,7 +50,7 @@ class CouncilService:
     FILE_TREE_INJECTION_ENABLED = False
     DECISION_GRAPH_ENABLED = False
 
-    def __init__(self, working_directory: str | Path | None = None):
+    def __init__(self, working_directory: str | Path | None = None, mcp_client: MCPClient | None = None):
         if working_directory is None:
             working_directory = (
                 Path(__file__).resolve().parents[2] / "data" / "outputs"
@@ -47,6 +59,7 @@ class CouncilService:
         self.working_directory.mkdir(parents=True, exist_ok=True)
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
+        self.mcp_client = mcp_client or MCPClient(server_url=_COUNCIL_MCP_URL)
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
@@ -82,22 +95,25 @@ class CouncilService:
             normalized.append(perspective)
         return normalized
 
-    def build_participants(self, selected_perspectives: list[str]) -> list[Participant]:
+    async def build_participants(self, selected_perspectives: list[str]) -> list[Participant]:
         normalized = self._normalize_perspectives(selected_perspectives)
         if len(normalized) < 2:
             raise ValueError("At least 2 perspectives are required for council deliberation")
 
         participants = []
-        for perspective in normalized:
-            persona = get_council_persona(perspective)
-            participants.append(
-                Participant(
-                    cli=self.DEFAULT_ADAPTER,
-                    model=self.DEFAULT_MODEL,
-                    display_name=persona.display_name,
-                    persona_prompt=persona.persona_prompt,
+        async with self.mcp_client.connect():
+            for perspective in normalized:
+                persona_prompt = await self.mcp_client.get_prompt(
+                    f"council_persona_{perspective.value}"
                 )
-            )
+                participants.append(
+                    Participant(
+                        cli=self.DEFAULT_ADAPTER,
+                        model=self.DEFAULT_MODEL,
+                        display_name=_DISPLAY_NAMES[perspective],
+                        persona_prompt=persona_prompt,
+                    )
+                )
         return participants
 
     def build_question(
@@ -158,7 +174,7 @@ class CouncilService:
 
         return "\n".join(context_sections)
 
-    def build_request(
+    async def build_request(
         self,
         debate_point: str,
         selected_perspectives: list[str],
@@ -168,7 +184,7 @@ class CouncilService:
         selected_findings=None,
     ) -> DeliberateRequest:
         runtime_profile = self.resolve_runtime_profile(council_settings)
-        participants = self.build_participants(selected_perspectives)
+        participants = await self.build_participants(selected_perspectives)
         question = self.build_question(debate_point, selected_findings or [])
         context = self.build_context(
             processing_result=processing_result,
@@ -259,7 +275,7 @@ class CouncilService:
             if finding_ids
             else processing_result.findings
         )
-        request = self.build_request(
+        request = await self.build_request(
             debate_point=debate_point,
             selected_perspectives=selected_perspectives,
             processing_result=processing_result,

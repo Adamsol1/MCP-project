@@ -1,10 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useConversation } from "../../hooks/useConversation/useConversation";
+import { useChat } from "../../hooks/useChat/useChat";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
-import {
-  getAnalysisDraft,
-  runAnalysisCouncil,
-} from "../../services/analysis/analysis";
 import type {
   AnalysisDraftResponse,
   AssertionConfidence,
@@ -704,19 +701,37 @@ function AssertionBreakdown({
 
 export default function AnalysisPrototypeView() {
   const { activeConversation } = useConversation();
+  const { sendCouncilRequest, isLoading: isCouncilLoading } = useChat();
   const { settings } = useSettings();
-  const [data, setData] = useState<AnalysisDraftResponse | null>(null);
-  const [councilNote, setCouncilNote] = useState<CouncilNote | null>(null);
   const [activeCouncilView, setActiveCouncilView] =
     useState(COUNCIL_SUMMARY_VIEW);
-  const [isLoading, setIsLoading] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>([
     "neutral",
   ]);
+
+  const data = useMemo<AnalysisDraftResponse | null>(() => {
+    if (!activeConversation) return null;
+    for (let i = activeConversation.messages.length - 1; i >= 0; i--) {
+      const msg = activeConversation.messages[i];
+      if (msg.type === "analysis" && msg.data) {
+        return msg.data as AnalysisDraftResponse;
+      }
+    }
+    return null;
+  }, [activeConversation]);
+
+  const councilNote = useMemo<CouncilNote | null>(() => {
+    if (!activeConversation) return null;
+    for (let i = activeConversation.messages.length - 1; i >= 0; i--) {
+      const msg = activeConversation.messages[i];
+      if (msg.type === "council" && msg.data) {
+        return msg.data as CouncilNote;
+      }
+    }
+    return null;
+  }, [activeConversation]);
   const [debatePoint, setDebatePoint] = useState("");
   const [selectedFindingIds, setSelectedFindingIds] = useState<string[]>([]);
-  const [isCouncilLoading, setIsCouncilLoading] = useState(false);
   const [councilErrorMessage, setCouncilErrorMessage] = useState<string | null>(
     null,
   );
@@ -734,7 +749,6 @@ export default function AnalysisPrototypeView() {
     setSelectedPerspectives(normalizedConversationPerspectives);
     setDebatePoint("");
     setSelectedFindingIds([]);
-    setCouncilNote(null);
     setActiveCouncilView(COUNCIL_SUMMARY_VIEW);
     setCouncilErrorMessage(null);
     setValidationMessage(null);
@@ -744,53 +758,6 @@ export default function AnalysisPrototypeView() {
   useEffect(() => {
     setActiveCouncilView(COUNCIL_SUMMARY_VIEW);
   }, [councilNote]);
-
-  useEffect(() => {
-    let isCancelled = false;
-
-    async function loadDraft(sessionId: string) {
-      setIsLoading(true);
-      setErrorMessage(null);
-
-      try {
-        const response = await getAnalysisDraft(sessionId);
-        if (!isCancelled) {
-          console.info(`[AnalysisView] Loaded session data for ${sessionId}.`);
-          setData(response);
-          setCouncilNote(response.latest_council_note);
-        }
-      } catch (error) {
-        console.error(
-          `[AnalysisView] Failed to load analysis draft for session ${sessionId}`,
-          error,
-        );
-        if (!isCancelled) {
-          setData(null);
-          setCouncilNote(null);
-          setErrorMessage(getErrorMessage(error));
-        }
-      } finally {
-        if (!isCancelled) {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    if (!activeConversation?.sessionId) {
-      setData(null);
-      setIsLoading(false);
-      setErrorMessage(null);
-      return () => {
-        isCancelled = true;
-      };
-    }
-
-    void loadDraft(activeConversation.sessionId);
-
-    return () => {
-      isCancelled = true;
-    };
-  }, [activeConversation?.sessionId]);
 
   async function handleCouncilSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -815,15 +782,13 @@ export default function AnalysisPrototypeView() {
 
     setValidationMessage(null);
     setCouncilErrorMessage(null);
-    setIsCouncilLoading(true);
 
     try {
-      const response = await runAnalysisCouncil({
-        session_id: activeConversation.sessionId,
-        debate_point: debatePoint.trim(),
-        finding_ids: selectedFindingIds,
-        selected_perspectives: selectedPerspectives,
-        council_settings: {
+      await sendCouncilRequest({
+        debatePoint: debatePoint.trim(),
+        findingIds: selectedFindingIds,
+        perspectives: selectedPerspectives,
+        councilSettings: {
           mode: settings.councilSettings.mode,
           rounds: settings.councilSettings.rounds,
           timeout_seconds: settings.councilSettings.timeoutSeconds,
@@ -831,12 +796,9 @@ export default function AnalysisPrototypeView() {
           vote_retry_attempts: settings.councilSettings.voteRetryAttempts,
         },
       });
-      setCouncilNote(response);
       setIsTranscriptExpanded(false);
     } catch (error) {
       setCouncilErrorMessage(getErrorMessage(error));
-    } finally {
-      setIsCouncilLoading(false);
     }
   }
 
@@ -881,35 +843,6 @@ export default function AnalysisPrototypeView() {
       <p className="text-sm text-text-secondary">
         Create or select a conversation to load the analysis prototype.
       </p>
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="space-y-3" aria-live="polite">
-        <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-          Draft Analysis
-        </p>
-        <div className="rounded-[24px] border border-border bg-surface px-5 py-6">
-          <p className="text-sm text-text-secondary">
-            Loading analysis draft...
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (errorMessage) {
-    return (
-      <div className="rounded-[24px] border border-error bg-error-subtle p-5">
-        <p className="text-xs font-medium uppercase tracking-[0.12em] text-error-text">
-          Analysis Error
-        </p>
-        <p className="mt-2 text-sm text-error-text">
-          Failed to load analysis draft.
-        </p>
-        <p className="mt-1 text-xs text-error-text/80">{errorMessage}</p>
-      </div>
     );
   }
 

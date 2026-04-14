@@ -17,9 +17,21 @@ export interface DialogueApiResponse {
   sub_state?: DialogueSubState;
 }
 
+export interface CouncilRunSettings {
+  mode: string;
+  rounds: number;
+  timeout_seconds: number;
+  vote_retry_enabled: boolean;
+  vote_retry_attempts: number;
+}
+
 export interface DialogueSendOptions {
   selectedSources?: string[];
   gatherMore?: boolean;
+  councilDebatePoint?: string;
+  councilFindingIds?: string[];
+  councilPerspectives?: string[];
+  councilSettings?: CouncilRunSettings;
 }
 
 export interface DialogueDevStateResponse {
@@ -79,6 +91,10 @@ export async function sendMessage(
       settings_timeframe: settingsTimeframe,
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
+      council_debate_point: options.councilDebatePoint ?? null,
+      council_finding_ids: options.councilFindingIds ?? null,
+      council_perspectives: options.councilPerspectives ?? null,
+      council_settings: options.councilSettings ?? null,
     },
   );
 

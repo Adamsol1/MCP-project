@@ -27,11 +27,14 @@ from src.services.llm_service import LLMService
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
+from src.services.analysis_service import AnalysisService
+from src.services.council_service import CouncilService
+from src.services.processing_prototype_service import ProcessingPrototypeService
 from src.services.state_machines.analysis_flow import AnalysisFlow
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.council_flow import CouncilFlow
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
-from src.services.state_machines.processing_flow import ProcessingFlow
+from src.services.state_machines.processing_flow import ProcessingFlow, ProcessingState
 
 #Global values used in the file
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
@@ -346,6 +349,8 @@ def _get_or_create_session(session_id: str) -> IntelligenceSession:
 
 
 def _get_active_stage_and_phase(session: IntelligenceSession) -> tuple[str, Phase]:
+    if session.analysis_flow:
+        return session.analysis_flow.state.value, Phase.ANALYSIS
     if session.processing_flow:
         return session.processing_flow.state.value, Phase.PROCESSING
     if session.collection_flow:
@@ -403,6 +408,8 @@ async def _handle_processing_phase(
     session: IntelligenceSession,
     request: DialogueMessageRequest,
     mcp_client: MCPClient,
+    orchestrator: AIOrchestrator,
+    review_service: ReviewService,
 ) -> DialogueMessageResponse:
     """
     handles messages during the processing phase of the investigation.
@@ -442,7 +449,30 @@ async def _handle_processing_phase(
         processing_service=processing_service,
         approved=request.approved,
     )
-    #Save current session and return message
+    if session.processing_flow.state == ProcessingState.COMPLETE and session.analysis_flow is None:
+        session.analysis_flow = AnalysisFlow(
+            session_id=request.session_id,
+            pir=session.processing_flow.pir,
+            research_logger=session.research_logger,
+        )
+        analysis_service = AnalysisService(mcp_client)
+        init_response = await session.analysis_flow.initialize(
+            processing_service=ProcessingPrototypeService(),
+            analysis_service=analysis_service,
+            orchestrator=orchestrator,
+            reviewer=review_service,
+        )
+        session.council_flow = CouncilFlow(
+            session_id=request.session_id,
+            research_logger=session.research_logger,
+        )
+        _save_session(session)
+        return _convert_to_message_response(
+            init_response,
+            stage=session.analysis_flow.state.value,
+            phase=Phase.ANALYSIS,
+        )
+
     _save_session(session)
     return _convert_to_message_response(response, stage=session.processing_flow.state.value, phase=Phase.PROCESSING)
 
@@ -582,6 +612,41 @@ async def _handle_direction_phase(
     )
 
 
+async def _handle_analysis_phase(
+    session: IntelligenceSession,
+    request: DialogueMessageRequest,
+) -> DialogueMessageResponse:
+    assert session.analysis_flow is not None
+    response = await session.analysis_flow.process_user_message()
+    return _convert_to_message_response(
+        response,
+        stage=session.analysis_flow.state.value,
+        phase=Phase.ANALYSIS,
+    )
+
+
+async def _handle_council_phase(
+    session: IntelligenceSession,
+    request: DialogueMessageRequest,
+) -> DialogueMessageResponse:
+    assert session.council_flow is not None
+    perspectives = request.council_perspectives or request.perspectives
+    response = await session.council_flow.process_user_message(
+        debate_point=request.council_debate_point,
+        finding_ids=request.council_finding_ids,
+        selected_perspectives=perspectives,
+        council_service=CouncilService(),
+        analysis_flow=session.analysis_flow,
+        council_settings=request.council_settings,
+    )
+    _save_session(session)
+    return _convert_to_message_response(
+        response,
+        stage=session.council_flow.state.value,
+        phase=Phase.ANALYSIS,
+    )
+
+
 @router.post("/message")
 async def send_message(
     request: DialogueMessageRequest,
@@ -609,10 +674,12 @@ async def send_message(
     """
     session = _get_or_create_session(request.session_id)
     orchestrator = _build_orchestrator(session)
-    #Current state is processing
+    if session.analysis_flow:
+        if request.council_debate_point:
+            return await _handle_council_phase(session, request)
+        return await _handle_analysis_phase(session, request)
     if session.processing_flow:
-        return await _handle_processing_phase(session, request, mcp_client)
-    #Current state is collection
+        return await _handle_processing_phase(session, request, mcp_client, orchestrator, review_service)
     if session.collection_flow:
         return await _handle_collection_phase(session, request, mcp_client, orchestrator, review_service)
     return await _handle_direction_phase(session, request, mcp_client, orchestrator, review_service)

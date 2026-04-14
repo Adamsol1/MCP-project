@@ -258,7 +258,9 @@ class AIOrchestrator:
         from src.models.dialogue import AnalysisContext
 
         async def analyse_fn(_=None):
-            draft, enriched = await analysis_service.generate_draft(processing_result)
+            draft, enriched = await analysis_service.generate_draft(
+                processing_result, pir=pir
+            )
             return {
                 "analysis_draft": draft.model_dump(),
                 "processing_result": enriched.model_dump(),
