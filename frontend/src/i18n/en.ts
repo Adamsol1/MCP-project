@@ -79,6 +79,7 @@ export const en = {
   tableStatus: "Status",
   dataFound: "Data found",
   empty: "Empty",
+  priority: "Priority",
   priorityHigh: "High",
   priorityMedium: "Medium",
   priorityLow: "Low",

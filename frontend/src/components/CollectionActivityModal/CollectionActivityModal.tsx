@@ -95,7 +95,7 @@ export default function CollectionActivityModal({
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Collection Activity</h2>
+            <h2 className="text-base font-semibold text-text-primary">Review Activity</h2>
             <p className="mt-0.5 text-xs text-text-muted">
               {activity.length} attempt{activity.length !== 1 ? "s" : ""}
             </p>

@@ -5,6 +5,7 @@ import type {
   DialogueStage,
   DialogueSubState,
 } from "../types/dialogue";
+import type { PhaseReviewItem } from "../types/conversation";
 
 /** Base URL for the backend REST API. */
 const API_BACKEND_URL = "http://localhost:8000";
@@ -15,6 +16,7 @@ export interface DialogueApiResponse {
   stage?: DialogueStage;
   phase?: DialoguePhase;
   sub_state?: DialogueSubState;
+  review_activity?: PhaseReviewItem[];
 }
 
 export interface DialogueSendOptions {

@@ -82,6 +82,7 @@ export const no = {
   tableStatus: "Status",
   dataFound: "Data funnet",
   empty: "Tom",
+  priority: "Prioritet",
   priorityHigh: "H\u00f8y",
   priorityMedium: "Middels",
   priorityLow: "Lav",

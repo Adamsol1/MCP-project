@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
-from src.models.dialogue import DialogueAction, DialogueResponse, Phase
+from src.models.dialogue import DialogueAction, DialogueResponse, Phase, PhaseReviewItem
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.collection_status import CollectionStatusTracker
@@ -181,6 +181,7 @@ class DialogueMessageResponse(BaseModel):
     stage: str
     phase: str
     sub_state: str | None = None
+    review_activity: list[dict] | None = None
 
 
 
@@ -281,6 +282,11 @@ def _convert_to_message_response(
         stage=stage,
         phase=phase.value,
         sub_state=sub_state,
+        review_activity=(
+            [item.model_dump() for item in response.review_activity]
+            if response.review_activity
+            else None
+        ),
     )
     return result
 

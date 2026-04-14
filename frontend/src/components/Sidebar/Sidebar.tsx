@@ -31,9 +31,11 @@ interface SidebarProps {
   onDevResetStage?: () => void;
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
+  /** Whether the sidebar is in its narrow rail mode (controlled by parent). */
+  isCollapsed?: boolean;
+  /** Whether expanded-only content is visible (controlled by parent). */
+  showExpandedContent?: boolean;
 }
-
-const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
 /**
  * Left-hand navigation sidebar showing all conversations.
@@ -54,7 +56,9 @@ const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
  *   openMenuId  — id of the conversation whose options dropdown is open, or null.
  *   renamingId  — id of the conversation currently being renamed, or null.
  *   draftTitle  — controlled value of the rename input field.
- *   isCollapsed — whether the sidebar is in its narrow rail mode.
+ *
+ * Collapse state (isCollapsed, showExpandedContent) is owned by the parent (App)
+ * so the toggle button can live in the full-width top bar.
  */
 export function Sidebar({
   conversations,
@@ -70,6 +74,8 @@ export function Sidebar({
   onDevSyncStage,
   onDevResetStage,
   onOpenSettings,
+  isCollapsed = false,
+  showExpandedContent = true,
 }: SidebarProps) {
   const t = useT();
 
@@ -89,15 +95,12 @@ export function Sidebar({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showExpandedContent, setShowExpandedContent] = useState(true);
   const [isDevToolsMinimized, setIsDevToolsMinimized] = useState(true);
   const [isCollectionPhaseMinimized, setIsCollectionPhaseMinimized] =
     useState(true);
 
   // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   /**
    * Closes the options dropdown when the user clicks anywhere outside it.
@@ -117,71 +120,12 @@ export function Sidebar({
     return () => document.removeEventListener("mousedown", closeMenu);
   }, [openMenuId]);
 
-  useEffect(() => {
-    return () => {
-      if (revealTimeoutRef.current !== null) {
-        window.clearTimeout(revealTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleToggleSidebar = () => {
-    if (revealTimeoutRef.current !== null) {
-      window.clearTimeout(revealTimeoutRef.current);
-      revealTimeoutRef.current = null;
-    }
-
-    setIsCollapsed((prev) => {
-      const next = !prev;
-
-      if (next) {
-        setShowExpandedContent(false);
-      } else {
-        revealTimeoutRef.current = window.setTimeout(() => {
-          setShowExpandedContent(true);
-          revealTimeoutRef.current = null;
-        }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
-      }
-
-      return next;
-    });
-  };
-
   return (
     <aside
       className={`${
         isCollapsed ? "w-14" : "w-64"
       } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden transition-[width] duration-300 ease-in-out motion-reduce:transition-none`}
     >
-      {/* Toggle button — SVG chevron, clearer than a Unicode character.
-          Points right (›) when collapsed to signal "expand",
-          left (‹) when expanded to signal "collapse". */}
-      <button
-        aria-label="Toggle sidebar"
-        onClick={handleToggleSidebar}
-        className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className={`transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
-            isCollapsed ? "rotate-180" : "rotate-0"
-          }`}
-        >
-          {isCollapsed
-            ? <path d="M9 18l6-6-6-6" />   /* › chevron-right = expand */
-            : <path d="M15 18l-6-6 6-6" />  /* ‹ chevron-left  = collapse */
-          }
-        </svg>
-      </button>
-
       {/* New Chat button — always visible in both expanded and collapsed states.
           When collapsed, text is hidden and the button shows only the + icon.
           aria-label stays "New Chat" in both states so tests and screen readers
@@ -189,8 +133,10 @@ export function Sidebar({
       <button
         onClick={onNewChat}
         aria-label={t.newChat}
-        className={`mx-2 mb-2 py-1.5 px-2 bg-primary-dark text-white rounded flex items-center justify-center gap-1.5 shrink-0 ${
-          isCollapsed ? "" : "w-[calc(100%-1rem)]"
+        className={`bg-primary-dark text-white rounded flex items-center shrink-0 ${
+          isCollapsed
+            ? "w-8 h-8 mx-auto mt-2 mb-2 justify-center"
+            : "mx-2 mt-2 mb-2 py-1.5 px-2 justify-start gap-1.5 w-[calc(100%-1rem)]"
         }`}
       >
         <span className="text-lg leading-none">+</span>
@@ -314,21 +260,6 @@ export function Sidebar({
           )}
         </div>
       )}
-      {/* Settings gear — sits just above Dev Tools */}
-      <div className="shrink-0 border-t border-border p-2 flex justify-end">
-        <button
-          aria-label={t.openSettings}
-          onClick={onOpenSettings}
-          className="p-2 rounded text-text-muted hover:bg-surface-elevated hover:text-text-primary"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-      </div>
       {/* DEV TOOLS — only visible when the sidebar is expanded. */}
       {showExpandedContent && (
         <div className="shrink-0 border-t border-border p-2">

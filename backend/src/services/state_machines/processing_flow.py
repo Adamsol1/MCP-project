@@ -16,7 +16,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse, PhaseReviewItem
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
@@ -212,7 +212,26 @@ class ProcessingFlow(BasePhaseFlow):
         logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         _write_processed(self.session_id, self.pir, raw_result)
 
-        return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
+        response = DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
+
+        if orchestrator and orchestrator.review_results:
+            response.review_activity = [
+                PhaseReviewItem(
+                    phase="processing",
+                    attempt=i + 1,
+                    reviewer_approved=review["approved"],
+                    reviewer_suggestions=review.get("suggestions"),
+                    sources_used=[],
+                    generated_content=(
+                        str(orchestrator.attempts[i])
+                        if i < len(orchestrator.attempts)
+                        else None
+                    ),
+                )
+                for i, review in enumerate(orchestrator.review_results)
+            ]
+
+        return response
 
     async def process_user_message(
         self,

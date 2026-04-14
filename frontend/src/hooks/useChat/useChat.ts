@@ -15,6 +15,7 @@ import type {
 } from "../../types/dialogue";
 import { useConversation } from "../useConversation/useConversation";
 import { useToast } from "../useToast/useToast";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type {
   CollectionPlanData,
   CollectionPlanStep,
@@ -403,6 +404,7 @@ export function useChat(initialPerspectives?: string[]) {
     useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
+  const { setReviewActivity } = useWorkspace();
   const [isLoading, setIsLoading] = useState(false);
   const [isDecisionPending, setIsDecisionPending] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
@@ -479,12 +481,16 @@ export function useChat(initialPerspectives?: string[]) {
   ) => {
     addMessage(buildSystemMessage(response), conversationId);
 
-    const next = inferStageFromResponse(
-      response,
-      fallbackStage,
-      fallbackSubState,
-    );
+    const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
     const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
+
+    // Reset review activity when phase changes, then apply new data if present
+    if (nextPhase !== fallbackPhase) {
+      setReviewActivity(response.review_activity ?? []);
+    } else if (response.review_activity && response.review_activity.length > 0) {
+      setReviewActivity(response.review_activity);
+    }
+
     setStage(conversationId, next.stage, next.subState, nextPhase);
   };
 

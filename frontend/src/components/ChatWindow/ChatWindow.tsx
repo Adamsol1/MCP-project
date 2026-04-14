@@ -57,6 +57,13 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     low: "text-text-muted",
   };
 
+  const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+  const sortedPirs = [...pirData.pirs].sort(
+    (a, b) =>
+      (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3)
+  );
+
   useEffect(() => {
     setPirData(pirData);
   }, [pirData, setPirData]);
@@ -84,7 +91,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         </div>
       )}
       <div className="space-y-2 mt-2">
-        {pirData.pirs.map((pir, i) => (
+        {sortedPirs.map((pir, i) => (
           <div
             key={i}
             className="rounded-lg border border-border-muted bg-surface px-3 py-2.5 space-y-1"
@@ -97,9 +104,9 @@ function PirMessage({ pirData }: { pirData: PirData }) {
                 {pir.question}
               </p>
               <span
-                className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold uppercase ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"} bg-surface-muted`}
+                className={`ml-auto shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold ${PRIORITY_COLOR[pir.priority] ?? "text-text-muted"} bg-surface-muted`}
               >
-                {PRIORITY_LABEL[pir.priority] ?? pir.priority}
+                {t.priority}: {PRIORITY_LABEL[pir.priority] ?? pir.priority}
               </span>
             </div>
             <details className="group">
@@ -171,7 +178,6 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 }
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
-  const t = useT();
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
@@ -288,56 +294,6 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
   );
 }
 
-function CollectionReviewPrompt({
-  isLoading,
-  onAccept,
-  onGatherMore,
-  gapsPrefill,
-  onGapCollect,
-}: {
-  isLoading: boolean;
-  onAccept?: () => void;
-  onGatherMore?: () => void;
-  gapsPrefill?: string | null;
-  onGapCollect?: (gap: string) => void;
-}) {
-  const t = useT();
-  return (
-    <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
-      <div className="flex-1 min-w-0">
-        <h3 className="text-sm font-semibold text-text-primary">
-          {t.collectionReviewHeader}
-        </h3>
-        <p className="text-sm text-text-secondary">
-          {t.collectionReviewSubtitle}
-        </p>
-      </div>
-
-      <div className="shrink-0 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => onAccept?.()}
-          disabled={isLoading}
-          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t.accept}
-        </button>
-
-        <button
-          type="button"
-          onClick={() => {
-            if (gapsPrefill) onGapCollect?.(gapsPrefill);
-            onGatherMore?.();
-          }}
-          disabled={isLoading}
-          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {t.collectMoreData}
-        </button>
-      </div>
-    </section>
-  );
-}
 
 type ConfidenceTier = "low" | "moderate" | "high" | "assessed";
 
@@ -367,6 +323,19 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   osint:          "OSINT",
 };
 
+
+/** Increments 0-based PIR numbers so they display as 1-based (e.g. "PIR-0" → "PIR-1"). */
+function formatRelevantTo(values: string[]): string {
+  return values
+    .map((v) => {
+      const m = v.match(/^(PIR[-\s]?)(\d+)$/i);
+      if (m) return `${m[1]}${parseInt(m[2], 10) + 1}`;
+      const n = parseInt(v, 10);
+      if (!isNaN(n) && String(n) === v) return `PIR-${n + 1}`;
+      return v;
+    })
+    .join(", ");
+}
 
 function FindingDetailModal({
   finding,
@@ -399,15 +368,20 @@ function FindingDetailModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-xl max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl flex flex-col"
+        className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
-          <p className="text-sm font-semibold text-text-primary leading-snug flex-1">{finding.title}</p>
+          <div className="flex items-start gap-2 flex-1 min-w-0">
+            <span className="shrink-0 rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-text-muted mt-0.5">
+              {finding.id}
+            </span>
+            <p className="text-sm font-semibold text-text-primary leading-snug">{finding.title}</p>
+          </div>
           <div className="flex items-center gap-2 shrink-0">
             <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${tierStyle}`}>
-              {tier.toUpperCase()} {finding.confidence}%
+              {tier.toUpperCase()}
             </span>
             <button
               aria-label="close"
@@ -443,7 +417,7 @@ function FindingDetailModal({
             </div>
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Relevant To</p>
-              <p className="text-text-secondary">{finding.relevant_to.join(", ")}</p>
+              <p className="text-text-secondary">{formatRelevantTo(finding.relevant_to)}</p>
             </div>
           </div>
 
@@ -524,6 +498,7 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
           <table className="w-full text-xs border-collapse">
             <thead>
               <tr className="bg-surface-muted text-text-muted">
+                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">ID</th>
                 <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted">Title</th>
                 <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Source</th>
                 <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Confidence</th>
@@ -541,16 +516,19 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
                     onClick={() => setSelectedFinding(f)}
                     className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
                   >
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <span className="font-mono text-[10px] font-semibold text-text-muted">{f.id}</span>
+                    </td>
                     <td className="px-3 py-2 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[22ch] truncate">
                       {f.title}
                     </td>
                     <td className="px-3 py-2 text-text-muted whitespace-nowrap">{sourceLabel}</td>
                     <td className="px-3 py-2 whitespace-nowrap">
                       <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tierStyle}`}>
-                        {tier.toUpperCase()} {f.confidence}%
+                        {tier.toUpperCase()}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{f.relevant_to.join(", ")}</td>
+                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{formatRelevantTo(f.relevant_to)}</td>
                   </tr>
                 );
               })}
@@ -573,6 +551,9 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
   );
 }
 
+// ── Reviewer content extraction ────────────────────────────────────────────────
+
+
 interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
   messages?: Message[];
@@ -583,7 +564,6 @@ interface ChatWindowProps {
   subState?: DialogueSubState;
   onApprove?: () => void;
   onReject?: () => void;
-  onGatherMore?: () => void;
   onGatherMoreFromProcessing?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
@@ -596,7 +576,6 @@ interface ChatWindowProps {
   onDevPrefillConsumed?: () => void;
   inputPrefill?: string | null;
   onInputPrefillConsumed?: () => void;
-  onGapCollect?: (gap: string) => void;
 }
 
 function SourceSummaryTable({
@@ -679,7 +658,6 @@ export default function ChatWindow({
   subState,
   onApprove,
   onReject,
-  onGatherMore,
   onGatherMoreFromProcessing,
   isSourceSelecting = false,
   isCollecting = false,
@@ -692,7 +670,6 @@ export default function ChatWindow({
   onDevPrefillConsumed,
   inputPrefill,
   onInputPrefillConsumed,
-  onGapCollect,
 }: ChatWindowProps) {
   const t = useT();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
@@ -727,26 +704,7 @@ export default function ChatWindow({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [inputPrefill, onInputPrefillConsumed]);
 
-  // Build a pre-fill prompt from the gaps in the last collection summary message.
-  // Shown when the user clicks "Collect More Data" so they can review/edit before sending.
-  const lastCollectionGapsPrefill = useMemo(() => {
-    for (let i = (messages ?? []).length - 1; i >= 0; i--) {
-      const msg = (messages ?? [])[i];
-      if (
-        msg.type === "collection" &&
-        msg.data &&
-        typeof msg.data === "object" &&
-        "sources_used" in msg.data
-      ) {
-        const gaps = (msg.data as CollectionSummaryData).gaps;
-        if (gaps) {
-          return `Please collect additional intelligence to address the following gaps identified in the collection summary:\n\n${gaps}`;
-        }
-        return null;
-      }
-    }
-    return null;
-  }, [messages]);
+
 
   const submitMessage = () => {
     if (inputValue.trim() === "") return;
@@ -856,9 +814,9 @@ export default function ChatWindow({
   }
 
   return (
-    <div className="flex-1 min-h-0 w-full flex flex-col">
+    <div className="flex-1 min-h-0 w-full relative flex flex-col">
       {hasConversationContent && (
-        <div className="flex-1 min-h-0 overflow-y-auto py-4">
+        <div className="absolute inset-0 overflow-y-auto py-4 pb-40">
           <div className={`${contentWidthClass} flex flex-col`}>
             {messages.map((message) => (
               <div
@@ -905,7 +863,9 @@ export default function ChatWindow({
       {!isAnalysisComplete && (
         <div
           className={`flex flex-col items-center gap-4 pb-6 ${
-            hasConversationContent ? "pt-2" : "flex-1 justify-center"
+            hasConversationContent
+              ? "absolute bottom-0 left-0 right-0 pt-8 bg-linear-to-t from-surface-elevated via-surface-elevated/90 to-transparent"
+              : "flex-1 justify-center"
           }`}
         >
           {!hasConversationContent && (
@@ -1090,44 +1050,37 @@ export default function ChatWindow({
                   )}
                 </section>
               ) : isConfirming ? (
-                stage === "processing" ||
-                (stage === "reviewing" && phase === "processing") ? (
-                  <section className="rounded-lg border border-border bg-surface p-4 flex items-center gap-4">
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-sm font-semibold text-text-primary">
-                        Processing Review
-                      </h3>
-                      <p className="text-sm text-text-secondary">
-                        Accept the analysis or go back to collect more data.
-                      </p>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onApprove?.()}
-                        disabled={isLoading}
-                        className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Accept
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onGatherMoreFromProcessing?.()}
-                        disabled={isLoading}
-                        className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        Gather More
-                      </button>
+                stage === "processing" || stage === "reviewing" ? (
+                  <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-text-primary">
+                          Processing Review
+                        </h3>
+                        <p className="text-sm text-text-secondary">
+                          Accept the analysis or go back to collect more data.
+                        </p>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onApprove?.()}
+                          disabled={isLoading}
+                          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onGatherMoreFromProcessing?.()}
+                          disabled={isLoading}
+                          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Gather More
+                        </button>
+                      </div>
                     </div>
                   </section>
-                ) : stage === "reviewing" && phase === "collection" ? (
-                  <CollectionReviewPrompt
-                    isLoading={isLoading}
-                    onAccept={onApprove}
-                    onGatherMore={onGatherMore}
-                    gapsPrefill={lastCollectionGapsPrefill}
-                    onGapCollect={onGapCollect}
-                  />
                 ) : (
                   <ApprovalPrompt
                     isLoading={isLoading}

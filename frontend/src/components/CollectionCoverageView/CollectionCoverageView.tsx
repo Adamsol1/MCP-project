@@ -116,7 +116,7 @@ function PriorityBadge({ priority }: { priority: string }) {
         : "bg-surface text-text-muted border-border";
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] ${styles}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest ${styles}`}
     >
       {priority}
     </span>
@@ -242,7 +242,7 @@ export default function CollectionCoverageView({
         Collection Coverage
       </p>
 
-      <div className="overflow-hidden rounded-[24px] border border-border bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-5 py-4">
           <div className="space-y-1 flex-1 min-w-0">

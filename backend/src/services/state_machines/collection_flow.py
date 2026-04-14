@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
 
-from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse, PhaseReviewItem
 from src.models.reasoning import ReasoningLog
 from src.services.collection_service import CollectionService
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
@@ -242,18 +242,29 @@ class CollectionFlow(BasePhaseFlow):
 
         display_payload = CollectionService.parse_collected_data(collection_summary)
 
+        response = DialogueResponse(
+            action=DialogueAction.SHOW_COLLECTION,
+            content=json.dumps(display_payload, ensure_ascii=False),
+        )
+
         if orchestrator and orchestrator.review_results:
-            display_payload["activity_summary"] = [
-                {
-                    "attempt": i + 1,
-                    "collector_sources": self.selected_sources,
-                    "reviewer_approved": review["approved"],
-                    "reviewer_suggestions": review.get("suggestions"),
-                }
+            response.review_activity = [
+                PhaseReviewItem(
+                    phase="collection",
+                    attempt=i + 1,
+                    reviewer_approved=review["approved"],
+                    reviewer_suggestions=review.get("suggestions"),
+                    sources_used=self.selected_sources,
+                    generated_content=(
+                        str(orchestrator.attempts[i])
+                        if i < len(orchestrator.attempts)
+                        else None
+                    ),
+                )
                 for i, review in enumerate(orchestrator.review_results)
             ]
 
-        return DialogueResponse(action=DialogueAction.SHOW_COLLECTION, content=json.dumps(display_payload, ensure_ascii=False))
+        return response
 
 
 

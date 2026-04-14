@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
@@ -22,24 +22,29 @@ import {
 } from "./contexts/WorkspaceContext/WorkspaceContext";
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import StageTracker from "./components/StageTracker/StageTracker";
+import { useT } from "./i18n/useT";
+
+const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
 function WorkspaceResetWatcher({
   conversationId,
 }: {
   conversationId: string | null;
 }) {
-  const { setPirData, setCollectionData, setHighlightedRefs } = useWorkspace();
+  const { setPirData, setCollectionData, setHighlightedRefs, setReviewActivity } = useWorkspace();
 
   useEffect(() => {
     setPirData(null);
     setCollectionData(null);
     setHighlightedRefs([]);
+    setReviewActivity([]);
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return null;
 }
 
 function AppShell() {
+  const t = useT();
   const { success, error } = useToast();
   const {
     conversations,
@@ -83,6 +88,37 @@ function AppShell() {
     prefillGapPrompt,
     clearInputPrefill,
   } = useChat(pendingPerspectives);
+
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showExpandedContent, setShowExpandedContent] = useState(true);
+  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (revealTimeoutRef.current !== null) {
+        window.clearTimeout(revealTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleToggleSidebar = () => {
+    if (revealTimeoutRef.current !== null) {
+      window.clearTimeout(revealTimeoutRef.current);
+      revealTimeoutRef.current = null;
+    }
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowExpandedContent(false);
+      } else {
+        revealTimeoutRef.current = window.setTimeout(() => {
+          setShowExpandedContent(true);
+          revealTimeoutRef.current = null;
+        }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
+      }
+      return next;
+    });
+  };
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -197,36 +233,83 @@ function AppShell() {
   };
 
   const activePhase = activeConversation?.phase ?? "direction";
-  const isAnalysisPhase = activePhase === "analysis";
 
   return (
     <>
       <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
 
-      <div className="flex h-screen">
-        <Sidebar
-          conversations={conversations}
-          activeConversationId={activeConversation?.id ?? null}
-          onNewChat={() => createNewConversation(pendingPerspectives)}
-          onSwitchConversation={switchConversation}
-          onDeleteConversation={deleteConversation}
-          onRenameConversation={renameConversation}
-          onDeleteAllConversations={deleteAllConversations}
-          onDevSendMessage={() =>
-            triggerDevMessage(
-              "What are the latest cyber threats targeting European critical infrastructure?",
-            )
-          }
-          onDevShowCollectionApproval={debugConfirm}
-          onDevJumpToStage={jumpToDevStage}
-          onDevSyncStage={syncDevStage}
-          onDevResetStage={resetDevStage}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-        />
+      <div className="flex flex-col h-screen">
+        {/* Full-width top bar — spans all columns */}
+        <div className="shrink-0 h-14 relative flex items-center bg-surface border-b border-border">
+          {/* Left icon group — collapse toggle + settings, fixed so they never shift */}
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1">
+            <button
+              aria-label={t.toggleSidebar}
+              onClick={handleToggleSidebar}
+              className="p-2 flex items-center justify-center hover:bg-surface-elevated rounded text-text-muted hover:text-text-primary"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="1.5" y="1.5" width="15" height="15" rx="2" />
+                <path d="M6 1.5v15" />
+              </svg>
+            </button>
+            <button
+              aria-label={t.openSettings}
+              onClick={() => setIsSettingsOpen(true)}
+              className="p-2 flex items-center justify-center hover:bg-surface-elevated rounded text-text-muted hover:text-text-primary"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                aria-hidden="true">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </button>
+          </div>
+          {/* Stage tracker — absolutely centered on the full bar */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <div className="pointer-events-auto">
+              <StageTracker activePhase={activePhase} />
+            </div>
+          </div>
+        </div>
 
-        <main className="flex-1 min-h-0 flex flex-col bg-surface-elevated overflow-hidden">
-          <StageTracker activePhase={activePhase} />
-          <ChatWindow
+        {/* Content row — all panels live below the top bar */}
+        <div className="flex flex-1 min-h-0 overflow-hidden">
+          <Sidebar
+            conversations={conversations}
+            activeConversationId={activeConversation?.id ?? null}
+            onNewChat={() => createNewConversation(pendingPerspectives)}
+            onSwitchConversation={switchConversation}
+            onDeleteConversation={deleteConversation}
+            onRenameConversation={renameConversation}
+            onDeleteAllConversations={deleteAllConversations}
+            onDevSendMessage={() =>
+              triggerDevMessage(
+                "What are the latest cyber threats targeting European critical infrastructure?",
+              )
+            }
+            onDevShowCollectionApproval={debugConfirm}
+            onDevJumpToStage={jumpToDevStage}
+            onDevSyncStage={syncDevStage}
+            onDevResetStage={resetDevStage}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            isCollapsed={isCollapsed}
+            showExpandedContent={showExpandedContent}
+          />
+
+          <main className="flex-1 min-h-0 flex flex-col bg-surface-elevated overflow-hidden">
+            <ChatWindow
             messages={messages}
             onSendMessage={sendMessage}
             isConfirming={isConfirming}
@@ -253,27 +336,26 @@ function AppShell() {
           />
         </main>
 
-        {!isAnalysisPhase && (
-          <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
-            <IntelligencePanel
-              phase={activePhase}
-              selectedPerspectives={
-                activeConversation?.perspectives ?? pendingPerspectives
-              }
-              onPerspectiveChange={
-                activeConversation
-                  ? updatePerspectives
-                  : setPendingPerspectives
-              }
-              onOpenFileUpload={() => setIsFileUploadOpen(true)}
-              uploadedFiles={visibleUploadedFiles}
-              onFileRemove={handleFileRemove}
-              isCollecting={isCollecting}
-              collectionStatus={visibleCollectionStatus}
-            />
-          </div>
-        )}
-      </div>
+        <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+          <IntelligencePanel
+            phase={activePhase}
+            selectedPerspectives={
+              activeConversation?.perspectives ?? pendingPerspectives
+            }
+            onPerspectiveChange={
+              activeConversation
+                ? updatePerspectives
+                : setPendingPerspectives
+            }
+            onOpenFileUpload={() => setIsFileUploadOpen(true)}
+            uploadedFiles={visibleUploadedFiles}
+            onFileRemove={handleFileRemove}
+            isCollecting={isCollecting}
+            collectionStatus={visibleCollectionStatus}
+          />
+        </div>
+        </div>{/* end content row */}
+      </div>{/* end flex-col h-screen */}
 
       <FileUploadModal
         isOpen={isFileUploadOpen}

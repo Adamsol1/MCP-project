@@ -71,11 +71,23 @@ class ProcessingContext(BaseModel):
     collected_data: str
 
 
+class PhaseReviewItem(BaseModel):
+    """A single AI review attempt for any phase (direction, collection, processing)."""
+
+    phase: str
+    attempt: int
+    reviewer_approved: bool
+    reviewer_suggestions: str | None = None
+    sources_used: list[str] = []
+    generated_content: str | None = None
+
+
 class DialogueResponse(BaseModel):
     """Response object returned by dialogue flow to frontend"""
 
     action: DialogueAction = DialogueAction.ASK_QUESTION
     content: str = ""
+    review_activity: list[PhaseReviewItem] | None = None
 
 
 class ClarifyingQuestion(BaseModel):
