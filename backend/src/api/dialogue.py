@@ -675,7 +675,7 @@ async def send_message(
     session = _get_or_create_session(request.session_id)
     orchestrator = _build_orchestrator(session)
     if session.analysis_flow:
-        if request.council_debate_point:
+        if request.council_debate_point or request.council_finding_ids:
             return await _handle_council_phase(session, request)
         return await _handle_analysis_phase(session, request)
     if session.processing_flow:

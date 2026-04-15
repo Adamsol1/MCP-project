@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 
 from src.mcp_client.client import MCPClient
 from src.models.analysis import AnalysisDraft, FindingModel, ProcessingResult
@@ -47,6 +48,9 @@ class AnalysisService:
             return self._enrich_draft_assertions(fallback_draft, enriched_result), enriched_result
 
         try:
+            if isinstance(raw, str):
+                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
+                raw = fence.group(1).strip() if fence else raw.strip()
             payload = json.loads(raw) if isinstance(raw, str) else raw
         except (json.JSONDecodeError, TypeError):
             logger.warning("[AnalysisService] Agent returned non-JSON — using fallback draft.")

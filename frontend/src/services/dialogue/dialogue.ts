@@ -4,7 +4,7 @@ import type {
   DialoguePhase,
   DialogueStage,
   DialogueSubState,
-} from "../types/dialogue";
+} from "../../types/dialogue";
 
 /** Base URL for the backend REST API. */
 const API_BACKEND_URL = "http://localhost:8000";
@@ -91,9 +91,9 @@ export async function sendMessage(
       settings_timeframe: settingsTimeframe,
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
-      council_debate_point: options.councilDebatePoint ?? null,
-      council_finding_ids: options.councilFindingIds ?? null,
-      council_perspectives: options.councilPerspectives ?? null,
+      council_debate_point: options.councilDebatePoint ?? "",
+      council_finding_ids: options.councilFindingIds ?? [],
+      council_perspectives: options.councilPerspectives ?? [],
       council_settings: options.councilSettings ?? null,
     },
   );
