@@ -52,8 +52,9 @@ export interface ConversationContextValue {
   addMessage: (message: Message, conversationId?: string) => void;
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
-  /** Set canonical backend dialogue stage and optional sub-state. */
+  /** Set canonical backend dialogue stage and optional sub-state for a specific conversation. */
   setStage: (
+    conversationId: string,
     stage: DialogueStage,
     subState?: DialogueSubState,
     phase?: DialoguePhase,
@@ -80,6 +81,7 @@ type Action =
   | {
       type: "SET_STAGE";
       payload: {
+        conversationId: string;
         stage: DialogueStage;
         subState: DialogueSubState;
         phase?: DialoguePhase;
@@ -201,7 +203,7 @@ function conversationReducer(
       };
     }
     case "SET_STAGE": {
-      const { stage, subState, phase } = action.payload;
+      const { conversationId, stage, subState, phase } = action.payload;
       const isConfirming =
         (stage === "summary_confirming" ||
           stage === "pir_confirming" ||
@@ -212,7 +214,7 @@ function conversationReducer(
       return {
         ...state,
         conversations: state.conversations.map((conv) =>
-          conv.id === state.activeConversationId
+          conv.id === conversationId
             ? {
                 ...conv,
                 stage,
@@ -326,11 +328,12 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
 
   const setStage = useCallback(
     (
+      conversationId: string,
       stage: DialogueStage,
       subState: DialogueSubState = null,
       phase?: DialoguePhase,
     ) => {
-      dispatch({ type: "SET_STAGE", payload: { stage, subState, phase } });
+      dispatch({ type: "SET_STAGE", payload: { conversationId, stage, subState, phase } });
     },
     [],
   );

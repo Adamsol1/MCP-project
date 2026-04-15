@@ -35,16 +35,23 @@ Do not call any other tools during planning.
 
 ## Instructions
 1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
-2. Based on the PIRs and background knowledge, write a concise step-by-step collection plan
-3. Select which sources are most relevant to answer the PIRs
+2. Break the collection task into discrete steps — one step per PIR or coherent intelligence theme
+3. For each step, select only the sources from Available Sources that are genuinely useful for that specific step
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown.
 
 {{
-  "plan": "Step-by-step collection plan describing what to collect, from which sources, and why",
-  "suggested_sources": ["source name as listed in Available Sources"]
+  "steps": [
+    {{
+      "title": "Short step title (e.g. PIR-0 title or theme)",
+      "description": "What to collect for this step, why it matters, and what angle to take",
+      "suggested_sources": ["source name as listed in Available Sources"]
+    }}
+  ]
 }}
+
+Each step must have at least one suggested_source. Only use source names exactly as listed in Available Sources.
 
 {lang_note}"""
 
@@ -57,6 +64,7 @@ def build_collection_collect_prompt(
     since_date: str | None = None,
     existing_data: str | None = None,
     perspectives: list[str] | None = None,
+    step_source_guidance: str | None = None,
 ) -> str:
     approved_tools = [
         tool
@@ -169,6 +177,8 @@ def build_collection_collect_prompt(
     else:
         web_search_note = ""
 
+    step_guidance_section = f"\n{step_source_guidance}\n" if step_source_guidance else ""
+
     return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
 
 ## Approved PIRs
@@ -176,7 +186,7 @@ def build_collection_collect_prompt(
 
 ## Collection Plan
 {plan}
-{existing_data_section}
+{step_guidance_section}{existing_data_section}
 ## Approved Tools
 You MUST only use the following tools: {approved_tools_str}
 Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
@@ -321,6 +331,7 @@ def collection_collect(
     since_date: str = "",
     existing_data: str = "",
     perspectives: str = "[]",
+    step_source_guidance: str = "",
 ) -> str:
     """Prompt for collecting raw intelligence data via tools in the Collection phase.
 
@@ -332,6 +343,7 @@ def collection_collect(
         since_date: ISO date (YYYY-MM-DD) to filter OTX pulses by modification date.
         existing_data: Raw data already collected in previous attempts (for retry context).
         perspectives: JSON array of geopolitical perspectives from the Direction phase.
+        step_source_guidance: Per-step source availability guidance for the agent.
     """
     return build_collection_collect_prompt(
         pir=pir,
@@ -341,6 +353,7 @@ def collection_collect(
         since_date=since_date or None,
         existing_data=existing_data or None,
         perspectives=json.loads(perspectives) or None,
+        step_source_guidance=step_source_guidance or None,
     )
 
 

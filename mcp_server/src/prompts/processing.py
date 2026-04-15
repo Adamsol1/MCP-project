@@ -98,7 +98,7 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
       "title": "Short finding title",
       "finding": "Detailed analytical narrative of the finding",
       "evidence_summary": "Concise summary of the supporting evidence",
-      "source": "source_category",
+      "source": "web_search",
       "confidence": 75,
       "relevant_to": ["PIR-0", "PIR-1"],
       "supporting_data": {{

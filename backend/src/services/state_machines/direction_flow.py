@@ -9,6 +9,7 @@ from src.models.dialogue import (
     DialogueContext,
     DialogueResponse,
     Perspective,
+    PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
@@ -442,6 +443,24 @@ class DirectionFlow(BasePhaseFlow):
             dialogue_response.content = (
                 json.dumps(pir) if isinstance(pir, dict) else pir
             )
+            if orchestrator and orchestrator.review_results:
+                dialogue_response.review_activity = [
+                    PhaseReviewItem(
+                        phase="direction",
+                        attempt=i + 1,
+                        reviewer_approved=review["approved"],
+                        reviewer_suggestions=review.get("suggestions"),
+                        sources_used=[],
+                        generated_content=(
+                            json.dumps(orchestrator.attempts[i])
+                            if i < len(orchestrator.attempts) and isinstance(orchestrator.attempts[i], dict)
+                            else str(orchestrator.attempts[i])
+                            if i < len(orchestrator.attempts)
+                            else None
+                        ),
+                    )
+                    for i, review in enumerate(orchestrator.review_results)
+                ]
         else:
             # User rejected with modifications. Save and self-loop
             self.context.modifications = user_message

@@ -340,9 +340,48 @@ class CollectionService:
 
     @classmethod
     def _coerce_plan_payload(cls, raw_plan: str) -> dict[str, Any]:
-        """Return a stable payload with at least {plan, suggested_sources}."""
+        """Return a stable payload with at least {steps, plan, suggested_sources}.
+
+        Handles two formats:
+        - New: {"steps": [{"title": ..., "description": ..., "suggested_sources": [...]}]}
+        - Legacy: {"plan": "...", "suggested_sources": [...]}
+        """
         parsed = cls._try_parse_json(raw_plan)
         if parsed:
+            raw_steps = parsed.get("steps")
+            if isinstance(raw_steps, list) and raw_steps:
+                # New per-step format — normalise each step and aggregate sources.
+                steps: list[dict[str, Any]] = []
+                seen_sources: list[str] = []
+                for step in raw_steps:
+                    if not isinstance(step, dict):
+                        continue
+                    step_sources = cls._normalize_sources(step.get("suggested_sources"))
+                    steps.append({
+                        "title": str(step.get("title", "")),
+                        "description": str(step.get("description", "")),
+                        "suggested_sources": step_sources,
+                    })
+                    for s in step_sources:
+                        if s not in seen_sources:
+                            seen_sources.append(s)
+                # Build a readable plan text from steps for the collect prompt.
+                plan_lines: list[str] = []
+                for i, step in enumerate(steps, 1):
+                    sources_str = ", ".join(step["suggested_sources"]) or "any available source"
+                    plan_lines.append(
+                        f"{i}. {step['title']}\n"
+                        f"   {step['description']}\n"
+                        f"   Intended sources: {sources_str}"
+                    )
+                plan_text = "\n\n".join(plan_lines)
+                return {
+                    "steps": steps,
+                    "plan": plan_text,
+                    "suggested_sources": seen_sources,
+                }
+
+            # Legacy format: flat plan text + global suggested_sources.
             plan_text = parsed.get("plan")
             if isinstance(plan_text, str):
                 normalized_plan = plan_text
@@ -350,13 +389,10 @@ class CollectionService:
                 normalized_plan = json.dumps(plan_text if plan_text is not None else parsed, ensure_ascii=False, indent=2)
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
-            result: dict[str, Any] = {
+            return {
                 "plan": normalized_plan,
                 "suggested_sources": suggested_sources,
             }
-            if isinstance(parsed.get("steps"), list):
-                result["steps"] = parsed["steps"]
-            return result
 
         return {
             "plan": raw_plan.strip(),
@@ -389,9 +425,15 @@ class CollectionService:
 
         payload = self._coerce_plan_payload(ai_output)
 
-        # If AI missed suggested sources, infer from plan text and default to local KB.
+        # Fallback: if the AI produced steps with no suggested_sources on any step,
+        # fill each empty step from plan text inference, then aggregate global list.
         if not payload["suggested_sources"]:
-            payload["suggested_sources"] = self._infer_sources_from_plan_text(payload["plan"]) or [_DEFAULT_SOURCE]
+            fallback = self._infer_sources_from_plan_text(payload["plan"]) or [_DEFAULT_SOURCE]
+            payload["suggested_sources"] = fallback
+            if "steps" in payload:
+                for step in payload["steps"]:
+                    if not step.get("suggested_sources"):
+                        step["suggested_sources"] = fallback
 
         return json.dumps(payload, ensure_ascii=False)
 
@@ -430,7 +472,30 @@ class CollectionService:
         """
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
+        steps = payload.get("steps", [])
         tracker = None
+
+        # Build per-step source guidance so the AI knows which intended sources
+        # are available and which were deselected by the user.
+        step_source_guidance = ""
+        if steps:
+            lines: list[str] = ["## Per-Step Source Guidance"]
+            for i, step in enumerate(steps, 1):
+                intended = step.get("suggested_sources", [])
+                available = [s for s in intended if s in selected_sources]
+                unavailable = [s for s in intended if s not in selected_sources]
+                line = f"Step {i} ({step.get('title', '')}): intended [{', '.join(intended) or 'any'}]"
+                if unavailable:
+                    alt = [s for s in selected_sources if s not in intended]
+                    line += (
+                        f" — {', '.join(unavailable)} not selected by user."
+                        f" Use {', '.join(available) or 'other approved sources'}"
+                        f"{' + ' + ', '.join(alt) if alt else ''} to cover this step instead."
+                    )
+                else:
+                    line += f" — all intended sources available: {', '.join(available)}."
+                lines.append(line)
+            step_source_guidance = "\n".join(lines)
 
         async with self.mcp_client.connect():
             collect_prompt = await self.mcp_client.get_prompt(
@@ -443,6 +508,7 @@ class CollectionService:
                     "since_date": timeframe,
                     "existing_data": existing_raw_data or "",
                     "perspectives": json.dumps(perspectives or []),
+                    "step_source_guidance": step_source_guidance,
                 },
             )
             allowed_tool_names = {

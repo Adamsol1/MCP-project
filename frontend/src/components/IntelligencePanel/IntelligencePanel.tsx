@@ -2,9 +2,11 @@ import { useState } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { DialoguePhase } from "../../types/dialogue";
+import type { PhaseReviewItem } from "../../types/conversation";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
+import ReviewActivityModal from "../ReviewActivityModal/ReviewActivityModal";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
 import type { UploadedFileRecord } from "../../services/upload/upload";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
@@ -32,9 +34,11 @@ export default function IntelligencePanel({
   isCollecting = false,
   collectionStatus = null,
 }: IntelligencePanelProps) {
-  const { collectionData } = useWorkspace();
+  const { collectionData, pirData, reviewActivity } = useWorkspace();
   const t = useT();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewFocusAttempt, setReviewFocusAttempt] = useState<number | undefined>(undefined);
   const [showAllFiles, setShowAllFiles] = useState(false);
 
   const visibleFiles = showAllFiles
@@ -61,33 +65,27 @@ export default function IntelligencePanel({
                 />
               </section>
             )}
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <PirSourcesView />
-            </section>
+            {pirData && (
+              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+                <PirSourcesView />
+              </section>
+            )}
           </>
         );
 
       case "collection":
         return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <CollectionStatsView
-                collectionData={collectionData}
-                onOpenModal={() => setIsModalOpen(true)}
-              />
-            </section>
-          </>
+          <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+            <FileUploadSection
+              uploadedFiles={uploadedFiles}
+              visibleFiles={visibleFiles}
+              hiddenCount={hiddenCount}
+              showAllFiles={showAllFiles}
+              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
+              onOpenFileUpload={onOpenFileUpload}
+              onFileRemove={onFileRemove}
+            />
+          </section>
         );
 
       case "processing":
@@ -149,13 +147,40 @@ export default function IntelligencePanel({
       </header>
 
       <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-chatgpt">
-        <div className="flex flex-col gap-2">{renderPhaseContent()}</div>
+        <div className="flex flex-col gap-2">
+          {renderPhaseContent()}
+          {reviewActivity.length > 0 && (
+            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <ReviewActivitySection
+                activity={reviewActivity}
+                onOpenReviewModal={(attempt) => {
+                  setReviewFocusAttempt(attempt);
+                  setReviewModalOpen(true);
+                }}
+              />
+            </section>
+          )}
+          {collectionData && (
+            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <CollectionStatsView
+                collectionData={collectionData}
+                onOpenModal={() => setIsModalOpen(true)}
+              />
+            </section>
+          )}
+        </div>
       </div>
 
       <CollectionStatsModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         collectionData={collectionData}
+      />
+      <ReviewActivityModal
+        isOpen={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        activity={reviewActivity}
+        focusAttempt={reviewFocusAttempt}
       />
     </div>
   );
@@ -227,6 +252,53 @@ function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
           );
         })}
       </ul>
+    </div>
+  );
+}
+
+interface ReviewActivitySectionProps {
+  activity: PhaseReviewItem[];
+  onOpenReviewModal: (attempt: number) => void;
+}
+
+function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySectionProps) {
+  return (
+    <div className="space-y-2">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+        Review Activity
+      </p>
+      {activity.map((item) => (
+        <button
+          key={item.attempt}
+          type="button"
+          onClick={() => onOpenReviewModal(item.attempt)}
+          className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-1 text-left transition-colors hover:border-primary hover:bg-primary-subtle"
+        >
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+              Attempt {item.attempt}
+            </p>
+            <span
+              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                item.reviewer_approved
+                  ? "bg-success-subtle text-success-text"
+                  : "bg-error-subtle text-error-text"
+              }`}
+            >
+              {item.reviewer_approved ? "Approved" : "Rejected"}
+            </span>
+          </div>
+          {item.sources_used.length > 0 && (
+            <p className="text-xs text-text-secondary truncate">
+              <span className="font-medium text-text-primary">Sources: </span>
+              {item.sources_used.join(", ")}
+            </p>
+          )}
+          {item.sources_used.length === 0 && (
+            <p className="text-xs text-text-secondary capitalize">{item.phase} phase</p>
+          )}
+        </button>
+      ))}
     </div>
   );
 }

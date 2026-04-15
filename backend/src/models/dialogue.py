@@ -75,18 +75,12 @@ class ProcessingContext(BaseModel):
     collected_data: str
 
 
-class AnalysisContext(BaseModel):
-    """Context passed to the reviewer during the analysis phase."""
-
-    pir: str
-    processing_result: dict
-
-
 class DialogueResponse(BaseModel):
     """Response object returned by dialogue flow to frontend"""
 
     action: DialogueAction = DialogueAction.ASK_QUESTION
     content: str = ""
+    review_activity: list[PhaseReviewItem] | None = None
 
 
 class ClarifyingQuestion(BaseModel):

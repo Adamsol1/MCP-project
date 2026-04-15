@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useState } from "react";
-import type { CollectionDisplayData, PirData } from "../../types/conversation";
+import type { CollectionDisplayData, PhaseReviewItem, PirData } from "../../types/conversation";
 import React from "react";
 
 export interface WorkspaceContextValue {
@@ -12,6 +12,8 @@ export interface WorkspaceContextValue {
   setPirData: (pirData: PirData | null) => void;
   collectionData: CollectionDisplayData | null;
   setCollectionData: (data: CollectionDisplayData | null) => void;
+  reviewActivity: PhaseReviewItem[];
+  setReviewActivity: (items: PhaseReviewItem[]) => void;
 }
 
 export { useWorkspace } from "../../hooks/useWorkspace/useWorkspace";
@@ -25,6 +27,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [pirData, setPirData] = useState<PirData | null>(null);
   const [collectionData, setCollectionData] =
     useState<CollectionDisplayData | null>(null);
+  const [reviewActivity, setReviewActivity] = useState<PhaseReviewItem[]>([]);
   const highlightedRef = highlightedRefs[0] ?? null;
   const setHighlightedRef = (ref: string | null) => {
     setHighlightedRefs(ref ? [ref] : []);
@@ -38,6 +41,8 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setPirData,
     collectionData,
     setCollectionData,
+    reviewActivity,
+    setReviewActivity,
   };
 
   return (

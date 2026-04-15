@@ -217,6 +217,7 @@ class DialogueMessageResponse(BaseModel):
     stage: str
     phase: str
     sub_state: str | None = None
+    review_activity: list[dict] | None = None
 
 
 
@@ -317,6 +318,11 @@ def _convert_to_message_response(
         stage=stage,
         phase=phase.value,
         sub_state=sub_state,
+        review_activity=(
+            [item.model_dump() for item in response.review_activity]
+            if response.review_activity
+            else None
+        ),
     )
     return result
 

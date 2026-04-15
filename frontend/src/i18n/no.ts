@@ -82,6 +82,7 @@ export const no = {
   tableStatus: "Status",
   dataFound: "Data funnet",
   empty: "Tom",
+  priority: "Prioritet",
   priorityHigh: "H\u00f8y",
   priorityMedium: "Middels",
   priorityLow: "Lav",
@@ -160,18 +161,18 @@ export const no = {
   timeframePlaceholder: "f.eks. Siste 30 dager",
 
   // ApprovalPrompt
-  approvalDefault: "Godkjenningsforesp\u00f8rsel",
+  approvalDefault: "Klar til \u00e5 fortsette?",
   approvalDefaultSubtitle:
-    "Gjennomg\u00e5 det genererte resultatet f\u00f8r du fortsetter.",
-  approvalSummary: "Godkjenning av oppsummering",
+    "Gjennomg\u00e5 resultatet ovenfor f\u00f8r du fortsetter.",
+  approvalSummary: "Stemmer dette med din intensjon?",
   approvalSummarySubtitle:
-    "Gjennomg\u00e5 den genererte oppsummeringen f\u00f8r du fortsetter til PIR.",
-  approvalPir: "Godkjenning av PIR",
+    "Godkjenn for \u00e5 generere prioriterte etterretningskrav, eller avvis for \u00e5 justere oppsummeringen.",
+  approvalPir: "Ser disse PIR-ene riktige ut?",
   approvalPirSubtitle:
-    "Gjennomg\u00e5 den genererte PIR-en f\u00f8r du fullf\u00f8rer Retning.",
-  approvalPlan: "Godkjenning av innsamlingsplan",
+    "Godkjenn for \u00e5 g\u00e5 til innsamlingsplanlegging, eller avvis for \u00e5 justere kravene.",
+  approvalPlan: "Klar til \u00e5 starte innsamling?",
   approvalPlanSubtitle:
-    "Gjennomg\u00e5 den genererte innsamlingsplanen f\u00f8r du velger kilder.",
+    "Godkjenn for \u00e5 velge kilder og starte innsamling, eller avvis for \u00e5 justere planen.",
   approveContinue: "Godkjenn og fortsett",
   rejectWithFeedback: "Avvis med tilbakemelding",
 } satisfies Translations;

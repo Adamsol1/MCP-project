@@ -148,7 +148,8 @@ class GeminiAgent:
             tool_results = []
             for part in tool_calls:
                 fc = part.function_call
-                logger.info(f"[GeminiAgent] Calling tool: {fc.name}({dict(fc.args)})")
+                _args_safe = repr(dict(fc.args)).encode("ascii", errors="backslashreplace").decode("ascii")
+                logger.info(f"[GeminiAgent] Calling tool: {fc.name}({_args_safe})")
                 if status_tracker is not None:
                     status_tracker.record_tool_call(fc.name, dict(fc.args))
                 try:
