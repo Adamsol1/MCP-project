@@ -104,7 +104,7 @@ class TestMCPClientTools:
 
 class TestMCPClientStripFences:
     """Tests for the _strip_fences helper that removes markdown code fences
-    Gemini occasionally wraps its JSON output in.
+    LLMs occasionally wrap their JSON output in.
 
     _strip_fences should:
       - Remove ```json ... ``` wrappers
@@ -146,7 +146,7 @@ class TestMCPClientStripFences:
 
 class TestMCPClientCallToolParsing:
     """Tests that call_tool correctly parses the text returned by the MCP server,
-    including responses where Gemini has wrapped the JSON in markdown fences.
+    including responses where the model has wrapped the JSON in markdown fences.
     """
 
     def _make_client_with_response(self, response_text: str) -> MCPClient:

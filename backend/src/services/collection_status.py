@@ -41,7 +41,7 @@ class CollectionStatusTracker:
     Usage in collection_service.py::
 
         tracker = CollectionStatusTracker(session_id, selected_sources)
-        # pass to GeminiAgent.run(status_tracker=tracker)
+        # pass to ToolCallingAgent.run(status_tracker=tracker)
         tracker.mark_complete()
     """
 

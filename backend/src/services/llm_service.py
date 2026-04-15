@@ -1,18 +1,18 @@
-"""LLMService — direct Gemini API calls for the Direction phase.
+"""LLMService - direct OpenAI-compatible LLM calls.
 
-This service is used by DialogueService and ReviewService for all
-Direction phase AI generation. No MCP is involved.
+This service is used by DialogueService and ReviewService for plain text/JSON
+generation. No MCP is involved.
 
-Collection and Processing phases use GeminiAgent instead, which
+Collection and Processing phases use ToolCallingAgent instead, which
 communicates with the MCP server via the MCP protocol.
 """
 
 import json
 import logging
-import os
 import re
 
-from google import genai
+from src.services.llm_config import get_llm_config
+from src.services.openai_compatible_client import OpenAICompatibleClient
 
 logger = logging.getLogger("app")
 
@@ -90,20 +90,18 @@ def _repair_json(text: str) -> str:
 
 
 class LLMService:
-    """Direct Gemini API wrapper for backend AI calls.
+    """Direct OpenAI-compatible API wrapper for backend AI calls.
 
-    Used exclusively in the Direction phase where no external tool
-    integration is needed. Wraps google-genai with async support
-    and JSON parsing convenience.
+    Used where no external tool integration is needed. Provides async text
+    generation and JSON parsing convenience.
     """
 
-    def __init__(self, model: str = "gemini-2.5-flash"):
-        api_key = os.getenv("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=api_key)
-        self.model = model
+    def __init__(self, model: str | None = None):
+        self.client = OpenAICompatibleClient(config=get_llm_config(model=model))
+        self.model = self.client.model
 
     async def generate_text(self, prompt: str) -> str:
-        """Send a prompt to Gemini and return the raw text response.
+        """Send a prompt to the configured model and return the raw text response.
 
         Args:
             prompt: The prompt string to send to the model.
@@ -115,16 +113,10 @@ class LLMService:
             ValueError: If the model returns an empty response.
         """
         logger.debug(f"[LLMService] Calling {self.model} (text)")
-        response = await self.client.aio.models.generate_content(
-            model=self.model,
-            contents=prompt,
-        )
-        if not response.text:
-            raise ValueError(f"[LLMService] {self.model} returned empty response")
-        return response.text
+        return await self.client.generate_text(prompt)
 
     async def generate_json(self, prompt: str) -> dict:
-        """Send a prompt to Gemini and return the parsed JSON response.
+        """Send a prompt to the configured model and return the parsed JSON response.
 
         Args:
             prompt: The prompt string to send to the model.

@@ -14,12 +14,13 @@ from src.models.analysis import (
 )
 from src.models.dialogue import Perspective
 from src.services.council_personas import get_council_persona
-from src.services.gemini_deliberation_adapter import GeminiDeliberationAdapter
+from src.services.llm_config import get_default_llm_model, get_llm_config
 
 COUNCIL_MCP_DIR = Path(__file__).resolve().parents[3] / "council_mcp"
 if str(COUNCIL_MCP_DIR) not in sys.path:
     sys.path.insert(0, str(COUNCIL_MCP_DIR))
 
+from adapters.openai import OpenAIAdapter  # type: ignore  # noqa: E402
 from deliberation.engine import DeliberationEngine  # type: ignore  # noqa: E402
 from deliberation.transcript import TranscriptManager  # type: ignore  # noqa: E402
 from models.schema import DeliberateRequest, Participant  # type: ignore  # noqa: E402
@@ -28,8 +29,8 @@ from models.schema import DeliberateRequest, Participant  # type: ignore  # noqa
 class CouncilService:
     """Run a council deliberation with fixed app defaults."""
 
-    DEFAULT_ADAPTER = "gemini"
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_ADAPTER = "openai"
+    DEFAULT_MODEL = get_default_llm_model()
     DEFAULT_MODE = "conference"
     DEFAULT_ROUNDS = 2
     DEFAULT_TIMEOUT_PER_ROUND = 180
@@ -187,12 +188,21 @@ class CouncilService:
         )
 
     def _build_engine(self, runtime_profile: CouncilRuntimeProfile):
-        adapter = GeminiDeliberationAdapter(timeout=180)
+        llm_config = get_llm_config(model=runtime_profile.model)
+        adapter = OpenAIAdapter(
+            base_url=llm_config.base_url,
+            api_key=llm_config.api_key,
+            timeout=runtime_profile.timeout_per_round_seconds,
+            max_retries=1,
+        )
         adapters = {self.DEFAULT_ADAPTER: adapter}
         config = SimpleNamespace(
             defaults=SimpleNamespace(
                 timeout_per_round=runtime_profile.timeout_per_round_seconds,
                 rounds=runtime_profile.rounds,
+                summary_adapter=self.DEFAULT_ADAPTER,
+                summary_model=runtime_profile.model,
+                summary_display_name=f"{self.DEFAULT_ADAPTER} summary model",
             ),
             deliberation=SimpleNamespace(
                 convergence_detection=SimpleNamespace(enabled=False),
@@ -238,7 +248,7 @@ class CouncilService:
         first_error = responses[0].response.strip("[]")
         if "API key" in first_error or "api key" in first_error:
             raise RuntimeError(
-                "Council runtime failed: Gemini API access is not configured correctly for the backend process."
+                "Council runtime failed: local OpenAI-compatible API access is not configured correctly for the backend process."
             )
         raise RuntimeError(f"Council runtime failed: {first_error}")
 

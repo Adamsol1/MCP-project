@@ -23,7 +23,7 @@ import type { UploadedFileRecord } from "./upload";
 
 vi.mock("axios");
 
-const BASE = "http://localhost:8000";
+const BASE = "http://localhost:8003";
 
 beforeEach(() => {
   vi.clearAllMocks();

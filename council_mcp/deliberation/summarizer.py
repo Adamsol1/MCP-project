@@ -20,16 +20,23 @@ class DeliberationSummarizer:
     - Final recommendation
     """
 
-    def __init__(self, adapter: Union[BaseCLIAdapter, BaseHTTPAdapter], model: str):
+    def __init__(
+        self,
+        adapter: Union[BaseCLIAdapter, BaseHTTPAdapter],
+        model: str,
+        max_response_chars: int = 600,
+    ):
         """
         Initialize summarizer.
 
         Args:
             adapter: Adapter to use for summary generation (CLI or HTTP)
             model: Model identifier to use (e.g., "sonnet" for Claude)
+            max_response_chars: Maximum characters retained from each debate response.
         """
         self.adapter = adapter
         self.model = model
+        self.max_response_chars = max_response_chars
 
     async def generate_summary(
         self, question: str, responses: List[RoundResponse]
@@ -81,9 +88,21 @@ class DeliberationSummarizer:
             lines.append(f"\n--- Round {round_num} ---")
             for resp in rounds[round_num]:
                 lines.append(f"\n{resp.participant}:")
-                lines.append(resp.response)
+                lines.append(self._truncate_response(resp.response))
 
         return "\n".join(lines)
+
+    def _truncate_response(self, response: str) -> str:
+        """Trim long participant responses so summary prompts fit small local models."""
+        if len(response) <= self.max_response_chars:
+            return response
+        half = max(1, self.max_response_chars // 2)
+        omitted = len(response) - (half * 2)
+        return (
+            response[:half].rstrip()
+            + f"\n[... {omitted} characters omitted for summary prompt size ...]\n"
+            + response[-half:].lstrip()
+        )
 
     def _create_summary_prompt(self, debate_text: str) -> str:
         """

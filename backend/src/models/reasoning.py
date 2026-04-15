@@ -29,7 +29,7 @@ class ReasoningLogEntry(BaseModel):
     review_duration: float = Field(
         ..., ge=0, description="Time spent reviewing content. Uses seconds"
     )
-    model_used: str = Field(..., description="Model used for AI generation. e.g Gemini 2.5")
+    model_used: str = Field(..., description="Model used for AI generation.")
     error_type: str | None = Field(
         default=None,
         description="Exception type if generation or review failed, e.g. 'TimeoutError'",

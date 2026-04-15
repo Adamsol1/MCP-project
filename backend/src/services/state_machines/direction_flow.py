@@ -205,7 +205,7 @@ class DirectionFlow(BasePhaseFlow):
             orchestrator: If provided, uses the generate-and-review loop for PIR generation.
             reviewer: Required alongside orchestrator for PIR review.
             language: BCP-47 language code (e.g. "en", "no") — forwarded to MCP tools
-                      so Gemini generates all responses in the selected language.
+                      so the model generates all responses in the selected language.
             settings_timeframe: Pre-set timeframe from the user's Settings → Parameters
                                  (e.g. "Last 30 days"). Pre-fills context.timeframe when
                                  it is currently empty, skipping the timeframe question.
@@ -259,12 +259,20 @@ class DirectionFlow(BasePhaseFlow):
         if extracted_context.get("timeframe"):
             self.context.timeframe = extracted_context["timeframe"]
         if extracted_context.get("target_entities"):
-            self.context.target_entities = extracted_context["target_entities"]
+            self.context.target_entities = self._as_list(extracted_context["target_entities"])
         if extracted_context.get("threat_actors"):
-            self.context.threat_actors = extracted_context["threat_actors"]
+            self.context.threat_actors = self._as_list(extracted_context["threat_actors"])
         if extracted_context.get("priority_focus"):
             pf = extracted_context["priority_focus"]
             self.context.priority_focus = ", ".join(pf) if isinstance(pf, list) else pf
+
+    @staticmethod
+    def _as_list(value: Any) -> list[str]:
+        if isinstance(value, list):
+            return [str(item) for item in value if item]
+        if isinstance(value, str):
+            return [value]
+        return []
 
     async def handle_initial_input(
         self, user_message, dialogue_service, language: str = "en"
@@ -493,7 +501,7 @@ class DirectionFlow(BasePhaseFlow):
             self.context.modifications = user_message
             self._log_user_action(action="reject", phase=self.state.value, modifications=user_message, perspectives=self.context.perspectives)
             try:
-                pir = await dialogue_service.generate_pir(self.context)
+                pir = await dialogue_service.generate_pir(self.context, language=language)
             except Exception:
                 logger.error(f"[Session {self.session_id}] Failed to regenerate PIR", exc_info=True)
                 return DialogueResponse(action=DialogueAction.ERROR, content="Failed to regenerate PIR")

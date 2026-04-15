@@ -1,7 +1,7 @@
 import logging
 
 from src.mcp_client.client import MCPClient
-from src.services.gemini_agent import GeminiAgent
+from src.services.tool_calling_agent import ToolCallingAgent
 
 logger = logging.getLogger("app")
 
@@ -34,7 +34,7 @@ class ProcessingService:
                     "previous_result": previous_result or "",
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Process the collected intelligence data into structured PMESII entities.",
@@ -54,7 +54,7 @@ class ProcessingService:
                     "modifications": modifications,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing processing result.",

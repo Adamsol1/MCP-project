@@ -2,8 +2,8 @@
 
 Each turn:
   1. Backend fetches the appropriate system prompt from the MCP server (Prompts primitive)
-  2. GeminiAgent runs with that system prompt + the user's message
-  3. Gemini may autonomously call MCP tools (e.g. read_knowledge_base) during the turn
+  2. ToolCallingAgent runs with that system prompt + the user's message
+  3. The model may autonomously call MCP tools (e.g. read_knowledge_base) during the turn
   4. Backend parses the result and updates state
 """
 
@@ -13,7 +13,7 @@ from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
-from src.services.gemini_agent import GeminiAgent
+from src.services.tool_calling_agent import ToolCallingAgent
 
 logger = logging.getLogger("app")
 
@@ -33,7 +33,7 @@ class DialogueService:
         """Generate a clarifying question and extract context from the user's answer.
 
         Fetches the direction_gathering system prompt from the MCP server, then
-        runs GeminiAgent so Gemini can optionally call knowledge bank tools.
+        runs ToolCallingAgent so the model can optionally call knowledge bank tools.
 
         Args:
             user_message: The user's latest message.
@@ -55,7 +55,7 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             raw = await agent.run(system_prompt=system_prompt, task=user_message)
 
         question_result = self._parse_json(raw)
@@ -117,7 +117,7 @@ class DialogueService:
             )
             # MCP Tools primitive: AI may still call read_knowledge_base()
             # autonomously during the tool-loop to explore additional knowledge.
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
@@ -239,7 +239,7 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a structured summary of the intelligence collection context.",

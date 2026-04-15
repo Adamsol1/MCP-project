@@ -88,18 +88,39 @@ class DeliberationEngine:
         else:
             logger.debug("No config provided, convergence detection disabled")
 
-        # Initialize summarizer fallback chain
-        # Store all available adapters in preference order: claude, droid, codex, gemini
+        # Initialize summarizer fallback chain.
+        # Store all available adapters in preference order. App integrations can
+        # provide config.defaults.summary_adapter/model to use the same provider
+        # that produced the participant debate.
         self.summarizer_chain: List[tuple] = []
 
-        summarizer_preferences = [
+        summarizer_preferences = []
+        defaults_cfg = getattr(config, "defaults", None)
+        summary_adapter = getattr(defaults_cfg, "summary_adapter", None)
+        summary_model = getattr(defaults_cfg, "summary_model", None)
+        if summary_adapter and summary_model:
+            summary_display_name = getattr(
+                defaults_cfg,
+                "summary_display_name",
+                f"{summary_adapter} summary model",
+            )
+            summarizer_preferences.append(
+                (summary_adapter, summary_model, summary_display_name)
+            )
+
+        summarizer_preferences.extend([
             ("claude", "sonnet", "Claude Sonnet"),
             ("droid", "claude-sonnet-4-5-20250929", "Droid with Claude Sonnet"),
             ("codex", "gpt-5-codex", "GPT-5 Codex"),
             ("gemini", "gemini-2.5-pro", "Gemini 2.5 Pro"),
-        ]
+        ])
 
+        seen_summarizers = set()
         for cli_name, model_name, display_name in summarizer_preferences:
+            key = (cli_name, model_name)
+            if key in seen_summarizers:
+                continue
+            seen_summarizers.add(key)
             if cli_name in adapters:
                 self.summarizer_chain.append((adapters[cli_name], model_name, display_name))
 
@@ -109,7 +130,8 @@ class DeliberationEngine:
         else:
             logger.warning(
                 "No suitable adapter available for summary generation. "
-                "Install at least one CLI (claude, droid, codex, or gemini) for AI-powered summaries."
+                "Configure defaults.summary_adapter/model or install at least one "
+                "CLI (claude, droid, codex, or gemini) for AI-powered summaries."
             )
 
         # Initialize decision graph if enabled

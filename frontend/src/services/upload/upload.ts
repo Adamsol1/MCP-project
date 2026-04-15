@@ -1,7 +1,8 @@
 import axios from "axios";
 
 /** Base URL for the backend REST API. */
-const API_BACKEND_URL = "http://localhost:8000";
+const API_BACKEND_URL =
+  import.meta.env.VITE_API_BACKEND_URL ?? "http://localhost:8003";
 
 export interface CitationMetadata {
   author: string;

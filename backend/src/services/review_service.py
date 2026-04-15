@@ -21,7 +21,7 @@ class ReviewService:
     """AI review wrapper using the Review MCP Server for prompts and LLMService for generation.
 
     Fetches review prompt templates from the dedicated review MCP server (port 8002),
-    then calls LLMService (Gemini) to perform the actual review.
+    then calls LLMService to perform the actual review.
     """
 
     def __init__(self, llm_service: LLMService, review_mcp_client: MCPClient):

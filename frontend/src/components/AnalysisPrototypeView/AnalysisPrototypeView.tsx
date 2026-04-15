@@ -114,7 +114,7 @@ function getCouncilRuntimeIssue(councilNote: CouncilNote | null) {
     return null;
   }
 
-  return "Latest saved council note contains only runtime errors. Re-run council after fixing Gemini access in the backend environment.";
+  return "Latest saved council note contains only runtime errors. Re-run council after fixing local model access in the backend environment.";
 }
 
 function getConfidenceColor(confidence: number) {

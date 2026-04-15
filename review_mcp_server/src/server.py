@@ -3,7 +3,7 @@
 This server is exclusively for the review agent (AI #2). It exposes review
 prompt templates via the MCP Prompts primitive. ReviewService connects here
 to fetch the appropriate review prompt for each phase, then calls LLMService
-(Gemini) with that prompt.
+with that prompt.
 
 Architecture:
   Port 8001 — Generation server (mcp_server/) — Agent #1 connects here

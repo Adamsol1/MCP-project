@@ -22,6 +22,7 @@ from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
 from src.services.collection_status import CollectionStatusTracker
 from src.services.dialogue_service import DialogueService
+from src.services.llm_config import get_default_llm_model
 from src.services.llm_service import LLMService
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
@@ -34,7 +35,7 @@ from src.services.state_machines.processing_flow import ProcessingFlow
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
 
-_GEMINI_MODEL = "gemini-2.5-flash"
+_AI_MODEL = get_default_llm_model()
 _GATHER_MORE_CONTENT = "What gaps would you like to fill? Describe what additional information to gather."
 _SUB_STATE_GATHER_MORE = "awaiting_gather_more"
 _SUB_STATE_AWAITING_DECISION = "awaiting_decision"
@@ -344,7 +345,7 @@ def _get_mcp_client() -> MCPClient:
 
 
 def _get_review_service() -> ReviewService:
-    llm = LLMService(model=_GEMINI_MODEL)
+    llm = LLMService(model=_AI_MODEL)
     review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
     return ReviewService(llm, review_mcp_client)
 
@@ -361,8 +362,8 @@ def _build_orchestrator(session: IntelligenceSession) -> AIOrchestrator:
     """
     return AIOrchestrator(
         research_logger=session.research_logger,
-        generator_model=_GEMINI_MODEL,
-        reviewer_model=_GEMINI_MODEL,
+        generator_model=_AI_MODEL,
+        reviewer_model=_AI_MODEL,
     )
 
 

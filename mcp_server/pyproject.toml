@@ -9,7 +9,6 @@ license = {text = "MIT"}
 requires-python = ">=3.11,<4"
 dependencies = [
     "fastmcp (>=2.14.4,<3.0.0)",
-    "google-genai (>=1.0.0)",
     "httpx (>=0.28.1,<0.29.0)",
     "pymisp (>=2.5.32,<3.0.0)",
     "python-dotenv (>=1.0.0)",
@@ -59,7 +58,7 @@ pythonpath = ["src"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = ["-m", "not integration"]
-markers = ["integration: marks tests that hit real Gemini API"]
+markers = ["integration: marks tests that hit real external APIs"]
 
 [tool.mypy]
 python_version = "3.11"

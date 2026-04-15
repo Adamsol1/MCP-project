@@ -1,8 +1,8 @@
 """CollectionService
 
 For each collection phase we:
-1. Backend fetches the system prompt from MCP server and sends it to a Gemini agent.
-2. Gemini agent executes prompts and uses allowed tools.
+1. Backend fetches the system prompt from MCP server and sends it to a tool-calling agent.
+2. The configured model executes prompts and uses allowed tools.
 3. Agent returns collected/derived content.
 4. Backend returns structured content to CollectionFlow for frontend review.
 """
@@ -15,7 +15,7 @@ from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.services.collection_status import CollectionStatusTracker
-from src.services.gemini_agent import GeminiAgent
+from src.services.tool_calling_agent import ToolCallingAgent
 
 logger = logging.getLogger("app")
 
@@ -417,7 +417,7 @@ class CollectionService:
                     "modifications": modifications or "",
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a collection plan and suggest relevant sources for the given PIRs.",
@@ -470,6 +470,7 @@ class CollectionService:
 
         existing_raw_data: data already gathered in previous attempts (passed for context).
         """
+        del language
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
         steps = payload.get("steps", [])
@@ -520,7 +521,7 @@ class CollectionService:
             if session_id:
                 tracker = CollectionStatusTracker(session_id, selected_sources)
 
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
                 task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
@@ -535,17 +536,17 @@ class CollectionService:
         if tracker:
             tracker.mark_complete()
 
-        # Second pass: summarize full page content via Gemini url_context (no scraping).
-        # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        # Second pass: summarize full page content.
+        # Runs outside the MCP context because page fetching is not an MCP tool.
         # We pass up to 25 URLs (buffer) because some pages will be inaccessible and get
         # filtered out inside fetch_url_summaries, so we need extras to hit the ~15 target.
         if "Web Search" in selected_sources:
             urls = _extract_search_urls(raw_data)
             if urls:
-                url_agent = GeminiAgent(self.mcp_client)
+                url_agent = ToolCallingAgent(self.mcp_client)
                 _url_buffer = min(len(urls), 25)
                 logger.info(
-                    f"[CollectionService] url_context: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
+                    f"[CollectionService] fetch_page: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
                 )
                 summaries = await url_agent.fetch_url_summaries(
                     urls=urls[:_url_buffer],
@@ -555,7 +556,7 @@ class CollectionService:
                 if summaries:
                     raw_data = _append_to_collected_data(raw_data, summaries)
                     logger.info(
-                        f"[CollectionService] url_context: added {len(summaries)} page summaries"
+                        f"[CollectionService] fetch_page: added {len(summaries)} page summaries"
                     )
 
             raw_data = _strip_search_snippet_items(raw_data)
@@ -578,7 +579,7 @@ class CollectionService:
                     "modifications": modifications,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = ToolCallingAgent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing intelligence summary.",

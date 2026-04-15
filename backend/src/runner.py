@@ -1,6 +1,10 @@
 """Runner module for starting the FastAPI server."""
 
+import os
+
 import uvicorn
+
+_BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8003"))
 
 
 def dev():
@@ -8,7 +12,7 @@ def dev():
     uvicorn.run(
         "src.api.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=_BACKEND_PORT,
         reload=True,
     )
 
@@ -18,5 +22,5 @@ def start():
     uvicorn.run(
         "src.api.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=_BACKEND_PORT,
     )

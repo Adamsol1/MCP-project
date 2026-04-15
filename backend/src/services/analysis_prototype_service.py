@@ -11,6 +11,7 @@ from src.models.confidence import (
 from src.models.dialogue import Perspective
 from src.services.confidence.assertion_enrichment import enrich_assertions, validate_finding_ids
 from src.services.confidence.scoring import compute_confidence
+from src.services.llm_config import get_default_llm_model
 from src.services.llm_service import LLMService
 
 logger = logging.getLogger("app")
@@ -20,7 +21,7 @@ class AnalysisPrototypeService:
     """Generate an analysis draft from a ProcessingResult."""
 
     DEFAULT_PERSPECTIVES = tuple(p.value for p in Perspective)
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = get_default_llm_model()
 
     def __init__(self, llm_service: LLMService | None = None):
         self.llm_service = llm_service or LLMService(model=self.DEFAULT_MODEL)
@@ -56,7 +57,7 @@ class AnalysisPrototypeService:
             )
         except Exception as exc:  # pragma: no cover - network/runtime failure path
             logger.warning(
-                "[AnalysisPrototypeService] Gemini draft generation failed, using fallback draft: %s",
+                "[AnalysisPrototypeService] LLM draft generation failed, using fallback draft: %s",
                 exc,
             )
             return fallback_draft, enriched_processing_result
@@ -77,7 +78,7 @@ class AnalysisPrototypeService:
             llm_draft = AnalysisDraft.model_validate(payload)
         except Exception as exc:
             logger.warning(
-                "[AnalysisPrototypeService] Gemini returned invalid draft payload, using fallback draft: %s",
+                "[AnalysisPrototypeService] LLM returned invalid draft payload, using fallback draft: %s",
                 exc,
             )
             return fallback_draft, enriched_processing_result

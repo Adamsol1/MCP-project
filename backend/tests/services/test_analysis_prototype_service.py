@@ -45,7 +45,7 @@ class _FakeLLMService:
         assert "Processed findings" in prompt
         assert "supporting_finding_ids" in prompt  # new prompt shape
         return {
-            "summary": "Gemini-generated assessment of the processed findings.",
+            "summary": "LLM-generated assessment of the processed findings.",
             "key_judgments": [
                 "Credential-access activity and phishing staging reinforce a coordinated access-development assessment."
             ],
@@ -89,6 +89,7 @@ class _FakeLLMServiceWithHallucinatedIds:
     """Returns implications with hallucinated finding IDs that should be stripped."""
 
     async def generate_json(self, prompt: str) -> dict:
+        del prompt
         return {
             "summary": "Summary.",
             "key_judgments": ["Judgment."],
@@ -114,6 +115,7 @@ class _FakeLLMServiceOldStringFormat:
     """Simulates an LLM that returns old string-list format (should fall back gracefully)."""
 
     async def generate_json(self, prompt: str) -> dict:
+        del prompt
         return {
             "summary": "Summary.",
             "key_judgments": [],

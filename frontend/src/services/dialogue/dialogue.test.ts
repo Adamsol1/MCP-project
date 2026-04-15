@@ -29,7 +29,7 @@ import type {
 
 vi.mock("axios");
 
-const BASE = "http://localhost:8000";
+const BASE = "http://localhost:8003";
 
 // Reset call history between tests so assertions don't bleed across tests.
 beforeEach(() => {

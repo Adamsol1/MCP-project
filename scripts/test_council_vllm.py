@@ -1,7 +1,7 @@
-"""Run a minimal Gemini-backed council_mcp deliberation from the terminal.
+"""Run a minimal local-vLLM-backed council_mcp deliberation from the terminal.
 
 Usage:
-    python scripts/test_council_gemini.py "Should we keep using this council MCP?"
+    python scripts/test_council_vllm.py "Should we keep using this council MCP?"
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import logging
 import os
 import sys
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parent.parent
 COUNCIL_DIR = ROOT / "council_mcp"
@@ -38,12 +37,25 @@ def configure_logging_for_terminal() -> None:
 
 
 async def run(question: str) -> int:
-    """Execute a minimal quick-mode Gemini deliberation."""
+    """Execute a minimal quick-mode local-model deliberation."""
     sys.path.insert(0, str(COUNCIL_DIR))
 
     import server  # noqa: PLC0415
+    from adapters.openai import OpenAIAdapter  # noqa: PLC0415
 
-    # Keep terminal testing fast and Gemini-only.
+    base_url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
+    api_key = os.getenv("LLM_API_KEY", "my-secret-key")
+    model = os.getenv("LLM_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    adapter = OpenAIAdapter(
+        base_url=base_url,
+        api_key=api_key,
+        timeout=300,
+        max_retries=1,
+    )
+    server.adapters["openai"] = adapter
+    server.engine.adapters["openai"] = adapter
+
+    # Keep terminal testing fast and local-model-only.
     server.config.deliberation.file_tree.enabled = False
     server.engine.config.deliberation.file_tree.enabled = False
 
@@ -52,15 +64,13 @@ async def run(question: str) -> int:
         server.engine.config.decision_graph.enabled = False
     server.engine.graph_integration = None
 
-    server.engine.summarizer_chain = [
-        item for item in server.engine.summarizer_chain if item[0] is server.adapters["gemini"]
-    ]
+    server.engine.summarizer_chain = [(adapter, model, "local vLLM")]
 
     args = {
         "question": question,
         "participants": [
-            {"cli": "gemini", "model": "gemini-2.5-pro"},
-            {"cli": "gemini", "model": "gemini-2.5-pro"},
+            {"cli": "openai", "model": model},
+            {"cli": "openai", "model": model},
         ],
         "mode": "quick",
         "rounds": 1,
@@ -96,18 +106,10 @@ async def run(question: str) -> int:
 
 def main() -> int:
     if len(sys.argv) < 2:
-        print('Usage: python scripts/test_council_gemini.py "Your question here"')
-        return 2
-
-    if not (ROOT / ".env").exists():
-        print("Missing .env in repo root.")
+        print('Usage: python scripts/test_council_vllm.py "Your question here"')
         return 2
 
     load_repo_env()
-
-    if not os.getenv("GEMINI_API_KEY"):
-        print("GEMINI_API_KEY is not set in .env.")
-        return 2
 
     question = " ".join(sys.argv[1:]).strip()
     if len(question) < 10:

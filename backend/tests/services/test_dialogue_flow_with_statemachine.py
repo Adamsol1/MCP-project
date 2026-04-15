@@ -21,7 +21,8 @@ class MockDialogueService:
 
     async def generate_clarifying_question(
         self, user_message, context, language="en"
-    ):  # noqa: ARG002
+    ):
+        del context
         if self.raise_on_clarifying:
             raise RuntimeError("Service unavailable")
         self.clarifying_calls.append(
@@ -42,7 +43,8 @@ class MockDialogueService:
         modifications=None,
         language=None,
         current_pir=None,
-    ):  # noqa: ARG002
+    ):
+        del context
         if self.raise_on_pir:
             raise RuntimeError("Service unavailable")
         self.pir_calls.append(
@@ -59,7 +61,8 @@ class MockDialogueService:
         context,
         modifications=None,
         language="en",
-    ):  # noqa: ARG002
+    ):
+        del context
         if self.raise_on_summary:
             raise RuntimeError("Service unavailable")
         self.summary_calls.append(
@@ -171,7 +174,7 @@ async def test_state_stays_pir_confirming_on_reject():
     assert result.action == "show_pir"
     assert dialogue_flow.state == DirectionState.PIR_CONFIRMING
     assert dialogue_flow.context.modifications == "focus more on TTPs"
-    assert mock_service.pir_calls[0]["language"] is None
+    assert mock_service.pir_calls[0]["language"] == "en"
     assert mock_service.pir_calls[0]["current_pir"] is None
 
 

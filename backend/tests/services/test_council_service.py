@@ -115,20 +115,20 @@ class TestCouncilService:
     """Test participant construction and runtime defaults."""
 
     def test_participant_construction(self):
-        """One gemini participant should be built per selected perspective."""
+        """One local LLM participant should be built per selected perspective."""
         service = CouncilService()
 
         participants = service.build_participants(["us", "neutral", "china"])
 
         assert [participant.cli for participant in participants] == [
-            "gemini",
-            "gemini",
-            "gemini",
+            "openai",
+            "openai",
+            "openai",
         ]
         assert [participant.model for participant in participants] == [
-            "gemini-2.5-flash",
-            "gemini-2.5-flash",
-            "gemini-2.5-flash",
+            service.DEFAULT_MODEL,
+            service.DEFAULT_MODEL,
+            service.DEFAULT_MODEL,
         ]
         assert participants[0].display_name == "US Strategic Analyst"
         assert "evidence quality" in participants[1].persona_prompt
@@ -153,8 +153,8 @@ class TestCouncilService:
 
         profile = service.runtime_profile
 
-        assert profile.adapter == "gemini"
-        assert profile.model == "gemini-2.5-flash"
+        assert profile.adapter == "openai"
+        assert profile.model == service.DEFAULT_MODEL
         assert profile.mode == "conference"
         assert profile.rounds == 2
         assert profile.timeout_per_round_seconds == 180
@@ -163,6 +163,16 @@ class TestCouncilService:
         assert profile.working_directory == str(tmp_path)
         assert profile.file_tree_injection_enabled is False
         assert profile.decision_graph_enabled is False
+
+    def test_engine_uses_local_openai_adapter_for_summary(self, tmp_path):
+        """Council summaries should use the same local OpenAI-compatible adapter."""
+        service = CouncilService(working_directory=tmp_path)
+        engine = service._build_engine(service.runtime_profile)
+
+        assert len(engine.summarizer_chain) == 1
+        _adapter, model, display_name = engine.summarizer_chain[0]
+        assert model == service.DEFAULT_MODEL
+        assert display_name == "openai summary model"
 
     @pytest.mark.asyncio
     async def test_run_council_returns_council_note(self, monkeypatch, tmp_path):
@@ -173,11 +183,11 @@ class TestCouncilService:
         processing_result = ProcessingPrototypeService().get_processing_result(
             "session-council"
         )
-        analysis_draft = await AnalysisPrototypeService().generate_draft(
+        analysis_draft, _ = await AnalysisPrototypeService().generate_draft(
             processing_result
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda profile: _FakeEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda _profile: _FakeEngine())
 
         result = await service.run_council(
             session_id="session-council",
@@ -208,11 +218,11 @@ class TestCouncilService:
         processing_result = ProcessingPrototypeService().get_processing_result(
             "session-council"
         )
-        analysis_draft = await AnalysisPrototypeService().generate_draft(
+        analysis_draft, _ = await AnalysisPrototypeService().generate_draft(
             processing_result
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda _profile: _ErrorEngine())
 
         with pytest.raises(RuntimeError, match="Council runtime failed:"):
             await service.run_council(

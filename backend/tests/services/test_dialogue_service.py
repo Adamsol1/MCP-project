@@ -65,7 +65,7 @@ class MockMCPClient:
         )
 
 
-class MockGeminiAgent:
+class MockToolCallingAgent:
     def __init__(self, mcp_client):  # noqa: ARG002
         pass
 
@@ -78,7 +78,7 @@ class MockAIOrchestrator:
 
 
 def _build_service(monkeypatch):
-    monkeypatch.setattr(dialogue_service_module, "GeminiAgent", MockGeminiAgent)
+    monkeypatch.setattr(dialogue_service_module, "ToolCallingAgent", MockToolCallingAgent)
     mcp_client = MockMCPClient()
     return DialogueService(mcp_client, MockAIOrchestrator()), mcp_client
 
