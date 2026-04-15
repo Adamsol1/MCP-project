@@ -74,14 +74,19 @@ class ProcessingContext(BaseModel):
     collected_data: str
 
 
-class PhaseReviewItem(BaseModel):
-    """One AI review attempt emitted with phase outputs."""
+class AnalysisContext(BaseModel):
+    """Context passed to the reviewer during the analysis phase."""
 
+    pir: str
+    processing_result: dict
+
+
+class PhaseReviewItem(BaseModel):
     phase: Literal["direction", "collection", "processing"]
     attempt: int
     reviewer_approved: bool
     reviewer_suggestions: str | None = None
-    sources_used: list[str] = Field(default_factory=list)
+    sources_used: list[str] = []
     generated_content: str | None = None
 
 

@@ -1,9 +1,8 @@
 """Analysis-stage council wrapper using app runtime defaults."""
 
+import logging
 import os
-import sys
-from pathlib import Path
-from types import SimpleNamespace
+from pathlib import Path  # used in __init__ for working_directory
 
 from src.mcp_client.client import MCPClient
 from src.models.analysis import (
@@ -15,26 +14,11 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.gemini_deliberation_adapter import GeminiDeliberationAdapter
+from src.services.council_personas import get_council_persona
+
+logger = logging.getLogger("app")
 
 _COUNCIL_MCP_URL = os.getenv("COUNCIL_MCP_URL", "http://127.0.0.1:8003/sse")
-
-_DISPLAY_NAMES: dict[Perspective, str] = {
-    Perspective.US: "US Strategic Analyst",
-    Perspective.NORWAY: "Norway Security Analyst",
-    Perspective.CHINA: "China Strategic Analyst",
-    Perspective.EU: "EU Policy Analyst",
-    Perspective.RUSSIA: "Russia Strategic Analyst",
-    Perspective.NEUTRAL: "Neutral Evidence Analyst",
-}
-
-COUNCIL_MCP_DIR = Path(__file__).resolve().parents[3] / "council_mcp"
-if str(COUNCIL_MCP_DIR) not in sys.path:
-    sys.path.insert(0, str(COUNCIL_MCP_DIR))
-
-from deliberation.engine import DeliberationEngine  # type: ignore  # noqa: E402
-from deliberation.transcript import TranscriptManager  # type: ignore  # noqa: E402
-from models.schema import DeliberateRequest, Participant  # type: ignore  # noqa: E402
 
 
 class CouncilService:
@@ -95,25 +79,20 @@ class CouncilService:
             normalized.append(perspective)
         return normalized
 
-    async def build_participants(self, selected_perspectives: list[str]) -> list[Participant]:
+    def build_participants(self, selected_perspectives: list[str]) -> list[dict]:
         normalized = self._normalize_perspectives(selected_perspectives)
         if len(normalized) < 2:
             raise ValueError("At least 2 perspectives are required for council deliberation")
 
         participants = []
-        async with self.mcp_client.connect():
-            for perspective in normalized:
-                persona_prompt = await self.mcp_client.get_prompt(
-                    f"council_persona_{perspective.value}"
-                )
-                participants.append(
-                    Participant(
-                        cli=self.DEFAULT_ADAPTER,
-                        model=self.DEFAULT_MODEL,
-                        display_name=_DISPLAY_NAMES[perspective],
-                        persona_prompt=persona_prompt,
-                    )
-                )
+        for perspective in normalized:
+            persona = get_council_persona(perspective)
+            participants.append({
+                "cli": self.DEFAULT_ADAPTER,
+                "model": self.DEFAULT_MODEL,
+                "display_name": persona.display_name,
+                "persona_prompt": persona.persona_prompt,
+            })
         return participants
 
     def build_question(
@@ -174,7 +153,7 @@ class CouncilService:
 
         return "\n".join(context_sections)
 
-    async def build_request(
+    def build_request(
         self,
         debate_point: str,
         selected_perspectives: list[str],
@@ -182,9 +161,9 @@ class CouncilService:
         analysis_draft: AnalysisDraft,
         council_settings: CouncilRunSettings | None = None,
         selected_findings=None,
-    ) -> DeliberateRequest:
+    ) -> dict:
         runtime_profile = self.resolve_runtime_profile(council_settings)
-        participants = await self.build_participants(selected_perspectives)
+        participants = self.build_participants(selected_perspectives)
         question = self.build_question(debate_point, selected_findings or [])
         context = self.build_context(
             processing_result=processing_result,
@@ -193,68 +172,27 @@ class CouncilService:
             selected_findings=selected_findings,
         )
 
-        return DeliberateRequest(
-            question=question,
-            participants=participants,
-            rounds=runtime_profile.rounds,
-            mode=runtime_profile.mode,
-            context=context,
-            working_directory=runtime_profile.working_directory,
-        )
+        return {
+            "question": question,
+            "participants": participants,
+            "rounds": runtime_profile.rounds,
+            "mode": runtime_profile.mode,
+            "context": context,
+            "working_directory": runtime_profile.working_directory,
+        }
 
-    def _build_engine(self, runtime_profile: CouncilRuntimeProfile):
-        adapter = GeminiDeliberationAdapter(timeout=180)
-        adapters = {self.DEFAULT_ADAPTER: adapter}
-        config = SimpleNamespace(
-            defaults=SimpleNamespace(
-                timeout_per_round=runtime_profile.timeout_per_round_seconds,
-                rounds=runtime_profile.rounds,
-            ),
-            deliberation=SimpleNamespace(
-                convergence_detection=SimpleNamespace(enabled=False),
-                file_tree=SimpleNamespace(
-                    enabled=runtime_profile.file_tree_injection_enabled,
-                    max_depth=0,
-                    max_files=0,
-                ),
-                tool_security=SimpleNamespace(
-                    exclude_patterns=[],
-                    max_file_size_bytes=1_048_576,
-                ),
-                vote_retry=SimpleNamespace(
-                    enabled=runtime_profile.vote_retry_enabled,
-                    max_retries=runtime_profile.vote_retry_attempts,
-                    min_response_length=100,
-                ),
-            ),
-            decision_graph=SimpleNamespace(
-                enabled=runtime_profile.decision_graph_enabled
-            ),
-        )
-        transcript_manager = TranscriptManager(output_dir=str(self.transcript_dir))
-        engine = DeliberationEngine(
-            adapters=adapters,
-            transcript_manager=transcript_manager,
-            config=config,
-        )
-        # App analysis-stage councils should debate from the prepared dossier only.
-        # Disabling tool access avoids prompt contamination from transcript/output files.
-        engine.tool_executor = None
-        engine.tool_execution_history = []
-        return engine
-
-    def _raise_if_runtime_failed(self, result) -> None:
-        responses = list(result.full_debate)
-        if not responses:
+    def _raise_if_runtime_failed(self, result: dict) -> None:
+        debates = result.get("full_debate", [])
+        if not debates:
             raise RuntimeError("Council runtime failed: no participant responses were produced")
 
-        if any(not entry.response.startswith("[ERROR:") for entry in responses):
+        if any(not entry.get("response", "").startswith("[ERROR:") for entry in debates):
             return
 
-        first_error = responses[0].response.strip("[]")
+        first_error = debates[0].get("response", "").strip("[]")
         if "API key" in first_error or "api key" in first_error:
             raise RuntimeError(
-                "Council runtime failed: Gemini API access is not configured correctly for the backend process."
+                "Council runtime failed: Gemini API access is not configured correctly."
             )
         raise RuntimeError(f"Council runtime failed: {first_error}")
 
@@ -269,13 +207,12 @@ class CouncilService:
         council_settings: CouncilRunSettings | None = None,
     ) -> CouncilNote:
         del session_id
-        runtime_profile = self.resolve_runtime_profile(council_settings)
         selected_findings = (
-            [finding for finding in processing_result.findings if finding.id in finding_ids]
+            [f for f in processing_result.findings if f.id in finding_ids]
             if finding_ids
             else processing_result.findings
         )
-        request = await self.build_request(
+        request = self.build_request(
             debate_point=debate_point,
             selected_perspectives=selected_perspectives,
             processing_result=processing_result,
@@ -284,31 +221,34 @@ class CouncilService:
             selected_findings=selected_findings,
         )
 
-        engine = self._build_engine(runtime_profile)
-        try:
-            result = await engine.execute(request)
-        except Exception as exc:  # pragma: no cover - adapter/runtime failure path
-            raise RuntimeError("Council deliberation failed") from exc
+        logger.info(f"[CouncilService] Calling deliberate tool via MCP at {_COUNCIL_MCP_URL}")
+        async with self.mcp_client.connect():
+            result = await self.mcp_client.call_tool("deliberate", request)
+
+        if not isinstance(result, dict):
+            raise RuntimeError(f"Unexpected response type from deliberate tool: {type(result)}")
+        if result.get("status") == "failed" or "error" in result:
+            raise RuntimeError(f"Council deliberation failed: {result.get('error', 'unknown error')}")
 
         self._raise_if_runtime_failed(result)
 
         return CouncilNote(
-            status=result.status,
-            question=request.question,
-            participants=result.participants,
-            rounds_completed=result.rounds_completed,
-            summary=result.summary.consensus,
-            key_agreements=result.summary.key_agreements,
-            key_disagreements=result.summary.key_disagreements,
-            final_recommendation=result.summary.final_recommendation,
+            status=result.get("status", "completed"),
+            question=request["question"],
+            participants=result.get("participants", []),
+            rounds_completed=result.get("rounds_completed", 0),
+            summary=result.get("summary", {}).get("consensus", ""),
+            key_agreements=result.get("summary", {}).get("key_agreements", []),
+            key_disagreements=result.get("summary", {}).get("key_disagreements", []),
+            final_recommendation=result.get("summary", {}).get("final_recommendation", ""),
             full_debate=[
                 CouncilTranscriptEntry(
-                    round=entry.round,
-                    participant=entry.participant,
-                    response=entry.response,
-                    timestamp=entry.timestamp,
+                    round=entry["round"],
+                    participant=entry["participant"],
+                    response=entry["response"],
+                    timestamp=entry.get("timestamp", ""),
                 )
-                for entry in result.full_debate
+                for entry in result.get("full_debate", [])
             ],
-            transcript_path=result.transcript_path or None,
+            transcript_path=result.get("transcript_path") or None,
         )
