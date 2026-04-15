@@ -24,6 +24,7 @@ from src.models.analysis import CouncilRunSettings
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.analysis_service import AnalysisService
+from src.services.analysis_session_store import AnalysisSessionStore
 from src.services.collection_service import CollectionService
 from src.services.collection_status import CollectionStatusTracker
 from src.services.council_service import CouncilService
@@ -33,7 +34,7 @@ from src.services.processing_prototype_service import ProcessingPrototypeService
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
-from src.services.state_machines.analysis_flow import AnalysisFlow
+from src.services.state_machines.analysis_flow import AnalysisFlow, AnalysisState
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.council_flow import CouncilFlow
 from src.services.state_machines.direction_flow import DirectionFlow, DirectionState
@@ -494,6 +495,9 @@ def _stage_phase_from_session_data(
 ) -> tuple[str, str]:
     if not session_data:
         return DirectionState.INITIAL.value, Phase.DIRECTION.value
+    analysis_flow = session_data.get("analysis_flow")
+    if isinstance(analysis_flow, dict) and analysis_flow.get("state"):
+        return str(analysis_flow["state"]), Phase.ANALYSIS.value
     processing_flow = session_data.get("processing_flow")
     if isinstance(processing_flow, dict) and processing_flow.get("state"):
         return str(processing_flow["state"]), Phase.PROCESSING.value
@@ -631,6 +635,41 @@ def _ensure_processing_flow(session: IntelligenceSession) -> ProcessingFlow:
     return session.processing_flow
 
 
+def _ensure_analysis_flow(session: IntelligenceSession) -> AnalysisFlow:
+    processing_flow = _ensure_processing_flow(session)
+    processing_flow.state = ProcessingState.COMPLETE
+    if session.analysis_flow is None:
+        session.analysis_flow = AnalysisFlow(
+            session_id=session.session_id,
+            pir=session.direction_flow.current_pir or processing_flow.pir or "",
+            research_logger=session.research_logger,
+        )
+    return session.analysis_flow
+
+
+def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> None:
+    analysis_flow = _ensure_analysis_flow(session)
+    if analysis_flow.analysis_result:
+        return
+    try:
+        state = AnalysisSessionStore().load(session.session_id)
+    except ValueError:
+        return
+    if not state or not state.processing_result or not state.analysis_draft:
+        return
+    analysis_flow.analysis_result = {
+        "processing_result": state.processing_result.model_dump(mode="json"),
+        "analysis_draft": state.analysis_draft.model_dump(mode="json"),
+        "latest_council_note": (
+            state.latest_council_note.model_dump(mode="json")
+            if state.latest_council_note
+            else None
+        ),
+        "collection_coverage": None,
+        "data_source": "session",
+    }
+
+
 def _apply_dev_restore_stage(
     session: IntelligenceSession, target_stage: str | None, target_phase: str | None
 ) -> None:
@@ -647,6 +686,8 @@ def _apply_dev_restore_stage(
             raise HTTPException(status_code=400, detail="Invalid direction stage") from exc
         session.collection_flow = None
         session.processing_flow = None
+        session.analysis_flow = None
+        session.council_flow = None
         session.direction_flow.force_state(
             direction_state,
             current_pir=session.direction_flow.current_pir,
@@ -661,11 +702,15 @@ def _apply_dev_restore_stage(
             raise HTTPException(status_code=400, detail="Invalid collection stage") from exc
         collection_flow = _ensure_collection_flow(session)
         session.processing_flow = None
+        session.analysis_flow = None
+        session.council_flow = None
         collection_flow.state = collection_state
         return
 
     if phase == Phase.PROCESSING.value:
         processing_flow = _ensure_processing_flow(session)
+        session.analysis_flow = None
+        session.council_flow = None
         if target_stage == DirectionState.COMPLETE.value:
             processing_flow.state = ProcessingState.COMPLETE
             return
@@ -673,6 +718,23 @@ def _apply_dev_restore_stage(
             processing_flow.state = ProcessingState(target_stage)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail="Invalid processing stage") from exc
+        return
+
+    if phase == Phase.ANALYSIS.value:
+        analysis_flow = _ensure_analysis_flow(session)
+        if target_stage == AnalysisState.COMPLETE.value:
+            analysis_flow.state = AnalysisState.COMPLETE
+            _hydrate_analysis_flow_from_store(session)
+            if session.council_flow is None:
+                session.council_flow = CouncilFlow(
+                    session_id=session.session_id,
+                    research_logger=session.research_logger,
+                )
+            return
+        try:
+            analysis_flow.state = AnalysisState(target_stage)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid analysis stage") from exc
 
 
 def _try_parse_json(raw: str | None) -> Any:
@@ -750,6 +812,33 @@ def _processing_payload(session_id: str) -> dict[str, Any] | None:
     except Exception:
         return None
     return result.model_dump(mode="json")
+
+
+def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | None:
+    if session.analysis_flow and session.analysis_flow.analysis_result:
+        payload = dict(session.analysis_flow.analysis_result)
+        payload.setdefault("latest_council_note", None)
+        payload.setdefault("collection_coverage", None)
+        payload.setdefault("data_source", "session")
+        return payload
+
+    try:
+        state = AnalysisSessionStore().load(session.session_id)
+    except ValueError:
+        return None
+    if not state or not state.processing_result or not state.analysis_draft:
+        return None
+    return {
+        "processing_result": state.processing_result.model_dump(mode="json"),
+        "analysis_draft": state.analysis_draft.model_dump(mode="json"),
+        "latest_council_note": (
+            state.latest_council_note.model_dump(mode="json")
+            if state.latest_council_note
+            else None
+        ),
+        "collection_coverage": None,
+        "data_source": "session",
+    }
 
 
 def _summary_payload(session: IntelligenceSession) -> dict[str, str]:
@@ -833,6 +922,18 @@ def _build_dev_hydrated_messages(
                     "sender": "system",
                     "type": "processing",
                     "data": processing_data,
+                }
+            )
+
+    if target_phase == Phase.ANALYSIS.value:
+        analysis_data = _analysis_payload(session)
+        if analysis_data:
+            messages.append(
+                {
+                    "text": "Analysis draft is ready.",
+                    "sender": "system",
+                    "type": "analysis",
+                    "data": analysis_data,
                 }
             )
 

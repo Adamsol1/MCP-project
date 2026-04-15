@@ -378,7 +378,7 @@ export function Sidebar({
                         <button
                           type="button"
                           onClick={() =>
-                            restoreSnapshot("complete", "processing")
+                            restoreSnapshot("complete", "analysis")
                           }
                           disabled={isDevSnapshotsLoading}
                           className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
