@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
-import type { DialogueStage } from "../../types/dialogue";
+import type { DialoguePhase, DialogueStage } from "../../types/dialogue";
 import { useT } from "../../i18n/useT";
+import type { DialogueDevSnapshot } from "../../services/dialogue/dialogue";
 
 /** Props for the Sidebar component. */
 interface SidebarProps {
@@ -29,6 +30,18 @@ interface SidebarProps {
   onDevSyncStage?: () => void;
   /** DEV: Reset session stage to initial. */
   onDevResetStage?: () => void;
+  /** DEV: Saved backend runs that can be restored into the active session. */
+  devSnapshots?: DialogueDevSnapshot[];
+  /** DEV: Whether saved runs are being loaded/restored. */
+  isDevSnapshotsLoading?: boolean;
+  /** DEV: Refresh saved backend runs. */
+  onDevRefreshSnapshots?: () => void;
+  /** DEV: Restore a saved run into the active session at a specific stage. */
+  onDevRestoreSnapshot?: (
+    sourceSessionId: string,
+    stage: DialogueStage,
+    phase: DialoguePhase,
+  ) => void;
   /** Called when the user clicks the settings gear icon. */
   onOpenSettings: () => void;
   /** Whether the sidebar is in its narrow rail mode (controlled by parent). */
@@ -73,6 +86,10 @@ export function Sidebar({
   onDevJumpToStage,
   onDevSyncStage,
   onDevResetStage,
+  devSnapshots = [],
+  isDevSnapshotsLoading = false,
+  onDevRefreshSnapshots,
+  onDevRestoreSnapshot,
   onOpenSettings,
   isCollapsed = false,
   showExpandedContent = true,
@@ -98,6 +115,7 @@ export function Sidebar({
   const [isDevToolsMinimized, setIsDevToolsMinimized] = useState(true);
   const [isCollectionPhaseMinimized, setIsCollectionPhaseMinimized] =
     useState(true);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
 
   // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -119,6 +137,22 @@ export function Sidebar({
     document.addEventListener("mousedown", closeMenu);
     return () => document.removeEventListener("mousedown", closeMenu);
   }, [openMenuId]);
+
+  useEffect(() => {
+    if (selectedSnapshotId) return;
+    if (devSnapshots.length > 0) {
+      setSelectedSnapshotId(devSnapshots[0].session_id);
+    }
+  }, [devSnapshots, selectedSnapshotId]);
+
+  const selectedSnapshot =
+    devSnapshots.find((snapshot) => snapshot.session_id === selectedSnapshotId) ??
+    devSnapshots[0];
+
+  const restoreSnapshot = (stage: DialogueStage, phase: DialoguePhase) => {
+    if (!selectedSnapshot || !onDevRestoreSnapshot) return;
+    onDevRestoreSnapshot(selectedSnapshot.session_id, stage, phase);
+  };
 
   return (
     <aside
@@ -293,6 +327,94 @@ export function Sidebar({
                 >
                   {t.showCollectionApproval}
                 </button>
+              )}
+              {onDevRestoreSnapshot && (
+                <div className="mt-2 rounded border border-border-muted p-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-text-secondary">
+                      {t.previousRun}
+                    </label>
+                    {onDevRefreshSnapshots && (
+                      <button
+                        type="button"
+                        onClick={onDevRefreshSnapshots}
+                        disabled={isDevSnapshotsLoading}
+                        className="rounded px-1.5 py-0.5 text-xs text-text-secondary hover:bg-surface-elevated disabled:opacity-50"
+                      >
+                        {isDevSnapshotsLoading ? t.loading : t.refresh}
+                      </button>
+                    )}
+                  </div>
+                  {devSnapshots.length > 0 ? (
+                    <>
+                      <select
+                        value={selectedSnapshot?.session_id ?? ""}
+                        onChange={(event) =>
+                          setSelectedSnapshotId(event.target.value)
+                        }
+                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
+                      >
+                        {devSnapshots.map((snapshot) => (
+                          <option
+                            key={snapshot.session_id}
+                            value={snapshot.session_id}
+                          >
+                            {snapshot.title || snapshot.session_id}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 truncate font-mono text-[10px] text-text-muted">
+                        {selectedSnapshot?.session_id}
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("pir_confirming", "direction")
+                          }
+                          disabled={isDevSnapshotsLoading}
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadPir}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("reviewing", "collection")
+                          }
+                          disabled={isDevSnapshotsLoading}
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadCollection}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("reviewing", "processing")
+                          }
+                          disabled={isDevSnapshotsLoading}
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadProcessing}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("complete", "processing")
+                          }
+                          disabled={isDevSnapshotsLoading}
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadAnalysis}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-text-muted">
+                      {isDevSnapshotsLoading ? t.loading : t.noPreviousRuns}
+                    </p>
+                  )}
+                </div>
               )}
               {onDevJumpToStage && (
                 <div className="mt-1">

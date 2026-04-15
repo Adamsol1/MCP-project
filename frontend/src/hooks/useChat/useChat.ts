@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getDevDialogueState,
+  listDevDialogueSnapshots,
   resetDevDialogueState,
+  restoreDevDialogueSnapshot,
   sendMessage,
   setDevDialogueState,
   type CouncilRunSettings,
   type DialogueApiResponse,
+  type DialogueDevSnapshot,
   type DialogueSendOptions,
 } from "../../services/dialogue/dialogue";
 import type {
@@ -30,6 +33,8 @@ import type {
 } from "../../types/conversation";
 import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+
+let didRequestInitialDevSnapshots = false;
 
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
@@ -428,8 +433,13 @@ function getFeedbackPrompt(stage: DialogueStage): string {
 }
 
 export function useChat(initialPerspectives?: string[]) {
-  const { activeConversation, createNewConversation, addMessage, setStage } =
-    useConversation();
+  const {
+    activeConversation,
+    createNewConversation,
+    addMessage,
+    replaceMessages,
+    setStage,
+  } = useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
   const { setReviewActivity } = useWorkspace();
@@ -445,6 +455,8 @@ export function useChat(initialPerspectives?: string[]) {
   const [pendingGatherMoreText, setPendingGatherMoreText] = useState<
     string | null
   >(null);
+  const [devSnapshots, setDevSnapshots] = useState<DialogueDevSnapshot[]>([]);
+  const [isDevSnapshotsLoading, setIsDevSnapshotsLoading] = useState(false);
 
   const messages = useMemo(
     () => activeConversation?.messages ?? [],
@@ -872,6 +884,7 @@ export function useChat(initialPerspectives?: string[]) {
     }
   };
 
+<<<<<<< Updated upstream
   const sendCouncilRequest = async (params: {
     debatePoint: string;
     findingIds: string[];
@@ -898,6 +911,76 @@ export function useChat(initialPerspectives?: string[]) {
       applyResponse(response, activeConversation.id, "idle", null, "analysis");
     } finally {
       setIsLoading(false);
+=======
+  const refreshDevSnapshots = async () => {
+    setIsDevSnapshotsLoading(true);
+    try {
+      const snapshots = await listDevDialogueSnapshots();
+      setDevSnapshots(snapshots);
+      if (snapshots.length === 0) {
+        info("No previous backend runs found.");
+      }
+    } catch (e) {
+      const status =
+        typeof e === "object" && e !== null && "response" in e
+          ? (e as { response?: { status?: number } }).response?.status
+          : undefined;
+      error(
+        status === 404
+          ? "Previous-run dev endpoint not found. Restart the backend."
+          : "Failed to load previous runs",
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (didRequestInitialDevSnapshots) return;
+    didRequestInitialDevSnapshots = true;
+    void refreshDevSnapshots();
+    // Dev snapshot loading is intentionally one-shot on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const restoreDevSnapshot = async (
+    sourceSessionId: string,
+    targetStage: DialogueStage,
+    targetPhase: DialoguePhase,
+  ) => {
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
+    setIsDevSnapshotsLoading(true);
+    try {
+      const response = await restoreDevDialogueSnapshot(
+        sourceSessionId,
+        conversation.sessionId,
+        targetStage,
+        targetPhase,
+      );
+      replaceMessages(
+        conversation.id,
+        response.messages.map((message) => ({
+          ...message,
+          id: crypto.randomUUID(),
+        })),
+      );
+      setStage(
+        conversation.id,
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
+      success(`Loaded previous run: ${sourceSessionId.slice(0, 8)}`);
+    } catch (e) {
+      error(
+        `Failed to restore previous run: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+>>>>>>> Stashed changes
     }
   };
 
@@ -923,6 +1006,10 @@ export function useChat(initialPerspectives?: string[]) {
     jumpToDevStage,
     syncDevStage,
     resetDevStage,
+    devSnapshots,
+    isDevSnapshotsLoading,
+    refreshDevSnapshots,
+    restoreDevSnapshot,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,

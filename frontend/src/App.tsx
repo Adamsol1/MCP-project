@@ -81,6 +81,10 @@ function AppShell() {
     jumpToDevStage,
     syncDevStage,
     resetDevStage,
+    devSnapshots,
+    isDevSnapshotsLoading,
+    refreshDevSnapshots,
+    restoreDevSnapshot,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
@@ -303,6 +307,10 @@ function AppShell() {
             onDevJumpToStage={jumpToDevStage}
             onDevSyncStage={syncDevStage}
             onDevResetStage={resetDevStage}
+            devSnapshots={devSnapshots}
+            isDevSnapshotsLoading={isDevSnapshotsLoading}
+            onDevRefreshSnapshots={refreshDevSnapshots}
+            onDevRestoreSnapshot={restoreDevSnapshot}
             onOpenSettings={() => setIsSettingsOpen(true)}
             isCollapsed={isCollapsed}
             showExpandedContent={showExpandedContent}

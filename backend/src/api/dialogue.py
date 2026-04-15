@@ -10,6 +10,9 @@ Sessions are stored in memory in `_sessions`.
 import json
 import logging
 import os
+import re
+import shutil
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -17,7 +20,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
+<<<<<<< Updated upstream
 from src.models.analysis import CouncilRunSettings
+=======
+>>>>>>> Stashed changes
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
 from src.services.collection_service import CollectionService
@@ -49,6 +55,12 @@ router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
 
 _SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
+_BACKEND_DIR = Path(__file__).resolve().parents[2]
+_DATA_DIR = _BACKEND_DIR / "data"
+_SESSION_DATA_DIR = _DATA_DIR / "sessions"
+_OUTPUTS_DIR = _DATA_DIR / "outputs"
+_COLLECTION_STATUS_DIR = _DATA_DIR / "collection_status"
+_SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def ensure_sessions_dir() -> None:
@@ -242,6 +254,27 @@ class DialogueDevStateRequest(BaseModel):
     current_pir: str | None = None
 
 
+class DialogueDevSnapshot(BaseModel):
+    session_id: str
+    title: str
+    stage: str
+    phase: str
+    updated_at: str | None = None
+    artifacts: dict[str, bool]
+
+
+class DialogueDevRestoreRequest(BaseModel):
+    source_session_id: str
+    target_session_id: str
+    target_stage: str | None = None
+    target_phase: str | None = None
+
+
+class DialogueDevRestoreResponse(DialogueDevStateResponse):
+    source_session_id: str
+    messages: list[dict[str, Any]]
+
+
 def evict_session(session_id: str) -> None:
     """
     Remove a session from the in-memory cache and delete its state file.
@@ -369,11 +402,16 @@ def _build_dev_state_response(
 ) -> DialogueDevStateResponse:
     active_stage, active_phase = _get_active_stage_and_phase(session)
     state = session.direction_flow.get_debug_state()
+    sub_state = (
+        state["sub_state"]
+        if active_phase == Phase.DIRECTION
+        else _default_dev_sub_state(active_stage)
+    )
     return DialogueDevStateResponse(
         session_id=session_id,
         stage=active_stage,
         phase=active_phase.value,
-        sub_state=state["sub_state"],
+        sub_state=sub_state,
         question_count=state["question_count"],
         max_questions=state["max_questions"],
         missing_context_fields=state["missing_context_fields"],
@@ -381,6 +419,427 @@ def _build_dev_state_response(
         awaiting_user_decision=state["awaiting_user_decision"],
         has_modifications=state["has_modifications"],
     )
+
+
+def _default_dev_sub_state(stage: str) -> str | None:
+    if stage in {
+        DirectionState.SUMMARY_CONFIRMING.value,
+        DirectionState.PIR_CONFIRMING.value,
+        CollectionState.PLAN_CONFIRMING.value,
+        CollectionState.REVIEWING.value,
+        ProcessingState.PROCESSING.value,
+        ProcessingState.REVIEWING.value,
+    }:
+        return _SUB_STATE_AWAITING_DECISION
+    return None
+
+
+def _validate_dev_session_id(session_id: str) -> str:
+    if not _SESSION_ID_RE.fullmatch(session_id):
+        raise HTTPException(status_code=400, detail="Invalid session_id")
+    return session_id
+
+
+def _safe_child(root: Path, *parts: str) -> Path:
+    root_resolved = root.resolve()
+    path = root_resolved.joinpath(*parts).resolve()
+    if path != root_resolved and root_resolved not in path.parents:
+        raise HTTPException(status_code=400, detail="Invalid artifact path")
+    return path
+
+
+def _read_json_file(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _latest_mtime(paths: list[Path]) -> str | None:
+    existing = [path for path in paths if path.exists()]
+    if not existing:
+        return None
+    return datetime.fromtimestamp(
+        max(path.stat().st_mtime for path in existing), tz=UTC
+    ).isoformat()
+
+
+def _session_artifact_paths(session_id: str) -> dict[str, Path]:
+    return {
+        "session": _safe_child(_SESSIONS_DIR, f"{session_id}.json"),
+        "analysis": _safe_child(_SESSIONS_DIR, f"{session_id}.analysis.json"),
+        "data": _safe_child(_SESSION_DATA_DIR, session_id),
+        "collection_status": _safe_child(
+            _COLLECTION_STATUS_DIR, f"{session_id}.json"
+        ),
+        "research_log": _safe_child(
+            _OUTPUTS_DIR, f"research_log_{session_id}.jsonl"
+        ),
+        "reasoning_log": _safe_child(
+            _OUTPUTS_DIR, f"reasoning_log_{session_id}.json"
+        ),
+    }
+
+
+def _snapshot_title(session_id: str, session_data: dict[str, Any] | None) -> str:
+    context = (session_data or {}).get("direction_flow", {}).get("context", {})
+    initial_query = context.get("initial_query")
+    if isinstance(initial_query, str) and initial_query.strip():
+        return initial_query.strip()[:90]
+    return session_id
+
+
+def _stage_phase_from_session_data(
+    session_data: dict[str, Any] | None,
+) -> tuple[str, str]:
+    if not session_data:
+        return DirectionState.INITIAL.value, Phase.DIRECTION.value
+    processing_flow = session_data.get("processing_flow")
+    if isinstance(processing_flow, dict) and processing_flow.get("state"):
+        return str(processing_flow["state"]), Phase.PROCESSING.value
+    collection_flow = session_data.get("collection_flow")
+    if isinstance(collection_flow, dict) and collection_flow.get("state"):
+        return str(collection_flow["state"]), Phase.COLLECTION.value
+    direction_flow = session_data.get("direction_flow")
+    if isinstance(direction_flow, dict) and direction_flow.get("state"):
+        return str(direction_flow["state"]), Phase.DIRECTION.value
+    return DirectionState.INITIAL.value, Phase.DIRECTION.value
+
+
+def _build_dev_snapshot(session_id: str) -> DialogueDevSnapshot:
+    paths = _session_artifact_paths(session_id)
+    session_data = _read_json_file(paths["session"])
+    stage, phase = _stage_phase_from_session_data(session_data)
+    processed_path = paths["data"] / "processed.json"
+    collected_path = paths["data"] / "collected.json"
+    artifacts = {
+        "session": paths["session"].exists(),
+        "analysis": paths["analysis"].exists(),
+        "collection": collected_path.exists(),
+        "processing": processed_path.exists(),
+        "collection_status": paths["collection_status"].exists(),
+        "research_log": paths["research_log"].exists(),
+        "reasoning_log": paths["reasoning_log"].exists(),
+    }
+    updated_at = _latest_mtime(
+        [
+            paths["session"],
+            paths["analysis"],
+            collected_path,
+            processed_path,
+            paths["collection_status"],
+            paths["research_log"],
+            paths["reasoning_log"],
+        ]
+    )
+    return DialogueDevSnapshot(
+        session_id=session_id,
+        title=_snapshot_title(session_id, session_data),
+        stage=stage,
+        phase=phase,
+        updated_at=updated_at,
+        artifacts=artifacts,
+    )
+
+
+def _replace_session_id_in_text(path: Path, source_id: str, target_id: str) -> None:
+    text = path.read_text(encoding="utf-8")
+    path.write_text(text.replace(source_id, target_id), encoding="utf-8")
+
+
+def _copy_text_artifact(
+    source_path: Path, target_path: Path, source_id: str, target_id: str
+) -> None:
+    if not source_path.exists():
+        return
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
+    _replace_session_id_in_text(target_path, source_id, target_id)
+
+
+def _copy_directory_artifact(
+    source_path: Path, target_path: Path, source_id: str, target_id: str
+) -> None:
+    if not source_path.exists():
+        return
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    if target_path.exists():
+        shutil.rmtree(target_path)
+    shutil.copytree(source_path, target_path)
+    for child in target_path.rglob("*"):
+        if child.is_file() and child.suffix.lower() in {".json", ".jsonl", ".md", ".txt"}:
+            _replace_session_id_in_text(child, source_id, target_id)
+
+
+def _clone_dev_artifacts(source_id: str, target_id: str) -> None:
+    source_paths = _session_artifact_paths(source_id)
+    target_paths = _session_artifact_paths(target_id)
+    if not source_paths["session"].exists():
+        raise HTTPException(status_code=404, detail="Source session not found")
+
+    _copy_text_artifact(
+        source_paths["session"], target_paths["session"], source_id, target_id
+    )
+    _copy_text_artifact(
+        source_paths["analysis"], target_paths["analysis"], source_id, target_id
+    )
+    _copy_text_artifact(
+        source_paths["collection_status"],
+        target_paths["collection_status"],
+        source_id,
+        target_id,
+    )
+    _copy_text_artifact(
+        source_paths["research_log"],
+        target_paths["research_log"],
+        source_id,
+        target_id,
+    )
+    _copy_text_artifact(
+        source_paths["reasoning_log"],
+        target_paths["reasoning_log"],
+        source_id,
+        target_id,
+    )
+    _copy_directory_artifact(
+        source_paths["data"], target_paths["data"], source_id, target_id
+    )
+
+
+def _ensure_collection_flow(session: IntelligenceSession) -> CollectionFlow:
+    if session.collection_flow is None:
+        session.collection_flow = CollectionFlow(
+            session_id=session.session_id,
+            pir=session.direction_flow.current_pir or "",
+            direction_context=session.direction_flow.context,
+            research_logger=session.research_logger,
+        )
+    session.direction_flow.state = DirectionState.COMPLETE
+    return session.collection_flow
+
+
+def _ensure_processing_flow(session: IntelligenceSession) -> ProcessingFlow:
+    collection_flow = _ensure_collection_flow(session)
+    collection_flow.state = CollectionState.COMPLETE
+    if session.processing_flow is None:
+        session.processing_flow = ProcessingFlow(
+            session_id=session.session_id,
+            pir=session.direction_flow.current_pir or collection_flow.pir or "",
+            direction_context=session.direction_flow.context,
+            research_logger=session.research_logger,
+        )
+    return session.processing_flow
+
+
+def _apply_dev_restore_stage(
+    session: IntelligenceSession, target_stage: str | None, target_phase: str | None
+) -> None:
+    if not target_stage:
+        return
+    phase = target_phase or _stage_phase_from_session_data(
+        _read_json_file(_session_artifact_paths(session.session_id)["session"])
+    )[1]
+
+    if phase == Phase.DIRECTION.value:
+        try:
+            direction_state = DirectionState(target_stage)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid direction stage") from exc
+        session.collection_flow = None
+        session.processing_flow = None
+        session.direction_flow.force_state(
+            direction_state,
+            current_pir=session.direction_flow.current_pir,
+            sub_state=_default_dev_sub_state(direction_state.value),
+        )
+        return
+
+    if phase == Phase.COLLECTION.value:
+        try:
+            collection_state = CollectionState(target_stage)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid collection stage") from exc
+        collection_flow = _ensure_collection_flow(session)
+        session.processing_flow = None
+        collection_flow.state = collection_state
+        return
+
+    if phase == Phase.PROCESSING.value:
+        processing_flow = _ensure_processing_flow(session)
+        if target_stage == DirectionState.COMPLETE.value:
+            processing_flow.state = ProcessingState.COMPLETE
+            return
+        try:
+            processing_flow.state = ProcessingState(target_stage)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="Invalid processing stage") from exc
+
+
+def _try_parse_json(raw: str | None) -> Any:
+    if not raw:
+        return None
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        try:
+            return json.loads(raw, strict=False)
+        except json.JSONDecodeError:
+            pass
+        match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.I)
+        if match:
+            try:
+                return json.loads(match.group(1))
+            except json.JSONDecodeError:
+                try:
+                    return json.loads(match.group(1), strict=False)
+                except json.JSONDecodeError:
+                    return None
+    return None
+
+
+def _latest_attempt(path: Path) -> str | None:
+    data = _read_json_file(path)
+    attempts = data.get("attempts") if data else None
+    if isinstance(attempts, list) and attempts:
+        latest = attempts[-1]
+        return latest if isinstance(latest, str) else json.dumps(latest)
+    return None
+
+
+def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
+    collected_path = _session_artifact_paths(session_id)["data"] / "collected.json"
+    parsed = _try_parse_json(_latest_attempt(collected_path))
+    if not isinstance(parsed, dict):
+        return None
+    collected_data = parsed.get("collected_data")
+    if not isinstance(collected_data, list):
+        return None
+
+    summaries: dict[str, dict[str, Any]] = {}
+    for item in collected_data:
+        if not isinstance(item, dict):
+            continue
+        source = str(item.get("source") or "unknown")
+        summary = summaries.setdefault(
+            source,
+            {
+                "display_name": source,
+                "count": 0,
+                "resource_ids": [],
+                "has_content": False,
+            },
+        )
+        summary["count"] += 1
+        resource_id = item.get("resource_id")
+        if resource_id and resource_id not in summary["resource_ids"]:
+            summary["resource_ids"].append(resource_id)
+        if item.get("content"):
+            summary["has_content"] = True
+
+    return {
+        "collected_data": collected_data,
+        "source_summary": list(summaries.values()),
+    }
+
+
+def _processing_payload(session_id: str) -> dict[str, Any] | None:
+    try:
+        from src.services.processing_prototype_service import ProcessingPrototypeService
+
+        result = ProcessingPrototypeService().get_processing_result(session_id)
+    except Exception:
+        return None
+    return result.model_dump(mode="json")
+
+
+def _summary_payload(session: IntelligenceSession) -> dict[str, str]:
+    context = session.direction_flow.context
+    lines = [
+        f"Scope: {context.scope or 'n/a'}",
+        f"Timeframe: {context.timeframe or 'n/a'}",
+        "Targets: "
+        + (", ".join(context.target_entities) if context.target_entities else "n/a"),
+        "Threat actors: "
+        + (", ".join(context.threat_actors) if context.threat_actors else "n/a"),
+        f"Priority focus: {context.priority_focus or 'n/a'}",
+    ]
+    return {"summary": "\n".join(lines)}
+
+
+def _build_dev_hydrated_messages(
+    session: IntelligenceSession, target_stage: str, target_phase: str
+) -> list[dict[str, Any]]:
+    messages: list[dict[str, Any]] = []
+    initial_query = session.direction_flow.context.initial_query
+    if initial_query:
+        messages.append({"text": initial_query, "sender": "user"})
+
+    messages.append(
+        {
+            "text": json.dumps(_summary_payload(session)),
+            "sender": "system",
+            "type": "summary",
+            "data": _summary_payload(session),
+        }
+    )
+
+    include_pir = target_phase in {
+        Phase.DIRECTION.value,
+        Phase.COLLECTION.value,
+        Phase.PROCESSING.value,
+        Phase.ANALYSIS.value,
+    } and target_stage != DirectionState.SUMMARY_CONFIRMING.value
+    if include_pir and session.direction_flow.current_pir:
+        pir_data = _try_parse_json(session.direction_flow.current_pir)
+        messages.append(
+            {
+                "text": session.direction_flow.current_pir,
+                "sender": "system",
+                "type": "pir",
+                "data": pir_data if isinstance(pir_data, dict) else None,
+            }
+        )
+
+    if target_phase in {Phase.COLLECTION.value, Phase.PROCESSING.value, Phase.ANALYSIS.value}:
+        if session.collection_flow and session.collection_flow.collection_plan:
+            messages.append(
+                {
+                    "text": session.collection_flow.collection_plan,
+                    "sender": "system",
+                    "type": "plan",
+                    "data": {
+                        "plan": session.collection_flow.collection_plan,
+                        "suggested_sources": session.collection_flow.selected_sources,
+                    },
+                }
+            )
+        collection_data = _collection_display_payload(session.session_id)
+        if collection_data:
+            messages.append(
+                {
+                    "text": "Collection complete",
+                    "sender": "system",
+                    "type": "collection",
+                    "data": collection_data,
+                }
+            )
+
+    if target_phase in {Phase.PROCESSING.value, Phase.ANALYSIS.value}:
+        processing_data = _processing_payload(session.session_id)
+        if processing_data:
+            messages.append(
+                {
+                    "text": "Processing complete - results are ready for review.",
+                    "sender": "system",
+                    "type": "processing",
+                    "data": processing_data,
+                }
+            )
+
+    return messages
 
 
 def _get_mcp_client() -> MCPClient:
@@ -711,6 +1170,75 @@ async def get_dev_state(session_id: str) -> DialogueDevStateResponse:
     _ensure_dev_tools_enabled()
     session = _get_or_create_session(session_id)
     return _build_dev_state_response(session_id, session)
+
+
+@router.get("/dev/snapshots")
+async def list_dev_snapshots() -> list[DialogueDevSnapshot]:
+    """DEV endpoint: list saved sessions with reusable artifacts."""
+    _ensure_dev_tools_enabled()
+    ensure_sessions_dir()
+    session_ids: set[str] = set()
+    for path in _SESSIONS_DIR.glob("*.json"):
+        if path.name.endswith(".analysis.json"):
+            continue
+        session_ids.add(path.stem)
+    if _SESSION_DATA_DIR.exists():
+        session_ids.update(path.name for path in _SESSION_DATA_DIR.iterdir() if path.is_dir())
+    if _OUTPUTS_DIR.exists():
+        for path in _OUTPUTS_DIR.glob("research_log_*.jsonl"):
+            session_ids.add(path.name.removeprefix("research_log_").removesuffix(".jsonl"))
+        for path in _OUTPUTS_DIR.glob("reasoning_log_*.json"):
+            session_ids.add(path.name.removeprefix("reasoning_log_").removesuffix(".json"))
+
+    snapshots = [
+        _build_dev_snapshot(session_id)
+        for session_id in session_ids
+        if _SESSION_ID_RE.fullmatch(session_id)
+    ]
+    snapshots = [
+        snapshot
+        for snapshot in snapshots
+        if any(
+            snapshot.artifacts.get(key, False)
+            for key in (
+                "analysis",
+                "collection",
+                "processing",
+                "research_log",
+                "reasoning_log",
+            )
+        )
+    ]
+    return sorted(
+        snapshots,
+        key=lambda item: item.updated_at or "",
+        reverse=True,
+    )
+
+
+@router.post("/dev/restore")
+async def restore_dev_snapshot(
+    request: DialogueDevRestoreRequest,
+) -> DialogueDevRestoreResponse:
+    """DEV endpoint: clone prior session data/logs into the active session."""
+    _ensure_dev_tools_enabled()
+    source_id = _validate_dev_session_id(request.source_session_id)
+    target_id = _validate_dev_session_id(request.target_session_id)
+
+    if source_id != target_id:
+        _clone_dev_artifacts(source_id, target_id)
+    _sessions.pop(target_id, None)
+    session = _get_or_create_session(target_id)
+    _apply_dev_restore_stage(session, request.target_stage, request.target_phase)
+    _save_session(session)
+
+    state = _build_dev_state_response(target_id, session)
+    messages = _build_dev_hydrated_messages(session, state.stage, state.phase)
+    return DialogueDevRestoreResponse(
+        **state.model_dump(),
+        source_session_id=source_id,
+        messages=messages,
+    )
 
 
 @router.post("/dev/state")

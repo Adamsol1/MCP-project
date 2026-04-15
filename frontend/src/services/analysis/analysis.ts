@@ -4,8 +4,7 @@ import type {
   CouncilNote,
   RunAnalysisCouncilRequest,
 } from "../../types/analysis";
-
-const API_BACKEND_URL = "http://localhost:8000";
+import { API_BACKEND_URL } from "../apiConfig";
 
 // TODO: sjekk om kan fjerne — disse kalles ikke lenger, AnalysisPrototypeView leser fra Message.data
 

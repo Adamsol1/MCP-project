@@ -5,10 +5,15 @@ import type {
   DialogueStage,
   DialogueSubState,
 } from "../../types/dialogue";
+<<<<<<< Updated upstream
 import type { PhaseReviewItem } from "../../types/conversation";
 
 /** Base URL for the backend REST API. */
 const API_BACKEND_URL = "http://localhost:8000";
+=======
+import type { Message, PhaseReviewItem } from "../../types/conversation";
+import { API_BACKEND_URL } from "../apiConfig";
+>>>>>>> Stashed changes
 
 export interface DialogueApiResponse {
   question: string;
@@ -47,6 +52,22 @@ export interface DialogueDevStateResponse {
   has_sufficient_context: boolean;
   awaiting_user_decision: boolean;
   has_modifications: boolean;
+}
+
+export interface DialogueDevSnapshot {
+  session_id: string;
+  title: string;
+  stage: DialogueStage;
+  phase: DialoguePhase;
+  updated_at: string | null;
+  artifacts: Record<string, boolean>;
+}
+
+export type DialogueDevHydratedMessage = Omit<Message, "id">;
+
+export interface DialogueDevRestoreResponse extends DialogueDevStateResponse {
+  source_session_id: string;
+  messages: DialogueDevHydratedMessage[];
 }
 
 /**
@@ -132,6 +153,31 @@ export async function getDevDialogueState(sessionId: string) {
     `${API_BACKEND_URL}/api/dialogue/dev/state`,
     {
       params: { session_id: sessionId },
+    },
+  );
+  return httpResponse.data;
+}
+
+export async function listDevDialogueSnapshots() {
+  const httpResponse = await axios.get<DialogueDevSnapshot[]>(
+    `${API_BACKEND_URL}/api/dialogue/dev/snapshots`,
+  );
+  return httpResponse.data;
+}
+
+export async function restoreDevDialogueSnapshot(
+  sourceSessionId: string,
+  targetSessionId: string,
+  targetStage: DialogueStage,
+  targetPhase: DialoguePhase,
+) {
+  const httpResponse = await axios.post<DialogueDevRestoreResponse>(
+    `${API_BACKEND_URL}/api/dialogue/dev/restore`,
+    {
+      source_session_id: sourceSessionId,
+      target_session_id: targetSessionId,
+      target_stage: targetStage,
+      target_phase: targetPhase,
     },
   );
   return httpResponse.data;
