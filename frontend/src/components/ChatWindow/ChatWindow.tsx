@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ToastContainer } from "../Toast";
 import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
@@ -480,7 +480,13 @@ function FindingDetailModal({
   );
 }
 
-function ProcessingMessage({ data }: { data: ProcessingData }) {
+function ProcessingMessage({
+  data,
+  onGapCollect,
+}: {
+  data: ProcessingData;
+  onGapCollect?: (gap: string) => void;
+}) {
   const [selectedFinding, setSelectedFinding] = useState<ProcessingData["findings"][number] | null>(null);
 
   return (
@@ -535,9 +541,20 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
       {data.gaps.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Gaps</p>
-          <ul className="mt-1 list-disc pl-5 text-sm text-text-muted">
+          <ul className="mt-1 space-y-1 text-sm text-text-muted">
             {data.gaps.map((gap, i) => (
-              <li key={i}>{gap}</li>
+              <li key={i} className="flex items-start justify-between gap-2">
+                <span>{gap}</span>
+                {onGapCollect && (
+                  <button
+                    type="button"
+                    onClick={() => onGapCollect(gap)}
+                    className="shrink-0 rounded-md border border-border-muted px-2 py-0.5 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary"
+                  >
+                    Collect
+                  </button>
+                )}
+              </li>
             ))}
           </ul>
         </div>
@@ -560,6 +577,7 @@ interface ChatWindowProps {
   subState?: DialogueSubState;
   onApprove?: () => void;
   onReject?: () => void;
+  onGatherMore?: () => void;
   onGatherMoreFromProcessing?: () => void;
   isSourceSelecting?: boolean;
   isCollecting?: boolean;
@@ -572,6 +590,7 @@ interface ChatWindowProps {
   onDevPrefillConsumed?: () => void;
   inputPrefill?: string | null;
   onInputPrefillConsumed?: () => void;
+  onGapCollect?: (gap: string) => void;
 }
 
 function SourceSummaryTable({
@@ -654,6 +673,7 @@ export default function ChatWindow({
   subState,
   onApprove,
   onReject,
+  onGatherMore,
   onGatherMoreFromProcessing,
   isSourceSelecting = false,
   isCollecting = false,
@@ -666,6 +686,7 @@ export default function ChatWindow({
   onDevPrefillConsumed,
   inputPrefill,
   onInputPrefillConsumed,
+  onGapCollect,
 }: ChatWindowProps) {
   const t = useT();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
@@ -774,7 +795,12 @@ export default function ChatWindow({
       message.data &&
       "findings" in message.data
     ) {
-      return <ProcessingMessage data={message.data as ProcessingData} />;
+      return (
+        <ProcessingMessage
+          data={message.data as ProcessingData}
+          onGapCollect={onGapCollect}
+        />
+      );
     }
 
     if (
@@ -1044,7 +1070,7 @@ export default function ChatWindow({
                   )}
                 </section>
               ) : isConfirming ? (
-                stage === "processing" || stage === "reviewing" ? (
+                phase === "processing" ? (
                   <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
                     <div className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
@@ -1067,6 +1093,45 @@ export default function ChatWindow({
                         <button
                           type="button"
                           onClick={() => onGatherMoreFromProcessing?.()}
+                          disabled={isLoading}
+                          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Gather More
+                        </button>
+                      </div>
+                    </div>
+                  </section>
+                ) : phase === "collection" && stage === "reviewing" ? (
+                  <section className="rounded-lg border border-border bg-surface p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <h3 className="text-sm font-semibold text-text-primary">
+                          Collection Review
+                        </h3>
+                        <p className="text-sm text-text-secondary">
+                          Accept the collection, revise it, or gather more data.
+                        </p>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => onApprove?.()}
+                          disabled={isLoading}
+                          className="rounded-md bg-success px-4 py-2 text-sm font-medium text-text-inverse hover:bg-success-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onReject?.()}
+                          disabled={isLoading}
+                          className="rounded-md bg-error px-4 py-2 text-sm font-medium text-text-inverse hover:bg-error-dark disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Revise
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onGatherMore?.()}
                           disabled={isLoading}
                           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                         >

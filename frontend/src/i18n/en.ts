@@ -23,16 +23,6 @@ export const en = {
   loadCollection: "Collection",
   loadProcessing: "Processing",
   loadAnalysis: "Analysis",
-  directionPhase: "Direction Phase",
-  expandDirectionPhase: "Expand direction phase",
-  minimizeDirectionPhase: "Minimize direction phase",
-  jumpToInitial: "Jump to Initial",
-  jumpToGathering: "Jump to Gathering",
-  jumpToSummary: "Jump to Summary",
-  jumpToPir: "Jump to PIR",
-  jumpToComplete: "Jump to Complete",
-  syncStage: "Sync stage",
-  resetStage: "Reset stage",
   deleteAllConversations: "Delete all conversations",
 
   // ChatWindow

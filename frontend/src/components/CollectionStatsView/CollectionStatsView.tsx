@@ -19,7 +19,6 @@ export default function CollectionStatsView({
   }
 
   const total = collectionData.source_summary.reduce((sum, source) => sum + source.count, 0);
-  const maxCount = Math.max(...collectionData.source_summary.map((s) => s.count), 1);
 
   return (
     <div className="space-y-4">

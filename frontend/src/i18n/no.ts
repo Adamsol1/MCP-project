@@ -25,16 +25,6 @@ export const no = {
   loadCollection: "Innsamling",
   loadProcessing: "Behandling",
   loadAnalysis: "Analyse",
-  directionPhase: "Retningsfase",
-  expandDirectionPhase: "Utvid retningsfase",
-  minimizeDirectionPhase: "Minimer retningsfase",
-  jumpToInitial: "Hopp til start",
-  jumpToGathering: "Hopp til innsamling",
-  jumpToSummary: "Hopp til oppsummering",
-  jumpToPir: "Hopp til PIR",
-  jumpToComplete: "Hopp til ferdig",
-  syncStage: "Synkroniser fase",
-  resetStage: "Tilbakestill fase",
   deleteAllConversations: "Slett alle samtaler",
 
   // ChatWindow

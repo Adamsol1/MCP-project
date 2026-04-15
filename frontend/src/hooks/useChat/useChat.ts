@@ -884,7 +884,6 @@ export function useChat(initialPerspectives?: string[]) {
     }
   };
 
-<<<<<<< Updated upstream
   const sendCouncilRequest = async (params: {
     debatePoint: string;
     findingIds: string[];
@@ -911,7 +910,9 @@ export function useChat(initialPerspectives?: string[]) {
       applyResponse(response, activeConversation.id, "idle", null, "analysis");
     } finally {
       setIsLoading(false);
-=======
+    }
+  };
+
   const refreshDevSnapshots = async () => {
     setIsDevSnapshotsLoading(true);
     try {
@@ -980,7 +981,6 @@ export function useChat(initialPerspectives?: string[]) {
       );
     } finally {
       setIsDevSnapshotsLoading(false);
->>>>>>> Stashed changes
     }
   };
 

@@ -1,8 +1,7 @@
 from enum import Enum
 from typing import Literal
 
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 
 class Perspective(str, Enum):
@@ -73,6 +72,17 @@ class ProcessingContext(BaseModel):
 
     pir: str
     collected_data: str
+
+
+class PhaseReviewItem(BaseModel):
+    """One AI review attempt emitted with phase outputs."""
+
+    phase: Literal["direction", "collection", "processing"]
+    attempt: int
+    reviewer_approved: bool
+    reviewer_suggestions: str | None = None
+    sources_used: list[str] = Field(default_factory=list)
+    generated_content: str | None = None
 
 
 class DialogueResponse(BaseModel):

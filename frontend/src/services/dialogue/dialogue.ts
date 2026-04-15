@@ -5,15 +5,8 @@ import type {
   DialogueStage,
   DialogueSubState,
 } from "../../types/dialogue";
-<<<<<<< Updated upstream
-import type { PhaseReviewItem } from "../../types/conversation";
-
-/** Base URL for the backend REST API. */
-const API_BACKEND_URL = "http://localhost:8000";
-=======
 import type { Message, PhaseReviewItem } from "../../types/conversation";
 import { API_BACKEND_URL } from "../apiConfig";
->>>>>>> Stashed changes
 
 export interface DialogueApiResponse {
   question: string;

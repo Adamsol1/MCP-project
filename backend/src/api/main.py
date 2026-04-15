@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-# from src.api.analysis import router as analysis_router  # legacy — kept for reference, replaced by AnalysisFlow
-from src.api.dialogue import evict_session, ensure_sessions_dir
+from src.api.analysis import router as analysis_router
+from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
 from src.importers.session_uploads import (
     default_uploads_root,
@@ -54,7 +54,7 @@ app.add_middleware(
 )
 
 # Includes
-# app.include_router(analysis_router)  # legacy — kept for reference, replaced by AnalysisFlow
+app.include_router(analysis_router)
 app.include_router(dialogue_router)
 
 # Path for saving uploaded files.

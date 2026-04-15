@@ -78,9 +78,6 @@ function AppShell() {
     toggleSourceSelection,
     submitSourceSelection,
     debugConfirm,
-    jumpToDevStage,
-    syncDevStage,
-    resetDevStage,
     devSnapshots,
     isDevSnapshotsLoading,
     refreshDevSnapshots,
@@ -304,14 +301,10 @@ function AppShell() {
               )
             }
             onDevShowCollectionApproval={debugConfirm}
-            onDevJumpToStage={jumpToDevStage}
-            onDevSyncStage={syncDevStage}
-            onDevResetStage={resetDevStage}
             devSnapshots={devSnapshots}
             isDevSnapshotsLoading={isDevSnapshotsLoading}
             onDevRefreshSnapshots={refreshDevSnapshots}
             onDevRestoreSnapshot={restoreDevSnapshot}
-            onOpenSettings={() => setIsSettingsOpen(true)}
             isCollapsed={isCollapsed}
             showExpandedContent={showExpandedContent}
           />

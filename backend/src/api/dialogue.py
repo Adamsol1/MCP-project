@@ -20,22 +20,19 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
-<<<<<<< Updated upstream
 from src.models.analysis import CouncilRunSettings
-=======
->>>>>>> Stashed changes
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
+from src.services.analysis_service import AnalysisService
 from src.services.collection_service import CollectionService
 from src.services.collection_status import CollectionStatusTracker
+from src.services.council_service import CouncilService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
+from src.services.processing_prototype_service import ProcessingPrototypeService
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
-from src.services.analysis_service import AnalysisService
-from src.services.council_service import CouncilService
-from src.services.processing_prototype_service import ProcessingPrototypeService
 from src.services.state_machines.analysis_flow import AnalysisFlow
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.council_flow import CouncilFlow
@@ -1079,7 +1076,7 @@ async def _handle_direction_phase(
 
 async def _handle_analysis_phase(
     session: IntelligenceSession,
-    request: DialogueMessageRequest,
+    _request: DialogueMessageRequest,
 ) -> DialogueMessageResponse:
     assert session.analysis_flow is not None
     response = await session.analysis_flow.process_user_message()

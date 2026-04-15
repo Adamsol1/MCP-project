@@ -6,32 +6,30 @@ import type {
 } from "../../types/analysis";
 import { API_BACKEND_URL } from "../apiConfig";
 
-// TODO: sjekk om kan fjerne — disse kalles ikke lenger, AnalysisPrototypeView leser fra Message.data
+export interface GetAnalysisDraftOptions {
+  forceRefresh?: boolean;
+}
 
-// export interface GetAnalysisDraftOptions {
-//   forceRefresh?: boolean;
-// }
+export async function getAnalysisDraft(
+  sessionId: string,
+  options: GetAnalysisDraftOptions = {},
+) {
+  const httpResponse = await axios.post<AnalysisDraftResponse>(
+    `${API_BACKEND_URL}/api/analysis/draft`,
+    {
+      session_id: sessionId,
+      force_refresh: options.forceRefresh ?? false,
+    },
+  );
 
-// export async function getAnalysisDraft(
-//   sessionId: string,
-//   options: GetAnalysisDraftOptions = {},
-// ) {
-//   const httpResponse = await axios.post<AnalysisDraftResponse>(
-//     `${API_BACKEND_URL}/api/analysis/draft`,
-//     {
-//       session_id: sessionId,
-//       force_refresh: options.forceRefresh ?? false,
-//     },
-//   );
+  return httpResponse.data;
+}
 
-//   return httpResponse.data;
-// }
+export async function runAnalysisCouncil(request: RunAnalysisCouncilRequest) {
+  const httpResponse = await axios.post<CouncilNote>(
+    `${API_BACKEND_URL}/api/analysis/council`,
+    request,
+  );
 
-// export async function runAnalysisCouncil(request: RunAnalysisCouncilRequest) {
-//   const httpResponse = await axios.post<CouncilNote>(
-//     `${API_BACKEND_URL}/api/analysis/council`,
-//     request,
-//   );
-
-//   return httpResponse.data;
-// }
+  return httpResponse.data;
+}

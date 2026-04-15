@@ -1,9 +1,9 @@
-import type { ActivitySummaryItem } from "../../types/conversation";
+import type { PhaseReviewItem } from "../../types/conversation";
 
 interface CollectionActivityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activity: ActivitySummaryItem[];
+  activity: PhaseReviewItem[];
   /** If set, this attempt number will be expanded by default. */
   focusAttempt?: number;
 }
@@ -153,8 +153,8 @@ export default function CollectionActivityModal({
                           Collector
                         </p>
                         <div className="flex flex-wrap gap-1.5">
-                          {item.collector_sources.length > 0
-                            ? item.collector_sources.map((src) => (
+                          {item.sources_used.length > 0
+                            ? item.sources_used.map((src) => (
                                 <span
                                   key={src}
                                   className="rounded px-2 py-0.5 text-xs font-medium bg-surface-muted text-text-secondary border border-border-muted"
