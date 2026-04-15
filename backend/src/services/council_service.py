@@ -18,7 +18,11 @@ from src.services.council_personas import get_council_persona
 
 logger = logging.getLogger("app")
 
-_COUNCIL_MCP_URL = os.getenv("COUNCIL_MCP_URL", "http://127.0.0.1:8003/sse")
+_DEFAULT_COUNCIL_MCP_URL = "http://127.0.0.1:8003/sse"
+
+
+def get_council_mcp_url() -> str:
+    return os.getenv("COUNCIL_MCP_URL", _DEFAULT_COUNCIL_MCP_URL)
 
 
 class CouncilService:
@@ -43,7 +47,7 @@ class CouncilService:
         self.working_directory.mkdir(parents=True, exist_ok=True)
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
-        self.mcp_client = mcp_client or MCPClient(server_url=_COUNCIL_MCP_URL)
+        self.mcp_client = mcp_client or MCPClient(server_url=get_council_mcp_url())
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
@@ -221,9 +225,19 @@ class CouncilService:
             selected_findings=selected_findings,
         )
 
-        logger.info(f"[CouncilService] Calling deliberate tool via MCP at {_COUNCIL_MCP_URL}")
-        async with self.mcp_client.connect():
-            result = await self.mcp_client.call_tool("deliberate", request)
+        logger.info(
+            "[CouncilService] Calling deliberate tool via MCP at %s",
+            self.mcp_client.server_url,
+        )
+        try:
+            async with self.mcp_client.connect():
+                result = await self.mcp_client.call_tool("deliberate", request)
+        except Exception as exc:
+            raise RuntimeError(
+                "Could not reach the council MCP server at "
+                f"{self.mcp_client.server_url}. Start it with `npm run dev:council` "
+                "or set COUNCIL_MCP_URL to the running council server."
+            ) from exc
 
         if not isinstance(result, dict):
             raise RuntimeError(f"Unexpected response type from deliberate tool: {type(result)}")

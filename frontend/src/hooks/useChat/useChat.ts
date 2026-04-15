@@ -907,6 +907,9 @@ export function useChat(initialPerspectives?: string[]) {
           councilSettings: params.councilSettings,
         },
       );
+      if (response.action === "error") {
+        throw new Error(response.question || "Council run failed.");
+      }
       applyResponse(response, activeConversation.id, "idle", null, "analysis");
     } finally {
       setIsLoading(false);

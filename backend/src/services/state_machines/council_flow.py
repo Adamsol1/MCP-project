@@ -1,10 +1,16 @@
+from __future__ import annotations
+
 import json
 import logging
 from enum import Enum
+from typing import TYPE_CHECKING
 
 from src.models.analysis import CouncilNote, CouncilRunSettings
 from src.models.dialogue import DialogueAction, DialogueResponse
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
+
+if TYPE_CHECKING:
+    from src.services.state_machines.analysis_flow import AnalysisFlow
 
 logger = logging.getLogger("app")
 
@@ -33,7 +39,7 @@ class CouncilFlow(BasePhaseFlow):
         }
 
     @classmethod
-    def from_dict(cls, data: dict, research_logger=None) -> "CouncilFlow":
+    def from_dict(cls, data: dict, research_logger=None) -> CouncilFlow:
         flow = cls(
             session_id=data["session_id"],
             research_logger=research_logger,
@@ -48,7 +54,7 @@ class CouncilFlow(BasePhaseFlow):
         finding_ids: list[str],
         selected_perspectives: list[str],
         council_service,
-        analysis_flow: "AnalysisFlow | None" = None,  # type: ignore[name-defined]
+        analysis_flow: AnalysisFlow | None = None,
         council_settings: CouncilRunSettings | None = None,
     ) -> DialogueResponse:
         from src.models.analysis import AnalysisDraft, ProcessingResult
@@ -80,8 +86,13 @@ class CouncilFlow(BasePhaseFlow):
                 finding_ids=finding_ids or None,
                 council_settings=council_settings,
             )
-        except (ValueError, RuntimeError) as exc:
-            logger.error("[CouncilFlow] Council run failed for session %s: %s", self.session_id, exc)
+        except Exception as exc:
+            logger.error(
+                "[CouncilFlow] Council run failed for session %s: %s",
+                self.session_id,
+                exc,
+                exc_info=True,
+            )
             return DialogueResponse(action=DialogueAction.ERROR, content=str(exc))
 
         self.latest_council_note = council_note.model_dump()

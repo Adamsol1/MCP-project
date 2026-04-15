@@ -516,9 +516,13 @@ def _build_dev_snapshot(session_id: str) -> DialogueDevSnapshot:
     stage, phase = _stage_phase_from_session_data(session_data)
     processed_path = paths["data"] / "processed.json"
     collected_path = paths["data"] / "collected.json"
+    analysis_flow = (session_data or {}).get("analysis_flow")
+    has_analysis_flow_result = (
+        isinstance(analysis_flow, dict) and bool(analysis_flow.get("analysis_result"))
+    )
     artifacts = {
         "session": paths["session"].exists(),
-        "analysis": paths["analysis"].exists(),
+        "analysis": paths["analysis"].exists() or has_analysis_flow_result,
         "collection": collected_path.exists(),
         "processing": processed_path.exists(),
         "collection_status": paths["collection_status"].exists(),
@@ -1192,7 +1196,11 @@ async def _handle_council_phase(
     session: IntelligenceSession,
     request: DialogueMessageRequest,
 ) -> DialogueMessageResponse:
-    assert session.council_flow is not None
+    if session.council_flow is None:
+        session.council_flow = CouncilFlow(
+            session_id=request.session_id,
+            research_logger=session.research_logger,
+        )
     perspectives = request.council_perspectives or request.perspectives
     response = await session.council_flow.process_user_message(
         debate_point=request.council_debate_point,

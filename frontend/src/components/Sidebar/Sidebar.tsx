@@ -350,7 +350,10 @@ export function Sidebar({
                           onClick={() =>
                             restoreSnapshot("pir_confirming", "direction")
                           }
-                          disabled={isDevSnapshotsLoading}
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.session
+                          }
                           className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
                         >
                           {t.loadPir}
@@ -360,7 +363,10 @@ export function Sidebar({
                           onClick={() =>
                             restoreSnapshot("reviewing", "collection")
                           }
-                          disabled={isDevSnapshotsLoading}
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.collection
+                          }
                           className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
                         >
                           {t.loadCollection}
@@ -370,7 +376,10 @@ export function Sidebar({
                           onClick={() =>
                             restoreSnapshot("reviewing", "processing")
                           }
-                          disabled={isDevSnapshotsLoading}
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.processing
+                          }
                           className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
                         >
                           {t.loadProcessing}
@@ -380,7 +389,10 @@ export function Sidebar({
                           onClick={() =>
                             restoreSnapshot("complete", "analysis")
                           }
-                          disabled={isDevSnapshotsLoading}
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.analysis
+                          }
                           className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
                         >
                           {t.loadAnalysis}

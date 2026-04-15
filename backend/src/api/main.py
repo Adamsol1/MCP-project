@@ -17,6 +17,8 @@ from src.importers.session_uploads import (
     save_session_upload,
 )
 from src.logging_config import setup_logging
+from src.services.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
+from src.services.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
 load_dotenv()
@@ -37,9 +39,13 @@ async def lifespan(_app: FastAPI):
     Does not have any input of output
     """
     ensure_sessions_dir()
+    council_mcp_process = await maybe_start_council_mcp(get_council_mcp_url())
     logger.info("Application started")
-    yield
-    logger.info("Application stopped")
+    try:
+        yield
+    finally:
+        await stop_council_mcp(council_mcp_process)
+        logger.info("Application stopped")
 
 
 app = FastAPI(lifespan=lifespan)
