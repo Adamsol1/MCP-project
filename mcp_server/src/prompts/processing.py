@@ -78,6 +78,10 @@ otx, knowledge_base, web_search, csv_upload, pdf_upload, txt_upload, json_upload
 - 80-90: Confirmed by multiple independent sources
 - 90+: Three or more sources with consistent attribution
 
+## PIR Numbering
+PIRs are numbered starting from 1. The first PIR in the list is PIR-1, the second is PIR-2, etc.
+Use this 1-based numbering consistently in all `relevant_to` fields and in the Processing Summary.
+
 ## Processing Summary Format
 Write one line per PIR with status and key entities found:
 PIR-1 (short description): Answered
@@ -94,13 +98,13 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 {{
   "findings": [
     {{
-      "id": "F-001",
+      "id": "F-01",
       "title": "Short finding title",
       "finding": "Detailed analytical narrative of the finding",
       "evidence_summary": "Concise summary of the supporting evidence",
       "source": "web_search",
       "confidence": 75,
-      "relevant_to": ["PIR-0", "PIR-1"],
+      "relevant_to": ["PIR-1", "PIR-2"],
       "supporting_data": {{
         "iocs": ["indicator1", "indicator2"],
         "attack_ids": ["T1078", "T1110.003"],

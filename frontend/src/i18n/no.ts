@@ -64,13 +64,13 @@ export const no = {
   startCollecting: "Start innsamling",
   sourceNames: {
     "AlienVault OTX": "AlienVault OTX",
-    "Internal Knowledge Bank": "Intern kunnskapsbank",
+    "Knowledge Bank": "Intern kunnskapsbank",
     "Uploaded Documents": "Opplastede dokumenter",
     "Web Search": "Nettsøk",
   } as Record<string, string>,
   sourceDescriptions: {
     "AlienVault OTX": "Åpne trusselinnmatinger",
-    "Internal Knowledge Bank": "Organisasjonens kuraterte intel",
+    "Knowledge Bank": "Organisasjonens kuraterte intel",
     "Uploaded Documents": "PDF-er, rapporter, o.l.",
     "Web Search": "Søker på nettet etter relevant informasjon",
   } as Record<string, string>,

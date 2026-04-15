@@ -61,13 +61,13 @@ export const en = {
   startCollecting: "Start Collecting",
   sourceNames: {
     "AlienVault OTX": "AlienVault OTX",
-    "Internal Knowledge Bank": "Internal Knowledge Bank",
+    "Knowledge Bank": "Knowledge Bank",
     "Uploaded Documents": "Uploaded Documents",
     "Web Search": "Web Search",
   } as Record<string, string>,
   sourceDescriptions: {
     "AlienVault OTX": "Open threat exchange feeds",
-    "Internal Knowledge Bank": "Your org's curated intel",
+    "Knowledge Bank": "Your org's curated intel",
     "Uploaded Documents": "PDFs, reports, etc.",
     "Web Search": "Searching the web for relevant information",
   } as Record<string, string>,

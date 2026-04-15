@@ -312,7 +312,7 @@ const FINDING_TIER_STYLES: Record<ConfidenceTier, string> = {
 };
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
-  knowledge_bank: "Internal Knowledge Bank",
+  knowledge_bank: "Knowledge Bank",
   otx:            "AlienVault OTX",
   web_gov:        "Government / Official",
   web_think_tank: "Think Tank",
@@ -324,17 +324,8 @@ const SOURCE_DISPLAY_NAMES: Record<string, string> = {
 };
 
 
-/** Increments 0-based PIR numbers so they display as 1-based (e.g. "PIR-0" → "PIR-1"). */
 function formatRelevantTo(values: string[]): string {
-  return values
-    .map((v) => {
-      const m = v.match(/^(PIR[-\s]?)(\d+)$/i);
-      if (m) return `${m[1]}${parseInt(m[2], 10) + 1}`;
-      const n = parseInt(v, 10);
-      if (!isNaN(n) && String(n) === v) return `PIR-${n + 1}`;
-      return v;
-    })
-    .join(", ");
+  return values.join(", ");
 }
 
 function FindingDetailModal({
@@ -368,25 +359,42 @@ function FindingDetailModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-3xl max-h-[80vh] overflow-y-auto rounded-xl border border-border bg-surface shadow-2xl flex flex-col"
+        className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-2xl border border-border bg-surface shadow-2xl flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-border sticky top-0 bg-surface z-10">
-          <div className="flex items-start gap-2 flex-1 min-w-0">
-            <span className="shrink-0 rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] font-semibold text-text-muted mt-0.5">
-              {finding.id}
-            </span>
-            <p className="text-sm font-semibold text-text-primary leading-snug">{finding.title}</p>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <span className={`rounded px-1.5 py-0.5 text-xs font-semibold ${tierStyle}`}>
-              {tier.toUpperCase()}
-            </span>
+        <div className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 flex-1 min-w-0">
+              <span className="shrink-0 rounded-md border border-border-muted bg-surface-muted px-2 py-1 font-mono text-xs font-bold text-text-secondary mt-0.5">
+                {finding.id}
+              </span>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-semibold text-text-primary leading-snug">{finding.title}</h2>
+                <div className="flex flex-wrap items-center gap-2 mt-1.5">
+                  <span className={`rounded-md px-2 py-0.5 text-xs font-bold tracking-wide ${tierStyle}`}>
+                    {tier.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-text-muted">{sourceLabel}</span>
+                  {finding.relevant_to.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {finding.relevant_to.map((pir) => (
+                        <span
+                          key={pir}
+                          className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary"
+                        >
+                          {pir}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
             <button
               aria-label="close"
               onClick={onClose}
-              className="rounded p-1 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              className="shrink-0 rounded-lg p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
             >
               ✕
             </button>
@@ -394,7 +402,7 @@ function FindingDetailModal({
         </div>
 
         {/* Body */}
-        <div className="px-5 py-4 space-y-4 text-sm">
+        <div className="px-6 py-5 space-y-5 text-sm">
           {/* Finding */}
           <div>
             <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Finding</p>
@@ -409,28 +417,16 @@ function FindingDetailModal({
             </div>
           )}
 
-          {/* Meta row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Source</p>
-              <p className="text-text-secondary">{sourceLabel}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Relevant To</p>
-              <p className="text-text-secondary">{formatRelevantTo(finding.relevant_to)}</p>
-            </div>
-          </div>
-
           {/* Supporting data */}
           {((sd.kb_refs?.length ?? 0) > 0 ||
             (sd.attack_ids?.length ?? 0) > 0 ||
             (sd.entities?.length ?? 0) > 0 ||
             (sd.domains?.length ?? 0) > 0) && (
-            <div className="border-t border-border-muted pt-3 space-y-3">
+            <div className="border-t border-border-muted pt-4 space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Supporting Data</p>
               {(sd.kb_refs?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">Knowledge base refs</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">Knowledge Base Refs</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.kb_refs!.map((r) => (
                       <span key={r} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{r}</span>
@@ -440,7 +436,7 @@ function FindingDetailModal({
               )}
               {(sd.attack_ids?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">ATT&amp;CK techniques</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">ATT&amp;CK Techniques</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.attack_ids!.map((id) => (
                       <span key={id} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{id}</span>
@@ -469,9 +465,9 @@ function FindingDetailModal({
 
           {/* Uncertainties */}
           {(finding.uncertainties?.length ?? 0) > 0 && (
-            <div className="border-t border-border-muted pt-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Uncertainties</p>
-              <ul className="list-disc pl-4 space-y-0.5 text-xs text-text-muted">
+            <div className="border-t border-border-muted pt-4">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2">Uncertainties</p>
+              <ul className="list-disc pl-4 space-y-1 text-xs text-text-muted">
                 {finding.uncertainties.map((u, i) => (
                   <li key={i}>{u}</li>
                 ))}
@@ -489,53 +485,53 @@ function ProcessingMessage({ data }: { data: ProcessingData }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">Processing Results</h3>
-      <details className="group" open>
-        <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
-          {data.findings.length} findings <Chevron />
-        </summary>
-        <div className="mt-2 overflow-x-auto rounded border border-border-muted">
-          <table className="w-full text-xs border-collapse">
-            <thead>
-              <tr className="bg-surface-muted text-text-muted">
-                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">ID</th>
-                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted">Title</th>
-                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Source</th>
-                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Confidence</th>
-                <th className="px-3 py-2 text-left font-semibold uppercase tracking-wide text-[10px] border-b border-border-muted whitespace-nowrap">Relevant To</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-muted">
-              {data.findings.map((f) => {
-                const tier = confidenceTierFromInt(f.confidence);
-                const tierStyle = FINDING_TIER_STYLES[tier];
-                const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
-                return (
-                  <tr
-                    key={f.id}
-                    onClick={() => setSelectedFinding(f)}
-                    className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
-                  >
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span className="font-mono text-[10px] font-semibold text-text-muted">{f.id}</span>
-                    </td>
-                    <td className="px-3 py-2 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[22ch] truncate">
-                      {f.title}
-                    </td>
-                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{sourceLabel}</td>
-                    <td className="px-3 py-2 whitespace-nowrap">
-                      <span className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${tierStyle}`}>
-                        {tier.toUpperCase()}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2 text-text-muted whitespace-nowrap">{formatRelevantTo(f.relevant_to)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </details>
+      <div className="flex items-center justify-between gap-2">
+        <h3 className="font-semibold">Processing Results</h3>
+        <span className="rounded-full border border-border-muted bg-surface-muted px-2.5 py-0.5 text-xs text-text-muted">
+          {data.findings.length} findings
+        </span>
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-border-muted">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-surface-muted text-text-muted">
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">ID</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted">Title</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Source</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Confidence</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Relevant To</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border-muted">
+            {data.findings.map((f) => {
+              const tier = confidenceTierFromInt(f.confidence);
+              const tierStyle = FINDING_TIER_STYLES[tier];
+              const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
+              return (
+                <tr
+                  key={f.id}
+                  onClick={() => setSelectedFinding(f)}
+                  className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
+                >
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="font-mono text-xs font-semibold text-text-muted">{f.id}</span>
+                  </td>
+                  <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
+                    {f.title}
+                  </td>
+                  <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{sourceLabel}</td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${tierStyle}`}>
+                      {tier.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatRelevantTo(f.relevant_to)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
       {data.gaps.length > 0 && (
         <div className="border-t border-border pt-2">
           <p className="text-sm font-medium text-text-secondary">Gaps</p>
@@ -822,10 +818,12 @@ export default function ChatWindow({
               <div
                 key={message.id}
                 data-sender={message.sender}
-                className={`max-w-[75%] p-3 rounded-lg mb-2 ${
+                className={`p-3 rounded-lg mb-2 ${
                   message.sender === "user"
-                    ? "self-end"
-                    : "self-start bg-surface-muted text-text-primary"
+                    ? "self-end max-w-[75%]"
+                    : message.type === "processing"
+                      ? "self-start w-full bg-surface-muted text-text-primary"
+                      : "self-start max-w-[75%] bg-surface-muted text-text-primary"
                 }`}
                 style={
                   message.sender === "user"
@@ -874,11 +872,7 @@ export default function ChatWindow({
             </p>
           )}
 
-          <div
-            className={`w-full px-6 ${
-              isEmptyStateComposer ? "max-w-4xl" : "max-w-3xl"
-            }`}
-          >
+          <div className="w-full max-w-5xl px-6">
             <div className="relative">
               <ToastContainer position="above-input" />
               {isSourceSelecting ? (

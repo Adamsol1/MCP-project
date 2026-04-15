@@ -112,7 +112,7 @@ function normalizeSourceLabel(raw: string): string {
     return "AlienVault OTX";
   }
   if (lower.includes("knowledge") && lower.includes("bank")) {
-    return "Internal Knowledge Bank";
+    return "Knowledge Bank";
   }
   if (lower.includes("misp")) {
     return "MISP";
@@ -507,7 +507,9 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackSubState: DialogueSubState,
     fallbackPhase: DialoguePhase,
   ) => {
-    addMessage(buildSystemMessage(response), conversationId);
+    if (response.action !== "complete") {
+      addMessage(buildSystemMessage(response), conversationId);
+    }
 
     const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
     const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);

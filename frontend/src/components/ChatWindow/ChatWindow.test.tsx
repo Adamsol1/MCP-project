@@ -714,7 +714,7 @@ describe("PirMessage — rationale citation rendering", () => {
               author: "Threat Intelligence System",
               year: "2025",
               title: "Norwegian-Russian Geopolitical Relations",
-              publisher: "Internal Knowledge Bank",
+              publisher: "Knowledge Bank",
             },
           },
         ],

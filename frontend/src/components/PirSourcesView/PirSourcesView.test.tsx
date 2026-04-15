@@ -52,7 +52,7 @@ const pirDataWithSources: PirData = {
         author: "Threat Intelligence System",
         year: "2025",
         title: "Norwegian-Russian Geopolitical Relations",
-        publisher: "Internal Knowledge Bank",
+        publisher: "Knowledge Bank",
       },
     },
     {
@@ -63,7 +63,7 @@ const pirDataWithSources: PirData = {
         author: "Threat Intelligence System",
         year: "2025",
         title: "Energy Sector Threat Landscape",
-        publisher: "Internal Knowledge Bank",
+        publisher: "Knowledge Bank",
       },
     },
   ],
