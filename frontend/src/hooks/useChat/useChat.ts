@@ -803,10 +803,8 @@ export function useChat(initialPerspectives?: string[]) {
     setDevPrefill(null);
   };
 
-  const prefillGapPrompt = (gap: string) => {
-    setInputPrefill(
-      `Please collect additional intelligence to address the following gap:\n\n${gap}`,
-    );
+  const prefillGapPrompt = (message: string) => {
+    setInputPrefill(message);
   };
 
   const clearInputPrefill = () => {

@@ -63,12 +63,13 @@ class AnalysisFlow(BasePhaseFlow):
         analysis_service,
         orchestrator=None,
         reviewer=None,
+        selected_perspectives: list[str] | None = None,
     ) -> DialogueResponse:
         if not self.session_id:
             return DialogueResponse(action=DialogueAction.ERROR, content="No session ID set.")
 
         try:
-            processing_result = processing_service.get_processing_result(self.session_id)
+            processing_result = await processing_service.get_processing_result(self.session_id)
         except ValueError as exc:
             logger.error("[AnalysisFlow] Failed to load processing result for %s: %s", self.session_id, exc)
             return DialogueResponse(action=DialogueAction.ERROR, content=str(exc))
@@ -84,7 +85,8 @@ class AnalysisFlow(BasePhaseFlow):
                 )
             else:
                 analysis_draft, enriched_result = await analysis_service.generate_draft(
-                    processing_result
+                    processing_result,
+                    selected_perspectives=selected_perspectives,
                 )
         except Exception:
             logger.error("[AnalysisFlow] Analysis generation failed for %s", self.session_id, exc_info=True)

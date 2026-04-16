@@ -330,9 +330,11 @@ function formatRelevantTo(values: string[]): string {
 
 function FindingDetailModal({
   finding,
+  displayId,
   onClose,
 }: {
   finding: ProcessingData["findings"][number] | null;
+  displayId?: string;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -367,7 +369,7 @@ function FindingDetailModal({
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1 min-w-0">
               <span className="shrink-0 rounded-md border border-border-muted bg-surface-muted px-2 py-1 font-mono text-xs font-bold text-text-secondary mt-0.5">
-                {finding.id}
+                {displayId ?? finding.id}
               </span>
               <div className="flex-1 min-w-0">
                 <h2 className="text-base font-semibold text-text-primary leading-snug">{finding.title}</h2>
@@ -487,7 +489,36 @@ function ProcessingMessage({
   data: ProcessingData;
   onGapCollect?: (gap: string) => void;
 }) {
-  const [selectedFinding, setSelectedFinding] = useState<ProcessingData["findings"][number] | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<{ finding: ProcessingData["findings"][number]; displayId: string } | null>(null);
+  const [selectedGaps, setSelectedGaps] = useState<Set<number>>(new Set());
+  const [collectMode, setCollectMode] = useState(false);
+
+  const toggleGap = (idx: number) => {
+    setSelectedGaps((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
+  };
+
+  const collectSelected = () => {
+    if (!onGapCollect) return;
+    const gaps = data.gaps.filter((_, i) => selectedGaps.has(i));
+    if (gaps.length === 0) return;
+    const prompt = gaps.map((g, i) => `${i + 1}. ${g}`).join("\n");
+    onGapCollect(`Please collect additional intelligence to address the following gaps:\n\n${prompt}`);
+    setSelectedGaps(new Set());
+    setCollectMode(false);
+  };
+
+  const collectAll = () => {
+    if (!onGapCollect || data.gaps.length === 0) return;
+    const prompt = data.gaps.map((g, i) => `${i + 1}. ${g}`).join("\n");
+    onGapCollect(`Please collect additional intelligence to address the following gaps:\n\n${prompt}`);
+    setSelectedGaps(new Set());
+    setCollectMode(false);
+  };
 
   return (
     <div className="space-y-3">
@@ -509,18 +540,21 @@ function ProcessingMessage({
             </tr>
           </thead>
           <tbody className="divide-y divide-border-muted">
-            {data.findings.map((f) => {
+            {[...data.findings]
+              .sort((a, b) => b.confidence - a.confidence)
+              .map((f, idx) => {
               const tier = confidenceTierFromInt(f.confidence);
               const tierStyle = FINDING_TIER_STYLES[tier];
               const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
+              const displayId = `F-${String(idx + 1).padStart(2, "0")}`;
               return (
                 <tr
                   key={f.id}
-                  onClick={() => setSelectedFinding(f)}
+                  onClick={() => setSelectedFinding({ finding: f, displayId })}
                   className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
                 >
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-mono text-xs font-semibold text-text-muted">{f.id}</span>
+                    <span className="font-mono text-xs font-semibold text-text-muted">{displayId}</span>
                   </td>
                   <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
                     {f.title}
@@ -539,27 +573,73 @@ function ProcessingMessage({
         </table>
       </div>
       {data.gaps.length > 0 && (
-        <div className="border-t border-border pt-2">
-          <p className="text-sm font-medium text-text-secondary">Gaps</p>
-          <ul className="mt-1 space-y-1 text-sm text-text-muted">
+        <div className="border-t border-border pt-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold text-text-primary">Gaps <span className="ml-1 text-xs font-normal text-text-muted">({data.gaps.length})</span></p>
+            {onGapCollect && !collectMode && (
+              <button
+                type="button"
+                onClick={() => setCollectMode(true)}
+                className="rounded-md border border-border-muted px-3 py-1 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors"
+              >
+                Collect More
+              </button>
+            )}
+            {onGapCollect && collectMode && (
+              <button
+                type="button"
+                onClick={() => { setCollectMode(false); setSelectedGaps(new Set()); }}
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+          <ul className="space-y-2">
             {data.gaps.map((gap, i) => (
-              <li key={i} className="flex items-start justify-between gap-2">
-                <span>{gap}</span>
-                {onGapCollect && (
-                  <button
-                    type="button"
-                    onClick={() => onGapCollect(gap)}
-                    className="shrink-0 rounded-md border border-border-muted px-2 py-0.5 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary"
-                  >
-                    Collect
-                  </button>
+              <li
+                key={i}
+                className={`flex items-start gap-3 text-sm text-text-secondary leading-snug ${collectMode ? "cursor-pointer" : ""}`}
+                onClick={collectMode ? () => toggleGap(i) : undefined}
+              >
+                {collectMode && (
+                  <input
+                    type="checkbox"
+                    checked={selectedGaps.has(i)}
+                    onChange={() => toggleGap(i)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-0.5 shrink-0 size-4 accent-primary cursor-pointer"
+                  />
                 )}
+                {!collectMode && (
+                  <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-text-muted" />
+                )}
+                <span>{gap}</span>
               </li>
             ))}
           </ul>
+          {onGapCollect && collectMode && (
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={collectAll}
+                className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-text-inverse hover:bg-primary-dark transition-colors"
+              >
+                Collect All
+              </button>
+              <button
+                type="button"
+                onClick={collectSelected}
+                disabled={selectedGaps.size === 0}
+                className="rounded-md border border-border-muted px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              >
+                Collect Selected ({selectedGaps.size})
+              </button>
+            </div>
+          )}
         </div>
       )}
-      <FindingDetailModal finding={selectedFinding} onClose={() => setSelectedFinding(null)} />
+      <FindingDetailModal finding={selectedFinding?.finding ?? null} displayId={selectedFinding?.displayId} onClose={() => setSelectedFinding(null)} />
     </div>
   );
 }
@@ -631,12 +711,12 @@ function SourceSummaryTable({
 }
 
 function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
-  const { setCollectionData } = useWorkspace();
+  const { mergeCollectionData } = useWorkspace();
   const t = useT();
 
   useEffect(() => {
-    setCollectionData(data);
-  }, [data, setCollectionData]);
+    mergeCollectionData(data);
+  }, [data, mergeCollectionData]);
 
   if (data.parse_error) {
     return (
@@ -1099,7 +1179,7 @@ export default function ChatWindow({
                           disabled={isLoading}
                           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Gather More
+                          Collect More
                         </button>
                       </div>
                     </div>
@@ -1138,7 +1218,7 @@ export default function ChatWindow({
                           disabled={isLoading}
                           className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-text-inverse hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                          Gather More
+                          Collect More
                         </button>
                       </div>
                     </div>

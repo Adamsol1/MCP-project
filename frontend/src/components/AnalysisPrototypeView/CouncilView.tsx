@@ -496,6 +496,9 @@ export default function CouncilView({
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
             Run council on a point
           </p>
+          <p className="mt-2 text-sm leading-6 text-text-secondary">
+            The Council simulates structured deliberation between analytical perspectives, surfacing agreements, disagreements, and a final recommendation.
+          </p>
           <form className="mt-4 space-y-4" onSubmit={handleCouncilSubmit}>
             <div className="space-y-2">
               <p className="text-sm font-medium text-text-primary">Perspectives</p>
@@ -508,11 +511,11 @@ export default function CouncilView({
                       type="button"
                       onClick={() => togglePerspective(perspective)}
                       aria-pressed={isSelected}
-                      className={
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         isSelected
-                          ? "rounded-full border border-border bg-surface-muted px-3 py-1.5 text-xs font-medium text-text-primary"
-                          : "rounded-full border border-border-muted px-3 py-1.5 text-xs text-text-secondary"
-                      }
+                          ? "border-primary/40 bg-primary-subtle/40 text-text-primary"
+                          : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                      }`}
                     >
                       {formatPerspectiveLabel(perspective)}
                     </button>

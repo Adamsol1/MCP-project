@@ -743,11 +743,11 @@ def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
     }
 
 
-def _processing_payload(session_id: str) -> dict[str, Any] | None:
+async def _processing_payload(session_id: str) -> dict[str, Any] | None:
     try:
         from src.services.processing_prototype_service import ProcessingPrototypeService
 
-        result = ProcessingPrototypeService().get_processing_result(session_id)
+        result = await ProcessingPrototypeService().get_processing_result(session_id)
     except Exception:
         return None
     return result.model_dump(mode="json")
@@ -794,7 +794,7 @@ def _summary_payload(session: IntelligenceSession) -> dict[str, str]:
     return {"summary": "\n".join(lines)}
 
 
-def _build_dev_hydrated_messages(
+async def _build_dev_hydrated_messages(
     session: IntelligenceSession, target_stage: str, target_phase: str
 ) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
@@ -853,7 +853,7 @@ def _build_dev_hydrated_messages(
             )
 
     if target_phase in {Phase.PROCESSING.value, Phase.ANALYSIS.value}:
-        processing_data = _processing_payload(session.session_id)
+        processing_data = await _processing_payload(session.session_id)
         if processing_data:
             messages.append(
                 {
@@ -962,11 +962,16 @@ async def _handle_processing_phase(
             research_logger=session.research_logger,
         )
         analysis_service = AnalysisService(mcp_client)
+        selected_perspectives = [
+            p.value.lower()
+            for p in (session.direction_flow.context.perspectives or [])
+        ] if session.direction_flow and session.direction_flow.context else None
         init_response = await session.analysis_flow.initialize(
             processing_service=ProcessingPrototypeService(uow=uow),
             analysis_service=analysis_service,
             orchestrator=orchestrator,
             reviewer=review_service,
+            selected_perspectives=selected_perspectives,
         )
         session.council_flow = CouncilFlow(
             session_id=request.session_id,
@@ -1288,7 +1293,7 @@ async def restore_dev_snapshot(
     _save_session(session)
 
     state = _build_dev_state_response(target_id, session)
-    messages = _build_dev_hydrated_messages(session, state.stage, state.phase)
+    messages = await _build_dev_hydrated_messages(session, state.stage, state.phase)
     return DialogueDevRestoreResponse(
         **state.model_dump(),
         source_session_id=source_id,

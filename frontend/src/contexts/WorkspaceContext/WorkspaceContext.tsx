@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useState } from "react";
+import { createContext, useCallback, useState } from "react";
 import type { CollectionDisplayData, PhaseReviewItem, PirData } from "../../types/conversation";
 import React from "react";
 
@@ -12,6 +12,7 @@ export interface WorkspaceContextValue {
   setPirData: (pirData: PirData | null) => void;
   collectionData: CollectionDisplayData | null;
   setCollectionData: (data: CollectionDisplayData | null) => void;
+  mergeCollectionData: (data: CollectionDisplayData) => void;
   reviewActivity: PhaseReviewItem[];
   setReviewActivity: (items: PhaseReviewItem[]) => void;
 }
@@ -32,6 +33,27 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const setHighlightedRef = (ref: string | null) => {
     setHighlightedRefs(ref ? [ref] : []);
   };
+  const mergeCollectionData = useCallback((incoming: CollectionDisplayData) => {
+    setCollectionData((prev) => {
+      if (!prev) return incoming;
+      const mergedItems = [...prev.collected_data, ...incoming.collected_data];
+      const summaryMap = new Map(prev.source_summary.map((s) => [s.display_name, { ...s }]));
+      for (const s of incoming.source_summary) {
+        const existing = summaryMap.get(s.display_name);
+        if (existing) {
+          existing.count += s.count;
+          existing.has_content = existing.has_content || s.has_content;
+          existing.resource_ids = [...new Set([...existing.resource_ids, ...s.resource_ids])];
+        } else {
+          summaryMap.set(s.display_name, { ...s });
+        }
+      }
+      return {
+        collected_data: mergedItems,
+        source_summary: Array.from(summaryMap.values()),
+      };
+    });
+  }, []);
   const value = {
     highlightedRef,
     setHighlightedRef,
@@ -41,6 +63,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     setPirData,
     collectionData,
     setCollectionData,
+    mergeCollectionData,
     reviewActivity,
     setReviewActivity,
   };

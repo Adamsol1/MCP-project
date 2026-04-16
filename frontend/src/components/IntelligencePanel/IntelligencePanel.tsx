@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { DialoguePhase } from "../../types/dialogue";
-import type { PhaseReviewItem } from "../../types/conversation";
+import type { PhaseReviewItem, ProcessingData } from "../../types/conversation";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
@@ -90,24 +90,17 @@ export default function IntelligencePanel({
 
       case "processing":
         return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <p className="text-xs text-text-secondary">
-                {t.processingArtifacts}
-              </p>
-            </section>
-          </>
+          <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+            <FileUploadSection
+              uploadedFiles={uploadedFiles}
+              visibleFiles={visibleFiles}
+              hiddenCount={hiddenCount}
+              showAllFiles={showAllFiles}
+              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
+              onOpenFileUpload={onOpenFileUpload}
+              onFileRemove={onFileRemove}
+            />
+          </section>
         );
 
       case "analysis":
@@ -123,9 +116,6 @@ export default function IntelligencePanel({
                 onOpenFileUpload={onOpenFileUpload}
                 onFileRemove={onFileRemove}
               />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <p className="text-xs text-text-secondary">{t.analysisOutputs}</p>
             </section>
           </>
         );
@@ -261,44 +251,133 @@ interface ReviewActivitySectionProps {
   onOpenReviewModal: (attempt: number) => void;
 }
 
+function tryParseProcessingData(content: string | null): ProcessingData | null {
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && "findings" in parsed) {
+      return parsed as ProcessingData;
+    }
+  } catch { /* not JSON */ }
+  return null;
+}
+
 function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySectionProps) {
+  const [expandedAttempts, setExpandedAttempts] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (attempt: number) => {
+    setExpandedAttempts((prev) => {
+      const next = new Set(prev);
+      if (next.has(attempt)) next.delete(attempt);
+      else next.add(attempt);
+      return next;
+    });
+  };
+
   return (
     <div className="space-y-2">
       <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
         Review Activity
       </p>
-      {activity.map((item) => (
-        <button
-          key={item.attempt}
-          type="button"
-          onClick={() => onOpenReviewModal(item.attempt)}
-          className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-1 text-left transition-colors hover:border-primary hover:bg-primary-subtle"
-        >
-          <div className="flex items-center justify-between">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-              Attempt {item.attempt}
-            </p>
-            <span
-              className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                item.reviewer_approved
-                  ? "bg-success-subtle text-success-text"
-                  : "bg-error-subtle text-error-text"
-              }`}
-            >
-              {item.reviewer_approved ? "Approved" : "Rejected"}
-            </span>
+      {activity.map((item) => {
+        const isExpanded = expandedAttempts.has(item.attempt);
+        const processingData = item.phase === "processing" ? tryParseProcessingData(item.generated_content) : null;
+
+        return (
+          <div key={item.attempt} className="rounded-lg border border-border-muted bg-surface overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-stretch">
+              <button
+                type="button"
+                onClick={() => onOpenReviewModal(item.attempt)}
+                className="flex-1 px-3 py-2 space-y-1 text-left transition-colors hover:bg-primary-subtle"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    Attempt {item.attempt}
+                  </p>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      item.reviewer_approved
+                        ? "bg-success-subtle text-success-text"
+                        : "bg-error-subtle text-error-text"
+                    }`}
+                  >
+                    {item.reviewer_approved ? "Approved" : "Rejected"}
+                  </span>
+                </div>
+                {item.sources_used.length > 0 && (
+                  <p className="text-xs text-text-secondary truncate">
+                    <span className="font-medium text-text-primary">Sources: </span>
+                    {item.sources_used.join(", ")}
+                  </p>
+                )}
+                {item.sources_used.length === 0 && (
+                  <p className="text-xs text-text-secondary capitalize">{item.phase} phase</p>
+                )}
+              </button>
+              {processingData && (
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(item.attempt)}
+                  className="shrink-0 border-l border-border-muted px-2 text-text-muted hover:bg-primary-subtle hover:text-primary transition-colors"
+                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {/* Inline parsed processing content */}
+            {isExpanded && processingData && (
+              <div className="border-t border-border-muted px-3 py-2 space-y-2 bg-surface-muted/50">
+                {processingData.findings && processingData.findings.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                      Findings ({processingData.findings.length})
+                    </p>
+                    {[...processingData.findings]
+                      .sort((a, b) => b.confidence - a.confidence)
+                      .map((f, idx) => (
+                        <div key={f.id ?? idx} className="rounded border border-border-muted bg-surface p-2 space-y-1">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-[11px] font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
+                            {f.confidence != null && (
+                              <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold ${
+                                f.confidence >= 0.7 ? "bg-success-subtle text-success-text" :
+                                f.confidence >= 0.4 ? "bg-warning-subtle text-warning-text" :
+                                "bg-error-subtle text-error-text"
+                              }`}>
+                                {Math.round(f.confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-text-secondary leading-relaxed">{f.finding}</p>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {processingData.gaps && processingData.gaps.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">
+                      Gaps ({processingData.gaps.length})
+                    </p>
+                    <ul className="space-y-0.5">
+                      {processingData.gaps.map((gap, i) => (
+                        <li key={i} className="flex gap-1.5 text-[11px] text-text-secondary">
+                          <span className="shrink-0 text-text-muted">·</span>
+                          <span>{gap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          {item.sources_used.length > 0 && (
-            <p className="text-xs text-text-secondary truncate">
-              <span className="font-medium text-text-primary">Sources: </span>
-              {item.sources_used.join(", ")}
-            </p>
-          )}
-          {item.sources_used.length === 0 && (
-            <p className="text-xs text-text-secondary capitalize">{item.phase} phase</p>
-          )}
-        </button>
-      ))}
+        );
+      })}
     </div>
   );
 }

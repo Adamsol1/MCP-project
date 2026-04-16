@@ -8,7 +8,15 @@ The corresponding AI #2 (reviewer) prompt lives in review_mcp_server/src/prompts
 def build_analysis_generate_prompt(
     pir: str,
     findings: str,
+    perspectives: str = "us, norway, china, eu, russia, neutral",
 ) -> str:
+    # Build the per_perspective_implications schema dynamically from the selected list
+    perspective_keys = [p.strip() for p in perspectives.split(",") if p.strip()]
+    implications_example = "\n".join(
+        f'    "{key}": [{{"assertion": "string — analytical implication from {key} viewpoint", "supporting_finding_ids": ["F-001"]}}]{"," if i < len(perspective_keys) - 1 else ""}'
+        for i, key in enumerate(perspective_keys)
+    )
+
     return f"""You are drafting an intelligence-analysis summary for an analyst UI.
 
 Use the processed findings below as the primary evidence base.
@@ -24,8 +32,10 @@ Your role is synthesis and interpretation — not collection.
 ## Requirements
 - Be analytical, specific, and grounded in the findings.
 - Do not mention being an AI.
+- Title must be 6-10 words, written in intelligence-report style (e.g. "China-Taiwan Conflict Probability Assessment 2025"). Capitalise key words.
 - Summary must be 2–4 sentences.
 - Key judgments must be distinct and substantive — do not restate findings verbatim.
+- Only generate per_perspective_implications for the following perspectives: {perspectives}
 - For each perspective, provide 2 concise implications as objects with "assertion" and "supporting_finding_ids".
 - supporting_finding_ids must only contain finding IDs present in the findings above (e.g. "F-001").
 - If an implication cannot be traced to a specific finding, use an empty array [].
@@ -36,20 +46,11 @@ Your role is synthesis and interpretation — not collection.
 Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 
 {{
+  "title": "string — 6-10 word intelligence assessment title",
   "summary": "string",
   "key_judgments": ["string"],
   "per_perspective_implications": {{
-    "us": [
-      {{
-        "assertion": "string — analytical implication",
-        "supporting_finding_ids": ["F-001"]
-      }}
-    ],
-    "norway": [{{"assertion": "string", "supporting_finding_ids": []}}],
-    "china": [{{"assertion": "string", "supporting_finding_ids": []}}],
-    "eu": [{{"assertion": "string", "supporting_finding_ids": []}}],
-    "russia": [{{"assertion": "string", "supporting_finding_ids": []}}],
-    "neutral": [{{"assertion": "string", "supporting_finding_ids": []}}]
+{implications_example}
   }},
   "recommended_actions": ["string"],
   "information_gaps": ["string"]
@@ -62,18 +63,19 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 def analysis_generate(
     pir: str,
     findings: str,
+    perspectives: str = "us, norway, china, eu, russia, neutral",
 ) -> str:
     """Prompt for synthesising processed findings into a structured intelligence analysis.
-
-    Moved from AnalysisPrototypeService._build_prompt() — same content, now served
-    via MCP so the backend fetches it through MCPClient instead of hardcoding it.
 
     Args:
         pir: The approved PIRs from the Direction phase (JSON string).
         findings: Processed findings JSON injected by the backend after reading
                   the session Resource (session://{session_id}/processed).
+        perspectives: Comma-separated list of selected perspective keys to generate
+                      implications for (e.g. "us, eu, neutral").
     """
     return build_analysis_generate_prompt(
         pir=pir,
         findings=findings,
+        perspectives=perspectives,
     )

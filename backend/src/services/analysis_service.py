@@ -35,7 +35,11 @@ class AnalysisService:
             async with self.mcp_client.connect():
                 system_prompt = await self.mcp_client.get_prompt(
                     "analysis_generate",
-                    {"pir": pir, "findings": findings_json},
+                    {
+                        "pir": pir,
+                        "findings": findings_json,
+                        "perspectives": ", ".join(normalized),
+                    },
                 )
                 agent = GeminiAgent(self.mcp_client)
                 raw = await agent.run(
@@ -74,6 +78,12 @@ class AnalysisService:
             llm_draft = fallback_draft
 
         merged = self._merge_with_fallback(llm_draft, fallback_draft)
+        # Enforce: only return implications for the selected perspectives
+        filtered_implications = {
+            k: v for k, v in merged.per_perspective_implications.items()
+            if k in normalized
+        }
+        merged = merged.model_copy(update={"per_perspective_implications": filtered_implications})
         return self._enrich_draft_assertions(merged, enriched_result), enriched_result
 
     def _enrich_findings(self, processing_result: ProcessingResult) -> ProcessingResult:
@@ -165,6 +175,7 @@ class AnalysisService:
         )
 
         return AnalysisDraft(
+            title="",
             summary=summary,
             key_judgments=[
                 f"{f.title}: {f.why_it_matters} Confidence: {f.confidence}/100."
@@ -179,10 +190,14 @@ class AnalysisService:
 
     def _merge_with_fallback(self, llm_draft: AnalysisDraft, fallback: AnalysisDraft) -> AnalysisDraft:
         merged_implications: dict[str, list[PerspectiveAssertion]] = {}
-        for key in _DEFAULT_PERSPECTIVES:
+        for key in llm_draft.per_perspective_implications:
             llm_values = llm_draft.per_perspective_implications.get(key, [])
             merged_implications[key] = llm_values or fallback.per_perspective_implications.get(key, [])
+        for key in fallback.per_perspective_implications:
+            if key not in merged_implications:
+                merged_implications[key] = fallback.per_perspective_implications[key]
         return AnalysisDraft(
+            title=llm_draft.title.strip() if hasattr(llm_draft, "title") else "",
             summary=llm_draft.summary.strip() or fallback.summary,
             key_judgments=llm_draft.key_judgments or fallback.key_judgments,
             per_perspective_implications=merged_implications,

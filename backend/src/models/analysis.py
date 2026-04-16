@@ -48,6 +48,7 @@ class ProcessingResult(BaseModel):
 class AnalysisDraft(BaseModel):
     """Draft analysis produced from processed findings."""
 
+    title: str = Field(default="", description="Concise AI-generated title for the analysis (6-10 words)")
     summary: str = Field(..., description="Short analytical summary")
     key_judgments: list[str] = Field(
         default_factory=list, description="Primary analytical judgments"

@@ -172,10 +172,18 @@ function PirRow({
           ▶
         </span>
 
-        {/* PIR question (truncated) */}
-        <p className="flex-1 text-sm leading-5 text-text-primary line-clamp-2">
-          {pir.pir_question}
-        </p>
+        {/* PIR question (truncated) with inline low/moderate indicator */}
+        <div className="flex-1 min-w-0">
+          {(pir.tier === "low" || pir.tier === "moderate") && (
+            <span className={`mr-2 inline-flex items-center gap-1 text-[10px] font-medium ${pir.tier === "low" ? "text-error-text" : "text-warning-text"}`}>
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${pir.tier === "low" ? "bg-error" : "bg-warning"}`} />
+              {pir.tier === "low" ? "Low" : "Moderate"} coverage
+            </span>
+          )}
+          <p className="text-sm leading-5 text-text-primary line-clamp-2">
+            {pir.pir_question}
+          </p>
+        </div>
 
         {/* Meta badges */}
         <div className="ml-2 flex shrink-0 flex-col items-end gap-1.5">
@@ -185,10 +193,7 @@ function PirRow({
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-1 space-y-3">
-          {/* Full question */}
-          <p className="text-xs leading-5 text-text-secondary">{pir.pir_question}</p>
-
+        <div className="border-t border-border/50 px-4 pb-4 pt-3 space-y-3">
           {/* Stats row */}
           <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
             <span>
@@ -248,8 +253,11 @@ export default function CollectionCoverageView({
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <TierBadge tier={aggregate_tier} score={aggregate_score} />
+              <span className="text-sm text-text-secondary">
+                {aggStyles.label} coverage
+              </span>
               <span className="text-[11px] text-text-muted">
-                {per_pir.length} PIR{per_pir.length !== 1 ? "s" : ""} assessed
+                · {per_pir.length} PIR{per_pir.length !== 1 ? "s" : ""} assessed
               </span>
             </div>
             <p className="text-sm leading-5 text-text-secondary">{summary}</p>

@@ -22,6 +22,9 @@ export default function CollectionStatsView({
 
   return (
     <div className="space-y-4">
+      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+        Collection Stats
+      </p>
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-2">

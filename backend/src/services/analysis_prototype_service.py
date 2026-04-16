@@ -87,6 +87,13 @@ class AnalysisPrototypeService:
             fallback_draft=fallback_draft,
         )
 
+        # Enforce: only return implications for the selected perspectives
+        filtered_implications = {
+            k: v for k, v in merged.per_perspective_implications.items()
+            if k in normalized_perspectives
+        }
+        merged = merged.model_copy(update={"per_perspective_implications": filtered_implications})
+
         # Layer 3: compute assertion-level confidence for each perspective
         enriched_draft = self._enrich_draft_assertions(merged, enriched_processing_result)
         return enriched_draft, enriched_processing_result
@@ -192,6 +199,7 @@ You are drafting an intelligence-analysis summary for an analyst UI.
 Use the processed findings below as the primary evidence base.
 Return only valid JSON matching this exact structure:
 {{
+  "title": "string — 6-10 word concise intelligence assessment title",
   "summary": "string",
   "key_judgments": ["string"],
   "per_perspective_implications": {{
@@ -200,12 +208,7 @@ Return only valid JSON matching this exact structure:
         "assertion": "string — analytical implication",
         "supporting_finding_ids": ["F-001"]
       }}
-    ],
-    "norway": [...],
-    "china": [...],
-    "eu": [...],
-    "russia": [...],
-    "neutral": [...]
+    ]
   }},
   "recommended_actions": ["string"],
   "information_gaps": ["string"]
@@ -214,14 +217,15 @@ Return only valid JSON matching this exact structure:
 Requirements:
 - Be analytical, specific, and grounded in the findings.
 - Do not mention being an AI.
+- Title must be 6-10 words, intelligence-report style (e.g. "China-Taiwan Conflict Probability Assessment Q2 2025").
 - Summary must be 2-4 sentences.
 - Key judgments must be distinct and substantive.
+- Only generate per_perspective_implications for these perspectives: {perspectives_text}
 - For each perspective, provide 2 concise implications as objects with "assertion" and "supporting_finding_ids".
 - supporting_finding_ids must only contain IDs from this list: {finding_ids_list}
 - If an implication is not directly traceable to a specific finding, use an empty array [].
 - Recommended actions should be actionable and analyst-relevant.
 - information_gaps must reflect the provided gaps.
-- Supported perspectives in this session: {perspectives_text}
 
 Processed findings:
 {findings_text}
@@ -253,6 +257,7 @@ Information gaps:
         recommended_actions = self._build_recommended_actions(findings, gaps)
 
         return AnalysisDraft(
+            title="",
             summary=summary,
             key_judgments=key_judgments,
             per_perspective_implications=per_perspective_implications,
@@ -266,13 +271,18 @@ Information gaps:
         fallback_draft: AnalysisDraft,
     ) -> AnalysisDraft:
         merged_implications: dict[str, list[PerspectiveAssertion]] = {}
-        for key in self.DEFAULT_PERSPECTIVES:
+        for key in llm_draft.per_perspective_implications:
             llm_values = llm_draft.per_perspective_implications.get(key, [])
             merged_implications[key] = llm_values or fallback_draft.per_perspective_implications.get(
                 key, []
             )
+        # Include any fallback keys not returned by LLM
+        for key in fallback_draft.per_perspective_implications:
+            if key not in merged_implications:
+                merged_implications[key] = fallback_draft.per_perspective_implications[key]
 
         return AnalysisDraft(
+            title=llm_draft.title.strip() or fallback_draft.title,
             summary=llm_draft.summary.strip() or fallback_draft.summary,
             key_judgments=llm_draft.key_judgments or fallback_draft.key_judgments,
             per_perspective_implications=merged_implications,

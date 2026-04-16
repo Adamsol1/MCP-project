@@ -92,6 +92,7 @@ export interface ProcessingResult {
 }
 
 export interface AnalysisDraft {
+  title: string;
   summary: string;
   key_judgments: string[];
   per_perspective_implications: Record<string, PerspectiveAssertion[]>;
