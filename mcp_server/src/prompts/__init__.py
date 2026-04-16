@@ -1,5 +1,6 @@
 """MCP Prompts package."""
 
+from .analysis import analysis_generate
 from .collection import (
     collection_collect,
     collection_modify,
@@ -20,3 +21,4 @@ def register_prompts(mcp) -> None:
     mcp.prompt(collection_modify)
     mcp.prompt(processing_process)
     mcp.prompt(processing_modify)
+    mcp.prompt(analysis_generate)

@@ -158,9 +158,12 @@ async def _build_draft(
         or state.analysis_draft is None
         or processing_changed
     ):
-        analysis_draft, enriched_processing_result = await analysis_service.generate_draft(
-            processing_result
-        )
+        draft_result = await analysis_service.generate_draft(processing_result)
+        if isinstance(draft_result, tuple):
+            analysis_draft, enriched_processing_result = draft_result
+        else:
+            analysis_draft = draft_result
+            enriched_processing_result = processing_result
         if force_refresh or processing_changed:
             state.session_id = session_id
             state.processing_result = enriched_processing_result

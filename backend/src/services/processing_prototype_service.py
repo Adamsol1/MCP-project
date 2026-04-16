@@ -25,8 +25,11 @@ PROCESSING_RESULT_UNAVAILABLE_MESSAGE = (
 
 def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
     """Attempt to extract a ProcessingResult from raw LLM output."""
-    match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
     candidate = match.group(1) if match else raw.strip()
+    if candidate.startswith("```"):
+        candidate = re.sub(r"^```(?:json)?\s*", "", candidate, flags=re.IGNORECASE)
+        candidate = re.sub(r"\s*```$", "", candidate).strip()
 
     try:
         payload = json.loads(candidate)
@@ -48,6 +51,9 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
         except ValidationError:
             return None
         return _convert_legacy_processing_result(legacy_result)
+
+    if "pmesii_entities" in payload:
+        return _convert_grouped_pmesii_result(payload)
 
     return None
 
@@ -105,6 +111,63 @@ def _convert_legacy_processing_result(
         )
 
     return ProcessingResult(findings=findings, gaps=list(legacy_result.gaps))
+
+
+def _convert_grouped_pmesii_result(payload: dict) -> ProcessingResult | None:
+    """Convert grouped PMESII output from older processing runs."""
+    grouped = payload.get("pmesii_entities")
+    if not isinstance(grouped, dict):
+        return None
+
+    findings: list[dict[str, object]] = []
+    finding_index = 1
+    for category, items in grouped.items():
+        if not isinstance(items, list):
+            continue
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            text = str(item.get("entity") or item.get("description") or "").strip()
+            if not text:
+                continue
+            source = str(item.get("source") or "unknown")
+            resource_id = str(item.get("resource_id") or "").strip()
+            supporting_data: dict[str, list[str]] = {
+                "categories": [str(category)],
+                "sources": [source],
+            }
+            if resource_id:
+                supporting_data["source_refs"] = [resource_id]
+
+            findings.append(
+                {
+                    "id": f"F-{finding_index:02d}",
+                    "title": text[:80],
+                    "finding": text,
+                    "evidence_summary": (
+                        f"Extracted from {source}"
+                        + (f" resource {resource_id}." if resource_id else ".")
+                    ),
+                    "source": source,
+                    "confidence": 70,
+                    "relevant_to": [],
+                    "supporting_data": supporting_data,
+                    "why_it_matters": (
+                        f"This {category} factor contributes to the overall assessment."
+                    ),
+                    "uncertainties": [],
+                }
+            )
+            finding_index += 1
+
+    if not findings:
+        return None
+
+    gaps = payload.get("gaps")
+    return ProcessingResult(
+        findings=findings,
+        gaps=[str(gap) for gap in gaps] if isinstance(gaps, list) else [],
+    )
 
 
 class ProcessingPrototypeService:

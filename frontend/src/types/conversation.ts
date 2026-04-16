@@ -1,3 +1,4 @@
+import type { AnalysisDraftResponse, CouncilNote } from "./analysis";
 import type {
   DialoguePhase,
   DialogueStage,
@@ -20,6 +21,8 @@ export interface Message {
     | "suggested_sources"
     | "collection"
     | "processing"
+    | "analysis"
+    | "council"
     | "error"
     | "complete";
   data?:
@@ -29,7 +32,9 @@ export interface Message {
     | SuggestedSourcesData
     | CollectionSummaryData
     | CollectionDisplayData
-    | ProcessingData;
+    | ProcessingData
+    | AnalysisDraftResponse
+    | CouncilNote;
 }
 
 /**
@@ -200,18 +205,18 @@ export interface CollectionSourceSummary {
 }
 
 /**
- * A single attempt entry in the activity summary, showing what the collector
- * did and what feedback the reviewer gave for that attempt.
+ * A single AI review attempt for any phase (direction, collection, processing).
+ * Replaces the old ActivitySummaryItem — decoupled from the collection object.
  */
-export interface ActivitySummaryItem {
-  /** Attempt number, starting at 1. */
+export interface PhaseReviewItem {
+  phase: "direction" | "collection" | "processing";
   attempt: number;
-  /** Display names of the sources the collector queried in this attempt. */
-  collector_sources: string[];
-  /** Whether the reviewer approved the collected data on this attempt. */
   reviewer_approved: boolean;
-  /** Reviewer suggestions for improvement, or null if approved with no comments. */
   reviewer_suggestions: string | null;
+  /** Sources queried by the collector — only populated in the collection phase. */
+  sources_used: string[];
+  /** Full transcript of what the AI generated in this attempt. */
+  generated_content: string | null;
 }
 
 export interface ProcessingFinding {
@@ -246,6 +251,4 @@ export interface CollectionDisplayData {
   collected_data: CollectedItem[];
   source_summary: CollectionSourceSummary[];
   parse_error?: string;
-  /** Per-attempt summary of what the collector did and what the reviewer said. */
-  activity_summary?: ActivitySummaryItem[];
 }

@@ -1,6 +1,8 @@
 """Models for analysis-phase processing results, drafts, and council output."""
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.confidence import FindingConfidence, PerspectiveAssertion
 
@@ -60,6 +62,24 @@ class AnalysisDraft(BaseModel):
     information_gaps: list[str] = Field(
         default_factory=list, description="Remaining information gaps"
     )
+
+    @field_validator("per_perspective_implications", mode="before")
+    @classmethod
+    def _coerce_legacy_implications(cls, value: Any) -> Any:
+        """Accept older drafts where implications were plain strings."""
+        if not isinstance(value, dict):
+            return value
+
+        normalized: dict[str, list[Any]] = {}
+        for perspective, implications in value.items():
+            if not isinstance(implications, list):
+                normalized[perspective] = implications
+                continue
+            normalized[perspective] = [
+                {"assertion": item} if isinstance(item, str) else item
+                for item in implications
+            ]
+        return normalized
 
 
 class CouncilTranscriptEntry(BaseModel):

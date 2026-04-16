@@ -7,7 +7,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
-from src.api.dialogue import evict_session
+from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
 from src.db.engine import get_sessions_engine, get_knowledge_engine
 from src.db.unit_of_work import UnitOfWork, get_uow
@@ -19,6 +19,8 @@ from src.importers.session_uploads import (
     save_session_upload,
 )
 from src.logging_config import setup_logging
+from src.services.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
+from src.services.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
 load_dotenv()
@@ -30,13 +32,19 @@ logger = logging.getLogger("app")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Application lifecycle: initialize DB engines on startup."""
-    # Eagerly create engines to validate DB connectivity
+    """Application lifecycle: initialize DB engines and start council MCP."""
+    # Initialize DB engines so connectivity issues surface at startup
     get_sessions_engine()
     get_knowledge_engine()
+    # Keep legacy sessions/ dir creation for dev-tool snapshot endpoints
+    ensure_sessions_dir()
+    council_mcp_process = await maybe_start_council_mcp(get_council_mcp_url())
     logger.info("Application started — database engines initialized")
-    yield
-    logger.info("Application stopped")
+    try:
+        yield
+    finally:
+        await stop_council_mcp(council_mcp_process)
+        logger.info("Application stopped")
 
 
 app = FastAPI(lifespan=lifespan)

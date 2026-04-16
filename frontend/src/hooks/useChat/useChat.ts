@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getDevDialogueState,
+  listDevDialogueSnapshots,
   resetDevDialogueState,
+  restoreDevDialogueSnapshot,
   sendMessage,
   setDevDialogueState,
+  type CouncilRunSettings,
   type DialogueApiResponse,
+  type DialogueDevSnapshot,
   type DialogueSendOptions,
 } from "../../services/dialogue/dialogue";
 import type {
@@ -15,6 +19,7 @@ import type {
 } from "../../types/dialogue";
 import { useConversation } from "../useConversation/useConversation";
 import { useToast } from "../useToast/useToast";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type {
   CollectionPlanData,
   CollectionPlanStep,
@@ -26,7 +31,10 @@ import type {
   SuggestedSourcesData,
   SummaryData,
 } from "../../types/conversation";
+import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+
+let didRequestInitialDevSnapshots = false;
 
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
@@ -48,6 +56,8 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   start_collecting: "question",
   show_collection: "collection",
   show_processing: "processing",
+  show_analysis: "analysis",
+  show_council: "council",
   select_gaps: "question",
   error: "error",
   complete: "complete",
@@ -107,7 +117,7 @@ function normalizeSourceLabel(raw: string): string {
     return "AlienVault OTX";
   }
   if (lower.includes("knowledge") && lower.includes("bank")) {
-    return "Internal Knowledge Bank";
+    return "Knowledge Bank";
   }
   if (lower.includes("misp")) {
     return "MISP";
@@ -257,6 +267,12 @@ function inferStageFromResponse(
   if (response.action === "show_processing") {
     return { stage: "processing", subState: "awaiting_decision" };
   }
+  if (response.action === "show_analysis") {
+    return { stage: "pending", subState: null };
+  }
+  if (response.action === "show_council") {
+    return { stage: "idle", subState: null };
+  }
   if (response.action === "select_gaps") {
     return { stage: "reviewing", subState: "awaiting_gather_more" };
   }
@@ -372,6 +388,24 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       break;
     }
 
+    case "analysis": {
+      const parsed = tryParseJson<AnalysisDraftResponse>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Analysis complete";
+      break;
+    }
+
+    case "council": {
+      const parsed = tryParseJson<CouncilNote>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Council deliberation complete";
+      break;
+    }
+
     case "suggested_sources": {
       const sources = parseSuggestedSources(response.question);
       if (sources.length > 0) {
@@ -399,10 +433,16 @@ function getFeedbackPrompt(stage: DialogueStage): string {
 }
 
 export function useChat(initialPerspectives?: string[]) {
-  const { activeConversation, createNewConversation, addMessage, setStage } =
-    useConversation();
+  const {
+    activeConversation,
+    createNewConversation,
+    addMessage,
+    replaceMessages,
+    setStage,
+  } = useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
+  const { setReviewActivity } = useWorkspace();
   const [isLoading, setIsLoading] = useState(false);
   const [isDecisionPending, setIsDecisionPending] = useState(false);
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
@@ -415,6 +455,8 @@ export function useChat(initialPerspectives?: string[]) {
   const [pendingGatherMoreText, setPendingGatherMoreText] = useState<
     string | null
   >(null);
+  const [devSnapshots, setDevSnapshots] = useState<DialogueDevSnapshot[]>([]);
+  const [isDevSnapshotsLoading, setIsDevSnapshotsLoading] = useState(false);
 
   const messages = useMemo(
     () => activeConversation?.messages ?? [],
@@ -477,14 +519,20 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackSubState: DialogueSubState,
     fallbackPhase: DialoguePhase,
   ) => {
-    addMessage(buildSystemMessage(response), conversationId);
+    if (response.action !== "complete") {
+      addMessage(buildSystemMessage(response), conversationId);
+    }
 
-    const next = inferStageFromResponse(
-      response,
-      fallbackStage,
-      fallbackSubState,
-    );
+    const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
     const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
+
+    // Reset review activity when phase changes, then apply new data if present
+    if (nextPhase !== fallbackPhase) {
+      setReviewActivity(response.review_activity ?? []);
+    } else if (response.review_activity && response.review_activity.length > 0) {
+      setReviewActivity(response.review_activity);
+    }
+
     setStage(conversationId, next.stage, next.subState, nextPhase);
   };
 
@@ -836,9 +884,113 @@ export function useChat(initialPerspectives?: string[]) {
     }
   };
 
+  const sendCouncilRequest = async (params: {
+    debatePoint: string;
+    findingIds: string[];
+    perspectives: string[];
+    councilSettings: CouncilRunSettings;
+  }) => {
+    if (!activeConversation) return;
+    setIsLoading(true);
+    try {
+      const response = await sendMessage(
+        "",
+        activeConversation.sessionId,
+        activeConversation.perspectives,
+        undefined,
+        settings.aiLanguage,
+        "",
+        {
+          councilDebatePoint: params.debatePoint,
+          councilFindingIds: params.findingIds,
+          councilPerspectives: params.perspectives,
+          councilSettings: params.councilSettings,
+        },
+      );
+      if (response.action === "error") {
+        throw new Error(response.question || "Council run failed.");
+      }
+      applyResponse(response, activeConversation.id, "idle", null, "analysis");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const refreshDevSnapshots = async () => {
+    setIsDevSnapshotsLoading(true);
+    try {
+      const snapshots = await listDevDialogueSnapshots();
+      setDevSnapshots(snapshots);
+      if (snapshots.length === 0) {
+        info("No previous backend runs found.");
+      }
+    } catch (e) {
+      const status =
+        typeof e === "object" && e !== null && "response" in e
+          ? (e as { response?: { status?: number } }).response?.status
+          : undefined;
+      error(
+        status === 404
+          ? "Previous-run dev endpoint not found. Restart the backend."
+          : "Failed to load previous runs",
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (didRequestInitialDevSnapshots) return;
+    didRequestInitialDevSnapshots = true;
+    void refreshDevSnapshots();
+    // Dev snapshot loading is intentionally one-shot on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const restoreDevSnapshot = async (
+    sourceSessionId: string,
+    targetStage: DialogueStage,
+    targetPhase: DialoguePhase,
+  ) => {
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
+    setIsDevSnapshotsLoading(true);
+    try {
+      const response = await restoreDevDialogueSnapshot(
+        sourceSessionId,
+        conversation.sessionId,
+        targetStage,
+        targetPhase,
+      );
+      replaceMessages(
+        conversation.id,
+        response.messages.map((message) => ({
+          ...message,
+          id: crypto.randomUUID(),
+        })),
+      );
+      setStage(
+        conversation.id,
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
+      success(`Loaded previous run: ${sourceSessionId.slice(0, 8)}`);
+    } catch (e) {
+      error(
+        `Failed to restore previous run: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+    }
+  };
+
   return {
     messages,
     sendMessage: handleSendMessage,
+    sendCouncilRequest,
     isConfirming,
     stage,
     subState,
@@ -857,6 +1009,10 @@ export function useChat(initialPerspectives?: string[]) {
     jumpToDevStage,
     syncDevStage,
     resetDevStage,
+    devSnapshots,
+    isDevSnapshotsLoading,
+    refreshDevSnapshots,
+    restoreDevSnapshot,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,

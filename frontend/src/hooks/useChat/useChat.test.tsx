@@ -5,6 +5,7 @@ import { useChat } from "./useChat";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { ConversationStore } from "../../types/conversation";
 
 // Mock the dialogue service so we don't make real API calls
@@ -19,7 +20,9 @@ function createWrapper() {
     return (
       <SettingsProvider>
         <ToastProvider>
-          <ConversationProvider>{children}</ConversationProvider>
+          <WorkspaceProvider>
+            <ConversationProvider>{children}</ConversationProvider>
+          </WorkspaceProvider>
         </ToastProvider>
       </SettingsProvider>
     );

@@ -19,13 +19,13 @@ from src.services.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
 
-_DEFAULT_SOURCE = "Internal Knowledge Bank"
+_DEFAULT_SOURCE = "Knowledge Bank"
 _SESSIONS_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "sessions"
 
 # Maps UI source names to the MCP tool names they are allowed to call.
 # Must stay in sync with SOURCE_TOOL_MAP in mcp_server/src/prompts/__init__.py.
 _SOURCE_TO_TOOLS: dict[str, list[str]] = {
-    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
     "Web Search": ["google_search"],
@@ -38,7 +38,7 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
 _SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
     (("otx",),               "AlienVault OTX"),
     (("alienvault",),        "AlienVault OTX"),
-    (("knowledge", "bank"),  "Internal Knowledge Bank"),
+    (("knowledge", "bank"),  "Knowledge Bank"),
     (("misp",),              "MISP"),
     (("upload",),            "Uploaded Documents"),
     (("local document",),    "Uploaded Documents"),
@@ -47,9 +47,9 @@ _SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
 ]
 
 _SOURCE_ALIASES = {
-    "internal knowledge bank": "Internal Knowledge Bank",
-    "knowledge bank": "Internal Knowledge Bank",
-    "local knowledge bank": "Internal Knowledge Bank",
+    "internal knowledge bank": "Knowledge Bank",
+    "knowledge bank": "Knowledge Bank",
+    "local knowledge bank": "Knowledge Bank",
     "otx": "AlienVault OTX",
     "alienvault": "AlienVault OTX",
     "alienvault otx": "AlienVault OTX",
@@ -63,8 +63,8 @@ _SOURCE_ALIASES = {
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
-    "list_knowledge_base": "Internal Knowledge Bank",
-    "read_knowledge_base": "Internal Knowledge Bank",
+    "list_knowledge_base": "Knowledge Bank",
+    "read_knowledge_base": "Knowledge Bank",
     "query_otx": "AlienVault OTX",
     "search_local_data": "Uploaded Documents",
     "list_uploads": "Uploaded Documents",

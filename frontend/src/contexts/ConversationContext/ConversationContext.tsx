@@ -50,6 +50,8 @@ export interface ConversationContextValue {
    * When conversationId is omitted it falls back to the active conversation.
    */
   addMessage: (message: Message, conversationId?: string) => void;
+  /** DEV: Replace a conversation's visible message history with restored artifacts. */
+  replaceMessages: (conversationId: string, messages: Message[]) => void;
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
   /** Set canonical backend dialogue stage and optional sub-state for a specific conversation. */
@@ -76,6 +78,10 @@ type Action =
   | {
       type: "ADD_MESSAGE";
       payload: { conversationId: string; message: Message };
+    }
+  | {
+      type: "REPLACE_MESSAGES";
+      payload: { conversationId: string; messages: Message[] };
     }
   | { type: "SET_IS_CONFIRMING"; payload: boolean }
   | {
@@ -180,6 +186,25 @@ function conversationReducer(
             updatedAt: Date.now(),
           };
         }),
+      };
+    }
+
+    case "REPLACE_MESSAGES": {
+      const { conversationId, messages } = action.payload;
+      return {
+        ...state,
+        conversations: state.conversations.map((conv) =>
+          conv.id === conversationId
+            ? {
+                ...conv,
+                messages,
+                title:
+                  messages.find((message) => message.sender === "user")
+                    ?.text.slice(0, 50) || conv.title,
+                updatedAt: Date.now(),
+              }
+            : conv,
+        ),
       };
     }
 
@@ -322,6 +347,16 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     [activeConversation],
   );
 
+  const replaceMessages = useCallback(
+    (conversationId: string, messages: Message[]) => {
+      dispatch({
+        type: "REPLACE_MESSAGES",
+        payload: { conversationId, messages },
+      });
+    },
+    [],
+  );
+
   const setIsConfirming = useCallback((value: boolean) => {
     dispatch({ type: "SET_IS_CONFIRMING", payload: value });
   }, []);
@@ -351,6 +386,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     deleteAllConversations,
     renameConversation,
     addMessage,
+    replaceMessages,
     setIsConfirming,
     setStage,
     updatePerspectives,

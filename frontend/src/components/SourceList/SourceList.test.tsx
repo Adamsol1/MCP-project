@@ -26,7 +26,7 @@ const sourceNorway: Source = {
     author: "Threat Intelligence System",
     year: "2025",
     title: "Norwegian-Russian Geopolitical Relations",
-    publisher: "Internal Knowledge Bank",
+    publisher: "Knowledge Bank",
   },
 };
 
@@ -38,7 +38,7 @@ const sourceEnergy: Source = {
     author: "Threat Intelligence System",
     year: "2025",
     title: "Energy Sector Threat Landscape",
-    publisher: "Internal Knowledge Bank",
+    publisher: "Knowledge Bank",
   },
 };
 
@@ -57,7 +57,7 @@ describe("SourceList — APA7th formatting", () => {
     expect(
       screen.getByText(/Threat Intelligence System\. \(2025\)\./)
     ).toBeInTheDocument();
-    expect(screen.getByText(/Internal Knowledge Bank\./)).toBeInTheDocument();
+    expect(screen.getByText(/Knowledge Bank\./)).toBeInTheDocument();
   });
 
   it("renders the title in italics", () => {

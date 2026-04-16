@@ -13,7 +13,9 @@ export default function PirSourcesView() {
     setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
   };
 
-  if (!pirData || pirData.sources.length === 0) {
+  if (!pirData) return null;
+
+  if (pirData.sources.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-secondary">
         {t.noSourcesAvailable}

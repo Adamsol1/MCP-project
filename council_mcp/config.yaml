@@ -87,11 +87,9 @@ cli_tools:
     # This ensures deliberations work seamlessly regardless of Droid's permission requirements.
 
   gemini:
-    command: "node"
+    command: "gemini"
     args:
       [
-        "--no-warnings=DEP0040",
-        "C:\\Users\\herma\\AppData\\Roaming\\npm\\node_modules\\@google\\gemini-cli\\dist\\index.js",
         "-m",
         "{model}",
         "-p",

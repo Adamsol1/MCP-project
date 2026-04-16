@@ -14,6 +14,7 @@ from tools.google_search import register_google_search_tools
 from tools.knowledge_tools import register_knowledge_resources, register_knowledge_tools
 from tools.local_search import register_local_search_tools
 from tools.otx_tools import register_otx_tools
+from tools.session_resources import register_session_resources
 from tools.upload_tools import register_upload_tools
 
 load_dotenv()
@@ -30,6 +31,7 @@ mcp = FastMCP(
 
 # Tools and resources registration
 register_knowledge_resources(mcp)
+register_session_resources(mcp)
 register_knowledge_tools(mcp)
 register_upload_tools(mcp)
 register_google_search_tools(mcp)
