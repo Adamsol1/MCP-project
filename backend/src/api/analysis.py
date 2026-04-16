@@ -6,9 +6,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from src.db.unit_of_work import UnitOfWork, get_uow
 from src.models.analysis import (
     AnalysisDraft,
     CouncilNote,
@@ -40,12 +41,24 @@ class AnalysisDraftRequest(BaseModel):
     force_refresh: bool = False
 
 
-def _load_pirs_for_session(session_id: str) -> list[dict]:
-    """Load the approved PIR list from the direction-phase session JSON.
+async def _load_pirs_for_session(session_id: str, uow: UnitOfWork | None = None) -> list[dict]:
+    """Load the approved PIR list from sessions.db or legacy JSON.
 
-    Returns an empty list if the file is missing or malformed — coverage
+    Returns an empty list if the session is missing or malformed — coverage
     will still compute (all PIRs will be LOW), so callers never crash.
     """
+    # Try DB first
+    if uow:
+        try:
+            row = await uow.sessions.get(session_id)
+            if row and row.current_pir:
+                pir_data = json.loads(row.current_pir)
+                pirs: list[dict] = pir_data.get("pirs", [])
+                return [p for p in pirs if isinstance(p, dict) and "question" in p]
+        except Exception:
+            logger.debug("DB PIR load failed for %s, trying file fallback", session_id)
+
+    # Legacy file fallback
     session_path = _SESSIONS_DIR / f"{session_id}.json"
     if not session_path.exists():
         logger.debug("Session file not found for PIR loading: %s", session_path)
@@ -56,7 +69,7 @@ def _load_pirs_for_session(session_id: str) -> list[dict]:
         if not current_pir_raw:
             return []
         pir_data = json.loads(current_pir_raw)
-        pirs: list[dict] = pir_data.get("pirs", [])
+        pirs = pir_data.get("pirs", [])
         return [p for p in pirs if isinstance(p, dict) and "question" in p]
     except (OSError, json.JSONDecodeError, AttributeError):
         logger.warning("Failed to load PIRs from session %s", session_id)
@@ -127,15 +140,16 @@ class AnalysisCouncilRequest(BaseModel):
 async def _build_draft(
     session_id: str,
     store: AnalysisSessionStore,
+    uow: UnitOfWork | None = None,
     force_refresh: bool = False,
     processing_service: ProcessingPrototypeService | None = None,
     analysis_service: AnalysisPrototypeService | None = None,
 ) -> AnalysisDraftResponse:
-    processing_service = processing_service or ProcessingPrototypeService()
+    processing_service = processing_service or ProcessingPrototypeService(uow=uow)
     analysis_service = analysis_service or AnalysisPrototypeService()
 
-    state = store.get_or_create(session_id)
-    processing_result = processing_service.get_processing_result(session_id)
+    state = await store.get_or_create(session_id)
+    processing_result = await processing_service.get_processing_result(session_id)
     processing_changed = state.processing_result != processing_result
 
     if (
@@ -152,14 +166,14 @@ async def _build_draft(
             state.processing_result = enriched_processing_result
             state.analysis_draft = analysis_draft
             state.latest_council_note = None
-            state = store.save(state)
+            state = await store.save(state)
         else:
-            state = store.save_draft(
+            state = await store.save_draft(
                 session_id, enriched_processing_result, analysis_draft
             )
         processing_result = enriched_processing_result
 
-    pirs = _load_pirs_for_session(session_id)
+    pirs = await _load_pirs_for_session(session_id, uow=uow)
     coverage = compute_collection_coverage(
         findings=processing_result.findings,
         gaps=processing_result.gaps,
@@ -178,14 +192,16 @@ async def _build_draft(
 @router.post("/draft", response_model=AnalysisDraftResponse)
 async def create_analysis_draft(
     request: AnalysisDraftRequest,
+    uow: UnitOfWork = Depends(get_uow),
 ) -> AnalysisDraftResponse:
     """Load the prototype processing result and generate a draft analysis."""
-    store = AnalysisSessionStore()
+    store = AnalysisSessionStore(uow=uow)
 
     try:
         return await _build_draft(
             request.session_id,
             store,
+            uow=uow,
             force_refresh=request.force_refresh,
         )
     except ValueError as exc:
@@ -200,9 +216,10 @@ async def create_analysis_draft(
 @router.post("/council", response_model=CouncilNote)
 async def create_analysis_council(
     request: AnalysisCouncilRequest,
+    uow: UnitOfWork = Depends(get_uow),
 ) -> CouncilNote:
     """Run a council deliberation against the current analysis-stage state."""
-    store = AnalysisSessionStore()
+    store = AnalysisSessionStore(uow=uow)
     council_service = CouncilService()
     research_logger = ResearchLogger(session_id=request.session_id)
 
@@ -210,6 +227,7 @@ async def create_analysis_council(
         draft_response = await _build_draft(
             request.session_id,
             store,
+            uow=uow,
         )
     except ValueError as exc:
         status_code = (
@@ -251,7 +269,7 @@ async def create_analysis_council(
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
-        store.save_council_note(request.session_id, council_note)
+        await store.save_council_note(request.session_id, council_note)
         research_logger.create_log(
             {
                 "timestamp": datetime.now(UTC).isoformat(),

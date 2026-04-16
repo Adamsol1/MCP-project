@@ -494,13 +494,13 @@ function CouncilParticipantPanel({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[20px] border border-border bg-[linear-gradient(135deg,rgba(255,255,255,0.82)_0%,rgba(244,239,230,0.82)_100%)] px-4 py-4">
+      <section className="rounded-[20px] border border-border bg-surface-muted px-4 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
             Active view
           </span>
           {participantView.latestEntry ? (
-            <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] text-text-secondary">
+            <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] text-text-secondary">
               Round {participantView.latestEntry.round}
             </span>
           ) : null}
@@ -579,7 +579,7 @@ const ASSERTION_TIER_STYLES: Record<
   low: { bg: "bg-error-subtle", text: "text-error-text", border: "border-error/30", label: "Low" },
   moderate: { bg: "bg-warning-subtle", text: "text-warning-text", border: "border-warning/30", label: "Moderate" },
   high: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "High" },
-  assessed: { bg: "bg-[#edf6f0]", text: "text-[#1a6640]", border: "border-[#1a6640]/20", label: "Assessed" },
+  assessed: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "Assessed" },
 };
 
 function AssertionTierBadge({ confidence }: { confidence: AssertionConfidence | null }) {
@@ -943,11 +943,11 @@ export default function AnalysisPrototypeView() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-8">
-      <section className="overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(135deg,#f4efe6_0%,#edf3f4_48%,#f5f7fb_100%)] shadow-sm">
+      <section className="overflow-hidden rounded-[28px] border border-border bg-surface-muted shadow-sm">
         <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1.5fr,0.9fr]">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
+              <span className="rounded-full border border-border bg-surface/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
                 Draft Analysis
               </span>
             </div>
@@ -962,7 +962,7 @@ export default function AnalysisPrototypeView() {
           </div>
 
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 Findings
               </p>
@@ -970,7 +970,7 @@ export default function AnalysisPrototypeView() {
                 {processingResult.findings.length}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 Avg confidence
               </p>
@@ -988,7 +988,7 @@ export default function AnalysisPrototypeView() {
                 </div>
               </div>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 ATT&CK Techniques
               </p>
@@ -996,7 +996,7 @@ export default function AnalysisPrototypeView() {
                 {uniqueTechniques.length}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 Shared indicators
               </p>
@@ -1009,7 +1009,7 @@ export default function AnalysisPrototypeView() {
                 )}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 Timeline span
               </p>
@@ -1017,7 +1017,7 @@ export default function AnalysisPrototypeView() {
                 {timelineSpan}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">
                 Sources
               </p>
@@ -1152,7 +1152,7 @@ export default function AnalysisPrototypeView() {
                     <span className="rounded-full border border-border bg-surface-muted px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-text-muted">
                       {finding.id}
                     </span>
-                    <span className="rounded-full border border-border bg-white px-2.5 py-1 text-[11px] uppercase tracking-wide text-text-secondary">
+                    <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] uppercase tracking-wide text-text-secondary">
                       {formatSourceLabel(finding.source)}
                     </span>
                   </div>

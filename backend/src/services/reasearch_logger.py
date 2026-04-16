@@ -1,54 +1,115 @@
+"""ResearchLogger — writes research/reasoning log entries to sessions.db.
+
+Uses the sync sqlite3 module because the logger is invoked from many sync
+contexts (state machines, agent callbacks). The `research_log_entries` table
+holds both append-style entries (ai_generation, user_action) and the full
+reasoning trace written on PIR approval.
+"""
+
 import json
 import logging
+import os
+import sqlite3
+import threading
+from datetime import UTC, datetime
 from pathlib import Path
 
 from src.models.reasoning import ReasoningLog
 
 logger = logging.getLogger("app")
 
+_BACKEND_ROOT = Path(__file__).resolve().parents[2]
+_DEFAULT_DATA_DIR = _BACKEND_ROOT / "data"
+
+_conn: sqlite3.Connection | None = None
+_conn_lock = threading.Lock()
+
+
+def _db_path() -> str:
+    override = os.getenv("SESSIONS_DB_PATH")
+    if override:
+        return override
+    _DEFAULT_DATA_DIR.mkdir(parents=True, exist_ok=True)
+    return str(_DEFAULT_DATA_DIR / "sessions.db")
+
+
+def _get_connection() -> sqlite3.Connection:
+    global _conn
+    if _conn is None:
+        with _conn_lock:
+            if _conn is None:
+                _conn = sqlite3.connect(_db_path(), check_same_thread=False)
+                _conn.execute("PRAGMA journal_mode=WAL")
+                _conn.execute("PRAGMA busy_timeout=5000")
+    return _conn
+
 
 class ResearchLogger:
-    """
-    Writes session logs to disk in JSON format
+    """Persists per-session research and reasoning logs to sessions.db.
 
-    Uses two different log types:
-    - research_log_{session_id}.jsonl .Append one entry per line (user actions + AI attempts)
-    - reasoning_log_{session_id}.json  .Single file written on PIR approval (full reasoning trace)
-
+    Two entry types land in the `research_log_entries` table:
+      - "ai_generation" / "user_action" — appended via create_log()
+      - "reasoning_log" — full reasoning trace written via write_reasoning_log()
     """
 
-    def __init__(self, log_path=None, session_id=None):
-        # Use given log_path
-        if log_path:
-            self.log_path = Path(log_path)
-        # Use default logpath
-        else:
-            self.log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"research_log_{session_id}.jsonl"
+    def __init__(self, session_id: str | None = None, log_path=None):
+        # log_path is kept for backwards compatibility with existing callers;
+        # it is ignored (all logs now go to DB).
+        self.session_id = session_id
+        # Some callers (e.g., main.py delete_session) read .log_path.parent to
+        # clean up legacy files. Provide a harmless path for that.
+        self.log_path = _DEFAULT_DATA_DIR / "outputs" / f"research_log_{session_id}.jsonl"
 
-        self.log_path.parent.mkdir(parents=True, exist_ok=True)
-
-    def create_log(self, log_entry):
-        "Append single log entry to sessions JSON log"
-        # Convert Pydantic model to dict, then to json
+    def create_log(self, log_entry) -> None:
+        """Append a single research log entry (ai_generation or user_action)."""
         if hasattr(log_entry, "model_dump"):
-            log_entry = log_entry.model_dump(mode="json")
-        converted_log = json.dumps(log_entry)
-        # Attempt to write to disk
+            payload = log_entry.model_dump(mode="json")
+        elif isinstance(log_entry, dict):
+            payload = log_entry
+        else:
+            payload = {"raw": str(log_entry)}
+
+        entry_type = payload.get("entry_type") or payload.get("action") or "ai_generation"
+        phase = payload.get("phase")
+        session_id = payload.get("session_id") or self.session_id
+        if not session_id:
+            logger.warning("[ResearchLogger] create_log called without session_id")
+            return
+
         try:
-            with open(self.log_path, "a", encoding="utf-8") as f:
-                f.write(converted_log + "\n")
-        # Cast error if unsuccesfull.
-        except OSError as e:
+            conn = _get_connection()
+            conn.execute(
+                """INSERT INTO research_log_entries
+                       (session_id, entry_type, phase, timestamp, content)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    session_id,
+                    entry_type,
+                    phase,
+                    payload.get("timestamp") or datetime.now(UTC).isoformat(),
+                    json.dumps(payload),
+                ),
+            )
+            conn.commit()
+        except Exception as e:
             logger.error(f"[ResearchLogger] Failed to write log entry: {e}")
 
     def write_reasoning_log(self, reasoning_log: "ReasoningLog") -> None:
-        """
-        Writes fulll reasoning log to JSON file.
-        """
-        log_path = Path(__file__).resolve().parents[2] / "data" / "outputs" / f"reasoning_log_{reasoning_log.session_id}.json"
-        log_path.parent.mkdir(parents=True, exist_ok=True)
+        """Persist the full reasoning trace (one row per PIR approval)."""
         try:
-            with open(log_path, "w", encoding="utf-8") as f:
-                f.write(reasoning_log.model_dump_json(indent=2))
-        except OSError as e:
+            conn = _get_connection()
+            conn.execute(
+                """INSERT INTO research_log_entries
+                       (session_id, entry_type, phase, timestamp, content)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (
+                    reasoning_log.session_id,
+                    "reasoning_log",
+                    reasoning_log.phase,
+                    datetime.now(UTC).isoformat(),
+                    reasoning_log.model_dump_json(),
+                ),
+            )
+            conn.commit()
+        except Exception as e:
             logger.error(f"[ResearchLogger] Failed to write reasoning log: {e}")

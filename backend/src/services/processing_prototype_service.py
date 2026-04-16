@@ -1,4 +1,8 @@
-"""Service for loading processing results from session artifacts only."""
+"""Service for loading processing results from session artifacts.
+
+Reads from the processing_attempts table in sessions.db.
+Falls back to the legacy processed.json files if DB load fails.
+"""
 
 import json
 import logging
@@ -12,6 +16,7 @@ from src.models.processing import ProcessingResult as LegacyProcessingResult
 
 logger = logging.getLogger(__name__)
 
+# Legacy fallback path — kept for pre-migration data
 _SESSIONS_DATA_DIR = Path(__file__).resolve().parents[2] / "data" / "sessions"
 PROCESSING_RESULT_UNAVAILABLE_MESSAGE = (
     "No processed result available for this session. Complete processing first."
@@ -103,22 +108,63 @@ def _convert_legacy_processing_result(
 
 
 class ProcessingPrototypeService:
-    """Loads a processing result from a session's processed.json."""
+    """Loads a processing result from the processing_attempts DB table."""
 
-    def get_processing_result(self, session_id: str) -> ProcessingResult:
-        """Load and validate the session processing result."""
+    def __init__(self, uow=None):
+        self._uow = uow
+
+    async def get_processing_result(self, session_id: str) -> ProcessingResult:
+        """Load and validate the session processing result from DB (or legacy JSON)."""
+        # Try DB first
+        if self._uow:
+            result = await self._try_load_from_db(session_id)
+            if result is not None:
+                logger.info(
+                    "Loaded processing result from processing_attempts table for session %s",
+                    session_id,
+                )
+                return result
+
+        # Legacy fallback: JSON file
         processed_path = _SESSIONS_DATA_DIR / session_id / "processed.json"
         result = self._try_load_session(processed_path)
-        if result is None:
-            raise ValueError(PROCESSING_RESULT_UNAVAILABLE_MESSAGE)
+        if result is not None:
+            logger.info(
+                "Loaded processing result from legacy processed.json for session %s",
+                session_id,
+            )
+            return result
+
+        raise ValueError(PROCESSING_RESULT_UNAVAILABLE_MESSAGE)
+
+    async def _try_load_from_db(self, session_id: str) -> ProcessingResult | None:
+        """Read processing attempts from DB, return the latest valid ProcessingResult."""
+        try:
+            attempts = await self._uow.processing_attempts.get_all(session_id)
+        except Exception:
+            logger.exception(
+                "DB load failed for session %s processing attempts", session_id
+            )
+            return None
+
+        if not attempts:
+            return None
+
+        # Walk attempts newest-first to find the most recent valid result
+        for attempt in reversed(attempts):
+            result = _try_parse_processing_result(attempt.raw_result)
+            if result is not None:
+                return result
 
         logger.info(
-            "Loaded processing result from session %s processed.json", session_id
+            "No valid ProcessingResult found in %d DB attempts for session %s",
+            len(attempts),
+            session_id,
         )
-        return result
+        return None
 
     def _try_load_session(self, processed_path: Path) -> ProcessingResult | None:
-        """Try to load a ProcessingResult from a session processed.json file."""
+        """Try to load a ProcessingResult from a legacy processed.json file."""
         if not processed_path.exists():
             return None
 

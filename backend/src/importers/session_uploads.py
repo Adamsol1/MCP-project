@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 import re
 import shutil
+import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from src.services.mcp_staging import stage_to_mcp, unstage_from_mcp, unstage_session_from_mcp
+logger = logging.getLogger("app")
 
 ALLOWED_FILETYPES = {".txt", ".pdf", ".json", ".csv"}
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
@@ -337,6 +340,64 @@ def format_apa_citation(citation: dict[str, str]) -> str:
     )
 
 
+def _get_db_path() -> str:
+    """Resolve sessions.db path."""
+    override = os.getenv("SESSIONS_DB_PATH")
+    if override:
+        return override
+    return str(Path(__file__).resolve().parents[2] / "data" / "sessions.db")
+
+
+def _sync_to_db(entry: dict[str, Any], parsed_path: Path) -> None:
+    """Insert/update the uploaded_files row in sessions.db (sync)."""
+    try:
+        parsed_content = None
+        if parsed_path.exists():
+            parsed_content = parsed_path.read_text(encoding="utf-8", errors="ignore")
+
+        conn = sqlite3.connect(_get_db_path())
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute(
+            """INSERT INTO uploaded_files
+                   (id, session_id, original_filename, filename, stored_filename,
+                    stored_path, extension, mime_type, size_bytes, sha256,
+                    uploaded_at, parse_status, searchable, search_skip_reason,
+                    parsed_content, parsed_markdown_path, citation, metadata_flags)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                    parsed_content=excluded.parsed_content,
+                    parse_status=excluded.parse_status,
+                    searchable=excluded.searchable,
+                    citation=excluded.citation
+            """,
+            (
+                entry["file_upload_id"],
+                entry["session_id"],
+                entry.get("original_filename", ""),
+                entry.get("filename", ""),
+                entry.get("stored_filename", ""),
+                entry.get("stored_path", "") or entry.get("path", ""),
+                entry.get("extension", ""),
+                entry.get("mime_type"),
+                entry.get("size_bytes", 0),
+                entry.get("sha256", ""),
+                entry.get("uploaded_at", datetime.now(UTC).isoformat()),
+                entry.get("parse_status", "pending"),
+                entry.get("searchable", False),
+                entry.get("search_skip_reason"),
+                parsed_content,
+                entry.get("parsed_markdown_path"),
+                json.dumps(entry.get("citation", {})),
+                json.dumps(entry.get("metadata_flags")) if entry.get("metadata_flags") else None,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        logger.warning("[session_uploads] Failed to sync upload to DB — manifest still has the data", exc_info=True)
+
+
 def save_session_upload(
     *,
     file_obj,
@@ -404,8 +465,6 @@ def save_session_upload(
         entry["citation"] = citation
         entry["parsed_markdown_path"] = parsed_path.as_posix()
         entry["metadata_flags"] = metadata_flags
-        if parse_status in (_READY, _SKIPPED):
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
     else:
         parse_status = _convert_to_markdown(
             file_upload_id=file_upload_id,
@@ -417,12 +476,14 @@ def save_session_upload(
         )
         entry["parse_status"] = parse_status
         entry["parsed_markdown_path"] = parsed_path.as_posix()
-        if parse_status == _READY:
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
 
     manifest = _load_manifest(paths["manifest_path"], validated_session_id)
     manifest["files"].append(entry)
     _write_manifest(paths["manifest_path"], manifest)
+
+    # Also persist to uploaded_files table in sessions.db
+    _sync_to_db(entry, parsed_path)
+
     return entry
 
 
@@ -466,15 +527,13 @@ def delete_session_upload(
 
     manifest["files"] = kept
     _write_manifest(paths["manifest_path"], manifest)
-    unstage_from_mcp(validated_session_id, file_upload_id, removed_entry.get("filename", ""))
     return True
 
 
 def delete_session_uploads(*, session_id: str, uploads_root: Path) -> bool:
     """Delete all upload artifacts for a session and remove the session directory.
 
-    Removes the entire {uploads_root}/{session_id}/ directory tree and
-    clears the MCP staging directory for the session.
+    Removes the entire {uploads_root}/{session_id}/ directory tree.
 
     Returns True if the session directory existed and was removed, False otherwise.
     """
@@ -485,5 +544,4 @@ def delete_session_uploads(*, session_id: str, uploads_root: Path) -> bool:
     if existed:
         shutil.rmtree(session_dir)
 
-    unstage_session_from_mcp(validated_session_id)
     return existed

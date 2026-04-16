@@ -4,7 +4,7 @@ API router for the dialogue flow.
 Handles incoming messages from the frontend, routes them through
 the dialogue state machine (DirectionFlow), and returns structured responses.
 
-Sessions are stored in memory in `_sessions`.
+Sessions are cached in memory in `_sessions` and persisted to sessions.db.
 """
 
 import json
@@ -16,6 +16,8 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from src.db.mappers import row_to_session, session_to_row
+from src.db.unit_of_work import UnitOfWork, get_uow
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
 from src.services.ai_orchestrator import AIOrchestrator
@@ -41,12 +43,6 @@ _SUB_STATE_AWAITING_DECISION = "awaiting_decision"
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
-
-_SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
-
-
-def ensure_sessions_dir() -> None:
-    _SESSIONS_DIR.mkdir(exist_ok=True)
 
 
 class IntelligenceSession:
@@ -74,76 +70,29 @@ class IntelligenceSession:
 _sessions: dict[str, IntelligenceSession] = {}
 
 
-def _save_session(session: IntelligenceSession) -> None:
-    """
-    Persist session state to disk so it survives server restarts.
+async def _save_session(session: IntelligenceSession, uow: UnitOfWork) -> None:
+    """Persist session state to sessions.db so it survives server restarts.
 
     Args:
         session: The active session to save
+        uow: Unit of Work with an open DB transaction
     """
-    #Data to be saved
-    data = {
-        "session_id": session.session_id,
-        "direction_flow": session.direction_flow.to_dict(),
-        "collection_flow": session.collection_flow.to_dict()
-        if session.collection_flow
-        else None,
-        "processing_flow": session.processing_flow.to_dict()
-        if session.processing_flow
-        else None,
-    }
-    path = _SESSIONS_DIR / f"{session.session_id}.json"
-    #Attempt to write data to file. If failed throw error
-    try:
-        path.write_text(json.dumps(data), encoding="utf-8")
-    except OSError as exc:
-        raise RuntimeError(f"Failed to save session {session.session_id} to disk") from exc
+    row = session_to_row(session)
+    await uow.sessions.upsert(row)
+    await uow.commit()
 
 
-def _load_session(session_id: str, research_logger) -> IntelligenceSession | None:
-    """
-    Load a previously persisted session from disk.
+async def _load_session(session_id: str, research_logger, uow: UnitOfWork) -> IntelligenceSession | None:
+    """Load a previously persisted session from sessions.db.
+
     Returns None if not found.
-
-    Args:
-        session: The active session to save
-    '"""
-
-    path = _SESSIONS_DIR / f"{session_id}.json"
-
-    if not path.exists():
+    """
+    row = await uow.sessions.get(session_id)
+    if row is None:
         return None
 
-    #Attempt to save. If failed, call error
-    try:
-        data = json.loads(path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, OSError) as exc:
-        raise RuntimeError(f"Failed to load session {session_id} from disk") from exc
-
-    #Reconstruct session from saved data
-    session = IntelligenceSession.__new__(IntelligenceSession)
-    session.session_id = session_id
-    session.research_logger = research_logger
-
-    #Retrieve direction phase data
-    session.direction_flow = DirectionFlow.from_dict(data["direction_flow"], research_logger=research_logger)
-
-    #Retrieve collecion phase data
-    session.collection_flow = (
-        CollectionFlow.from_dict(
-            data["collection_flow"], research_logger=research_logger
-        )
-        if data.get("collection_flow")
-        else None
-    )
-    session.processing_flow = (
-        ProcessingFlow.from_dict(
-            data["processing_flow"], research_logger=research_logger
-        )
-        if data.get("processing_flow")
-        else None
-    )
-    logger.info(f"[Session {session_id}] Restored from disk")
+    session = row_to_session(row, research_logger)
+    logger.info(f"[Session {session_id}] Restored from DB")
     return session
 
 
@@ -205,18 +154,17 @@ class DialogueDevStateRequest(BaseModel):
     current_pir: str | None = None
 
 
-def evict_session(session_id: str) -> None:
-    """
-    Remove a session from the in-memory cache and delete its state file.
+async def evict_session(session_id: str, uow: UnitOfWork) -> None:
+    """Remove a session from the in-memory cache and delete it from the DB.
 
     Args:
-        session_id : session_id
+        session_id: session identifier
+        uow: Unit of Work with an open DB transaction
     """
     _sessions.pop(session_id, None)
-    state_file = _SESSIONS_DIR / f"{session_id}.json"
-    if state_file.exists():
-        state_file.unlink()
-    logger.info(f"[Session {session_id}] Evicted from cache")
+    await uow.sessions.delete_cascade(session_id)
+    await uow.commit()
+    logger.info(f"[Session {session_id}] Evicted from cache and DB")
 
 
 def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
@@ -290,20 +238,19 @@ def _ensure_dev_tools_enabled():
         raise HTTPException(status_code=404, detail="Not found")
 
 
-def _get_or_create_session(session_id: str) -> IntelligenceSession:
-    """
-    Get or create session. Will retrieved from disk if session exists. Else create new session.
+async def _get_or_create_session(session_id: str, uow: UnitOfWork) -> IntelligenceSession:
+    """Get or create session. Checks in-memory cache first, then DB, else creates new.
 
     Args:
         session_id: Unique identifier of session
+        uow: Unit of Work with an open DB transaction
 
     Returns:
-        the retrieved or new IntelligencecSession
+        the retrieved or new IntelligenceSession
     """
-    #Create session if id not found
     if session_id not in _sessions:
         research_logger = ResearchLogger(session_id=session_id)
-        loaded = _load_session(session_id, research_logger)
+        loaded = await _load_session(session_id, research_logger, uow)
         if loaded:
             _sessions[session_id] = loaded
         else:
@@ -370,6 +317,7 @@ async def _handle_processing_phase(
     session: IntelligenceSession,
     request: DialogueMessageRequest,
     mcp_client: MCPClient,
+    uow: UnitOfWork,
 ) -> DialogueMessageResponse:
     """
     handles messages during the processing phase of the investigation.
@@ -380,6 +328,7 @@ async def _handle_processing_phase(
         session: current session
         request: message from the frontend
         mcp_client: client used to start processing serbice
+        uow: Unit of Work for DB persistence
 
     Returns:
         response to the frontend
@@ -394,7 +343,7 @@ async def _handle_processing_phase(
             raise HTTPException(status_code=400, detail="No collection flow found")
         session.processing_flow = None
         session.collection_flow.state = CollectionState.REVIEWING
-        _save_session(session)
+        await _save_session(session, uow)
         return _convert_to_message_response(
             DialogueResponse(action=DialogueAction.SELECT_GAPS, content=_GATHER_MORE_CONTENT),
             stage=session.collection_flow.state.value,
@@ -408,9 +357,10 @@ async def _handle_processing_phase(
         user_message=request.message,
         processing_service=processing_service,
         approved=request.approved,
+        uow=uow,
     )
     #Save current session and return message
-    _save_session(session)
+    await _save_session(session, uow)
     return _convert_to_message_response(response, stage=session.processing_flow.state.value, phase=Phase.PROCESSING)
 
 
@@ -420,6 +370,7 @@ async def _handle_collection_phase(
     mcp_client: MCPClient,
     orchestrator: AIOrchestrator,
     review_service: ReviewService,
+    uow: UnitOfWork,
 ) -> DialogueMessageResponse:
     """
     Handles incoming messages during the collection phase
@@ -431,6 +382,7 @@ async def _handle_collection_phase(
         mcp_client: client used to initialize collection
         orchestator: AI orchestrator used to controll dual AI instance
         review_service: Service for handling reviewing
+        uow: Unit of Work for DB persistence
     """
     assert session.collection_flow is not None
     collection_service = CollectionService(mcp_client)
@@ -446,6 +398,7 @@ async def _handle_collection_phase(
         orchestrator=orchestrator,
         reviewer=review_service,
         gather_more=request.gather_more,
+        uow=uow,
     )
     #Initialize processing state if finished with collection
     if session.collection_flow.state == CollectionState.COMPLETE and session.processing_flow is None:
@@ -460,15 +413,16 @@ async def _handle_collection_phase(
             processing_service=processing_service,
             orchestrator=orchestrator,
             reviewer=review_service,
+            uow=uow,
         )
-        _save_session(session)
+        await _save_session(session, uow)
         return _convert_to_message_response(
             init_response,
             stage=session.processing_flow.state.value,
             phase=Phase.PROCESSING,
         )
 
-    _save_session(session)
+    await _save_session(session, uow)
     return _convert_to_message_response(
         response,
         stage=session.collection_flow.state.value,
@@ -482,6 +436,7 @@ async def _handle_direction_phase(
     mcp_client: MCPClient,
     orchestrator: AIOrchestrator,
     review_service: ReviewService,
+    uow: UnitOfWork,
 ) -> DialogueMessageResponse:
     """
     Handles incoming messages during the direction phase
@@ -493,6 +448,7 @@ async def _handle_direction_phase(
         mcp_client: client used to initialize collection
         orchestator: AI orchestrator used to controll dual AI instance
         review_service: Service for handling reviewing
+        uow: Unit of Work for DB persistence
     """
     direction_flow = session.direction_flow
     logger.info(
@@ -525,8 +481,8 @@ async def _handle_direction_phase(
             direction_context=direction_flow.context,
             research_logger=session.research_logger,
         )
-        init_response = await session.collection_flow.initialize(collection_service)
-        _save_session(session)
+        init_response = await session.collection_flow.initialize(collection_service, uow=uow)
+        await _save_session(session, uow)
         return _convert_to_message_response(
             init_response,
             stage=session.collection_flow.state.value,
@@ -540,7 +496,7 @@ async def _handle_direction_phase(
         in (DirectionState.SUMMARY_CONFIRMING, DirectionState.PIR_CONFIRMING)
         else None
     )
-    _save_session(session)
+    await _save_session(session, uow)
     return _convert_to_message_response(
         response,
         stage=direction_flow.state.value,
@@ -554,6 +510,7 @@ async def send_message(
     request: DialogueMessageRequest,
     mcp_client: MCPClient = Depends(_get_mcp_client),
     review_service: ReviewService = Depends(_get_review_service),
+    uow: UnitOfWork = Depends(get_uow),
 ) -> DialogueMessageResponse:
     """
     Process a user message and continue the flow in the dialogue state machine.
@@ -574,15 +531,15 @@ async def send_message(
     Raises:
         Any exception given by DirectionFlow or MCPClient
     """
-    session = _get_or_create_session(request.session_id)
+    session = await _get_or_create_session(request.session_id, uow)
     orchestrator = _build_orchestrator(session)
     #Current state is processing
     if session.processing_flow:
-        return await _handle_processing_phase(session, request, mcp_client)
+        return await _handle_processing_phase(session, request, mcp_client, uow)
     #Current state is collection
     if session.collection_flow:
-        return await _handle_collection_phase(session, request, mcp_client, orchestrator, review_service)
-    return await _handle_direction_phase(session, request, mcp_client, orchestrator, review_service)
+        return await _handle_collection_phase(session, request, mcp_client, orchestrator, review_service, uow)
+    return await _handle_direction_phase(session, request, mcp_client, orchestrator, review_service, uow)
 
 
 @router.get("/collection-status/{session_id}")
@@ -600,18 +557,18 @@ async def get_collection_status(session_id: str):
 
 
 @router.get("/dev/state")
-async def get_dev_state(session_id: str) -> DialogueDevStateResponse:
+async def get_dev_state(session_id: str, uow: UnitOfWork = Depends(get_uow)) -> DialogueDevStateResponse:
     """DEV endpoint: read current dialogue state for a session."""
     _ensure_dev_tools_enabled()
-    session = _get_or_create_session(session_id)
+    session = await _get_or_create_session(session_id, uow)
     return _build_dev_state_response(session_id, session)
 
 
 @router.post("/dev/state")
-async def set_dev_state(request: DialogueDevStateRequest) -> DialogueDevStateResponse:
+async def set_dev_state(request: DialogueDevStateRequest, uow: UnitOfWork = Depends(get_uow)) -> DialogueDevStateResponse:
     """DEV endpoint: force a session into a specific dialogue stage."""
     _ensure_dev_tools_enabled()
-    session = _get_or_create_session(request.session_id)
+    session = await _get_or_create_session(request.session_id, uow)
     try:
         stage = DirectionState(request.stage)
     except ValueError as exc:
@@ -631,9 +588,9 @@ async def set_dev_state(request: DialogueDevStateRequest) -> DialogueDevStateRes
 
 
 @router.post("/dev/reset")
-async def reset_dev_session(session_id: str) -> DialogueDevStateResponse:
+async def reset_dev_session(session_id: str, uow: UnitOfWork = Depends(get_uow)) -> DialogueDevStateResponse:
     """DEV endpoint: reset a session to INITIAL."""
     _ensure_dev_tools_enabled()
-    session = _get_or_create_session(session_id)
+    session = await _get_or_create_session(session_id, uow)
     session.direction_flow.force_state(DirectionState.INITIAL, sub_state=None)
     return _build_dev_state_response(session_id, session)

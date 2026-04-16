@@ -3,12 +3,14 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
-from src.api.dialogue import evict_session, ensure_sessions_dir
+from src.api.dialogue import evict_session
 from src.api.dialogue import router as dialogue_router
+from src.db.engine import get_sessions_engine, get_knowledge_engine
+from src.db.unit_of_work import UnitOfWork, get_uow
 from src.importers.session_uploads import (
     default_uploads_root,
     delete_session_upload,
@@ -28,16 +30,11 @@ logger = logging.getLogger("app")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """
-    Method for logging lifecycle events of the FASTAPI application.
-    The method will log:
-        - Start of the application
-        - End of the application
-
-    Does not have any input of output
-    """
-    ensure_sessions_dir()
-    logger.info("Application started")
+    """Application lifecycle: initialize DB engines on startup."""
+    # Eagerly create engines to validate DB connectivity
+    get_sessions_engine()
+    get_knowledge_engine()
+    logger.info("Application started — database engines initialized")
     yield
     logger.info("Application stopped")
 
@@ -156,19 +153,20 @@ async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)
 
 
 @app.delete("/api/sessions/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
     """Delete all backend and MCP artifacts for a session.
 
     Removes:
-    - Session state file (sessions/{session_id}.json)
+    - Session DB rows (cascade delete across all tables)
     - All uploaded files and parsed artifacts (data/imports/{session_id}/)
     - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
-    - MCP staged files (mcp_server/uploads/{session_id}/)
+    - Legacy: analysis state file and session JSON if they exist
     """
     try:
-        evict_session(session_id)
+        await evict_session(session_id, uow)
         delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
 
+        # Clean up legacy log files (will be removed once Phase 3 is complete)
         outputs_dir = ResearchLogger(session_id=session_id).log_path.parent
         for log_name in (
             f"research_log_{session_id}.jsonl",
@@ -178,6 +176,7 @@ async def delete_session(session_id: str):
             if log_file.exists():
                 log_file.unlink()
 
+        # Clean up legacy analysis state file
         analysis_state_file = (
             Path(__file__).resolve().parents[2]
             / "sessions"
@@ -185,6 +184,15 @@ async def delete_session(session_id: str):
         )
         if analysis_state_file.exists():
             analysis_state_file.unlink()
+
+        # Clean up legacy session JSON file
+        legacy_session_file = (
+            Path(__file__).resolve().parents[2]
+            / "sessions"
+            / f"{session_id}.json"
+        )
+        if legacy_session_file.exists():
+            legacy_session_file.unlink()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:

@@ -38,9 +38,9 @@ const TIER_BADGE: Record<
   },
   assessed: {
     label: "Assessed",
-    bg: "bg-[#edf6f0]",
-    text: "text-[#1a6640]",
-    border: "border-[#1a6640]/20",
+    bg: "bg-success-subtle",
+    text: "text-success-text",
+    border: "border-success/30",
   },
 };
 
@@ -131,7 +131,7 @@ function AggregateBar({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
     score >= 0.9
-      ? "bg-[#2a9d5c]"
+      ? "bg-success-dark"
       : score >= 0.7
         ? "bg-success"
         : score >= 0.4

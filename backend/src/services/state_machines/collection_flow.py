@@ -2,7 +2,6 @@ import json
 import logging
 from datetime import UTC, datetime
 from enum import Enum
-from pathlib import Path
 
 from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
 from src.models.reasoning import ReasoningLog
@@ -11,46 +10,37 @@ from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
-# TODO: DB migration — _SESSIONS_DATA_DIR, _collected_path, _read_collected, _write_collected
-# all persist collected data to JSON files on disk. Replace with a DB write/read
-# (e.g. CollectedData table keyed on session_id) when sessions.db is in place.
-_SESSIONS_DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions"
 
-
-def _collected_path(session_id: str) -> Path:
-    return _SESSIONS_DATA_DIR / session_id / "collected.json"
-
-
-def _read_collected(session_id: str) -> dict | None:
-    path = _collected_path(session_id)
-    if not path.exists():
-        return None
+async def _read_collected(session_id: str, uow=None) -> dict | None:
+    """Read collected data from DB via UoW."""
+    if uow is None:
+        raise RuntimeError(f"[CollectionFlow] UoW required to read collected data for {session_id}")
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        attempts = await uow.collection_attempts.get_all(session_id)
+        if not attempts:
+            return None
+        return {
+            "session_id": session_id,
+            "pir": attempts[0].pir,
+            "collected_at": attempts[0].created_at.isoformat() if attempts[0].created_at else "",
+            "updated_at": attempts[-1].created_at.isoformat() if attempts[-1].created_at else "",
+            "attempts": [a.raw_response for a in attempts],
+        }
     except Exception:
-        logger.exception(f"[CollectionFlow] Failed to read collected.json for {session_id}")
+        logger.exception(f"[CollectionFlow] Failed to read collected data from DB for {session_id}")
         return None
 
 
-def _write_collected(session_id: str, pir: str, raw_data: str) -> None:
-    """Append a raw agent response string to collected.json."""
-    path = _collected_path(session_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing = _read_collected(session_id)
-    now = datetime.now(UTC).isoformat()
-    if existing:
-        existing["attempts"].append(raw_data)
-        existing["updated_at"] = now
-    else:
-        existing = {
-            "session_id": session_id,
-            "pir": pir,
-            "collected_at": now,
-            "updated_at": now,
-            "attempts": [raw_data],
-        }
-    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
-    logger.info(f"[CollectionFlow] Appended attempt to collected.json for {session_id}")
+async def _write_collected(session_id: str, pir: str, raw_data: str, uow=None) -> None:
+    """Append a raw agent response to the collection_attempts table.
+
+    Does NOT commit — the caller (dialogue endpoint) is responsible for committing
+    the full transaction after saving session state.
+    """
+    if uow is None:
+        raise RuntimeError(f"[CollectionFlow] UoW required to persist collected data for {session_id}")
+    await uow.collection_attempts.append(session_id, pir, raw_data)
+    logger.info(f"[CollectionFlow] Appended collection attempt to DB for {session_id}")
 
 
 class CollectionState(str, Enum):
@@ -115,7 +105,7 @@ class CollectionFlow(BasePhaseFlow):
         )
         return flow
 
-    async def initialize(self, collection_service) -> DialogueResponse:
+    async def initialize(self, collection_service, uow=None) -> DialogueResponse:
         # Generate collection plan based on self.pir
         # Set state to PLAN_CONFIRMING
         # Return DialogueResponse with action="show_plan"
@@ -128,16 +118,16 @@ class CollectionFlow(BasePhaseFlow):
         self.state = CollectionState.PLAN_CONFIRMING
         return DialogueResponse(action=DialogueAction.SHOW_PLAN, content=self.collection_plan or "")
 
-    async def process_user_message(self, user_message, collection_service, approved=None, selected_sources: list[str] | None = None, orchestrator=None, reviewer=None, gather_more: bool = False) -> DialogueResponse:
+    async def process_user_message(self, user_message, collection_service, approved=None, selected_sources: list[str] | None = None, orchestrator=None, reviewer=None, gather_more: bool = False, uow=None) -> DialogueResponse:
         #PLAN PHASE
         if self.state == CollectionState.PLAN_CONFIRMING:
             return await self.handle_plan_confirming(user_message, collection_service, approved, selected_sources)
         #COLLECTING
         elif self.state == CollectionState.COLLECTING:
-            return await self.handle_collecting(collection_service, orchestrator, reviewer)
+            return await self.handle_collecting(collection_service, orchestrator, reviewer, uow=uow)
         #REVIEWING
         elif self.state == CollectionState.REVIEWING:
-            return await self.handle_reviewing(user_message, collection_service, approved, gather_more, selected_sources)
+            return await self.handle_reviewing(user_message, collection_service, approved, gather_more, selected_sources, uow=uow)
         #COMPLETE
         else:
             return DialogueResponse(action=DialogueAction.COMPLETE, content="Collection phase completed")
@@ -186,6 +176,7 @@ class CollectionFlow(BasePhaseFlow):
         collection_service,
         orchestrator=None,
         reviewer=None,
+        uow=None,
     ) -> DialogueResponse:
         timeframe = self.direction_context.timeframe if self.direction_context else ""
         perspectives = (
@@ -238,7 +229,7 @@ class CollectionFlow(BasePhaseFlow):
             )
 
         self.state = CollectionState.REVIEWING
-        _write_collected(self.session_id, self.pir, collection_summary)
+        await _write_collected(self.session_id, self.pir, collection_summary, uow=uow)
 
         display_payload = CollectionService.parse_collected_data(collection_summary)
 
@@ -257,7 +248,7 @@ class CollectionFlow(BasePhaseFlow):
 
 
 
-    async def handle_reviewing(self, user_message, collection_service, approved, gather_more: bool = False, selected_sources: list[str] | None = None) -> DialogueResponse:
+    async def handle_reviewing(self, user_message, collection_service, approved, gather_more: bool = False, selected_sources: list[str] | None = None, uow=None) -> DialogueResponse:
         """
         State handler for reviewing phase.
         Possible outcomes:
@@ -268,7 +259,7 @@ class CollectionFlow(BasePhaseFlow):
         if approved:
             self._log_user_action(action="approve", phase="reviewing", modifications=None, perspectives=None)
             if self.pending_reasoning_log and self.research_logger:
-                collected = _read_collected(self.session_id)
+                collected = await _read_collected(self.session_id, uow=uow)
                 self.pending_reasoning_log.final_approved_content = json.dumps(collected) if collected else ""
                 self.pending_reasoning_log.timestamps["collection_approved"] = datetime.now().isoformat()
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
@@ -286,14 +277,14 @@ class CollectionFlow(BasePhaseFlow):
 
         else:
             self._log_user_action(action="modify", phase="reviewing", modifications=user_message, perspectives=None)
-            collected = _read_collected(self.session_id)
+            collected = await _read_collected(self.session_id, uow=uow)
             raw = collected["attempts"][-1] if collected and collected.get("attempts") else ""
             try:
                 modified = await collection_service.modify_summary(raw, user_message)
             except Exception as e:
                 logger.error(f"[Session {self.session_id}] Failed to modify summary: {e}")
                 return DialogueResponse(action=DialogueAction.ERROR, content="Failed to modify collection summary")
-            _write_collected(self.session_id, self.pir, modified)
+            await _write_collected(self.session_id, self.pir, modified, uow=uow)
             display_payload = CollectionService.parse_collected_data(modified)
             return DialogueResponse(action=DialogueAction.SHOW_COLLECTION, content=json.dumps(display_payload, ensure_ascii=False))
 

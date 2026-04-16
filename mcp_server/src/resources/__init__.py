@@ -1,9 +1,12 @@
 """MCP Resources - Knowledge bank registry and loader."""
 
 import json
+import logging
 from pathlib import Path
 
 from models import PIRResponse
+
+logger = logging.getLogger("mcp_server")
 
 RESOURCES_DIR = Path(__file__).parent
 
@@ -137,8 +140,68 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
 }
 
 
+def _load_knowledge_from_db(scan_text: str) -> str | None:
+    """DB-backed keyword search — returns formatted markdown or None."""
+    try:
+        from db import get_knowledge_connection
+        conn = get_knowledge_connection()
+    except Exception:
+        return None  # DB not available, caller falls back to file-based
+
+    try:
+        rows = conn.execute(
+            "SELECT id, keywords, priority, markdown_content FROM knowledge_resources"
+        ).fetchall()
+    except Exception:
+        conn.close()
+        return None
+
+    text_lower = scan_text.lower()
+    scored: list[tuple[int, dict]] = []
+
+    for row in rows:
+        keywords = json.loads(row["keywords"]) if row["keywords"] else []
+        hits = sum(1 for kw in keywords if kw.lower() in text_lower)
+        if hits > 0:
+            scored.append((hits, {"id": row["id"], "priority": row["priority"], "content": row["markdown_content"]}))
+
+    conn.close()
+
+    if not scored:
+        return None
+
+    scored.sort(key=lambda x: (-x[0], x[1]["priority"]))
+    top = scored[:5]
+
+    content = ["## Background Knowledge"]
+    for _, entry in top:
+        content.append(f"### Source: {entry['id']}")
+        content.append(entry["content"])
+
+    return "\n".join(content) if len(content) > 1 else None
+
+
+def _get_citation_from_db(resource_id: str) -> dict | None:
+    """Look up citation for a resource from knowledge.db."""
+    try:
+        from db import get_knowledge_connection
+        conn = get_knowledge_connection()
+        row = conn.execute(
+            "SELECT citation FROM knowledge_resources WHERE id = ?",
+            (resource_id,),
+        ).fetchone()
+        conn.close()
+        if row and row["citation"]:
+            return json.loads(row["citation"])
+    except Exception:
+        pass
+    return None
+
+
 def load_knowledge(scan_text: str) -> str | None:
     """Match keywords against scan_text and return formatted content from top 5 matches.
+
+    Tries knowledge.db first, falls back to file-based if DB is unavailable.
 
     Args:
         scan_text: Free-form text derived from investigation context fields.
@@ -149,6 +212,13 @@ def load_knowledge(scan_text: str) -> str | None:
     if not scan_text.strip():
         return None
 
+    # Try DB first
+    db_result = _load_knowledge_from_db(scan_text)
+    if db_result is not None:
+        return db_result
+
+    # Fallback: file-based
+    logger.debug("knowledge.db unavailable, falling back to file-based knowledge loading")
     text_lower = scan_text.lower()
     matches: dict[str, dict] = {}
 
@@ -176,11 +246,9 @@ def load_knowledge(scan_text: str) -> str | None:
 
 
 def enrich_pir_response(raw_json: str) -> PIRResponse:
-    """Parse raw AI JSON and enrich sources with citation metadata from KNOWLEDGE_REGISTRY.
+    """Parse raw AI JSON and enrich sources with citation metadata.
 
-    The AI returns sources with id, ref, source_type but no citation metadata.
-    This function looks up the citation for each source ID in KNOWLEDGE_REGISTRY
-    and attaches it. Sources not found in the registry are silently dropped.
+    Tries knowledge.db for citations first, falls back to KNOWLEDGE_REGISTRY.
 
     Args:
         raw_json: Raw JSON string from the AI's PIR generation response.
@@ -199,8 +267,12 @@ def enrich_pir_response(raw_json: str) -> PIRResponse:
     enriched_sources = []
     for source in data.get("sources", []):
         source_id = source.get("id", "")
-        if source_id in KNOWLEDGE_REGISTRY:
-            source["citation"] = KNOWLEDGE_REGISTRY[source_id]["citation"]
+        # Try DB first, then registry
+        citation = _get_citation_from_db(source_id)
+        if citation is None and source_id in KNOWLEDGE_REGISTRY:
+            citation = KNOWLEDGE_REGISTRY[source_id].get("citation")
+        if citation:
+            source["citation"] = citation
             enriched_sources.append(source)
         # unknown source_id: silently drop
 
