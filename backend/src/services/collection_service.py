@@ -288,6 +288,20 @@ class CollectionService:
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
 
+            # Deduplicate items by (source, resource_id) — the agent may call
+            # search_local_data or read_upload multiple times across PIRs/attempts,
+            # returning the same document each time. Keep the last occurrence so
+            # later calls (with potentially fuller content) win.
+            if items:
+                deduped: dict[tuple, dict] = {}
+                for item in items:
+                    key = (
+                        str(item.get("source") or ""),
+                        str(item.get("resource_id") or ""),
+                    )
+                    deduped[key] = item
+                items = list(deduped.values())
+
             # Unwrap MCP response wrappers the model occasionally embeds in content.
             # Pattern: {"result": "text"} or {"tool_response": {"result": "text"}}
             for item in items:

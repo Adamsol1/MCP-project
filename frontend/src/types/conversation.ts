@@ -209,7 +209,7 @@ export interface CollectionSourceSummary {
  * Replaces the old ActivitySummaryItem — decoupled from the collection object.
  */
 export interface PhaseReviewItem {
-  phase: "direction" | "collection" | "processing";
+  phase: "direction" | "collection" | "processing" | "analysis";
   attempt: number;
   reviewer_approved: boolean;
   reviewer_suggestions: string | null;

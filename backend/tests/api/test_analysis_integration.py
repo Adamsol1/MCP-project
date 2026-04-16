@@ -9,8 +9,8 @@ from src.models.analysis import AnalysisDraft, CouncilNote
 from src.services.analysis_session_store import AnalysisSessionStore
 
 
-class _FakeAnalysisPrototypeService:
-    async def generate_draft(self, processing_result, selected_perspectives=None):
+class _FakeAnalysisService:
+    async def generate_draft(self, processing_result, selected_perspectives=None, pir=""):
         del selected_perspectives
         return AnalysisDraft(
             summary="Integrated analysis summary.",
@@ -82,8 +82,8 @@ def test_analysis_and_council_flow_persists_across_reload(monkeypatch, tmp_path)
     monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda: store)
     monkeypatch.setattr(
         analysis_api,
-        "AnalysisPrototypeService",
-        lambda: _FakeAnalysisPrototypeService(),
+        "AnalysisService",
+        lambda _: _FakeAnalysisService(),
     )
     monkeypatch.setattr(analysis_api, "CouncilService", lambda: _FakeCouncilService())
     monkeypatch.setattr(

@@ -5,10 +5,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from src.services import processing_prototype_service as processing_service_module
-from src.services.analysis_prototype_service import AnalysisPrototypeService
+from src.models.analysis import AnalysisDraft
+from src.services import processing_result_store as processing_service_module
 from src.services.council_service import CouncilService
-from src.services.processing_prototype_service import ProcessingPrototypeService
+from src.services.processing_result_store import ProcessingResultStore
 
 VALID_PROCESSING_PAYLOAD = {
     "findings": [
@@ -170,11 +170,15 @@ class TestCouncilService:
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-council")
         service = CouncilService(working_directory=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result = ProcessingResultStore().get_processing_result(
             "session-council"
         )
-        analysis_draft = await AnalysisPrototypeService().generate_draft(
-            processing_result
+        analysis_draft = AnalysisDraft(
+            summary="Test analysis summary.",
+            key_judgments=["Test judgment."],
+            per_perspective_implications={"us": [], "neutral": []},
+            recommended_actions=["Test action."],
+            information_gaps=[],
         )
 
         monkeypatch.setattr(service, "_build_engine", lambda profile: _FakeEngine())
@@ -205,11 +209,15 @@ class TestCouncilService:
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-council")
         service = CouncilService(working_directory=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result = ProcessingResultStore().get_processing_result(
             "session-council"
         )
-        analysis_draft = await AnalysisPrototypeService().generate_draft(
-            processing_result
+        analysis_draft = AnalysisDraft(
+            summary="Test analysis summary.",
+            key_judgments=["Test judgment."],
+            per_perspective_implications={"us": [], "neutral": []},
+            recommended_actions=["Test action."],
+            information_gaps=[],
         )
 
         monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())

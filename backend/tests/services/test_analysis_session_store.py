@@ -3,9 +3,9 @@
 import json
 
 from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
-from src.services import processing_prototype_service as processing_service_module
+from src.services import processing_result_store as processing_service_module
 from src.services.analysis_session_store import AnalysisSessionStore
-from src.services.processing_prototype_service import ProcessingPrototypeService
+from src.services.processing_result_store import ProcessingResultStore
 
 VALID_PROCESSING_PAYLOAD = {
     "findings": [
@@ -75,7 +75,7 @@ class TestAnalysisSessionStore:
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-draft")
         store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result = ProcessingResultStore().get_processing_result(
             "session-draft"
         )
         draft = _make_draft()
@@ -106,7 +106,7 @@ class TestAnalysisSessionStore:
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-reload")
         store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
-        processing_result = ProcessingPrototypeService().get_processing_result(
+        processing_result = ProcessingResultStore().get_processing_result(
             "session-reload"
         )
         draft = _make_draft()

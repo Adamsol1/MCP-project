@@ -253,13 +253,14 @@ class AIOrchestrator:
         reviewer,
         session_id: str,
         pir: str = "",
+        selected_perspectives: list[str] | None = None,
     ) -> tuple:
         from src.models.analysis import AnalysisDraft, ProcessingResult
         from src.models.dialogue import AnalysisContext
 
         async def analyse_fn(_=None):
             draft, enriched = await analysis_service.generate_draft(
-                processing_result, pir=pir
+                processing_result, pir=pir, selected_perspectives=selected_perspectives
             )
             return {
                 "analysis_draft": draft.model_dump(),

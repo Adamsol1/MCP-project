@@ -2,7 +2,7 @@ import json
 import logging
 from enum import Enum
 
-from src.models.dialogue import DialogueAction, DialogueResponse
+from src.models.dialogue import DialogueAction, DialogueResponse, PhaseReviewItem
 from src.services.confidence.collection_coverage import compute_collection_coverage
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
@@ -82,6 +82,7 @@ class AnalysisFlow(BasePhaseFlow):
                     reviewer=reviewer,
                     session_id=self.session_id,
                     pir=self.pir,
+                    selected_perspectives=selected_perspectives,
                 )
             else:
                 analysis_draft, enriched_result = await analysis_service.generate_draft(
@@ -109,10 +110,29 @@ class AnalysisFlow(BasePhaseFlow):
         self.state = AnalysisState.COMPLETE
         logger.info("[Session %s] AnalysisFlow: PENDING -> COMPLETE", self.session_id)
 
-        return DialogueResponse(
+        response = DialogueResponse(
             action=DialogueAction.SHOW_ANALYSIS,
             content=json.dumps(result),
         )
+
+        if orchestrator and orchestrator.review_results:
+            response.review_activity = [
+                PhaseReviewItem(
+                    phase="analysis",
+                    attempt=i + 1,
+                    reviewer_approved=review["approved"],
+                    reviewer_suggestions=review.get("suggestions"),
+                    sources_used=[],
+                    generated_content=(
+                        str(orchestrator.attempts[i])
+                        if i < len(orchestrator.attempts)
+                        else None
+                    ),
+                )
+                for i, review in enumerate(orchestrator.review_results)
+            ]
+
+        return response
 
     async def process_user_message(self, **kwargs) -> DialogueResponse:
         if self.state == AnalysisState.COMPLETE and self.analysis_result:

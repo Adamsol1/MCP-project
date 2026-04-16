@@ -1,4 +1,4 @@
-"""Service for loading processing results from session artifacts.
+"""Loads processing results from session storage.
 
 Reads from the processing_attempts table in sessions.db.
 Falls back to the legacy processed.json files if DB load fails.
@@ -170,7 +170,7 @@ def _convert_grouped_pmesii_result(payload: dict) -> ProcessingResult | None:
     )
 
 
-class ProcessingPrototypeService:
+class ProcessingResultStore:
     """Loads a processing result from the processing_attempts DB table."""
 
     def __init__(self, uow=None):

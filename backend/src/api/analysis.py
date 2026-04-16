@@ -1,4 +1,4 @@
-"""API router for prototype analysis endpoints."""
+"""API router for analysis endpoints."""
 
 import json
 import logging
@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.db.unit_of_work import UnitOfWork, get_uow
+from src.mcp_client.client import MCPClient
 from src.models.analysis import (
     AnalysisDraft,
     CouncilNote,
@@ -17,15 +18,19 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.confidence import CollectionCoverageResult
-from src.services.analysis_prototype_service import AnalysisPrototypeService
+from src.services.analysis_service import AnalysisService
 from src.services.analysis_session_store import AnalysisSessionStore
 from src.services.confidence.collection_coverage import compute_collection_coverage
 from src.services.council_service import CouncilService
-from src.services.processing_prototype_service import (
+from src.services.processing_result_store import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
-    ProcessingPrototypeService,
+    ProcessingResultStore,
 )
 from src.services.reasearch_logger import ResearchLogger
+
+
+def _get_mcp_client() -> MCPClient:
+    return MCPClient()
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +40,7 @@ router = APIRouter(prefix="/api/analysis")
 
 
 class AnalysisDraftRequest(BaseModel):
-    """Request body for generating a prototype analysis draft."""
+    """Request body for generating an analysis draft."""
 
     session_id: str = Field(..., min_length=1)
     force_refresh: bool = False
@@ -77,7 +82,7 @@ async def _load_pirs_for_session(session_id: str, uow: UnitOfWork | None = None)
 
 
 class AnalysisDraftResponse(BaseModel):
-    """Response body containing both processing and analysis prototype data."""
+    """Response body containing processing and analysis data."""
 
     processing_result: ProcessingResult
     analysis_draft: AnalysisDraft
@@ -137,16 +142,32 @@ class AnalysisCouncilRequest(BaseModel):
         return self
 
 
+async def _load_selected_perspectives(session_id: str, uow: UnitOfWork | None) -> list[str] | None:
+    """Load selected perspectives from the session's direction context."""
+    if not uow:
+        return None
+    try:
+        row = await uow.sessions.get(session_id)
+        if row and row.direction_context:
+            ctx = json.loads(row.direction_context)
+            raw = ctx.get("perspectives") or []
+            return [p.lower() for p in raw if isinstance(p, str) and p] or None
+    except Exception:
+        logger.debug("Failed to load perspectives for session %s", session_id)
+    return None
+
+
 async def _build_draft(
     session_id: str,
     store: AnalysisSessionStore,
     uow: UnitOfWork | None = None,
     force_refresh: bool = False,
-    processing_service: ProcessingPrototypeService | None = None,
-    analysis_service: AnalysisPrototypeService | None = None,
+    processing_service: ProcessingResultStore | None = None,
+    analysis_service: AnalysisService | None = None,
+    mcp_client: MCPClient | None = None,
 ) -> AnalysisDraftResponse:
-    processing_service = processing_service or ProcessingPrototypeService(uow=uow)
-    analysis_service = analysis_service or AnalysisPrototypeService()
+    processing_service = processing_service or ProcessingResultStore(uow=uow)
+    analysis_service = analysis_service or AnalysisService(mcp_client or MCPClient())
 
     state = await store.get_or_create(session_id)
     processing_result = await processing_service.get_processing_result(session_id)
@@ -158,7 +179,11 @@ async def _build_draft(
         or state.analysis_draft is None
         or processing_changed
     ):
-        draft_result = await analysis_service.generate_draft(processing_result)
+        selected_perspectives = await _load_selected_perspectives(session_id, uow)
+        draft_result = await analysis_service.generate_draft(
+            processing_result,
+            selected_perspectives=selected_perspectives,
+        )
         if isinstance(draft_result, tuple):
             analysis_draft, enriched_processing_result = draft_result
         else:
@@ -196,8 +221,9 @@ async def _build_draft(
 async def create_analysis_draft(
     request: AnalysisDraftRequest,
     uow: UnitOfWork = Depends(get_uow),
+    mcp_client: MCPClient = Depends(_get_mcp_client),
 ) -> AnalysisDraftResponse:
-    """Load the prototype processing result and generate a draft analysis."""
+    """Load the processing result and generate a draft analysis."""
     store = AnalysisSessionStore(uow=uow)
 
     try:
@@ -206,6 +232,7 @@ async def create_analysis_draft(
             store,
             uow=uow,
             force_refresh=request.force_refresh,
+            mcp_client=mcp_client,
         )
     except ValueError as exc:
         status_code = (
@@ -220,6 +247,7 @@ async def create_analysis_draft(
 async def create_analysis_council(
     request: AnalysisCouncilRequest,
     uow: UnitOfWork = Depends(get_uow),
+    mcp_client: MCPClient = Depends(_get_mcp_client),
 ) -> CouncilNote:
     """Run a council deliberation against the current analysis-stage state."""
     store = AnalysisSessionStore(uow=uow)
@@ -231,6 +259,7 @@ async def create_analysis_council(
             request.session_id,
             store,
             uow=uow,
+            mcp_client=mcp_client,
         )
     except ValueError as exc:
         status_code = (

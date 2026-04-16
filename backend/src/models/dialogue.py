@@ -82,7 +82,7 @@ class AnalysisContext(BaseModel):
 
 
 class PhaseReviewItem(BaseModel):
-    phase: Literal["direction", "collection", "processing"]
+    phase: Literal["direction", "collection", "processing", "analysis"]
     attempt: int
     reviewer_approved: bool
     reviewer_suggestions: str | None = None

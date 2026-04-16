@@ -5,10 +5,10 @@ import json
 import pytest
 
 from src.models.analysis import ProcessingResult
-from src.services import processing_prototype_service as processing_service_module
-from src.services.processing_prototype_service import (
+from src.services import processing_result_store as processing_service_module
+from src.services.processing_result_store import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
-    ProcessingPrototypeService,
+    ProcessingResultStore,
 )
 
 VALID_PROCESSING_PAYLOAD = {
@@ -60,8 +60,8 @@ def _write_processed_json(tmp_path, session_id: str, attempts: list[str]) -> Non
     )
 
 
-class TestProcessingPrototypeService:
-    """Test ProcessingPrototypeService."""
+class TestProcessingResultStore:
+    """Test ProcessingResultStore."""
 
     def test_successful_load_returns_processing_result(self, monkeypatch, tmp_path):
         """Service should load the session processing result successfully."""
@@ -76,7 +76,7 @@ class TestProcessingPrototypeService:
             [json.dumps(VALID_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingPrototypeService().get_processing_result("session-123")
+        result = ProcessingResultStore().get_processing_result("session-123")
 
         assert isinstance(result, ProcessingResult)
         assert len(result.findings) == 1
@@ -95,7 +95,7 @@ class TestProcessingPrototypeService:
             [json.dumps(VALID_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingPrototypeService().get_processing_result("session-456")
+        result = ProcessingResultStore().get_processing_result("session-456")
 
         assert type(result) is ProcessingResult
 
@@ -123,7 +123,7 @@ class TestProcessingPrototypeService:
             ],
         )
 
-        result = ProcessingPrototypeService().get_processing_result("session-789")
+        result = ProcessingResultStore().get_processing_result("session-789")
 
         assert result.findings[0].id == "F-NEW"
 
@@ -140,7 +140,7 @@ class TestProcessingPrototypeService:
             [json.dumps(LEGACY_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingPrototypeService().get_processing_result("legacy-session")
+        result = ProcessingResultStore().get_processing_result("legacy-session")
 
         assert len(result.findings) == 1
         assert result.findings[0].id == "E-001"
@@ -157,7 +157,7 @@ class TestProcessingPrototypeService:
         )
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingPrototypeService().get_processing_result("nonexistent-session")
+            ProcessingResultStore().get_processing_result("nonexistent-session")
 
     def test_invalid_file_raises_clear_error(self, monkeypatch, tmp_path):
         """Invalid JSON should raise the processing-required error."""
@@ -171,7 +171,7 @@ class TestProcessingPrototypeService:
         (session_dir / "processed.json").write_text("{not-valid-json", encoding="utf-8")
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingPrototypeService().get_processing_result("invalid-session")
+            ProcessingResultStore().get_processing_result("invalid-session")
 
     def test_invalid_payload_raises_clear_error(self, monkeypatch, tmp_path):
         """Schema-invalid payload should raise the processing-required error."""
@@ -187,6 +187,6 @@ class TestProcessingPrototypeService:
         )
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingPrototypeService().get_processing_result(
+            ProcessingResultStore().get_processing_result(
                 "invalid-payload-session"
             )

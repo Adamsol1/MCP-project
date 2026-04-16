@@ -176,7 +176,7 @@ function AssertionRow({
   const conf = assertion.confidence;
 
   return (
-    <li className="border-b border-border/50 last:border-none py-3">
+    <div>
       <div className="flex items-start gap-3">
         <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
           <AssertionTierBadge confidence={conf} />
@@ -247,7 +247,7 @@ function AssertionRow({
           )}
         </div>
       )}
-    </li>
+    </div>
   );
 }
 
@@ -665,14 +665,17 @@ function PerspectiveSection({
         </p>
       )}
 
-      {/* Expanded assertions — indented with a subtle left rule */}
+      {/* Expanded assertions — flat, separated by border-b, labeled */}
       {open && (
-        <div className="mb-4 border-l-2 border-border/50 pl-4">
-          <ul>
-            {implications.map((assertion, idx) => (
-              <AssertionRow key={idx} assertion={assertion} allFindings={allFindings} />
-            ))}
-          </ul>
+        <div className="mb-4">
+          {implications.map((assertion, idx) => (
+            <div key={idx} className="border-t border-border/40 py-3">
+              <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Assertion {idx + 1}
+              </p>
+              <AssertionRow assertion={assertion} allFindings={allFindings} />
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -256,6 +256,7 @@ function phaseLabel(phase: PhaseReviewItem["phase"]): string {
     case "direction": return "Direction";
     case "collection": return "Collection";
     case "processing": return "Processing";
+    case "analysis": return "Analysis";
   }
 }
 

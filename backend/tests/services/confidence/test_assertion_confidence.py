@@ -1,6 +1,6 @@
 """TDD tests for assertion-level confidence enrichment.
 
-Tests are written against the enrichment logic in analysis_prototype_service.py
+Tests are written against the enrichment logic in analysis_service.py
 that maps PerspectiveAssertion.supporting_finding_ids → AssertionConfidence.
 """
 

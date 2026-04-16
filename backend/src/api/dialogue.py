@@ -32,7 +32,7 @@ from src.services.collection_status import CollectionStatusTracker
 from src.services.council_service import CouncilService
 from src.services.dialogue_service import DialogueService
 from src.services.llm_service import LLMService
-from src.services.processing_prototype_service import ProcessingPrototypeService
+from src.services.processing_result_store import ProcessingResultStore
 from src.services.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
 from src.services.review_service import ReviewService
@@ -745,9 +745,9 @@ def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
 
 async def _processing_payload(session_id: str) -> dict[str, Any] | None:
     try:
-        from src.services.processing_prototype_service import ProcessingPrototypeService
+        from src.services.processing_result_store import ProcessingResultStore
 
-        result = await ProcessingPrototypeService().get_processing_result(session_id)
+        result = await ProcessingResultStore().get_processing_result(session_id)
     except Exception:
         return None
     return result.model_dump(mode="json")
@@ -967,7 +967,7 @@ async def _handle_processing_phase(
             for p in (session.direction_flow.context.perspectives or [])
         ] if session.direction_flow and session.direction_flow.context else None
         init_response = await session.analysis_flow.initialize(
-            processing_service=ProcessingPrototypeService(uow=uow),
+            processing_service=ProcessingResultStore(uow=uow),
             analysis_service=analysis_service,
             orchestrator=orchestrator,
             reviewer=review_service,
