@@ -19,6 +19,8 @@ def session_to_row(session) -> SessionTable:
     direction_data = session.direction_flow.to_dict()
     collection_data = session.collection_flow.to_dict() if session.collection_flow else None
     processing_data = session.processing_flow.to_dict() if session.processing_flow else None
+    analysis_data = session.analysis_flow.to_dict() if getattr(session, "analysis_flow", None) else None
+    council_data = session.council_flow.to_dict() if getattr(session, "council_flow", None) else None
 
     row = SessionTable(
         id=session.session_id,
@@ -51,12 +53,31 @@ def session_to_row(session) -> SessionTable:
     # Processing flow
     if processing_data:
         row.processing_state = processing_data["state"]
-        # pir already set from collection; processing uses the same
         if not row.pir:
             row.pir = processing_data.get("pir", "")
         row.pending_reasoning_log_processing = (
             json.dumps(processing_data["pending_reasoning_log"])
             if processing_data.get("pending_reasoning_log")
+            else None
+        )
+
+    # Analysis flow
+    if analysis_data:
+        row.analysis_state = analysis_data["state"]
+        if not row.pir:
+            row.pir = analysis_data.get("pir", "")
+        row.analysis_result = (
+            json.dumps(analysis_data["analysis_result"])
+            if analysis_data.get("analysis_result")
+            else None
+        )
+
+    # Council flow
+    if council_data:
+        row.council_state = council_data["state"]
+        row.latest_council_note = (
+            json.dumps(council_data["latest_council_note"])
+            if council_data.get("latest_council_note")
             else None
         )
 
@@ -72,6 +93,8 @@ def row_to_session(row: SessionTable, research_logger):
     from src.services.state_machines.direction_flow import DirectionFlow
     from src.services.state_machines.collection_flow import CollectionFlow
     from src.services.state_machines.processing_flow import ProcessingFlow
+    from src.services.state_machines.analysis_flow import AnalysisFlow
+    from src.services.state_machines.council_flow import CouncilFlow
 
     # Avoid circular import — import here
     from src.api.dialogue import IntelligenceSession
@@ -123,6 +146,29 @@ def row_to_session(row: SessionTable, research_logger):
             ),
         }
 
+    # Reconstruct analysis flow dict
+    analysis_data = None
+    if row.analysis_state:
+        analysis_data = {
+            "session_id": row.id,
+            "state": row.analysis_state,
+            "pir": row.pir or "",
+            "analysis_result": (
+                json.loads(row.analysis_result) if row.analysis_result else None
+            ),
+        }
+
+    # Reconstruct council flow dict
+    council_data = None
+    if row.council_state:
+        council_data = {
+            "session_id": row.id,
+            "state": row.council_state,
+            "latest_council_note": (
+                json.loads(row.latest_council_note) if row.latest_council_note else None
+            ),
+        }
+
     # Build IntelligenceSession
     session = IntelligenceSession.__new__(IntelligenceSession)
     session.session_id = row.id
@@ -136,6 +182,16 @@ def row_to_session(row: SessionTable, research_logger):
     session.processing_flow = (
         ProcessingFlow.from_dict(processing_data, research_logger=research_logger)
         if processing_data
+        else None
+    )
+    session.analysis_flow = (
+        AnalysisFlow.from_dict(analysis_data, research_logger=research_logger)
+        if analysis_data
+        else None
+    )
+    session.council_flow = (
+        CouncilFlow.from_dict(council_data, research_logger=research_logger)
+        if council_data
         else None
     )
     return session

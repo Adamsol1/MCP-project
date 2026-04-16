@@ -35,7 +35,7 @@ const ASSERTION_TIER_STYLES: Record<
   low: { bg: "bg-error-subtle", text: "text-error-text", border: "border-error/30", label: "Low" },
   moderate: { bg: "bg-warning-subtle", text: "text-warning-text", border: "border-warning/30", label: "Moderate" },
   high: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "High" },
-  assessed: { bg: "bg-[#edf6f0]", text: "text-[#1a6640]", border: "border-[#1a6640]/20", label: "Assessed" },
+  assessed: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "Assessed" },
 };
 
 // ---------------------------------------------------------------------------
@@ -310,11 +310,11 @@ export default function AnalysisView({
   return (
     <div className="mx-auto max-w-6xl space-y-8 pb-8">
       {/* Hero section */}
-      <section className="overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(135deg,#f4efe6_0%,#edf3f4_48%,#f5f7fb_100%)] shadow-sm">
+      <section className="overflow-hidden rounded-[28px] border border-border bg-surface-muted shadow-sm">
         <div className="grid gap-6 px-6 py-6 lg:grid-cols-[1.5fr,0.9fr]">
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full border border-border bg-white/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
+              <span className="rounded-full border border-border bg-surface/75 px-3 py-1 text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
                 Draft Analysis
               </span>
             </div>
@@ -329,13 +329,13 @@ export default function AnalysisView({
           </div>
 
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Findings</p>
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">
                 {findings.length}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Avg confidence</p>
               <div className="mt-1.5 flex items-center gap-2">
                 <p className={`text-2xl font-semibold ${getConfidenceTextColor(averageConfidence)}`}>
@@ -349,13 +349,13 @@ export default function AnalysisView({
                 </div>
               </div>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">ATT&CK Techniques</p>
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">
                 {uniqueTechniques.length}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Shared indicators</p>
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">
                 {sharedIndicatorCount}
@@ -364,11 +364,11 @@ export default function AnalysisView({
                 )}
               </p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Timeline span</p>
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">{timelineSpan}</p>
             </div>
-            <div className="rounded-[20px] border border-border bg-white/70 px-4 py-3">
+            <div className="rounded-[20px] border border-border bg-surface/70 px-4 py-3">
               <p className="text-[11px] uppercase tracking-[0.16em] text-text-muted">Sources</p>
               <p className="mt-1.5 text-2xl font-semibold text-text-primary">{uniqueSources.length}</p>
               <p className="mt-0.5 text-[11px] text-text-muted truncate">
@@ -486,7 +486,7 @@ export default function AnalysisView({
                     <span className="rounded-full border border-border bg-surface-muted px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.16em] text-text-muted">
                       {finding.id}
                     </span>
-                    <span className="rounded-full border border-border bg-white px-2.5 py-1 text-[11px] uppercase tracking-wide text-text-secondary">
+                    <span className="rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] uppercase tracking-wide text-text-secondary">
                       {formatSourceLabel(finding.source)}
                     </span>
                   </div>

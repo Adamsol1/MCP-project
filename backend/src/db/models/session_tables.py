@@ -39,6 +39,14 @@ class SessionTable(SQLModel, table=True):
     processing_state: Optional[str] = Field(default=None)
     pending_reasoning_log_processing: Optional[str] = Field(default=None)  # JSON
 
+    # Analysis flow state
+    analysis_state: Optional[str] = Field(default=None)
+    analysis_result: Optional[str] = Field(default=None)  # JSON
+
+    # Council flow state
+    council_state: Optional[str] = Field(default=None)
+    latest_council_note: Optional[str] = Field(default=None)  # JSON
+
     # Shared
     sub_state: Optional[str] = Field(default=None)
 

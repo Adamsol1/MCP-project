@@ -297,13 +297,13 @@ function CouncilParticipantPanel({
 
   return (
     <div className="space-y-4">
-      <section className="rounded-[20px] border border-border bg-[linear-gradient(135deg,rgba(255,255,255,0.82)_0%,rgba(244,239,230,0.82)_100%)] px-4 py-4">
+      <section className="rounded-[20px] border border-border bg-surface-muted px-4 py-4">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
             Active view
           </span>
           {participantView.latestEntry ? (
-            <span className="rounded-full border border-border bg-white/80 px-2.5 py-1 text-[11px] text-text-secondary">
+            <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] text-text-secondary">
               Round {participantView.latestEntry.round}
             </span>
           ) : null}
