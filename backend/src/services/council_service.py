@@ -14,7 +14,7 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.council_personas import get_council_persona
+from src.services.agent_builder import build_agent
 
 logger = logging.getLogger("app")
 
@@ -83,20 +83,20 @@ class CouncilService:
             normalized.append(perspective)
         return normalized
 
-    def build_participants(self, selected_perspectives: list[str]) -> list[dict]:
+    async def build_participants(self, selected_perspectives: list[str]) -> list[dict]:
         normalized = self._normalize_perspectives(selected_perspectives)
         if len(normalized) < 2:
             raise ValueError("At least 2 perspectives are required for council deliberation")
 
         participants = []
         for perspective in normalized:
-            persona = get_council_persona(perspective)
-            participants.append({
-                "cli": self.DEFAULT_ADAPTER,
-                "model": self.DEFAULT_MODEL,
-                "display_name": persona.display_name,
-                "persona_prompt": persona.persona_prompt,
-            })
+            agent = await build_agent(
+                mcp_client=self.mcp_client,
+                perspective=perspective,
+                cli=self.DEFAULT_ADAPTER,
+                model=self.DEFAULT_MODEL,
+            )
+            participants.append(agent)
         return participants
 
     def build_question(
@@ -160,14 +160,13 @@ class CouncilService:
     def build_request(
         self,
         debate_point: str,
-        selected_perspectives: list[str],
+        participants: list[dict],
         processing_result: ProcessingResult,
         analysis_draft: AnalysisDraft,
         council_settings: CouncilRunSettings | None = None,
         selected_findings=None,
     ) -> dict:
         runtime_profile = self.resolve_runtime_profile(council_settings)
-        participants = self.build_participants(selected_perspectives)
         question = self.build_question(debate_point, selected_findings or [])
         context = self.build_context(
             processing_result=processing_result,
@@ -216,21 +215,21 @@ class CouncilService:
             if finding_ids
             else processing_result.findings
         )
-        request = self.build_request(
-            debate_point=debate_point,
-            selected_perspectives=selected_perspectives,
-            processing_result=processing_result,
-            analysis_draft=analysis_draft,
-            council_settings=council_settings,
-            selected_findings=selected_findings,
-        )
-
         logger.info(
             "[CouncilService] Calling deliberate tool via MCP at %s",
             self.mcp_client.server_url,
         )
         try:
             async with self.mcp_client.connect():
+                participants = await self.build_participants(selected_perspectives)
+                request = self.build_request(
+                    debate_point=debate_point,
+                    participants=participants,
+                    processing_result=processing_result,
+                    analysis_draft=analysis_draft,
+                    council_settings=council_settings,
+                    selected_findings=selected_findings,
+                )
                 result = await self.mcp_client.call_tool("deliberate", request)
         except Exception as exc:
             raise RuntimeError(

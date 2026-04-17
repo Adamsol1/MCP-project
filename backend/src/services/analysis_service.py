@@ -37,55 +37,72 @@ class AnalysisService:
         enriched_result = self._enrich_findings(processing_result)
         fallback_draft = self._build_fallback_draft(enriched_result, normalized)
         findings_json = json.dumps(enriched_result.model_dump(), ensure_ascii=False)
+        valid_ids = {f.id for f in enriched_result.findings}
+
+        base_payload: dict | None = None
+        merged_implications: dict = {}
 
         try:
             async with self.mcp_client.connect():
-                system_prompt = await self.mcp_client.get_prompt(
-                    "analysis_generate",
-                    {
-                        "pir": pir,
-                        "findings": findings_json,
-                        "perspectives": ", ".join(normalized),
-                    },
-                )
-                agent = GeminiAgent(self.mcp_client)
-                raw = await agent.run(
-                    system_prompt=system_prompt,
-                    task="Generate an intelligence analysis draft from the provided findings.",
-                    allowed_tool_names=set(),
-                )
+                for perspective in normalized:
+                    persona = await self.mcp_client.read_resource(
+                        f"knowledge://personas/{perspective}"
+                    )
+                    task_prompt = await self.mcp_client.get_prompt(
+                        "analysis_generate",
+                        {
+                            "pir": pir,
+                            "findings": findings_json,
+                            "perspectives": perspective,
+                        },
+                    )
+                    system_prompt = f"{persona}\n\n{task_prompt}"
+                    agent = GeminiAgent(self.mcp_client)
+                    raw = await agent.run(
+                        system_prompt=system_prompt,
+                        task=f"Generate an intelligence analysis from the {perspective} perspective.",
+                        allowed_tool_names=set(),
+                    )
+
+                    try:
+                        if isinstance(raw, str):
+                            fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
+                            raw = fence.group(1).strip() if fence else raw.strip()
+                        payload = json.loads(raw) if isinstance(raw, str) else raw
+                    except (json.JSONDecodeError, TypeError):
+                        logger.warning("[AnalysisService] %s agent returned non-JSON — skipping.", perspective)
+                        continue
+
+                    # First agent provides shared fields (title, summary, key_judgments, etc.)
+                    if base_payload is None:
+                        base_payload = payload
+
+                    # Collect this perspective's implications
+                    raw_assertions = payload.get("per_perspective_implications", {}).get(perspective, [])
+                    if isinstance(raw_assertions, list):
+                        raw_assertions = [
+                            a if isinstance(a, dict) else {"assertion": str(a), "supporting_finding_ids": []}
+                            for a in raw_assertions
+                        ]
+                        merged_implications[perspective] = validate_finding_ids(raw_assertions, valid_ids)
+
         except Exception:
             logger.warning("[AnalysisService] MCP generation failed — using fallback draft.", exc_info=True)
             return self._enrich_draft_assertions(fallback_draft, enriched_result), enriched_result
 
-        try:
-            if isinstance(raw, str):
-                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
-                raw = fence.group(1).strip() if fence else raw.strip()
-            payload = json.loads(raw) if isinstance(raw, str) else raw
-        except (json.JSONDecodeError, TypeError):
-            logger.warning("[AnalysisService] Agent returned non-JSON — using fallback draft.")
+        if base_payload is None:
+            logger.warning("[AnalysisService] No agents produced output — using fallback draft.")
             return self._enrich_draft_assertions(fallback_draft, enriched_result), enriched_result
 
-        valid_ids = {f.id for f in enriched_result.findings}
-        raw_implications = payload.get("per_perspective_implications", {})
-        for key, assertion_list in raw_implications.items():
-            if isinstance(assertion_list, list):
-                raw_assertions = [
-                    a if isinstance(a, dict) else {"assertion": str(a), "supporting_finding_ids": []}
-                    for a in assertion_list
-                ]
-                raw_implications[key] = validate_finding_ids(raw_assertions, valid_ids)
-        payload["per_perspective_implications"] = raw_implications
+        base_payload["per_perspective_implications"] = merged_implications
 
         try:
-            llm_draft = AnalysisDraft.model_validate(payload)
+            llm_draft = AnalysisDraft.model_validate(base_payload)
         except Exception:
             logger.warning("[AnalysisService] Invalid draft payload — using fallback draft.")
             llm_draft = fallback_draft
 
         merged = self._merge_with_fallback(llm_draft, fallback_draft)
-        # Enforce: only return implications for the selected perspectives
         filtered_implications = {
             k: v for k, v in merged.per_perspective_implications.items()
             if k in normalized
