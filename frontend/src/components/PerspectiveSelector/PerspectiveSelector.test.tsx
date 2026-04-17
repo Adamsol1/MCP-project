@@ -2,7 +2,7 @@
  * PerspectiveSelector — toggle buttons for geopolitical analysis perspectives.
  *
  * PerspectiveSelector is a controlled component that calls onChange whenever
- * the user toggles a perspective. NEUTRAL is selected by default.
+ * the user toggles a perspective. GLOBAL (NEUTRAL) is selected by default.
  *
  * Props:
  *   selected: string[]           — currently selected perspective IDs
@@ -25,7 +25,7 @@ const PERSPECTIVE_LABELS: Record<string, string> = {
   CHINA: "China",
   EU: "EU",
   RUSSIA: "Russia",
-  NEUTRAL: "Neutral",
+  NEUTRAL: "Global",
 };
 
 describe("PerspectiveSelector", () => {
@@ -51,12 +51,12 @@ describe("PerspectiveSelector", () => {
 
   // ---------- Default state ----------
 
-  it("shows NEUTRAL as selected by default", () => {
+  it("shows GLOBAL as selected by default", () => {
     renderWithSettings(
       <PerspectiveSelector selected={["NEUTRAL"]} onChange={vi.fn()} />,
     );
 
-    const neutralBtn = screen.getByRole("button", { name: /neutral/i });
+    const neutralBtn = screen.getByRole("button", { name: /global/i });
     expect(neutralBtn).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -81,7 +81,7 @@ describe("PerspectiveSelector", () => {
     );
 
     // Click "US" which is currently not selected.
-    // First non-neutral pick replaces default NEUTRAL.
+    // First non-global pick replaces default NEUTRAL.
     const usBtn = screen.getByRole("button", { name: /^us$/i });
     await user.click(usBtn);
 
@@ -123,7 +123,7 @@ describe("PerspectiveSelector", () => {
     );
   });
 
-  it("allows selecting NEUTRAL together with other perspectives", async () => {
+  it("allows selecting GLOBAL together with other perspectives", async () => {
     const user = userEvent.setup();
     const handleChange = vi.fn();
 
@@ -131,7 +131,7 @@ describe("PerspectiveSelector", () => {
       <PerspectiveSelector selected={["US"]} onChange={handleChange} />,
     );
 
-    const neutralBtn = screen.getByRole("button", { name: /neutral/i });
+    const neutralBtn = screen.getByRole("button", { name: /global/i });
     await user.click(neutralBtn);
 
     expect(handleChange).toHaveBeenCalledWith(

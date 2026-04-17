@@ -1,4 +1,5 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { DialoguePhase } from "../../types/dialogue";
@@ -54,70 +55,40 @@ export default function IntelligencePanel({
         return (
           <>
             {isCollecting && collectionStatus ? (
-              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <PanelSection label="Collecting">
                 <CollectionStatusDisplay status={collectionStatus} />
-              </section>
+              </PanelSection>
             ) : (
-              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <PanelSection label="Perspective">
                 <PerspectiveSelector
                   selected={selectedPerspectives}
                   onChange={onPerspectiveChange}
                 />
-              </section>
+              </PanelSection>
             )}
             {pirData && (
-              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <PanelSection label="PIR Sources">
                 <PirSourcesView />
-              </section>
+              </PanelSection>
             )}
           </>
         );
 
       case "collection":
-        return (
-          <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-            <FileUploadSection
-              uploadedFiles={uploadedFiles}
-              visibleFiles={visibleFiles}
-              hiddenCount={hiddenCount}
-              showAllFiles={showAllFiles}
-              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-              onOpenFileUpload={onOpenFileUpload}
-              onFileRemove={onFileRemove}
-            />
-          </section>
-        );
-
       case "processing":
-        return (
-          <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-            <FileUploadSection
-              uploadedFiles={uploadedFiles}
-              visibleFiles={visibleFiles}
-              hiddenCount={hiddenCount}
-              showAllFiles={showAllFiles}
-              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-              onOpenFileUpload={onOpenFileUpload}
-              onFileRemove={onFileRemove}
-            />
-          </section>
-        );
-
       case "analysis":
         return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-          </>
+          <PanelSection label="Files">
+            <FileUploadSection
+              uploadedFiles={uploadedFiles}
+              visibleFiles={visibleFiles}
+              hiddenCount={hiddenCount}
+              showAllFiles={showAllFiles}
+              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
+              onOpenFileUpload={onOpenFileUpload}
+              onFileRemove={onFileRemove}
+            />
+          </PanelSection>
         );
 
       default:
@@ -136,11 +107,11 @@ export default function IntelligencePanel({
         </h2>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-chatgpt">
-        <div className="flex flex-col gap-2">
+      <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-chatgpt">
+        <div className="flex flex-col">
           {renderPhaseContent()}
           {reviewActivity.length > 0 && (
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+            <PanelSection label="Review Activity">
               <ReviewActivitySection
                 activity={reviewActivity}
                 onOpenReviewModal={(attempt) => {
@@ -148,15 +119,15 @@ export default function IntelligencePanel({
                   setReviewModalOpen(true);
                 }}
               />
-            </section>
+            </PanelSection>
           )}
           {collectionData && (
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+            <PanelSection label="Collection Stats">
               <CollectionStatsView
                 collectionData={collectionData}
                 onOpenModal={() => setIsModalOpen(true)}
               />
-            </section>
+            </PanelSection>
           )}
         </div>
       </div>
@@ -173,6 +144,17 @@ export default function IntelligencePanel({
         focusAttempt={reviewFocusAttempt}
       />
     </div>
+  );
+}
+
+function PanelSection({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <section className="py-4 first:pt-0 border-b border-border-muted last:border-none">
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+        {label}
+      </p>
+      {children}
+    </section>
   );
 }
 
@@ -276,9 +258,6 @@ function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySe
 
   return (
     <div className="space-y-2">
-      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-        Review Activity
-      </p>
       {activity.map((item) => {
         const isExpanded = expandedAttempts.has(item.attempt);
         const processingData = item.phase === "processing" ? tryParseProcessingData(item.generated_content) : null;
@@ -404,13 +383,9 @@ function FileUploadSection({
   const t = useT();
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-2">
-        {t.files}
-      </p>
-
       <button
         onClick={onOpenFileUpload}
-        className="w-full py-1 px-2 bg-primary-dark text-text-inverse rounded text-xs font-medium hover:bg-primary-hover transition-colors"
+        className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
       >
         {t.uploadFiles}
       </button>

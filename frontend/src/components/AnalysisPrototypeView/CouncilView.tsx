@@ -674,9 +674,9 @@ export default function CouncilView({
                   onClick={() => setIsTranscriptExpanded((current) => !current)}
                   className="inline-flex items-center gap-2 rounded-[12px] border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted"
                 >
-                  <span className="text-xs text-text-muted">
-                    {isTranscriptExpanded ? "▾" : "▸"}
-                  </span>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`text-text-muted transition-transform duration-150 ${isTranscriptExpanded ? "rotate-180" : ""}`}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
                   {isTranscriptExpanded ? "Hide full debate" : "Show full debate"}
                 </button>
                 {councilNote.transcript_path ? (

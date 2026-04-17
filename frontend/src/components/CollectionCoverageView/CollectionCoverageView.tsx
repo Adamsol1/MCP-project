@@ -165,13 +165,6 @@ function PirRow({
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface/60"
       >
-        {/* Expand chevron */}
-        <span
-          className={`mt-0.5 shrink-0 text-text-muted transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
-        >
-          ▶
-        </span>
-
         {/* PIR question (truncated) with inline low/moderate indicator */}
         <div className="flex-1 min-w-0">
           {(pir.tier === "low" || pir.tier === "moderate") && (
@@ -190,6 +183,11 @@ function PirRow({
           <TierBadge tier={pir.tier} score={pir.score} />
           <PriorityBadge priority={pir.priority} />
         </div>
+
+        {/* Expand chevron */}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`mt-1 shrink-0 text-text-muted transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {expanded && (

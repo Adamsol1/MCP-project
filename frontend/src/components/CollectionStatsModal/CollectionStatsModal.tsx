@@ -79,8 +79,9 @@ function PieChart({ slices }: { slices: SliceData[] }) {
         </g>
         <text
           x={cx}
-          y={cy - 6}
+          y={cy - 9}
           textAnchor="middle"
+          dominantBaseline="middle"
           fill="var(--color-text-primary)"
           fontSize="17"
           fontWeight="600"
@@ -89,8 +90,9 @@ function PieChart({ slices }: { slices: SliceData[] }) {
         </text>
         <text
           x={cx}
-          y={cy + 12}
+          y={cy + 9}
           textAnchor="middle"
+          dominantBaseline="middle"
           fill="var(--color-text-muted)"
           fontSize="11"
         >
@@ -255,8 +257,9 @@ function PieChart({ slices }: { slices: SliceData[] }) {
       {/* Center label */}
       <text
         x={cx}
-        y={cy - 6}
+        y={cy - 9}
         textAnchor="middle"
+        dominantBaseline="middle"
         fill="var(--color-text-primary)"
         fontSize="20"
         fontWeight="600"
@@ -265,8 +268,9 @@ function PieChart({ slices }: { slices: SliceData[] }) {
       </text>
       <text
         x={cx}
-        y={cy + 12}
+        y={cy + 9}
         textAnchor="middle"
+        dominantBaseline="middle"
         fill="var(--color-text-muted)"
         fontSize="11"
       >
@@ -917,7 +921,6 @@ function ItemCard({ item }: { item: CollectedItem }) {
   return (
     <details className="group/item rounded border border-border bg-surface overflow-hidden">
       <summary className="flex cursor-pointer select-none items-center gap-2 px-3 py-2 hover:bg-surface-muted transition-colors list-none">
-        <Chevron className="h-3.5 w-3.5 shrink-0 text-text-muted transition-transform group-open/item:rotate-180" />
         <span
           className="flex-1 min-w-0 truncate text-[11px] text-text-secondary"
           title={displayTitle}
@@ -935,6 +938,7 @@ function ItemCard({ item }: { item: CollectedItem }) {
             <span className="font-medium">{displayTitle}</span>
           )}
         </span>
+        <Chevron className="h-3.5 w-3.5 shrink-0 text-text-muted transition-transform group-open/item:rotate-180" />
       </summary>
       <div className="border-t border-border-muted px-3 pb-3 pt-2 space-y-2">
         {/* Clickable URL for non-KB web items */}

@@ -41,9 +41,9 @@ const ASSERTION_TIER_STYLES: Record<
 // ---------------------------------------------------------------------------
 
 function formatPerspectiveLabel(key: string) {
-  return key === "us" || key === "eu"
-    ? key.toUpperCase()
-    : key.charAt(0).toUpperCase() + key.slice(1);
+  if (key === "neutral") return "Global";
+  if (key === "us" || key === "eu") return key.toUpperCase();
+  return key.charAt(0).toUpperCase() + key.slice(1);
 }
 
 function formatSupportingDataLabel(key: string) {
@@ -189,10 +189,12 @@ function AssertionRow({
           <button
             type="button"
             onClick={() => setExpanded((v) => !v)}
-            className={`shrink-0 text-[10px] text-text-muted transition-transform mt-1 ${expanded ? "rotate-90" : ""}`}
+            className="shrink-0 text-text-muted mt-1"
             aria-label="Toggle confidence breakdown"
           >
-            ▶
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}>
+              <path d="M6 9l6 6 6-6" />
+            </svg>
           </button>
         )}
       </div>
@@ -288,10 +290,7 @@ export default function AnalysisView({
       {/* ── Hero: document-style header ──────────────────────────────── */}
       <section className="space-y-4">
         <div>
-          <span className="text-[11px] font-medium uppercase tracking-[0.18em] text-text-muted">
-            Draft Analysis
-          </span>
-          <h1 className="mt-2 font-serif text-[2rem] leading-tight text-text-primary">
+          <h1 className="font-sans text-[2rem] font-bold leading-tight text-text-primary">
             {analysisHeading}
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-text-secondary">
@@ -326,9 +325,11 @@ export default function AnalysisView({
               <span className="text-border/70">·</span>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] uppercase tracking-widest text-text-muted">Sources</span>
-                <span className="font-semibold text-text-primary">{allSourceTypes.length}</span>
-                <span className="text-[11px] text-text-muted truncate max-w-50">
-                  {allSourceTypes.map(formatSourceLabel).join(", ")}
+                <span className="font-semibold text-text-primary">{findings.length}</span>
+                <span className="text-[11px] text-text-muted">
+                  items across{" "}
+                  <span className="font-semibold text-text-primary">{allSourceTypes.length}</span>{" "}
+                  {allSourceTypes.length === 1 ? "source" : "sources"}
                 </span>
               </div>
             </>
@@ -514,7 +515,9 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
               {finding.confidence}%
             </span>
           </div>
-          <span className={`text-xs text-text-muted transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+            <path d="M6 9l6 6 6-6" />
+          </svg>
         </div>
       </button>
 
@@ -655,7 +658,9 @@ function PerspectiveSection({
           {formatPerspectiveLabel(perspectiveKey)}
         </h3>
         <AssertionTierBadge confidence={firstAssertion?.confidence ?? null} />
-        <span className={`ml-auto text-[10px] text-text-muted transition-transform duration-150 ${open ? "rotate-90" : ""}`}>▶</span>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`ml-auto shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {/* Collapsed preview */}

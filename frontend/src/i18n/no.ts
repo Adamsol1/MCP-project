@@ -90,7 +90,7 @@ export const no = {
   // PerspectiveSelector
   perspective: "Perspektiv",
   perspectiveLabels: {
-    NEUTRAL: "N\u00f8ytral",
+    NEUTRAL: "Global",
     CHINA: "Kina",
     EU: "EU",
     NORWAY: "Norge",
