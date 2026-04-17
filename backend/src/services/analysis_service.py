@@ -4,9 +4,16 @@ import re
 
 from src.mcp_client.client import MCPClient
 from src.models.analysis import AnalysisDraft, FindingModel, ProcessingResult
-from src.models.confidence import ConfidenceTier, FindingConfidence, PerspectiveAssertion
+from src.models.confidence import (
+    ConfidenceTier,
+    FindingConfidence,
+    PerspectiveAssertion,
+)
 from src.models.dialogue import Perspective
-from src.services.confidence.assertion_enrichment import enrich_assertions, validate_finding_ids
+from src.services.confidence.assertion_enrichment import (
+    enrich_assertions,
+    validate_finding_ids,
+)
 from src.services.confidence.scoring import compute_confidence
 from src.services.gemini_agent import GeminiAgent
 

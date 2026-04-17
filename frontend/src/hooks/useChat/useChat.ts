@@ -443,8 +443,28 @@ export function useChat(initialPerspectives?: string[]) {
   const { settings } = useSettings();
   const { success, info, error } = useToast();
   const { setReviewActivity } = useWorkspace();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDecisionPending, setIsDecisionPending] = useState(false);
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [decisionPendingIds, setDecisionPendingIds] = useState<Set<string>>(new Set());
+
+  const setIsLoading = (id: string, value: boolean) => {
+    setLoadingIds((prev) => {
+      const next = new Set(prev);
+      value ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const setIsDecisionPending = (id: string, value: boolean) => {
+    setDecisionPendingIds((prev) => {
+      const next = new Set(prev);
+      value ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const isLoading = loadingIds.has(activeConversation?.id ?? "");
+  const isDecisionPending = decisionPendingIds.has(activeConversation?.id ?? "");
+
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
   const [inputPrefill, setInputPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
@@ -619,7 +639,7 @@ export function useChat(initialPerspectives?: string[]) {
       return;
     }
 
-    setIsLoading(true);
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
         conversationId,
@@ -638,7 +658,7 @@ export function useChat(initialPerspectives?: string[]) {
         setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
@@ -652,8 +672,8 @@ export function useChat(initialPerspectives?: string[]) {
       return;
     }
 
-    setIsDecisionPending(true);
-    setIsLoading(true);
+    setIsDecisionPending(conversationId, true);
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
         conversationId,
@@ -678,8 +698,8 @@ export function useChat(initialPerspectives?: string[]) {
         }
       }
     } finally {
-      setIsLoading(false);
-      setIsDecisionPending(false);
+      setIsLoading(conversationId, false);
+      setIsDecisionPending(conversationId, false);
     }
   };
 
@@ -703,10 +723,11 @@ export function useChat(initialPerspectives?: string[]) {
 
   const gatherMoreFromProcessing = async () => {
     if (!activeConversation) return;
-    setIsLoading(true);
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         "",
         undefined,
@@ -721,7 +742,7 @@ export function useChat(initialPerspectives?: string[]) {
         `Gather more failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
@@ -768,10 +789,11 @@ export function useChat(initialPerspectives?: string[]) {
     setLocalSourceContext(null);
     setPendingGatherMoreText(null);
 
-    setIsLoading(true);
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         message,
         approved,
@@ -788,10 +810,10 @@ export function useChat(initialPerspectives?: string[]) {
         }`,
       );
       if (activeConversation?.stage === "collecting") {
-        setStage(activeConversation.id, "plan_confirming", "awaiting_decision", "collection");
+        setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
@@ -889,7 +911,8 @@ export function useChat(initialPerspectives?: string[]) {
     councilSettings: CouncilRunSettings;
   }) => {
     if (!activeConversation) return;
-    setIsLoading(true);
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
     try {
       const response = await sendMessage(
         "",
@@ -908,9 +931,9 @@ export function useChat(initialPerspectives?: string[]) {
       if (response.action === "error") {
         throw new Error(response.question || "Council run failed.");
       }
-      applyResponse(response, activeConversation.id, "idle", null, "analysis");
+      applyResponse(response, conversationId, "idle", null, "analysis");
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 

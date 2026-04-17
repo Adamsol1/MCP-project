@@ -10,7 +10,12 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from src.models.analysis import AnalysisSessionState, AnalysisDraft, CouncilNote, ProcessingResult
+from src.models.analysis import (
+    AnalysisDraft,
+    AnalysisSessionState,
+    CouncilNote,
+    ProcessingResult,
+)
 
 logger = logging.getLogger("app")
 

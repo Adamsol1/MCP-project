@@ -103,6 +103,9 @@ def _extract_search_urls(raw_data: str) -> list[str]:
 # when merging collected_data lists in parse_collected_data.
 _COLLECTION_SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
 
+# Web-fetch source tool names — used for title-based secondary deduplication.
+_WEB_FETCH_SOURCES = {"fetch_page", "google_news_search", "google_search"}
+
 
 def _try_parse_json_lenient(s: str) -> dict | None:
     """Try json.loads; on failure apply common LLM-output repairs and retry."""
@@ -301,6 +304,29 @@ class CollectionService:
                     )
                     deduped[key] = item
                 items = list(deduped.values())
+
+            # Secondary dedup for web sources: the same article can appear at
+            # slightly different URLs across retry attempts (UTM params, redirect
+            # chains, etc.).  When a title is available, deduplicate by
+            # (source, normalised_title), keeping whichever copy has more content.
+            if items:
+                seen_titles: dict[tuple, int] = {}  # (source, title) -> index in result
+                title_deduped: list[dict] = []
+                for item in items:
+                    source = str(item.get("source") or "")
+                    raw_title = str(item.get("title") or "").strip()
+                    if source in _WEB_FETCH_SOURCES and raw_title:
+                        title_key = (source, raw_title.lower()[:120])
+                        if title_key in seen_titles:
+                            idx = seen_titles[title_key]
+                            if len(str(item.get("content", ""))) > len(str(title_deduped[idx].get("content", ""))):
+                                title_deduped[idx] = item  # replace with richer copy
+                        else:
+                            seen_titles[title_key] = len(title_deduped)
+                            title_deduped.append(item)
+                    else:
+                        title_deduped.append(item)
+                items = title_deduped
 
             # Unwrap MCP response wrappers the model occasionally embeds in content.
             # Pattern: {"result": "text"} or {"tool_response": {"result": "text"}}
