@@ -4,7 +4,7 @@ import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
-import AnalysisPrototypeView from "../AnalysisPrototypeView/AnalysisPrototypeView";
+import AnalysisWorkspace from "../AnalysisWorkspace/AnalysisWorkspace";
 import type {
   CollectionDisplayData,
   CollectionPlanData,
@@ -94,7 +94,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         {sortedPirs.map((pir, i) => (
           <div
             key={i}
-            className="rounded-lg border border-border-muted bg-surface px-3 py-2.5 space-y-1"
+            className="rounded-lg border border-border/50 bg-surface-muted px-3 py-2.5 space-y-1"
           >
             <div className="flex items-center gap-2">
               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -126,7 +126,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           </div>
         ))}
       </div>
-      <details className="group mt-3 border-t border-border pt-2" open>
+      <details className="group mt-3 border-t border-border/50 pt-2" open>
         <summary className="cursor-pointer list-none text-xs font-medium uppercase tracking-wider text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
           Sources ({pirData.sources?.length ?? 0})
           <Chevron />
@@ -146,7 +146,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
         </div>
       </details>
       {reasoningPoints.length > 0 && (
-        <details className="group mt-3 border-t border-border pt-2">
+        <details className="group mt-3 border-t border-border/50 pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
             {t.showReasoning}
             <Chevron />
@@ -193,7 +193,7 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
             return (
               <div
                 key={index}
-                className="rounded-lg border border-border-muted bg-surface px-3 py-2.5 space-y-1"
+                className="rounded-lg border border-border/50 bg-surface-muted px-3 py-2.5 space-y-1"
               >
                 <div className="flex items-center gap-2">
                   <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
@@ -273,7 +273,7 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
         {data.summary}
       </p>
       {data.sources_used.length > 0 && (
-        <div className="border-t border-border pt-2">
+        <div className="border-t border-border/50 pt-2">
           <p className="text-sm font-medium text-text-secondary">
             {t.sourcesUsed}
           </p>
@@ -284,7 +284,7 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
           </ul>
         </div>
       )}
-      <div className="border-t border-border pt-2">
+      <div className="border-t border-border/50 pt-2">
         <p className="text-sm font-medium text-text-secondary">{t.gaps}</p>
         <p className="mt-1 text-sm text-text-secondary">
           {data.gaps ?? t.noGapsIdentified}
@@ -368,7 +368,7 @@ function FindingDetailModal({
         <div className="sticky top-0 z-10 bg-surface border-b border-border px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 flex-1 min-w-0">
-              <span className="shrink-0 rounded-md border border-border-muted bg-surface-muted px-2 py-1 font-mono text-xs font-bold text-text-secondary mt-0.5">
+              <span className="shrink-0 rounded-md border border-border/50 bg-surface-muted px-2 py-1 font-mono text-xs font-bold text-text-secondary mt-0.5">
                 {displayId ?? finding.id}
               </span>
               <div className="flex-1 min-w-0">
@@ -424,14 +424,14 @@ function FindingDetailModal({
             (sd.attack_ids?.length ?? 0) > 0 ||
             (sd.entities?.length ?? 0) > 0 ||
             (sd.domains?.length ?? 0) > 0) && (
-            <div className="border-t border-border-muted pt-4 space-y-3">
+            <div className="border-t border-border/50 pt-4 space-y-3">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Supporting Data</p>
               {(sd.kb_refs?.length ?? 0) > 0 && (
                 <div>
                   <p className="text-xs font-medium text-text-secondary mb-1">Knowledge Base Refs</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.kb_refs!.map((r) => (
-                      <span key={r} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{r}</span>
+                      <span key={r} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{r}</span>
                     ))}
                   </div>
                 </div>
@@ -441,7 +441,7 @@ function FindingDetailModal({
                   <p className="text-xs font-medium text-text-secondary mb-1">ATT&amp;CK Techniques</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.attack_ids!.map((id) => (
-                      <span key={id} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{id}</span>
+                      <span key={id} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{id}</span>
                     ))}
                   </div>
                 </div>
@@ -457,7 +457,7 @@ function FindingDetailModal({
                   <p className="text-xs font-medium text-text-secondary mb-1">Domains</p>
                   <div className="flex flex-wrap gap-1">
                     {sd.domains!.map((d) => (
-                      <span key={d} className="rounded border border-border-muted bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">{d}</span>
+                      <span key={d} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">{d}</span>
                     ))}
                   </div>
                 </div>
@@ -467,7 +467,7 @@ function FindingDetailModal({
 
           {/* Uncertainties */}
           {(finding.uncertainties?.length ?? 0) > 0 && (
-            <div className="border-t border-border-muted pt-4">
+            <div className="border-t border-border/50 pt-4">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2">Uncertainties</p>
               <ul className="list-disc pl-4 space-y-1 text-xs text-text-muted">
                 {finding.uncertainties.map((u, i) => (
@@ -524,22 +524,22 @@ function ProcessingMessage({
     <div className="space-y-3">
       <div className="flex items-center justify-between gap-2">
         <h3 className="font-semibold">Processing Results</h3>
-        <span className="rounded-full border border-border-muted bg-surface-muted px-2.5 py-0.5 text-xs text-text-muted">
+        <span className="rounded-full border border-border/50 bg-surface-muted px-2.5 py-0.5 text-xs text-text-muted">
           {data.findings.length} findings
         </span>
       </div>
-      <div className="overflow-x-auto rounded-lg border border-border-muted">
+      <div className="overflow-x-auto rounded-lg border border-border/50">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-surface-muted text-text-muted">
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">ID</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted">Title</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Source</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Confidence</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border-muted whitespace-nowrap">Relevant To</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">ID</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50">Title</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Source</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Confidence</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Relevant To</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-border-muted">
+          <tbody className="divide-y divide-border/50">
             {[...data.findings]
               .sort((a, b) => b.confidence - a.confidence)
               .map((f, idx) => {
@@ -573,14 +573,14 @@ function ProcessingMessage({
         </table>
       </div>
       {data.gaps.length > 0 && (
-        <div className="border-t border-border pt-3 space-y-3">
+        <div className="border-t border-border/50 pt-3 space-y-3">
           <div className="flex items-center justify-between gap-2">
             <p className="text-sm font-semibold text-text-primary">Gaps <span className="ml-1 text-xs font-normal text-text-muted">({data.gaps.length})</span></p>
             {onGapCollect && !collectMode && (
               <button
                 type="button"
                 onClick={() => setCollectMode(true)}
-                className="rounded-md border border-border-muted px-3 py-1 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                className="rounded-md border border-border/50 px-3 py-1 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors"
               >
                 Collect More
               </button>
@@ -631,7 +631,7 @@ function ProcessingMessage({
                 type="button"
                 onClick={collectSelected}
                 disabled={selectedGaps.size === 0}
-                className="rounded-md border border-border-muted px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="rounded-md border border-border/50 px-3 py-1.5 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 Collect Selected ({selectedGaps.size})
               </button>
@@ -681,7 +681,7 @@ function SourceSummaryTable({
   const t = useT();
   if (summaries.length === 0) return null;
   return (
-    <div className="overflow-x-auto rounded border border-border-muted">
+    <div className="overflow-x-auto rounded border border-border/50">
       <table className="min-w-full text-sm">
         <thead className="bg-surface-muted">
           <tr>
@@ -695,7 +695,7 @@ function SourceSummaryTable({
         </thead>
         <tbody>
           {summaries.map((s) => (
-            <tr key={s.display_name} className="border-t border-border-muted">
+            <tr key={s.display_name} className="border-t border-border/50">
               <td className="px-3 py-1.5 font-medium text-text-primary">
                 {s.display_name}
               </td>
@@ -931,8 +931,8 @@ export default function ChatWindow({
                   message.sender === "user"
                     ? "self-end max-w-[75%]"
                     : message.type === "processing"
-                      ? "self-start w-full bg-surface-muted text-text-primary"
-                      : "self-start max-w-[75%] bg-surface-muted text-text-primary"
+                      ? "self-start w-full bg-surface border border-border/50 text-text-primary"
+                      : "self-start max-w-[75%] bg-surface border border-border/50 text-text-primary"
                 }`}
                 style={
                   message.sender === "user"
@@ -947,7 +947,7 @@ export default function ChatWindow({
               </div>
             ))}
             {isLoading && (
-              <div className="self-start bg-surface-muted rounded-lg p-3 mb-2">
+              <div className="self-start bg-surface border border-border/50 rounded-lg p-3 mb-2">
                 <div className="flex items-center gap-1">
                   <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" />
                   <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce [animation-delay:150ms]" />
@@ -958,8 +958,8 @@ export default function ChatWindow({
           </div>
           {isAnalysisComplete && (
             <div className={`${contentWidthClass} mt-4`}>
-              <section className="rounded-xl border border-border-muted bg-surface p-4 shadow-sm">
-                <AnalysisPrototypeView />
+              <section className="rounded-xl border border-border/50 bg-surface p-4 shadow-sm">
+                <AnalysisWorkspace />
               </section>
             </div>
           )}

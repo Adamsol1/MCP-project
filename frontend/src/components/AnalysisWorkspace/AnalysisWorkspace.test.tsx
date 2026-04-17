@@ -2,21 +2,17 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ReactNode } from "react";
-import AnalysisPrototypeView from "./AnalysisPrototypeView";
+import AnalysisWorkspace from "./AnalysisWorkspace";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 import type { ConversationStore } from "../../types/conversation";
-import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
+import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 
 vi.mock("../../services/analysis/analysis", () => ({
-  getAnalysisDraft: vi.fn(),
   runAnalysisCouncil: vi.fn(),
 }));
 
-import {
-  getAnalysisDraft,
-  runAnalysisCouncil,
-} from "../../services/analysis/analysis";
+import { runAnalysisCouncil } from "../../services/analysis/analysis";
 
 const STORAGE_KEY = "mcp-conversations";
 
@@ -55,7 +51,7 @@ const demoCouncilNote: CouncilNote = {
   transcript_path: "backend/data/outputs/council_transcripts/demo.md",
 };
 
-const demoResponse: AnalysisDraftResponse = {
+const demoResponse: AnalysisResponse = {
   processing_result: {
     findings: [
       {
@@ -80,6 +76,7 @@ const demoResponse: AnalysisDraftResponse = {
         uncertainties: [
           "Successful logins may have used sprayed passwords or previously compromised credentials.",
         ],
+        computed_confidence: null,
       },
       {
         id: "F-002",
@@ -99,28 +96,35 @@ const demoResponse: AnalysisDraftResponse = {
         why_it_matters:
           "This supports a parallel credential-theft path against telecom staff.",
         uncertainties: ["The specific lure delivery method remains unknown."],
+        computed_confidence: null,
       },
     ],
     gaps: ["Attribution remains unclear.", "Victimology is incomplete."],
   },
   analysis_draft: {
+    title: "Northern Europe telecom access-development assessment",
     summary:
       "Analysis of processed findings indicates a likely access-development campaign against Northern European telecom functions.",
     key_judgments: [
       "Repeated credential-access activity suggests deliberate targeting of privileged telecom workflows.",
     ],
     per_perspective_implications: {
-      us: ["US analysts should monitor shared vendor-access pathways."],
-      norway: [
-        "Norwegian operators should prioritize identity and telecom admin review.",
+      us: [
+        {
+          assertion: "US analysts should monitor shared vendor-access pathways.",
+          supporting_finding_ids: ["F-001"],
+          source_types: ["network_telemetry"],
+          confidence: null,
+        },
       ],
-      china: [
-        "Actor-specific judgments should remain limited while attribution is unresolved.",
-      ],
-      eu: ["Cross-border telecom dependencies increase regional significance."],
-      russia: ["Regional critical-infrastructure scenarios remain relevant."],
       neutral: [
-        "The evidence is stronger on access preparation than final intent.",
+        {
+          assertion:
+            "The evidence is stronger on access preparation than final intent.",
+          supporting_finding_ids: ["F-002"],
+          source_types: ["osint"],
+          confidence: null,
+        },
       ],
     },
     recommended_actions: [
@@ -145,13 +149,24 @@ function createWrapper() {
   };
 }
 
-function seedConversationStore(perspectives = ["US", "NEUTRAL"]) {
+function seedConversationStore(
+  perspectives = ["US", "NEUTRAL"],
+  response: AnalysisResponse = demoResponse,
+) {
   const store: ConversationStore = {
     conversations: [
       {
         id: "conv-1",
         title: "Northern Europe telecom access-development assessment",
-        messages: [],
+        messages: [
+          {
+            id: "msg-1",
+            sender: "system",
+            text: "Analysis complete",
+            type: "analysis",
+            data: response,
+          },
+        ],
         perspectives,
         sessionId: "session-1",
         isConfirming: false,
@@ -167,25 +182,41 @@ function seedConversationStore(perspectives = ["US", "NEUTRAL"]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 }
 
-describe("AnalysisPrototypeView", () => {
+describe("AnalysisWorkspace", () => {
   beforeEach(() => {
     localStorage.clear();
     vi.clearAllMocks();
     seedConversationStore();
   });
 
-  it("renders a loading state while the draft is being fetched", () => {
-    vi.mocked(getAnalysisDraft).mockReturnValue(new Promise(() => {}));
+  it("shows a fallback when no analysis message exists", () => {
+    const store: ConversationStore = {
+      conversations: [
+        {
+          id: "conv-1",
+          title: "New conversation",
+          messages: [],
+          perspectives: ["US", "NEUTRAL"],
+          sessionId: "session-1",
+          isConfirming: false,
+          stage: "complete",
+          phase: "processing",
+          subState: null,
+          createdAt: 1000,
+          updatedAt: 1000,
+        },
+      ],
+      activeConversationId: "conv-1",
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
-    expect(screen.getByText(/loading analysis draft/i)).toBeInTheDocument();
+    expect(screen.getByText(/No analysis available for this session/i)).toBeInTheDocument();
   });
 
-  it("renders findings and draft sections after a successful load", async () => {
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+  it("renders findings and analysis sections", async () => {
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       await screen.findByRole("heading", {
@@ -215,7 +246,15 @@ describe("AnalysisPrototypeView", () => {
         {
           id: "conv-1",
           title: "New conversation",
-          messages: [],
+          messages: [
+            {
+              id: "msg-1",
+              sender: "system",
+              text: "Analysis complete",
+              type: "analysis",
+              data: { ...demoResponse, analysis_draft: { ...demoResponse.analysis_draft, title: "" } },
+            },
+          ],
           perspectives: ["US", "NEUTRAL"],
           sessionId: "session-1",
           isConfirming: false,
@@ -229,9 +268,8 @@ describe("AnalysisPrototypeView", () => {
       activeConversationId: "conv-1",
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       await screen.findByRole("heading", {
@@ -241,51 +279,15 @@ describe("AnalysisPrototypeView", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders an error state when the fetch fails", async () => {
-    vi.mocked(getAnalysisDraft).mockRejectedValue(
-      new Error("backend unavailable"),
-    );
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
-
-    expect(
-      await screen.findByText(/failed to load analysis draft/i),
-    ).toBeInTheDocument();
-    expect(screen.getByText(/backend unavailable/i)).toBeInTheDocument();
-  });
-
-  it("shows the processing-required error when no processed result exists", async () => {
-    vi.mocked(getAnalysisDraft).mockRejectedValue({
-      response: {
-        data: {
-          detail:
-            "No processed result available for this session. Complete processing first.",
-        },
-      },
-    });
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
-
-    expect(
-      await screen.findByText(
-        /No processed result available for this session. Complete processing first./i,
-      ),
-    ).toBeInTheDocument();
-  });
-
   it("renders a finding card with visible confidence", async () => {
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(await screen.findByLabelText(/finding f-001/i)).toBeInTheDocument();
     expect(screen.getByText(/^82%$/i)).toBeInTheDocument();
   });
 
   it("renders finding uncertainties clearly", async () => {
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       (await screen.findAllByText(/Uncertainties/i)).length,
@@ -297,9 +299,8 @@ describe("AnalysisPrototypeView", () => {
 
   it("supports perspective chip selection", async () => {
     const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     const chinaChip = await screen.findByRole("button", { name: "China" });
     expect(screen.getByRole("button", { name: "US" })).toHaveAttribute(
@@ -315,10 +316,9 @@ describe("AnalysisPrototypeView", () => {
 
   it("accepts textarea input and submits a council request", async () => {
     const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
     vi.mocked(runAnalysisCouncil).mockResolvedValue(demoCouncilNote);
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     const textarea = await screen.findByLabelText(/Debate point/i);
     await user.type(
@@ -354,9 +354,7 @@ describe("AnalysisPrototypeView", () => {
   });
 
   it("shows the active council runtime settings in the form", async () => {
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       await screen.findByText(
@@ -367,9 +365,8 @@ describe("AnalysisPrototypeView", () => {
 
   it("shows validation feedback when council input is incomplete", async () => {
     const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft).mockResolvedValue(demoResponse);
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     await screen.findByText(/Run council on a point/i);
     await user.click(screen.getByRole("button", { name: /Run council/i }));
@@ -381,14 +378,14 @@ describe("AnalysisPrototypeView", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the council result and expands the transcript without changing the draft", async () => {
+  it("renders the council result and expands the transcript", async () => {
     const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft).mockResolvedValue({
+    seedConversationStore(["US", "NEUTRAL"], {
       ...demoResponse,
       latest_council_note: demoCouncilNote,
     });
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       await screen.findByText(/deliberate access-development activity/i),
@@ -426,12 +423,12 @@ describe("AnalysisPrototypeView", () => {
 
   it("switches between council summary and participant views", async () => {
     const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft).mockResolvedValue({
+    seedConversationStore(["US", "NEUTRAL"], {
       ...demoResponse,
       latest_council_note: demoCouncilNote,
     });
 
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
+    render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
     expect(
       await screen.findByText(/deliberate access-development activity/i),
@@ -466,41 +463,5 @@ describe("AnalysisPrototypeView", () => {
         screen.queryByText(/Attribution remains unresolved/i),
       ).not.toBeInTheDocument();
     });
-  });
-
-  it("reloads with the persisted council note while keeping the draft visible", async () => {
-    const user = userEvent.setup();
-    vi.mocked(getAnalysisDraft)
-      .mockResolvedValueOnce(demoResponse)
-      .mockResolvedValueOnce({
-        ...demoResponse,
-        latest_council_note: demoCouncilNote,
-      });
-    vi.mocked(runAnalysisCouncil).mockResolvedValue(demoCouncilNote);
-
-    const view = render(<AnalysisPrototypeView />, {
-      wrapper: createWrapper(),
-    });
-
-    await screen.findByText(/likely access-development campaign/i);
-    await user.type(
-      screen.getByLabelText(/Debate point/i),
-      "Assess whether coordinated access development is the strongest interpretation.",
-    );
-    await user.click(screen.getByRole("button", { name: /Run council/i }));
-    await screen.findByText(/deliberate access-development activity/i);
-
-    view.unmount();
-
-    render(<AnalysisPrototypeView />, { wrapper: createWrapper() });
-
-    expect(
-      await screen.findByText(/deliberate access-development activity/i),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        /likely access-development campaign against Northern European telecom functions/i,
-      ),
-    ).toBeInTheDocument();
   });
 });

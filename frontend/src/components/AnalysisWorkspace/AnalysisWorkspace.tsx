@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useConversation } from "../../hooks/useConversation/useConversation";
-import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 import AnalysisView from "./AnalysisView";
 import CouncilView from "./CouncilView";
 
@@ -18,15 +19,16 @@ function normalizePerspectives(perspectives: string[] | undefined) {
   return PERSPECTIVE_ORDER.filter((value) => normalized.includes(value));
 }
 
-export default function AnalysisPrototypeView() {
+export default function AnalysisWorkspace() {
   const { activeConversation } = useConversation();
+  const { settings } = useSettings();
 
-  const data = useMemo<AnalysisDraftResponse | null>(() => {
+  const data = useMemo<AnalysisResponse | null>(() => {
     if (!activeConversation) return null;
     for (let i = activeConversation.messages.length - 1; i >= 0; i--) {
       const msg = activeConversation.messages[i];
       if (msg.type === "analysis" && msg.data) {
-        return msg.data as AnalysisDraftResponse;
+        return msg.data as AnalysisResponse;
       }
     }
     return null;
@@ -66,7 +68,7 @@ export default function AnalysisPrototypeView() {
   if (!activeConversation?.sessionId) {
     return (
       <p className="text-sm text-text-secondary">
-        Create or select a conversation to load the analysis prototype.
+        Create or select a conversation to load the analysis.
       </p>
     );
   }
@@ -74,7 +76,7 @@ export default function AnalysisPrototypeView() {
   if (!data) {
     return (
       <p className="text-sm text-text-secondary">
-        Analysis draft is not available for this session.
+        No analysis available for this session.
       </p>
     );
   }
@@ -95,6 +97,7 @@ export default function AnalysisPrototypeView() {
       data={data}
       conversationTitle={activeConversation?.title}
       onStartCouncil={() => setShowCouncil(true)}
+      timeframe={settings.inputParameters.timeframe}
     />
   );
 }

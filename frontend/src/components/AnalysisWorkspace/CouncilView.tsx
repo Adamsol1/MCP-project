@@ -478,7 +478,7 @@ export default function CouncilView({
       : (councilParticipantViews.find((view) => view.participant === activeCouncilView) ?? null);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8 pb-8">
+    <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
       {/* Back button */}
       <div>
         <button
@@ -490,16 +490,16 @@ export default function CouncilView({
         </button>
       </div>
 
-      <section className="grid gap-4 xl:grid-cols-[0.95fr,1.05fr]">
+      <section className="grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
         {/* Council form */}
-        <article className="rounded-[24px] border border-border bg-surface px-5 py-5 shadow-sm">
+        <article className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
             Run council on a point
           </p>
-          <p className="mt-2 text-sm leading-6 text-text-secondary">
+          <p className="text-sm leading-6 text-text-secondary">
             The Council simulates structured deliberation between analytical perspectives, surfacing agreements, disagreements, and a final recommendation.
           </p>
-          <form className="mt-4 space-y-4" onSubmit={handleCouncilSubmit}>
+          <form className="pt-2 space-y-4" onSubmit={handleCouncilSubmit}>
             <div className="space-y-2">
               <p className="text-sm font-medium text-text-primary">Perspectives</p>
               <div className="flex flex-wrap gap-2">
@@ -554,25 +554,50 @@ export default function CouncilView({
             </div>
 
             <div className="space-y-2">
-              <p className="text-sm font-medium text-text-primary">Findings in scope</p>
-              <div className="space-y-2">
-                {processingFindings.map((finding) => (
-                  <label
-                    key={finding.id}
-                    className="flex items-start gap-3 rounded-[18px] border border-border-muted px-3 py-3"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedFindingIds.includes(finding.id)}
-                      onChange={() => toggleFinding(finding.id)}
-                      className="mt-1"
-                    />
-                    <span className="text-sm text-text-primary">
-                      <span className="font-medium">{finding.id}</span>{" "}
-                      {finding.title}
-                    </span>
-                  </label>
-                ))}
+              <div className="flex items-center justify-between">
+                <p className="text-sm font-medium text-text-primary">Findings in scope</p>
+                <button
+                  type="button"
+                  onClick={() =>
+                    selectedFindingIds.length === processingFindings.length
+                      ? setSelectedFindingIds([])
+                      : setSelectedFindingIds(processingFindings.map((f) => f.id))
+                  }
+                  className="text-xs text-text-muted hover:text-text-primary transition-colors"
+                >
+                  {selectedFindingIds.length === processingFindings.length ? "Deselect all" : "Select all"}
+                </button>
+              </div>
+              <div className="overflow-hidden rounded-[18px] border border-border/50 divide-y divide-border/50">
+                {processingFindings.map((finding) => {
+                  const isSelected = selectedFindingIds.includes(finding.id);
+                  return (
+                    <button
+                      key={finding.id}
+                      type="button"
+                      onClick={() => toggleFinding(finding.id)}
+                      aria-pressed={isSelected}
+                      aria-label={`${finding.id} ${finding.title}`}
+                      className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors ${
+                        isSelected ? "bg-primary-subtle/40" : "hover:bg-surface-muted/50"
+                      }`}
+                    >
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
+                        isSelected ? "border-primary bg-primary" : "border-border"
+                      }`}>
+                        {isSelected && (
+                          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M2 6l3 3 5-5" />
+                          </svg>
+                        )}
+                      </span>
+                      <span className="text-sm text-text-primary">
+                        <span className="font-medium">{finding.id}</span>{" "}
+                        {finding.title}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
@@ -598,7 +623,8 @@ export default function CouncilView({
         </article>
 
         {/* Advisory note */}
-        <article className="rounded-[24px] border border-border bg-surface px-5 py-5 shadow-sm">
+
+        <article className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -614,11 +640,11 @@ export default function CouncilView({
           </div>
 
           {!councilNote ? (
-            <p className="mt-4 text-sm leading-6 text-text-secondary">
+            <p className="text-sm leading-6 text-text-secondary">
               Run a council deliberation to generate a separate advisory note for this assessment.
             </p>
           ) : (
-            <div className="mt-4 space-y-4">
+            <div className="space-y-4">
               {councilRuntimeIssue ? (
                 <div className="rounded-[18px] border border-error bg-error-subtle px-4 py-3">
                   <p className="text-sm text-error-text">{councilRuntimeIssue}</p>

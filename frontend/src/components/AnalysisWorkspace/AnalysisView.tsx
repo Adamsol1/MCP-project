@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import type {
-  AnalysisDraftResponse,
+  AnalysisResponse,
   AssertionConfidence,
   ConfidenceTier,
   PerspectiveAssertion,
@@ -82,12 +82,12 @@ function deriveTitleFromSummary(summary: string): string {
 }
 
 function getAnalysisHeading(
-  analysisDraftTitle: string,
+  analysisTitle: string,
   summary: string,
   conversationTitle: string | undefined,
   findings: ProcessingFinding[],
 ) {
-  if (analysisDraftTitle?.trim()) return analysisDraftTitle.trim();
+  if (analysisTitle?.trim()) return analysisTitle.trim();
   // Derive from the AI-generated summary so we always show analytical language
   if (summary?.trim()) return deriveTitleFromSummary(summary);
   const trimmedTitle = conversationTitle?.trim();
@@ -144,7 +144,6 @@ function getAllSourceTypes(findings: ProcessingFinding[]): string[] {
 // ---------------------------------------------------------------------------
 
 function AssertionTierBadge({ confidence }: { confidence: AssertionConfidence | null }) {
-  const [showScore, setShowScore] = useState(false);
   if (!confidence) {
     return (
       <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-text-muted">
@@ -156,11 +155,9 @@ function AssertionTierBadge({ confidence }: { confidence: AssertionConfidence | 
   return (
     <span
       title={`Score: ${confidence.score.toFixed(2)} | Authority: ${confidence.authority.toFixed(2)} | Corroboration: ${confidence.corroboration.toFixed(2)} | Independence: ${confidence.independence.toFixed(2)}`}
-      onMouseEnter={() => setShowScore(true)}
-      onMouseLeave={() => setShowScore(false)}
-      className={`inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest transition-all ${styles.bg} ${styles.text} ${styles.border}`}
+      className={`inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-widest ${styles.bg} ${styles.text} ${styles.border}`}
     >
-      {showScore ? confidence.score.toFixed(2) : styles.label}
+      {styles.label}
     </span>
   );
 }
@@ -172,7 +169,6 @@ function AssertionRow({
   assertion: PerspectiveAssertion;
   allFindings: ProcessingFinding[];
 }) {
-  const [expanded, setExpanded] = useState(false);
   const conf = assertion.confidence;
 
   return (
@@ -185,21 +181,9 @@ function AssertionRow({
           )}
         </div>
         <p className="flex-1 text-sm leading-6 text-text-primary">{assertion.assertion}</p>
-        {conf && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="shrink-0 text-text-muted mt-1"
-            aria-label="Toggle confidence breakdown"
-          >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}>
-              <path d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-        )}
       </div>
 
-      {expanded && conf && (
+      {conf && (
         <div className="mt-2 ml-18 space-y-2">
           <div className="grid grid-cols-3 gap-3">
             {(
@@ -258,9 +242,10 @@ function AssertionRow({
 // ---------------------------------------------------------------------------
 
 interface AnalysisViewProps {
-  data: AnalysisDraftResponse;
+  data: AnalysisResponse;
   conversationTitle: string | undefined;
   onStartCouncil: () => void;
+  timeframe?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,18 +256,20 @@ export default function AnalysisView({
   data,
   conversationTitle,
   onStartCouncil,
+  timeframe,
 }: AnalysisViewProps) {
-  const { processing_result: processingResult, analysis_draft: analysisDraft } = data;
+  const { processing_result: processingResult, analysis_draft: analysis } = data;
   const findings = processingResult.findings;
 
-  const timelineSpan = useMemo(() => getTimelineSpan(findings), [findings]);
+  const computedTimelineSpan = useMemo(() => getTimelineSpan(findings), [findings]);
+  const timelineSpan = timeframe?.trim() || computedTimelineSpan;
   const allSourceTypes = useMemo(() => getAllSourceTypes(findings), [findings]);
   const averageConfidence = getAverageConfidence(findings);
-  const analysisHeading = getAnalysisHeading(analysisDraft.title, analysisDraft.summary, conversationTitle, findings);
+  const analysisHeading = getAnalysisHeading(analysis.title, analysis.summary, conversationTitle, findings);
 
-  const orderedPerspectiveEntries = Object.keys(analysisDraft.per_perspective_implications)
+  const orderedPerspectiveEntries = Object.keys(analysis.per_perspective_implications)
     .sort((a, b) => a.localeCompare(b))
-    .map((key) => [key, analysisDraft.per_perspective_implications[key]] as const);
+    .map((key) => [key, analysis.per_perspective_implications[key]] as const);
 
   return (
     <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
@@ -294,7 +281,7 @@ export default function AnalysisView({
             {analysisHeading}
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-text-secondary">
-            {analysisDraft.summary}
+            {analysis.summary}
           </p>
         </div>
 
@@ -353,14 +340,14 @@ export default function AnalysisView({
 
       {/* ── Key Judgments + Recommended Actions (side-by-side) ───────── */}
       <section>
-        <div className="grid gap-8 border-b border-border/50 pb-8 md:grid-cols-2 md:divide-x md:divide-border/50">
+        <div className="border-b border-border/50 pb-8 md:grid md:grid-cols-[1fr_1px_1fr]">
           {/* Key Judgments */}
-          <div>
+          <div className="md:pr-8">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               Key Judgments
             </p>
             <ol className="mt-4 space-y-4">
-              {analysisDraft.key_judgments.map((judgment, index) => (
+              {analysis.key_judgments.map((judgment, index) => (
                 <li key={judgment} className="flex gap-3 text-sm leading-6 text-text-primary">
                   <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-semibold text-text-secondary">
                     {index + 1}
@@ -371,13 +358,16 @@ export default function AnalysisView({
             </ol>
           </div>
 
+          {/* Vertical divider */}
+          <div className="hidden md:block bg-border/50 my-2" />
+
           {/* Recommended Actions */}
-          <div className="md:pl-8">
+          <div className="mt-8 md:mt-0 md:pl-8">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               Recommended Actions
             </p>
             <ul className="mt-4 space-y-3">
-              {analysisDraft.recommended_actions.map((action) => (
+              {analysis.recommended_actions.map((action) => (
                 <li key={action} className="flex gap-2.5 text-sm leading-6 text-text-primary">
                   <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
                   <span>{action}</span>
@@ -431,13 +421,13 @@ export default function AnalysisView({
       )}
 
       {/* ── Information Gaps ──────────────────────────────────────────── */}
-      {analysisDraft.information_gaps.length > 0 && (
+      {analysis.information_gaps.length > 0 && (
         <section className="space-y-4 border-t border-border/50 pt-8">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
             Information Gaps
           </p>
           <ul className="space-y-2">
-            {analysisDraft.information_gaps.map((gap) => (
+            {analysis.information_gaps.map((gap) => (
               <li key={gap} className="flex gap-2.5 text-sm leading-6 text-text-secondary">
                 <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                 <span>{gap}</span>
@@ -523,7 +513,7 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
 
       {/* Expanded content */}
       {open && (
-        <div className="border-t border-border px-5 py-5 space-y-5">
+        <div className="px-5 py-5 space-y-5">
           {/* Finding */}
           <section>
             <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">Finding</p>

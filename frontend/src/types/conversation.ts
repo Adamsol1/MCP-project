@@ -1,4 +1,4 @@
-import type { AnalysisDraftResponse, CouncilNote } from "./analysis";
+import type { AnalysisResponse, CouncilNote } from "./analysis";
 import type {
   DialoguePhase,
   DialogueStage,
@@ -33,7 +33,7 @@ export interface Message {
     | CollectionSummaryData
     | CollectionDisplayData
     | ProcessingData
-    | AnalysisDraftResponse
+    | AnalysisResponse
     | CouncilNote;
 }
 

@@ -91,7 +91,7 @@ export interface ProcessingResult {
   gaps: string[];
 }
 
-export interface AnalysisDraft {
+export interface Analysis {
   title: string;
   summary: string;
   key_judgments: string[];
@@ -120,9 +120,9 @@ export interface CouncilNote {
   transcript_path: string | null;
 }
 
-export interface AnalysisDraftResponse {
+export interface AnalysisResponse {
   processing_result: ProcessingResult;
-  analysis_draft: AnalysisDraft;
+  analysis_draft: Analysis;
   latest_council_note: CouncilNote | null;
   collection_coverage: CollectionCoverageResult | null;
   data_source: "session";

@@ -31,7 +31,7 @@ import type {
   SuggestedSourcesData,
   SummaryData,
 } from "../../types/conversation";
-import type { AnalysisDraftResponse, CouncilNote } from "../../types/analysis";
+import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 
 let didRequestInitialDevSnapshots = false;
@@ -389,7 +389,7 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
     }
 
     case "analysis": {
-      const parsed = tryParseJson<AnalysisDraftResponse>(response.question);
+      const parsed = tryParseJson<AnalysisResponse>(response.question);
       if (parsed) {
         message.data = parsed;
       }
