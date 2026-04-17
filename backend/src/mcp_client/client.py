@@ -91,6 +91,8 @@ class MCPClient:
             raise
         logger.info(f"[MCP] Tool {tool_name} completed in {time.time() - start:.2f}s")
 
+        if not result.content:
+            raise ValueError(f"MCP tool '{tool_name}' returned empty content")
         content_item = result.content[0]
         if not isinstance(content_item, TextContent):
             raise ValueError(f"Unexpected content type: {type(content_item).__name__}")

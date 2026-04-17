@@ -190,7 +190,7 @@ class CouncilService:
         if not debates:
             raise RuntimeError("Council runtime failed: no participant responses were produced")
 
-        if any(not entry.get("response", "").startswith("[ERROR:") for entry in debates):
+        if not all(entry.get("response", "").startswith("[ERROR:") for entry in debates):
             return
 
         first_error = debates[0].get("response", "").strip("[]")

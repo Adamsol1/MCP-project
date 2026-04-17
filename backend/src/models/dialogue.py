@@ -119,6 +119,7 @@ class Phase(str, Enum):
     COLLECTION = "collection"
     PROCESSING = "processing"
     ANALYSIS = "analysis"
+    COUNCIL = "council"
 
 
 class PIRReview(BaseModel):

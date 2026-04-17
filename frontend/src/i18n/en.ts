@@ -128,6 +128,7 @@ export const en = {
     collection: "COLLECTION",
     processing: "PROCESSING",
     analysis: "ANALYSIS",
+    council: "COUNCIL",
   } as Record<string, string>,
 
   // SettingsModal
