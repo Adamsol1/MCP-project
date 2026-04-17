@@ -131,6 +131,7 @@ export const no = {
     collection: "INNSAMLING",
     processing: "BEHANDLING",
     analysis: "ANALYSE",
+    council: "RÅDSLAGNING",
   } as Record<string, string>,
 
   // SettingsModal

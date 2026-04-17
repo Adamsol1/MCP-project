@@ -586,12 +586,12 @@ def _ensure_analysis_flow(session: IntelligenceSession) -> AnalysisFlow:
     return session.analysis_flow
 
 
-def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> None:
+async def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> None:
     analysis_flow = _ensure_analysis_flow(session)
     if analysis_flow.analysis_result:
         return
     try:
-        state = AnalysisSessionStore().load(session.session_id)
+        state = await AnalysisSessionStore().load(session.session_id)
     except ValueError:
         return
     if not state or not state.processing_result or not state.analysis_draft:
@@ -609,7 +609,7 @@ def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> None:
     }
 
 
-def _apply_dev_restore_stage(
+async def _apply_dev_restore_stage(
     session: IntelligenceSession, target_stage: str | None, target_phase: str | None
 ) -> None:
     if not target_stage:
@@ -663,7 +663,7 @@ def _apply_dev_restore_stage(
         analysis_flow = _ensure_analysis_flow(session)
         if target_stage == AnalysisState.COMPLETE.value:
             analysis_flow.state = AnalysisState.COMPLETE
-            _hydrate_analysis_flow_from_store(session)
+            await _hydrate_analysis_flow_from_store(session)
             if session.council_flow is None:
                 session.council_flow = CouncilFlow(
                     session_id=session.session_id,
@@ -753,7 +753,7 @@ async def _processing_payload(session_id: str) -> dict[str, Any] | None:
     return result.model_dump(mode="json")
 
 
-def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | None:
+async def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | None:
     if session.analysis_flow and session.analysis_flow.analysis_result:
         payload = dict(session.analysis_flow.analysis_result)
         payload.setdefault("latest_council_note", None)
@@ -762,7 +762,7 @@ def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | None:
         return payload
 
     try:
-        state = AnalysisSessionStore().load(session.session_id)
+        state = await AnalysisSessionStore().load(session.session_id)
     except ValueError:
         return None
     if not state or not state.processing_result or not state.analysis_draft:
@@ -865,7 +865,7 @@ async def _build_dev_hydrated_messages(
             )
 
     if target_phase == Phase.ANALYSIS.value:
-        analysis_data = _analysis_payload(session)
+        analysis_data = await _analysis_payload(session)
         if analysis_data:
             messages.append(
                 {
@@ -1146,11 +1146,17 @@ async def _handle_analysis_phase(
 async def _handle_council_phase(
     session: IntelligenceSession,
     request: DialogueMessageRequest,
+    uow: UnitOfWork,
 ) -> DialogueMessageResponse:
     if session.council_flow is None:
-        session.council_flow = CouncilFlow(
-            session_id=request.session_id,
-            research_logger=session.research_logger,
+        from src.models.dialogue import DialogueAction, DialogueResponse
+        return _convert_to_message_response(
+            DialogueResponse(
+                action=DialogueAction.ERROR,
+                content="Council is not available until analysis is complete.",
+            ),
+            stage="unavailable",
+            phase=Phase.ANALYSIS,
         )
     perspectives = request.council_perspectives or request.perspectives
     response = await session.council_flow.process_user_message(
@@ -1161,11 +1167,11 @@ async def _handle_council_phase(
         analysis_flow=session.analysis_flow,
         council_settings=request.council_settings,
     )
-    _save_session(session)
+    await _save_session(session, uow)
     return _convert_to_message_response(
         response,
         stage=session.council_flow.state.value,
-        phase=Phase.ANALYSIS,
+        phase=Phase.COUNCIL,
     )
 
 
@@ -1199,7 +1205,7 @@ async def send_message(
     orchestrator = _build_orchestrator(session)
     if session.analysis_flow:
         if request.council_debate_point or request.council_finding_ids:
-            return await _handle_council_phase(session, request)
+            return await _handle_council_phase(session, request, uow)
         return await _handle_analysis_phase(session, request)
     if session.processing_flow:
         return await _handle_processing_phase(
@@ -1279,6 +1285,7 @@ async def list_dev_snapshots() -> list[DialogueDevSnapshot]:
 @router.post("/dev/restore")
 async def restore_dev_snapshot(
     request: DialogueDevRestoreRequest,
+    uow: UnitOfWork = Depends(get_uow),
 ) -> DialogueDevRestoreResponse:
     """DEV endpoint: clone prior session data/logs into the active session."""
     _ensure_dev_tools_enabled()
@@ -1288,9 +1295,9 @@ async def restore_dev_snapshot(
     if source_id != target_id:
         _clone_dev_artifacts(source_id, target_id)
     _sessions.pop(target_id, None)
-    session = _get_or_create_session(target_id)
-    _apply_dev_restore_stage(session, request.target_stage, request.target_phase)
-    _save_session(session)
+    session = await _get_or_create_session(target_id, uow)
+    await _apply_dev_restore_stage(session, request.target_stage, request.target_phase)
+    await _save_session(session, uow)
 
     state = _build_dev_state_response(target_id, session)
     messages = await _build_dev_hydrated_messages(session, state.stage, state.phase)

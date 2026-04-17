@@ -2,7 +2,8 @@ export type DialoguePhase =
   | "direction"
   | "collection"
   | "processing"
-  | "analysis";
+  | "analysis"
+  | "council";
 
 export type DialogueStage =
   | "initial"
