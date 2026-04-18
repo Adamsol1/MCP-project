@@ -25,6 +25,7 @@ if str(PROJECT_DIR) not in sys.path:
 
 from adapters import create_adapter  # noqa: E402
 from deliberation.engine import DeliberationEngine  # noqa: E402
+from deliberation.summarizer import DeliberationSummarizer  # noqa: E402
 from deliberation.transcript import TranscriptManager  # noqa: E402
 from models.config import AdapterConfig, CLIToolConfig, load_config  # noqa: E402
 from models.schema import DeliberateRequest, Participant  # noqa: E402
@@ -228,6 +229,77 @@ async def deliberate(
         f"Deliberation complete: {result.rounds_completed} rounds, status: {result.status}"
     )
     return result.model_dump()
+
+
+@mcp.tool()
+async def summarize_entries(
+    entries: list[dict],
+    adapter: str = "gemini",
+    model: str = "gemini-2.5-flash",
+) -> list[dict]:
+    """Generate a one-sentence AI summary for each council transcript entry.
+
+    Args:
+        entries:  List of dicts with keys: round (int), participant (str), response (str).
+        adapter:  Adapter name to use for summarization (default: gemini).
+        model:    Model identifier for the chosen adapter.
+
+    Returns:
+        List of dicts with keys: round, participant, summary.
+    """
+    chosen_adapter = adapters.get(adapter) or (next(iter(adapters.values())) if adapters else None)
+    if chosen_adapter is None:
+        raise RuntimeError("No adapters available for summarization")
+
+    # Strip VOTE blocks and truncate responses before sending to the model
+    items = []
+    for entry in entries:
+        response_text = entry.get("response", "")
+        vote_index = response_text.rfind("VOTE:")
+        body = response_text[:vote_index].strip() if vote_index != -1 else response_text.strip()
+        items.append({
+            "round": entry.get("round"),
+            "participant": entry.get("participant"),
+            "body": body[:1500],
+        })
+
+    entries_text = "\n\n".join(
+        f"Round {item['round']} — {item['participant']}:\n{item['body']}"
+        for item in items
+    )
+
+    prompt = (
+        "For each analyst response below, write a single sentence (max 180 characters) "
+        "capturing the analyst's core strategic position and key finding. "
+        "Be specific — name the key claim, not just the topic.\n\n"
+        "Return ONLY a JSON array. Each element must have exactly these keys: "
+        "round (integer), participant (string), summary (string). "
+        "Preserve the exact round number and participant name from the input.\n\n"
+        f"{entries_text}"
+    )
+
+    try:
+        raw_text = await chosen_adapter.invoke(prompt=prompt, model=model, context=None)
+        # Strip markdown fences if present
+        text = raw_text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1]).strip()
+        # Extract JSON array
+        start = text.find("[")
+        end = text.rfind("]")
+        if start != -1 and end != -1:
+            text = text[start : end + 1]
+        import json
+        result = json.loads(text)
+        return [
+            {"round": int(r["round"]), "participant": str(r["participant"]), "summary": str(r["summary"])}
+            for r in result
+            if "round" in r and "participant" in r and "summary" in r
+        ]
+    except Exception as exc:
+        logger.warning(f"summarize_entries failed: {exc}")
+        return []
 
 
 @mcp.custom_route("/health", methods=["GET"])

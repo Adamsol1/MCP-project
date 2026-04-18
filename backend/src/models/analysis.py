@@ -93,6 +93,7 @@ class CouncilTranscriptEntry(BaseModel):
     participant: str = Field(..., description="User-visible participant label")
     response: str = Field(..., description="Debate response text")
     timestamp: str = Field(..., description="ISO timestamp")
+    summary: str | None = Field(default=None, description="AI-generated 1-2 sentence summary")
 
 
 class CouncilRuntimeProfile(BaseModel):

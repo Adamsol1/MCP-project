@@ -24,11 +24,11 @@ export default function CollectionStatsView({
     <div className="space-y-4">
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-surface border border-border-muted px-3 py-2">
+        <div className="rounded-lg bg-surface border border-border px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.tableItems}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{total}</p>
         </div>
-        <div className="rounded-lg bg-surface border border-border-muted px-3 py-2">
+        <div className="rounded-lg bg-surface border border-border px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.statsSources}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{collectionData.source_summary.length}</p>
         </div>
@@ -52,7 +52,7 @@ export default function CollectionStatsView({
       {/* CTA button */}
       <button
         onClick={onOpenModal}
-        className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
       >
         {t.viewRawData}
       </button>

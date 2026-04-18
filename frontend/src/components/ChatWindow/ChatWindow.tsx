@@ -721,7 +721,10 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   if (data.parse_error) {
     return (
       <div className="space-y-2">
-        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+        <div>
+          <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+          <p className="mt-0.5 text-xs text-text-secondary">{t.collectionResultsSubtitle}</p>
+        </div>
         <p className="text-sm text-error-text">{t.couldNotParseCollection}</p>
         <details className="group">
           <summary className="cursor-pointer list-none text-xs text-text-muted hover:text-text-secondary select-none flex items-center gap-1">
@@ -737,7 +740,10 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
 
   return (
     <div className="space-y-3">
-      <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+      <div>
+        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+        <p className="mt-0.5 text-xs text-text-secondary">{t.collectionResultsSubtitle}</p>
+      </div>
       <SourceSummaryTable summaries={data.source_summary} />
     </div>
   );
@@ -947,11 +953,22 @@ export default function ChatWindow({
               </div>
             ))}
             {isLoading && (
-              <div className="self-start bg-surface border border-border/50 rounded-lg p-3 mb-2">
-                <div className="flex items-center gap-1">
-                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce" />
-                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce [animation-delay:150ms]" />
-                  <span className="w-2 h-2 bg-text-muted rounded-full animate-bounce [animation-delay:300ms]" />
+              <div className="self-start w-full mb-2">
+                <div className="bg-surface border border-border/50 rounded-lg px-4 py-3 flex items-center gap-3">
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:0ms]" />
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:150ms]" />
+                    <span className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:300ms]" />
+                  </div>
+                  <p className="text-sm text-text-secondary">
+                    {phase === "processing"
+                      ? "Processing collection data — this may take a moment…"
+                      : phase === "analysis"
+                        ? "Generating analysis…"
+                        : phase === "collection"
+                          ? "Collecting intelligence…"
+                          : "Working…"}
+                  </p>
                 </div>
               </div>
             )}

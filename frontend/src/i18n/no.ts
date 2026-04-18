@@ -53,6 +53,7 @@ export const no = {
   accept: "Godta",
   collectMoreData: "Samle inn mer data",
   collectionResultsHeader: "Innsamlingsresultater",
+  collectionResultsSubtitle: "Etterretning samlet fra følgende kilder.",
   couldNotParseCollection: "Kunne ikke tolke innsamlingsresultater.",
   rawOutput: "R\u00e5data",
   selectSourcesHeader: "Velg kilder",

@@ -55,11 +55,11 @@ export default function IntelligencePanel({
         return (
           <>
             {isCollecting && collectionStatus ? (
-              <PanelSection label="Collecting">
+              <PanelSection label="Collecting" first>
                 <CollectionStatusDisplay status={collectionStatus} />
               </PanelSection>
             ) : (
-              <PanelSection label="Perspective">
+              <PanelSection label="Perspective" first>
                 <PerspectiveSelector
                   selected={selectedPerspectives}
                   onChange={onPerspectiveChange}
@@ -78,7 +78,7 @@ export default function IntelligencePanel({
       case "processing":
       case "analysis":
         return (
-          <PanelSection label="Files">
+          <PanelSection label="Files" first>
             <FileUploadSection
               uploadedFiles={uploadedFiles}
               visibleFiles={visibleFiles}
@@ -98,7 +98,7 @@ export default function IntelligencePanel({
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <header className="h-14 border-b border-border-muted px-3 flex flex-col justify-center">
+      <header className="h-14 border-b border-border px-3 flex flex-col justify-center">
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
           {t.intelligenceWorkspace}
         </p>
@@ -147,14 +147,17 @@ export default function IntelligencePanel({
   );
 }
 
-function PanelSection({ label, children }: { label: string; children: ReactNode }) {
+function PanelSection({ label, children, first = false }: { label: string; children: ReactNode; first?: boolean }) {
   return (
-    <section className="py-4 first:pt-0 border-b border-border-muted last:border-none">
-      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-        {label}
-      </p>
-      {children}
-    </section>
+    <>
+      {!first && <hr className="border-border" />}
+      <section className={first ? "pb-4" : "py-4"}>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          {label}
+        </p>
+        {children}
+      </section>
+    </>
   );
 }
 
@@ -263,7 +266,7 @@ function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySe
         const processingData = item.phase === "processing" ? tryParseProcessingData(item.generated_content) : null;
 
         return (
-          <div key={item.attempt} className="rounded-lg border border-border-muted bg-surface overflow-hidden">
+          <div key={item.attempt} className="rounded-lg border border-border bg-surface overflow-hidden">
             {/* Header row */}
             <div className="flex items-stretch">
               <button
@@ -299,7 +302,7 @@ function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySe
                 <button
                   type="button"
                   onClick={() => toggleExpand(item.attempt)}
-                  className="shrink-0 border-l border-border-muted px-2 text-text-muted hover:bg-primary-subtle hover:text-primary transition-colors"
+                  className="shrink-0 border-l border-border px-2 text-text-muted hover:bg-primary-subtle hover:text-primary transition-colors"
                   aria-label={isExpanded ? "Collapse" : "Expand"}
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
@@ -310,7 +313,7 @@ function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySe
             </div>
             {/* Inline parsed processing content */}
             {isExpanded && processingData && (
-              <div className="border-t border-border-muted px-3 py-2 space-y-2 bg-surface-muted/50">
+              <div className="border-t border-border px-3 py-2 space-y-2 bg-surface-muted/50">
                 {processingData.findings && processingData.findings.length > 0 && (
                   <div className="space-y-1.5">
                     <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
@@ -319,7 +322,7 @@ function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySe
                     {[...processingData.findings]
                       .sort((a, b) => b.confidence - a.confidence)
                       .map((f, idx) => (
-                        <div key={f.id ?? idx} className="rounded border border-border-muted bg-surface p-2 space-y-1">
+                        <div key={f.id ?? idx} className="rounded border border-border bg-surface p-2 space-y-1">
                           <div className="flex items-start justify-between gap-1">
                             <p className="text-[11px] font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
                             {f.confidence != null && (
@@ -385,7 +388,7 @@ function FileUploadSection({
     <div>
       <button
         onClick={onOpenFileUpload}
-        className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
       >
         {t.uploadFiles}
       </button>

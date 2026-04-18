@@ -105,6 +105,7 @@ export interface CouncilTranscriptEntry {
   participant: string;
   response: string;
   timestamp: string;
+  summary?: string;
 }
 
 export interface CouncilNote {

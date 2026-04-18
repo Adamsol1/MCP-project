@@ -138,6 +138,14 @@ function buildCouncilSections(body: string) {
       continue;
     }
 
+    const inlineHeadingMatch = line.match(/^\*\*(.+?)\*\*:?\s+(.+)$/);
+    if (inlineHeadingMatch) {
+      flushSection();
+      currentSection = { title: normalizeSectionTitle(inlineHeadingMatch[1]), items: [] };
+      paragraphBuffer.push(inlineHeadingMatch[2].trim());
+      continue;
+    }
+
     paragraphBuffer.push(line);
   }
 
@@ -165,6 +173,22 @@ function buildCouncilParticipantViews(councilNote: CouncilNote) {
       vote,
     } satisfies CouncilParticipantView;
   });
+}
+
+function extractSummary(body: string): string {
+  const cleaned = stripMarkdown(body).replace(/\n+/g, " ").trim();
+  const sentenceEnd = /[.!?]\s+/g;
+  let count = 0;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = sentenceEnd.exec(cleaned)) !== null) {
+    count++;
+    lastIndex = match.index + match[0].length;
+    if (count >= 2) break;
+  }
+  const excerpt = count > 0 ? cleaned.slice(0, lastIndex).trim() : cleaned;
+  if (excerpt.length <= 220) return excerpt;
+  return excerpt.slice(0, 217) + "…";
 }
 
 function splitLabeledText(text: string) {
@@ -240,49 +264,50 @@ function getErrorMessage(error: unknown) {
 // ---------------------------------------------------------------------------
 
 function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
-  return (
-    <div className="space-y-5">
-      <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Summary</p>
-        <p className="mt-3 text-sm leading-7 text-text-primary">{councilNote.summary}</p>
-      </section>
+  const hasDisagreements =
+    councilNote.key_disagreements.length > 0 &&
+    !(councilNote.key_disagreements.length === 1 &&
+      councilNote.key_disagreements[0].toLowerCase() === "none");
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr,0.8fr]">
-        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Key agreements</p>
-          <ul className="mt-4 space-y-3">
-            {councilNote.key_agreements.map((item) => (
+  return (
+    <div className="space-y-6">
+      <div>
+        <p className="text-sm font-semibold text-text-primary">Summary</p>
+        <p className="mt-2 text-sm leading-7 text-text-primary">{councilNote.summary}</p>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-text-primary">Key Agreements</p>
+        <ul className="mt-2 space-y-2">
+          {councilNote.key_agreements.map((item) => (
+            <li key={item} className="flex gap-3 text-sm leading-6 text-text-primary">
+              <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-text-primary">Key Disagreements</p>
+        {hasDisagreements ? (
+          <ul className="mt-2 space-y-2">
+            {councilNote.key_disagreements.map((item) => (
               <li key={item} className="flex gap-3 text-sm leading-6 text-text-primary">
-                <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-success" />
+                <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                 <span>{item}</span>
               </li>
             ))}
           </ul>
-        </section>
-
-        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-5 py-5">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">Key disagreements</p>
-          {councilNote.key_disagreements.length === 0 ||
-          (councilNote.key_disagreements.length === 1 &&
-            councilNote.key_disagreements[0].toLowerCase() === "none") ? (
-            <p className="mt-4 text-sm italic text-text-muted">No disagreements recorded.</p>
-          ) : (
-            <ul className="mt-4 space-y-3">
-              {councilNote.key_disagreements.map((item) => (
-                <li key={item} className="flex gap-3 text-sm leading-6 text-text-secondary">
-                  <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
-                  <span>{item}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+        ) : (
+          <p className="mt-2 text-sm italic text-text-muted">No disagreements recorded.</p>
+        )}
       </div>
 
-      <section className="rounded-[20px] border-l-[3px] border-l-primary border border-border bg-primary-subtle/40 px-5 py-5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Final recommendation</p>
-        <p className="mt-3 text-sm leading-7 text-text-primary">{councilNote.final_recommendation}</p>
-      </section>
+      <div>
+        <p className="text-sm font-semibold text-text-primary">Final Recommendation</p>
+        <p className="mt-2 text-sm leading-7 text-text-primary">{councilNote.final_recommendation}</p>
+      </div>
     </div>
   );
 }
@@ -292,62 +317,24 @@ function CouncilParticipantPanel({
 }: {
   participantView: CouncilParticipantView;
 }) {
-  const leadSection = participantView.sections.find((section) => section.title === null);
-  const namedSections = participantView.sections.filter((section) => section.title !== null);
-
   return (
-    <div className="space-y-4">
-      <section className="rounded-[20px] border border-border bg-surface-muted px-4 py-4">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
-            Active view
-          </span>
-          {participantView.latestEntry ? (
-            <span className="rounded-full border border-border bg-surface/80 px-2.5 py-1 text-[11px] text-text-secondary">
-              Round {participantView.latestEntry.round}
-            </span>
+    <div className="space-y-6">
+      {participantView.sections.map((section, si) => (
+        <div key={si}>
+          {section.title ? (
+            <p className="mb-2 text-sm font-semibold text-text-primary">{section.title}</p>
           ) : null}
-        </div>
-        <h3 className="mt-3 text-xl font-semibold text-text-primary">
-          {participantView.participant}
-        </h3>
-        {participantView.latestEntry ? (
-          <p className="mt-2 text-xs text-text-secondary">
-            Latest response: {participantView.latestEntry.timestamp}
-          </p>
-        ) : null}
-      </section>
-
-      {leadSection ? (
-        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">Perspective overview</p>
-          <div className="mt-3 space-y-3">
-            {leadSection.items.map(renderCouncilSectionItem)}
+          <div className="space-y-3">
+            {section.items.map(renderCouncilSectionItem)}
           </div>
-        </section>
-      ) : null}
-
-      <div className="grid gap-4">
-        {namedSections.map((section) => (
-          <section
-            key={section.title}
-            className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4"
-          >
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-              {section.title}
-            </p>
-            <div className="mt-3 space-y-3">
-              {section.items.map(renderCouncilSectionItem)}
-            </div>
-          </section>
-        ))}
-      </div>
+        </div>
+      ))}
 
       {participantView.vote ? (
-        <section className="rounded-[20px] border border-border bg-surface-muted/60 px-4 py-4">
-          <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">Latest vote</p>
-          <div className="mt-3 grid gap-3 md:grid-cols-[1fr,auto] md:items-start">
-            <div className="space-y-2">
+        <div>
+          <p className="mb-2 text-sm font-semibold text-text-primary">Vote</p>
+          <div className="flex flex-wrap items-start gap-3">
+            <div className="flex-1 space-y-1">
               <p className="text-sm font-medium text-text-primary">{participantView.vote.option}</p>
               <p className="text-sm leading-6 text-text-secondary">{participantView.vote.rationale}</p>
             </div>
@@ -357,7 +344,112 @@ function CouncilParticipantPanel({
               </span>
             ) : null}
           </div>
-        </section>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entries: CouncilTranscriptEntry[] }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  return (
+    <div className="rounded-[14px] border border-border-muted overflow-hidden">
+      {/* Round header — always visible, shows participant summaries */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-muted/50 transition-colors"
+      >
+        <span className="text-sm font-semibold text-text-primary">Round {roundNumber}</span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`shrink-0 text-text-muted transition-transform duration-150 ${isOpen ? "rotate-180" : ""}`}
+        >
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </button>
+
+      {/* Participant summaries — shown in the collapsed header area */}
+      <div className="border-t border-border-muted divide-y divide-border-muted/60">
+        {entries.map((entry, i) => {
+          const { body, vote } = splitVoteFromResponse(entry.response);
+          const summary = entry.summary ?? extractSummary(body);
+          const shortName = entry.participant
+            .replace(/\b(Strategic|Policy|Senior|Junior|Chief|Lead)\b\s*/gi, "")
+            .trim();
+          return (
+            <div key={i} className="px-4 py-3 space-y-1">
+              <p className="text-xs font-semibold text-text-primary">{shortName}</p>
+              <p className="text-sm leading-6 text-text-secondary">{summary}</p>
+              {vote ? (
+                <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                  <span className="text-xs font-medium text-text-primary">{vote.option}</span>
+                  {vote.confidence !== null ? (
+                    <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-primary">
+                      {Math.round(vote.confidence * 100)}%
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Full responses — shown only when expanded */}
+      {isOpen ? (
+        <div className="border-t border-border-muted bg-surface-muted/20 px-4 py-4 space-y-6">
+          {entries.map((entry, index) => {
+            const { body, vote } = splitVoteFromResponse(entry.response);
+            const sections = buildCouncilSections(body);
+            return (
+              <div key={`${entry.round}-${entry.participant}-${index}`}>
+                <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-border-muted pb-2">
+                  <p className="text-sm font-semibold text-text-primary">
+                    {entry.participant}
+                  </p>
+                  <span className="text-xs text-text-muted">{entry.timestamp}</span>
+                </div>
+                <div className="space-y-5">
+                  {sections.map((section, si) => (
+                    <div key={si}>
+                      {section.title ? (
+                        <p className="mb-2 text-sm font-semibold text-text-primary">{section.title}</p>
+                      ) : null}
+                      <div className="space-y-3">
+                        {section.items.map(renderCouncilSectionItem)}
+                      </div>
+                    </div>
+                  ))}
+                  {vote ? (
+                    <div>
+                      <p className="mb-2 text-sm font-semibold text-text-primary">Vote</p>
+                      <div className="flex flex-wrap items-start gap-3">
+                        <div className="flex-1 space-y-1">
+                          <p className="text-sm font-medium text-text-primary">{vote.option}</p>
+                          <p className="text-sm leading-6 text-text-secondary">{vote.rationale}</p>
+                        </div>
+                        {vote.confidence !== null ? (
+                          <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-primary">
+                            {Math.round(vote.confidence * 100)}% confidence
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       ) : null}
     </div>
   );
@@ -478,7 +570,7 @@ export default function CouncilView({
       : (councilParticipantViews.find((view) => view.participant === activeCouncilView) ?? null);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
+    <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2 px-5">
       {/* Back button */}
       <div>
         <button
@@ -513,7 +605,7 @@ export default function CouncilView({
                       aria-pressed={isSelected}
                       className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                         isSelected
-                          ? "border-primary/40 bg-primary-subtle/40 text-text-primary"
+                          ? "border-primary bg-primary-subtle text-primary"
                           : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
                       }`}
                     >
@@ -602,12 +694,12 @@ export default function CouncilView({
             </div>
 
             {validationMessage ? (
-              <p className="rounded-[16px] bg-error-subtle px-3 py-2 text-sm text-error-text">
+              <p className="rounded-2xl bg-error-subtle px-3 py-2 text-sm text-error-text">
                 {validationMessage}
               </p>
             ) : null}
             {councilErrorMessage ? (
-              <p className="rounded-[16px] bg-error-subtle px-3 py-2 text-sm text-error-text">
+              <p className="rounded-2xl bg-error-subtle px-3 py-2 text-sm text-error-text">
                 {councilErrorMessage}
               </p>
             ) : null}
@@ -623,8 +715,7 @@ export default function CouncilView({
         </article>
 
         {/* Advisory note */}
-
-        <article className="space-y-4">
+        <article className="space-y-4 xl:border-t-0 border-t border-border-muted pt-6 xl:pt-0">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
@@ -658,19 +749,20 @@ export default function CouncilView({
                 <p className="mt-1.5 text-sm leading-6 text-text-primary">{councilNote.question}</p>
               </div>
 
-              <div className="flex flex-wrap gap-1.5 rounded-[14px] border border-border-muted bg-surface-muted/50 p-1.5">
+              <div className="inline-flex max-w-full overflow-hidden items-center gap-1.5 rounded-[14px] border border-border bg-surface-muted/50 p-1.5">
                 <button
                   type="button"
                   onClick={() => setActiveCouncilView(COUNCIL_SUMMARY_VIEW)}
                   aria-pressed={activeCouncilView === COUNCIL_SUMMARY_VIEW}
                   className={
                     activeCouncilView === COUNCIL_SUMMARY_VIEW
-                      ? "rounded-[10px] bg-surface px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm"
-                      : "rounded-[10px] px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+                      ? "rounded-[10px] border border-primary bg-primary-subtle px-3 py-1.5 text-xs font-medium text-primary"
+                      : "rounded-[10px] border border-transparent px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
                   }
                 >
-                  Council Summary
+                  Summary
                 </button>
+                <span className="h-4 w-px bg-border mx-1" />
                 {councilParticipantViews.map((participantView) => (
                   <button
                     key={participantView.participant}
@@ -679,11 +771,11 @@ export default function CouncilView({
                     aria-pressed={activeCouncilView === participantView.participant}
                     className={
                       activeCouncilView === participantView.participant
-                        ? "rounded-[10px] bg-surface px-3 py-1.5 text-xs font-medium text-text-primary shadow-sm"
-                        : "rounded-[10px] px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
+                        ? "rounded-[10px] border border-primary bg-primary-subtle px-3 py-1.5 text-xs font-medium text-primary"
+                        : "rounded-[10px] border border-transparent px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
                     }
                   >
-                    {participantView.participant}
+                    {participantView.participant.replace(/\b(Strategic|Policy|Senior|Junior|Chief|Lead)\b\s*/gi, "").trim()}
                   </button>
                 ))}
               </div>
@@ -698,7 +790,7 @@ export default function CouncilView({
                 <button
                   type="button"
                   onClick={() => setIsTranscriptExpanded((current) => !current)}
-                  className="inline-flex items-center gap-2 rounded-[12px] border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted"
+                  className="inline-flex items-center gap-2 rounded-xl border border-border px-4 py-2 text-sm font-medium text-text-primary transition-colors hover:bg-surface-muted"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`text-text-muted transition-transform duration-150 ${isTranscriptExpanded ? "rotate-180" : ""}`}>
                     <path d="M6 9l6 6 6-6" />
@@ -714,20 +806,19 @@ export default function CouncilView({
 
               {isTranscriptExpanded ? (
                 <div className="space-y-3">
-                  {councilNote.full_debate.map((entry, index) => (
-                    <article
-                      key={`${entry.round}-${entry.participant}-${index}`}
-                      className="rounded-[18px] border border-border bg-surface-muted/60 px-4 py-4"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <p className="text-sm font-medium text-text-primary">
-                          Round {entry.round}: {entry.participant}
-                        </p>
-                        <span className="text-xs text-text-secondary">{entry.timestamp}</span>
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-text-primary">{entry.response}</p>
-                    </article>
-                  ))}
+                  {Object.entries(
+                    councilNote.full_debate.reduce<Record<number, CouncilTranscriptEntry[]>>(
+                      (acc, entry) => {
+                        (acc[entry.round] ??= []).push(entry);
+                        return acc;
+                      },
+                      {},
+                    ),
+                  )
+                    .sort(([a], [b]) => Number(a) - Number(b))
+                    .map(([round, entries]) => (
+                      <CollapsibleRound key={round} roundNumber={Number(round)} entries={entries} />
+                    ))}
                 </div>
               ) : null}
             </div>

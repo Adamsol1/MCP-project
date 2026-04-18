@@ -275,7 +275,7 @@ export default function AnalysisView({
     <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
 
       {/* ── Hero: document-style header ──────────────────────────────── */}
-      <section className="space-y-4">
+      <section className="space-y-4 px-5">
         <div>
           <h1 className="font-sans text-[2rem] font-bold leading-tight text-text-primary">
             {analysisHeading}
@@ -339,7 +339,7 @@ export default function AnalysisView({
       )}
 
       {/* ── Key Judgments + Recommended Actions (side-by-side) ───────── */}
-      <section>
+      <section className="px-5">
         <div className="border-b border-border/50 pb-8 md:grid md:grid-cols-[1fr_1px_1fr]">
           {/* Key Judgments */}
           <div className="md:pr-8">
@@ -380,7 +380,7 @@ export default function AnalysisView({
 
       {/* ── Evidence Docket ───────────────────────────────────────────── */}
       <section className="space-y-4">
-        <div className="flex items-end justify-between gap-4">
+        <div className="flex items-end justify-between gap-4 px-5">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               Intelligence Findings
@@ -399,7 +399,7 @@ export default function AnalysisView({
 
       {/* ── Perspective Implications ──────────────────────────────────── */}
       {orderedPerspectiveEntries.length > 0 && (
-        <section className="space-y-4">
+        <section className="space-y-4 px-5">
           <div>
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
               Perspective Implications
@@ -422,7 +422,7 @@ export default function AnalysisView({
 
       {/* ── Information Gaps ──────────────────────────────────────────── */}
       {analysis.information_gaps.length > 0 && (
-        <section className="space-y-4 border-t border-border/50 pt-8">
+        <section className="space-y-4 border-t border-border/50 pt-8 px-5">
           <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
             Information Gaps
           </p>
@@ -438,7 +438,7 @@ export default function AnalysisView({
       )}
 
       {/* ── Start Council CTA ─────────────────────────────────────────── */}
-      <div className="flex justify-end pt-2">
+      <div className="flex justify-end pt-2 px-5">
         <button
           type="button"
           onClick={onStartCouncil}

@@ -241,11 +241,11 @@ export default function CollectionCoverageView({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+      <p className="px-5 text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
         Collection Coverage
       </p>
 
-      <div className="overflow-hidden rounded-3xl border border-border bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-5 py-4">
           <div className="space-y-1 flex-1 min-w-0">

@@ -158,6 +158,33 @@ class CouncilService:
             "working_directory": runtime_profile.working_directory,
         }
 
+    async def _generate_entry_summaries_via_mcp(
+        self, entries: list[CouncilTranscriptEntry]
+    ) -> dict[tuple[int, str], str]:
+        """Call the council MCP summarize_entries tool to generate per-entry summaries."""
+        payload = [
+            {"round": e.round, "participant": e.participant, "response": e.response}
+            for e in entries
+        ]
+        try:
+            result = await self.mcp_client.call_tool(
+                "summarize_entries",
+                {
+                    "entries": payload,
+                    "adapter": self.DEFAULT_ADAPTER,
+                    "model": self.DEFAULT_MODEL,
+                },
+            )
+            result_list = result if isinstance(result, list) else []
+            return {
+                (int(r["round"]), str(r["participant"])): str(r["summary"])
+                for r in result_list
+                if "round" in r and "participant" in r and "summary" in r
+            }
+        except Exception:
+            logger.warning("[CouncilService] MCP summarize_entries failed; falling back to frontend extraction")
+            return {}
+
     def _raise_if_runtime_failed(self, result: dict) -> None:
         debates = result.get("full_debate", [])
         if not debates:
@@ -209,6 +236,20 @@ class CouncilService:
                     selected_findings=selected_findings,
                 )
                 result = await self.mcp_client.call_tool("deliberate", request)
+
+                debate_entries = [
+                    CouncilTranscriptEntry(
+                        round=entry["round"],
+                        participant=entry["participant"],
+                        response=entry["response"],
+                        timestamp=entry.get("timestamp", ""),
+                    )
+                    for entry in result.get("full_debate", [])
+                ]
+
+                summaries = await self._generate_entry_summaries_via_mcp(debate_entries)
+                for entry in debate_entries:
+                    entry.summary = summaries.get((entry.round, entry.participant))
         except Exception as exc:
             raise RuntimeError(
                 "Could not reach the council MCP server at "
@@ -238,14 +279,6 @@ class CouncilService:
             final_recommendation=result.get("summary", {}).get(
                 "final_recommendation", ""
             ),
-            full_debate=[
-                CouncilTranscriptEntry(
-                    round=entry["round"],
-                    participant=entry["participant"],
-                    response=entry["response"],
-                    timestamp=entry.get("timestamp", ""),
-                )
-                for entry in result.get("full_debate", [])
-            ],
+            full_debate=debate_entries,
             transcript_path=result.get("transcript_path") or None,
         )

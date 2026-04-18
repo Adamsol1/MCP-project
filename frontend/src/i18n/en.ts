@@ -50,6 +50,7 @@ export const en = {
   accept: "Accept",
   collectMoreData: "Collect More Data",
   collectionResultsHeader: "Collection Results",
+  collectionResultsSubtitle: "Intelligence gathered from the following sources.",
   couldNotParseCollection: "Could not parse collection output.",
   rawOutput: "Raw output",
   selectSourcesHeader: "Select Sources",

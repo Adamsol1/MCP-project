@@ -92,6 +92,7 @@ function AppShell() {
 
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [showExpandedContent, setShowExpandedContent] = useState(true);
+  const [isRightPanelCollapsed, setIsRightPanelCollapsed] = useState(false);
   const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   useEffect(() => {
@@ -283,6 +284,29 @@ function AppShell() {
               <StageTracker activePhase={activePhase} />
             </div>
           </div>
+          {/* Right panel toggle — top-right */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+            <button
+              aria-label="Toggle intelligence panel"
+              onClick={() => setIsRightPanelCollapsed((v) => !v)}
+              className="p-2 flex items-center justify-center hover:bg-surface-elevated rounded text-text-muted hover:text-text-primary"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 18 18"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <rect x="1.5" y="1.5" width="15" height="15" rx="2" />
+                <path d="M12 1.5v15" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Content row — all panels live below the top bar */}
@@ -337,7 +361,7 @@ function AppShell() {
           />
         </main>
 
-        <div className="w-72 bg-surface border-l border-border-muted flex flex-col overflow-hidden">
+        <div className={`bg-surface border-l border-border-muted flex flex-col overflow-hidden transition-all duration-200 ${isRightPanelCollapsed ? "w-0 border-l-0" : "w-72"}`}>
           <IntelligencePanel
             phase={activePhase}
             selectedPerspectives={

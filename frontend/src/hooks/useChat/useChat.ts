@@ -674,6 +674,14 @@ export function useChat(initialPerspectives?: string[]) {
 
     setIsDecisionPending(conversationId, true);
     setIsLoading(conversationId, true);
+
+    // Optimistically advance the phase so the stage tracker updates immediately
+    if (stage === "reviewing" && activeConversation.phase === "collection") {
+      setStage(conversationId, "pending", null, "processing");
+    } else if (stage === "processing" && subState === "awaiting_decision") {
+      setStage(conversationId, "pending", null, "analysis");
+    }
+
     try {
       await sendAndHandle(
         conversationId,

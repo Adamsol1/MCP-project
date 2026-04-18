@@ -1,5 +1,6 @@
 import type { PhaseReviewItem } from "../../types/conversation";
 import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
+import type { Analysis } from "../../types/analysis";
 
 interface ReviewActivityModalProps {
   isOpen: boolean;
@@ -67,7 +68,7 @@ function PirTranscript({ data }: { data: PirData }) {
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">
             Reasoning
           </p>
-          <p className="text-xs text-text-secondary leading-relaxed">{data.reasoning}</p>
+          <FormattedReviewText text={data.reasoning} />
         </div>
       )}
       {data.pirs && data.pirs.length > 0 && (
@@ -223,11 +224,116 @@ function ProcessingTranscript({ data }: { data: ProcessingData }) {
   );
 }
 
+// ── Python repr → JSON normaliser ─────────────────────────────────────────────
+
+function normalizePythonRepr(s: string): string {
+  let result = "";
+  let i = 0;
+  while (i < s.length) {
+    if (s[i] === "'") {
+      let j = i + 1;
+      while (j < s.length && s[j] !== "'") {
+        if (s[j] === "\\") j++;
+        j++;
+      }
+      const inner = s.slice(i + 1, j).replace(/"/g, '\\"');
+      result += '"' + inner + '"';
+      i = j + 1;
+    } else if (s[i] === '"') {
+      let j = i + 1;
+      while (j < s.length && s[j] !== '"') {
+        if (s[j] === "\\") j++;
+        j++;
+      }
+      result += s.slice(i, j + 1);
+      i = j + 1;
+    } else {
+      result += s[i];
+      i++;
+    }
+  }
+  return result
+    .replace(/\bTrue\b/g, "true")
+    .replace(/\bFalse\b/g, "false")
+    .replace(/\bNone\b/g, "null");
+}
+
+function tryParseContent(content: string): unknown {
+  try { return JSON.parse(content); } catch { /* not valid JSON */ }
+  try { return JSON.parse(normalizePythonRepr(content)); } catch { /* not valid Python repr either */ }
+  return null;
+}
+
+// ── Analysis transcript renderer ───────────────────────────────────────────────
+
+function AnalysisTranscript({ data }: { data: Analysis }) {
+  return (
+    <div className="space-y-4">
+      {data.title ? (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Title</p>
+          <p className="text-xs font-medium text-text-primary">{data.title}</p>
+        </div>
+      ) : null}
+      {data.summary ? (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Summary</p>
+          <p className="text-xs text-text-secondary leading-relaxed">{data.summary}</p>
+        </div>
+      ) : null}
+      {data.key_judgments && data.key_judgments.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Key Judgments ({data.key_judgments.length})
+          </p>
+          <ul className="space-y-1.5">
+            {data.key_judgments.map((j, i) => (
+              <li key={i} className="flex gap-2 text-xs text-text-secondary leading-relaxed">
+                <span className="shrink-0 font-medium text-text-muted">{i + 1}.</span>
+                <span>{j}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.recommended_actions && data.recommended_actions.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Recommended Actions
+          </p>
+          <ul className="space-y-1">
+            {data.recommended_actions.map((a, i) => (
+              <li key={i} className="flex gap-2 text-xs text-text-secondary">
+                <span className="shrink-0 text-text-muted">·</span>
+                <span>{a}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {data.information_gaps && data.information_gaps.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Information Gaps
+          </p>
+          <ul className="space-y-1">
+            {data.information_gaps.map((g, i) => (
+              <li key={i} className="flex gap-2 text-xs text-text-secondary">
+                <span className="shrink-0 text-text-muted">·</span>
+                <span>{g}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Transcript dispatcher ──────────────────────────────────────────────────────
 
 function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: PhaseReviewItem["phase"]; content: string; reviewerSuggestions?: string | null }) {
-  let parsed: unknown = null;
-  try { parsed = JSON.parse(content); } catch { /* not JSON */ }
+  const parsed = tryParseContent(content);
 
   if (phase === "direction" && parsed && typeof parsed === "object" && ("pirs" in parsed || "pir_text" in parsed)) {
     return <PirTranscript data={parsed as PirData} />;
@@ -239,6 +345,15 @@ function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: Ph
 
   if (phase === "processing" && parsed && typeof parsed === "object" && "findings" in parsed) {
     return <ProcessingTranscript data={parsed as ProcessingData} />;
+  }
+
+  if (phase === "analysis" && parsed && typeof parsed === "object") {
+    const draft = "analysis_draft" in parsed
+      ? (parsed as { analysis_draft: Analysis }).analysis_draft
+      : (parsed as unknown as Analysis);
+    if (draft && typeof draft === "object" && ("summary" in draft || "key_judgments" in draft)) {
+      return <AnalysisTranscript data={draft} />;
+    }
   }
 
   // Unrecognised shape — render as formatted text
