@@ -99,7 +99,9 @@ class GeminiAgent:
             The agent's final text response after all tool calls are complete.
         """
         available_tools = await self._get_tool_declarations(allowed_tool_names)
-        logger.info(f"[GeminiAgent] Starting run with {len(available_tools)} tools available")
+        logger.info(
+            f"[GeminiAgent] Starting run with {len(available_tools)} tools available"
+        )
 
         contents = [
             types.Content(
@@ -122,7 +124,9 @@ class GeminiAgent:
                 )
             except BaseException as e:
                 if isinstance(e, ExceptionGroup):
-                    logger.error(f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}")
+                    logger.error(
+                        f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}"
+                    )
                     raise e.exceptions[0] from e
                 raise
 
@@ -142,13 +146,19 @@ class GeminiAgent:
                 logger.info(f"[GeminiAgent] Completed in {round_num + 1} round(s)")
                 return text
 
-            logger.info(f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)")
+            logger.info(
+                f"[GeminiAgent] Round {round_num + 1}: {len(tool_calls)} tool call(s)"
+            )
             contents.append(candidate.content)
 
             tool_results = []
             for part in tool_calls:
                 fc = part.function_call
-                _args_safe = repr(dict(fc.args)).encode("ascii", errors="backslashreplace").decode("ascii")
+                _args_safe = (
+                    repr(dict(fc.args))
+                    .encode("ascii", errors="backslashreplace")
+                    .decode("ascii")
+                )
                 logger.info(f"[GeminiAgent] Calling tool: {fc.name}({_args_safe})")
                 if status_tracker is not None:
                     status_tracker.record_tool_call(fc.name, dict(fc.args))
@@ -172,7 +182,9 @@ class GeminiAgent:
 
             contents.append(types.Content(role="tool", parts=tool_results))
 
-        logger.warning(f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached")
+        logger.warning(
+            f"[GeminiAgent] Max tool rounds ({self.max_tool_rounds}) reached"
+        )
         last_text = "".join(
             part.text for part in candidate.content.parts if part.text is not None
         )
@@ -180,11 +192,25 @@ class GeminiAgent:
 
     # Phrases that indicate Gemini could not access the page.
     _INACCESSIBLE_PHRASES: tuple[str, ...] = (
-        "not accessible", "unable to access", "cannot access", "could not access",
-        "access denied", "access is denied", "403", "404 not found",
-        "page not found", "could not fetch", "failed to fetch", "error fetching",
-        "blocked", "paywall", "subscription required", "behind a paywall",
-        "login required", "sign in required", "no content available",
+        "not accessible",
+        "unable to access",
+        "cannot access",
+        "could not access",
+        "access denied",
+        "access is denied",
+        "403",
+        "404 not found",
+        "page not found",
+        "could not fetch",
+        "failed to fetch",
+        "error fetching",
+        "blocked",
+        "paywall",
+        "subscription required",
+        "behind a paywall",
+        "login required",
+        "sign in required",
+        "no content available",
     )
 
     async def fetch_url_summaries(
@@ -241,7 +267,7 @@ class GeminiAgent:
                 f'{{"url": "...", "title": "...", "author": "Last, F. M. or null", '
                 f'"date": "YYYY-MM-DD or null", "publisher": "...", '
                 f'"apa_citation": "...", "summary": "..."}}'
-                f']}}'
+                f"]}}"
             )
 
             try:
@@ -255,7 +281,9 @@ class GeminiAgent:
                     )
                 except BaseException as e:
                     if isinstance(e, ExceptionGroup):
-                        logger.error(f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}")
+                        logger.error(
+                            f"[GeminiAgent] ExceptionGroup unwrapped: {e.exceptions[0]}"
+                        )
                         raise e.exceptions[0] from e
                     raise
                 # Gemini can return a response with no candidates or with a candidate
@@ -275,7 +303,9 @@ class GeminiAgent:
                     for part in candidate.content.parts
                     if part.text is not None
                 )
-                fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
+                fence = re.search(
+                    r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE
+                )
                 text = fence.group(1).strip() if fence else text.strip()
                 parsed = json.loads(text)
                 batch_results = 0
@@ -286,27 +316,30 @@ class GeminiAgent:
                         continue
                     # Skip pages Gemini flagged as inaccessible
                     summary_lower = item["summary"].lower()
-                    if any(phrase in summary_lower for phrase in self._INACCESSIBLE_PHRASES):
-                        logger.info(f"[GeminiAgent] Skipping inaccessible URL: {item['url']}")
+                    if any(
+                        phrase in summary_lower for phrase in self._INACCESSIBLE_PHRASES
+                    ):
+                        logger.info(
+                            f"[GeminiAgent] Skipping inaccessible URL: {item['url']}"
+                        )
                         batch_skipped += 1
                         continue
                     citation = item.get("apa_citation", "")
-                    content = (
-                        f"[{item.get('title', 'Article')}]\n"
-                        f"{item['summary']}"
-                    )
+                    content = f"[{item.get('title', 'Article')}]\n{item['summary']}"
                     if citation:
                         content += f"\n\nCitation: {citation}"
-                    results.append({
-                        "source": "fetch_page",
-                        "resource_id": item["url"],
-                        "content": content,
-                        "apa_citation": citation,
-                        "author": item.get("author"),
-                        "date": item.get("date"),
-                        "publisher": item.get("publisher"),
-                        "title": item.get("title"),
-                    })
+                    results.append(
+                        {
+                            "source": "fetch_page",
+                            "resource_id": item["url"],
+                            "content": content,
+                            "apa_citation": citation,
+                            "author": item.get("author"),
+                            "date": item.get("date"),
+                            "publisher": item.get("publisher"),
+                            "title": item.get("title"),
+                        }
+                    )
                     batch_results += 1
                 logger.info(
                     f"[GeminiAgent] url_context batch {i // batch_size + 1}: "
@@ -317,7 +350,9 @@ class GeminiAgent:
 
         return results
 
-    async def _get_tool_declarations(self, allowed_tool_names: set[str] | None = None) -> list:
+    async def _get_tool_declarations(
+        self, allowed_tool_names: set[str] | None = None
+    ) -> list:
         """Fetch available tools from the MCP server and convert to Gemini format.
 
         When allowed_tool_names is provided, only tools in that set are returned,
@@ -326,7 +361,10 @@ class GeminiAgent:
         raw_tools = await self.mcp_client.list_tools()
         declarations = []
         for tool in raw_tools:
-            if allowed_tool_names is not None and tool["name"] not in allowed_tool_names:
+            if (
+                allowed_tool_names is not None
+                and tool["name"] not in allowed_tool_names
+            ):
                 continue
             input_schema = tool.get("inputSchema", {})
             parameters = (

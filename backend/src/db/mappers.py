@@ -5,7 +5,7 @@ intermediate representation, keeping state machine code untouched.
 """
 
 import json
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from src.db.models.session_tables import SessionTable
 
@@ -17,10 +17,22 @@ def session_to_row(session) -> SessionTable:
         session: An IntelligenceSession instance (imported lazily to avoid circles).
     """
     direction_data = session.direction_flow.to_dict()
-    collection_data = session.collection_flow.to_dict() if session.collection_flow else None
-    processing_data = session.processing_flow.to_dict() if session.processing_flow else None
-    analysis_data = session.analysis_flow.to_dict() if getattr(session, "analysis_flow", None) else None
-    council_data = session.council_flow.to_dict() if getattr(session, "council_flow", None) else None
+    collection_data = (
+        session.collection_flow.to_dict() if session.collection_flow else None
+    )
+    processing_data = (
+        session.processing_flow.to_dict() if session.processing_flow else None
+    )
+    analysis_data = (
+        session.analysis_flow.to_dict()
+        if getattr(session, "analysis_flow", None)
+        else None
+    )
+    council_data = (
+        session.council_flow.to_dict()
+        if getattr(session, "council_flow", None)
+        else None
+    )
 
     row = SessionTable(
         id=session.session_id,
@@ -90,14 +102,13 @@ def row_to_session(row: SessionTable, research_logger):
     Imports are done inside the function to avoid circular dependencies
     between the db package and the services package.
     """
-    from src.services.state_machines.direction_flow import DirectionFlow
-    from src.services.state_machines.collection_flow import CollectionFlow
-    from src.services.state_machines.processing_flow import ProcessingFlow
-    from src.services.state_machines.analysis_flow import AnalysisFlow
-    from src.services.state_machines.council_flow import CouncilFlow
-
     # Avoid circular import — import here
     from src.api.dialogue import IntelligenceSession
+    from src.services.state_machines.analysis_flow import AnalysisFlow
+    from src.services.state_machines.collection_flow import CollectionFlow
+    from src.services.state_machines.council_flow import CouncilFlow
+    from src.services.state_machines.direction_flow import DirectionFlow
+    from src.services.state_machines.processing_flow import ProcessingFlow
 
     # Reconstruct direction flow dict
     direction_data = {
@@ -121,9 +132,13 @@ def row_to_session(row: SessionTable, research_logger):
             "state": row.collection_state,
             "pir": row.pir or "",
             "collection_plan": row.collection_plan,
-            "selected_sources": json.loads(row.selected_sources) if row.selected_sources else [],
+            "selected_sources": json.loads(row.selected_sources)
+            if row.selected_sources
+            else [],
             "gather_more_feedback": row.gather_more_feedback,
-            "direction_context": json.loads(row.direction_context) if row.direction_context else None,
+            "direction_context": json.loads(row.direction_context)
+            if row.direction_context
+            else None,
             "pending_reasoning_log": (
                 json.loads(row.pending_reasoning_log_collection)
                 if row.pending_reasoning_log_collection
@@ -138,7 +153,9 @@ def row_to_session(row: SessionTable, research_logger):
             "session_id": row.id,
             "state": row.processing_state,
             "pir": row.pir or "",
-            "direction_context": json.loads(row.direction_context) if row.direction_context else None,
+            "direction_context": json.loads(row.direction_context)
+            if row.direction_context
+            else None,
             "pending_reasoning_log": (
                 json.loads(row.pending_reasoning_log_processing)
                 if row.pending_reasoning_log_processing
@@ -173,7 +190,9 @@ def row_to_session(row: SessionTable, research_logger):
     session = IntelligenceSession.__new__(IntelligenceSession)
     session.session_id = row.id
     session.research_logger = research_logger
-    session.direction_flow = DirectionFlow.from_dict(direction_data, research_logger=research_logger)
+    session.direction_flow = DirectionFlow.from_dict(
+        direction_data, research_logger=research_logger
+    )
     session.collection_flow = (
         CollectionFlow.from_dict(collection_data, research_logger=research_logger)
         if collection_data

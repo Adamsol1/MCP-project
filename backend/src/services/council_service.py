@@ -1,5 +1,6 @@
 """Analysis-stage council wrapper using app runtime defaults."""
 
+import json
 import logging
 import os
 from pathlib import Path  # used in __init__ for working_directory
@@ -14,7 +15,7 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.agent_builder import build_agent
+from src.services.agent_builder import get_display_name
 
 logger = logging.getLogger("app")
 
@@ -38,11 +39,13 @@ class CouncilService:
     FILE_TREE_INJECTION_ENABLED = False
     DECISION_GRAPH_ENABLED = False
 
-    def __init__(self, working_directory: str | Path | None = None, mcp_client: MCPClient | None = None):
+    def __init__(
+        self,
+        working_directory: str | Path | None = None,
+        mcp_client: MCPClient | None = None,
+    ):
         if working_directory is None:
-            working_directory = (
-                Path(__file__).resolve().parents[2] / "data" / "outputs"
-            )
+            working_directory = Path(__file__).resolve().parents[2] / "data" / "outputs"
         self.working_directory = Path(working_directory)
         self.working_directory.mkdir(parents=True, exist_ok=True)
         self.transcript_dir = self.working_directory / "council_transcripts"
@@ -86,17 +89,24 @@ class CouncilService:
     async def build_participants(self, selected_perspectives: list[str]) -> list[dict]:
         normalized = self._normalize_perspectives(selected_perspectives)
         if len(normalized) < 2:
-            raise ValueError("At least 2 perspectives are required for council deliberation")
+            raise ValueError(
+                "At least 2 perspectives are required for council deliberation"
+            )
 
+        behavior = await self.mcp_client.get_prompt("council_behavior")
         participants = []
         for perspective in normalized:
-            agent = await build_agent(
-                mcp_client=self.mcp_client,
-                perspective=perspective,
-                cli=self.DEFAULT_ADAPTER,
-                model=self.DEFAULT_MODEL,
+            persona = await self.mcp_client.read_resource(
+                f"knowledge://personas/{perspective.value}"
             )
-            participants.append(agent)
+            participants.append(
+                {
+                    "cli": self.DEFAULT_ADAPTER,
+                    "model": self.DEFAULT_MODEL,
+                    "display_name": get_display_name(perspective),
+                    "persona_prompt": f"{persona}\n\n{behavior}",
+                }
+            )
         return participants
 
     def build_question(
@@ -107,57 +117,12 @@ class CouncilService:
         cleaned_point = debate_point.strip()
         if cleaned_point:
             return cleaned_point
-        finding_labels = ", ".join(f"{finding.id}: {finding.title}" for finding in selected_findings)
+        finding_labels = ", ".join(
+            f"{finding.id}: {finding.title}" for finding in selected_findings
+        )
         return f"Assess the strongest interpretation and strategic implications of findings {finding_labels}."
 
-    def build_context(
-        self,
-        processing_result: ProcessingResult,
-        analysis_draft: AnalysisDraft,
-        debate_point: str,
-        selected_findings=None,
-    ) -> str:
-        findings = list(selected_findings) if selected_findings is not None else processing_result.findings
-
-        finding_blocks = []
-        for finding in findings:
-            finding_blocks.append(
-                "\n".join(
-                    [
-                        f"- {finding.id} | {finding.title}",
-                        f"  Finding: {finding.finding}",
-                        f"  Evidence: {finding.evidence_summary}",
-                        f"  Why it matters: {finding.why_it_matters}",
-                        f"  Confidence: {finding.confidence}/100",
-                        f"  Relevant PIRs: {', '.join(finding.relevant_to) if finding.relevant_to else 'None'}",
-                        f"  Uncertainties: {'; '.join(finding.uncertainties)}",
-                    ]
-                )
-            )
-
-        context_sections = [
-            "## Analysis Draft Summary",
-            analysis_draft.summary,
-            "",
-            "## Key Judgments",
-            *[f"- {judgment}" for judgment in analysis_draft.key_judgments],
-            "",
-            "## Recommended Actions",
-            *[f"- {action}" for action in analysis_draft.recommended_actions],
-            "",
-            "## Information Gaps",
-            *[f"- {gap}" for gap in analysis_draft.information_gaps],
-            "",
-            "## Findings In Scope",
-            *finding_blocks,
-        ]
-
-        if debate_point.strip():
-            context_sections.extend(["", "## Debate Focus", debate_point.strip()])
-
-        return "\n".join(context_sections)
-
-    def build_request(
+    async def build_request(
         self,
         debate_point: str,
         participants: list[dict],
@@ -168,11 +133,20 @@ class CouncilService:
     ) -> dict:
         runtime_profile = self.resolve_runtime_profile(council_settings)
         question = self.build_question(debate_point, selected_findings or [])
-        context = self.build_context(
-            processing_result=processing_result,
-            analysis_draft=analysis_draft,
-            debate_point=debate_point,
-            selected_findings=selected_findings,
+        findings = (
+            list(selected_findings)
+            if selected_findings is not None
+            else processing_result.findings
+        )
+        context = await self.mcp_client.get_prompt(
+            "council_task",
+            {
+                "analysis_draft": analysis_draft.model_dump_json(),
+                "findings": json.dumps(
+                    [f.model_dump() for f in findings], ensure_ascii=False
+                ),
+                "debate_point": debate_point,
+            },
         )
 
         return {
@@ -187,9 +161,13 @@ class CouncilService:
     def _raise_if_runtime_failed(self, result: dict) -> None:
         debates = result.get("full_debate", [])
         if not debates:
-            raise RuntimeError("Council runtime failed: no participant responses were produced")
+            raise RuntimeError(
+                "Council runtime failed: no participant responses were produced"
+            )
 
-        if not all(entry.get("response", "").startswith("[ERROR:") for entry in debates):
+        if not all(
+            entry.get("response", "").startswith("[ERROR:") for entry in debates
+        ):
             return
 
         first_error = debates[0].get("response", "").strip("[]")
@@ -222,7 +200,7 @@ class CouncilService:
         try:
             async with self.mcp_client.connect():
                 participants = await self.build_participants(selected_perspectives)
-                request = self.build_request(
+                request = await self.build_request(
                     debate_point=debate_point,
                     participants=participants,
                     processing_result=processing_result,
@@ -239,9 +217,13 @@ class CouncilService:
             ) from exc
 
         if not isinstance(result, dict):
-            raise RuntimeError(f"Unexpected response type from deliberate tool: {type(result)}")
+            raise RuntimeError(
+                f"Unexpected response type from deliberate tool: {type(result)}"
+            )
         if result.get("status") == "failed" or "error" in result:
-            raise RuntimeError(f"Council deliberation failed: {result.get('error', 'unknown error')}")
+            raise RuntimeError(
+                f"Council deliberation failed: {result.get('error', 'unknown error')}"
+            )
 
         self._raise_if_runtime_failed(result)
 
@@ -253,7 +235,9 @@ class CouncilService:
             summary=result.get("summary", {}).get("consensus", ""),
             key_agreements=result.get("summary", {}).get("key_agreements", []),
             key_disagreements=result.get("summary", {}).get("key_disagreements", []),
-            final_recommendation=result.get("summary", {}).get("final_recommendation", ""),
+            final_recommendation=result.get("summary", {}).get(
+                "final_recommendation", ""
+            ),
             full_debate=[
                 CouncilTranscriptEntry(
                     round=entry["round"],

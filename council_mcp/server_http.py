@@ -11,6 +11,7 @@ Architecture:
 """
 import logging
 import os
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -77,6 +78,31 @@ engine.tool_execution_history = []
 logger.info("DeliberationEngine ready")
 
 # ---------------------------------------------------------------------------
+# Knowledge DB access
+# ---------------------------------------------------------------------------
+
+_DB_PATH = PROJECT_DIR.parent / "backend" / "data" / "knowledge.db"
+
+
+def _read_persona(perspective: str) -> str:
+    """Read persona markdown from knowledge.db for a given perspective."""
+    if not _DB_PATH.exists():
+        raise RuntimeError(f"knowledge.db not found at {_DB_PATH}")
+    conn = sqlite3.connect(str(_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    try:
+        row = conn.execute(
+            "SELECT markdown_content FROM knowledge_resources WHERE id = ?",
+            (f"personas/{perspective.lower()}",),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        raise ValueError(f"No persona found for perspective: '{perspective}'")
+    return row["markdown_content"]
+
+
+# ---------------------------------------------------------------------------
 # FastMCP server
 # ---------------------------------------------------------------------------
 
@@ -88,6 +114,76 @@ mcp = FastMCP(
     ),
 )
 
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+
+@mcp.resource("knowledge://personas/{perspective}", mime_type="text/markdown")
+def persona_resource(perspective: str) -> str:
+    """Analytical persona for a council participant.
+
+    Fetched by the backend for each selected perspective before building
+    the participants list for a deliberation.
+
+    Args:
+        perspective: One of: us, norway, china, eu, russia, neutral.
+    """
+    return _read_persona(perspective)
+
+
+# ---------------------------------------------------------------------------
+# Prompts
+# ---------------------------------------------------------------------------
+
+@mcp.prompt()
+def council_behavior() -> str:
+    """Debate behavior instructions shared by all council participants.
+
+    Injected into each participant's persona_prompt alongside the
+    perspective-specific persona from knowledge://personas/{perspective}.
+    """
+    return (
+        "You are participating in a structured multi-round analytical debate.\n"
+        "Represent your assigned perspective authentically and consistently.\n"
+        "Argue positions that align with your values and strategic priorities.\n"
+        "Challenge other participants' assessments where they conflict with your perspective.\n"
+        "Do not concede your position without solid evidence from the shared context.\n"
+        "Be direct and concrete — avoid vague platitudes.\n"
+        "Each response should advance the debate, not merely summarise what others have said."
+    )
+
+
+@mcp.prompt()
+def council_task(analysis_draft: str, findings: str, debate_point: str) -> str:
+    """Debate briefing shared with all council participants as context.
+
+    Replaces the inline build_context() in CouncilService.
+    Provides the shared evidence base and debate focus for the deliberation.
+
+    Args:
+        analysis_draft: JSON-serialised AnalysisDraft from the analysis phase.
+        findings:       JSON-serialised list of ProcessingResult findings.
+        debate_point:   The specific question or focus for the debate.
+    """
+    focus = debate_point.strip() or (
+        "Assess the strongest interpretation and strategic implications of the findings above."
+    )
+    return (
+        "## Intelligence Analysis Draft\n"
+        f"{analysis_draft}\n\n"
+        "## Key Findings\n"
+        f"{findings}\n\n"
+        "## Debate Focus\n"
+        f"{focus}\n\n"
+        "Use the analysis and findings above as your primary evidence base.\n"
+        "Do not introduce information not present in the provided material."
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tools
+# ---------------------------------------------------------------------------
 
 @mcp.tool()
 async def deliberate(

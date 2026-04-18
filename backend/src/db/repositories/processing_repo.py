@@ -1,7 +1,7 @@
 """Repository for the processing_attempts table."""
 
-from datetime import datetime, UTC
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,7 +14,9 @@ class ProcessingAttemptRepository(GenericRepository[ProcessingAttemptTable]):
     def __init__(self, session: AsyncSession):
         super().__init__(ProcessingAttemptTable, session)
 
-    async def append(self, session_id: str, pir: str, raw_result: str) -> ProcessingAttemptTable:
+    async def append(
+        self, session_id: str, pir: str, raw_result: str
+    ) -> ProcessingAttemptTable:
         """Append a new processing attempt, auto-numbering."""
         latest = await self.get_latest(session_id)
         next_num = (latest.attempt_number + 1) if latest else 1

@@ -13,7 +13,6 @@ _PROCESSING_TOOLS = [
 
 
 class ProcessingService:
-
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
 

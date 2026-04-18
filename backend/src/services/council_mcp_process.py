@@ -36,7 +36,7 @@ def _health_url(server_url: str) -> str:
 def _health_ok(server_url: str, timeout_seconds: float = 0.5) -> bool:
     try:
         with urlopen(_health_url(server_url), timeout=timeout_seconds) as response:
-            return 200 <= response.status < 300
+            return 200 <= response.status < 300  # type: ignore[no-any-return]
     except (OSError, URLError):
         return False
 
@@ -93,10 +93,14 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
     if await _wait_for_health(server_url):
         logger.info("[Council MCP] Local server is ready")
     elif (exit_code := process.poll()) is not None:
-        logger.error("[Council MCP] Server exited during startup with code %s", exit_code)
+        logger.error(
+            "[Council MCP] Server exited during startup with code %s", exit_code
+        )
         return None
     else:
-        logger.warning("[Council MCP] Server started but health check did not become ready")
+        logger.warning(
+            "[Council MCP] Server started but health check did not become ready"
+        )
 
     return process
 

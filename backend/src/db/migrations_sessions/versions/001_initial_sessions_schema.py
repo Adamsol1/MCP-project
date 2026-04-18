@@ -4,15 +4,16 @@ Revision ID: 001
 Revises:
 Create Date: 2026-04-14
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
+from alembic import op
 
 revision: str = "001"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -21,7 +22,9 @@ def upgrade() -> None:
         sa.Column("id", sa.String(), primary_key=True),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("updated_at", sa.DateTime(), nullable=False),
-        sa.Column("direction_state", sa.String(), nullable=False, server_default="initial"),
+        sa.Column(
+            "direction_state", sa.String(), nullable=False, server_default="initial"
+        ),
         sa.Column("direction_context", sa.Text(), nullable=True),
         sa.Column("question_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("current_pir", sa.Text(), nullable=True),
@@ -40,7 +43,13 @@ def upgrade() -> None:
     op.create_table(
         "collection_attempts",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("session_id", sa.String(), sa.ForeignKey("sessions.id"), nullable=False, index=True),
+        sa.Column(
+            "session_id",
+            sa.String(),
+            sa.ForeignKey("sessions.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("attempt_number", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("pir", sa.Text(), nullable=False, server_default=""),
         sa.Column("raw_response", sa.Text(), nullable=False, server_default=""),
@@ -50,7 +59,13 @@ def upgrade() -> None:
     op.create_table(
         "processing_attempts",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("session_id", sa.String(), sa.ForeignKey("sessions.id"), nullable=False, index=True),
+        sa.Column(
+            "session_id",
+            sa.String(),
+            sa.ForeignKey("sessions.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("attempt_number", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("pir", sa.Text(), nullable=False, server_default=""),
         sa.Column("raw_result", sa.Text(), nullable=False, server_default=""),
@@ -60,7 +75,13 @@ def upgrade() -> None:
     op.create_table(
         "uploaded_files",
         sa.Column("id", sa.String(), primary_key=True),
-        sa.Column("session_id", sa.String(), sa.ForeignKey("sessions.id"), nullable=False, index=True),
+        sa.Column(
+            "session_id",
+            sa.String(),
+            sa.ForeignKey("sessions.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("original_filename", sa.String(), nullable=False, server_default=""),
         sa.Column("filename", sa.String(), nullable=False, server_default=""),
         sa.Column("stored_filename", sa.String(), nullable=False, server_default=""),
@@ -70,7 +91,9 @@ def upgrade() -> None:
         sa.Column("size_bytes", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("sha256", sa.String(), nullable=False, server_default=""),
         sa.Column("uploaded_at", sa.DateTime(), nullable=False),
-        sa.Column("parse_status", sa.String(), nullable=False, server_default="pending"),
+        sa.Column(
+            "parse_status", sa.String(), nullable=False, server_default="pending"
+        ),
         sa.Column("searchable", sa.Boolean(), nullable=False, server_default="0"),
         sa.Column("search_skip_reason", sa.String(), nullable=True),
         sa.Column("parsed_content", sa.Text(), nullable=True),
@@ -82,7 +105,14 @@ def upgrade() -> None:
     op.create_table(
         "analysis_sessions",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("session_id", sa.String(), sa.ForeignKey("sessions.id"), nullable=False, unique=True, index=True),
+        sa.Column(
+            "session_id",
+            sa.String(),
+            sa.ForeignKey("sessions.id"),
+            nullable=False,
+            unique=True,
+            index=True,
+        ),
         sa.Column("processing_result", sa.Text(), nullable=True),
         sa.Column("analysis_draft", sa.Text(), nullable=True),
         sa.Column("latest_council_note", sa.Text(), nullable=True),
@@ -91,7 +121,13 @@ def upgrade() -> None:
     op.create_table(
         "research_log_entries",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
-        sa.Column("session_id", sa.String(), sa.ForeignKey("sessions.id"), nullable=False, index=True),
+        sa.Column(
+            "session_id",
+            sa.String(),
+            sa.ForeignKey("sessions.id"),
+            nullable=False,
+            index=True,
+        ),
         sa.Column("entry_type", sa.String(), nullable=False, server_default=""),
         sa.Column("phase", sa.String(), nullable=True),
         sa.Column("timestamp", sa.DateTime(), nullable=False),

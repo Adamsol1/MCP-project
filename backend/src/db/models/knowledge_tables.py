@@ -1,7 +1,6 @@
 """SQLModel table model for knowledge.db."""
 
-from datetime import datetime, UTC
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -16,5 +15,5 @@ class KnowledgeResourceTable(SQLModel, table=True):
     keywords: str = Field(default="[]")  # JSON array
     priority: int = Field(default=1)
     markdown_content: str = Field(default="")
-    citation: Optional[str] = Field(default=None)  # JSON
+    citation: str | None = Field(default=None)  # JSON
     last_updated: datetime = Field(default_factory=lambda: datetime.now(UTC))

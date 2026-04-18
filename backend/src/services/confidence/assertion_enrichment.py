@@ -9,8 +9,14 @@ No AI calls. No IO.
 import logging
 
 from src.models.analysis import FindingModel
-from src.models.confidence import AssertionConfidence, ConfidenceTier, PerspectiveAssertion
-from src.services.confidence.scoring import compute_confidence, detect_circular_reporting
+from src.models.confidence import (
+    AssertionConfidence,
+    ConfidenceTier,
+    PerspectiveAssertion,
+)
+from src.services.confidence.scoring import (
+    compute_confidence,
+)
 from src.services.confidence.source_authority_config import SOURCE_AUTHORITY_WEIGHTS
 
 logger = logging.getLogger(__name__)

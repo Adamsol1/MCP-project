@@ -21,7 +21,6 @@ class CouncilState(str, Enum):
 
 
 class CouncilFlow(BasePhaseFlow):
-
     def __init__(
         self,
         session_id: str | None = None,
@@ -48,7 +47,7 @@ class CouncilFlow(BasePhaseFlow):
         flow.latest_council_note = data.get("latest_council_note")
         return flow
 
-    async def process_user_message(
+    async def process_user_message(  # type: ignore[override]
         self,
         debate_point: str,
         finding_ids: list[str],
@@ -73,8 +72,14 @@ class CouncilFlow(BasePhaseFlow):
                 analysis_flow.analysis_result["analysis_draft"]
             )
         except Exception:
-            logger.error("[CouncilFlow] Failed to load analysis data for session %s", self.session_id, exc_info=True)
-            return DialogueResponse(action=DialogueAction.ERROR, content="Failed to load analysis data.")
+            logger.error(
+                "[CouncilFlow] Failed to load analysis data for session %s",
+                self.session_id,
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Failed to load analysis data."
+            )
 
         try:
             council_note: CouncilNote = await council_service.run_council(

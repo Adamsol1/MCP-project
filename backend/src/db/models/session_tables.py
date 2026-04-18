@@ -5,8 +5,7 @@ as a JSON TEXT column to avoid deep normalization and preserve compatibility
 with existing Pydantic models.
 """
 
-from datetime import datetime, UTC
-from typing import Optional
+from datetime import UTC, datetime
 
 from sqlmodel import Field, SQLModel
 
@@ -22,33 +21,33 @@ class SessionTable(SQLModel, table=True):
 
     # Direction flow state
     direction_state: str = Field(default="initial")
-    direction_context: Optional[str] = Field(default=None)  # JSON
+    direction_context: str | None = Field(default=None)  # JSON
     question_count: int = Field(default=0)
-    current_pir: Optional[str] = Field(default=None)  # JSON string
-    pending_reasoning_log_direction: Optional[str] = Field(default=None)  # JSON
+    current_pir: str | None = Field(default=None)  # JSON string
+    pending_reasoning_log_direction: str | None = Field(default=None)  # JSON
 
     # Collection flow state
-    collection_state: Optional[str] = Field(default=None)
-    pir: Optional[str] = Field(default=None)  # PIR text for collection/processing
-    collection_plan: Optional[str] = Field(default=None)
-    selected_sources: Optional[str] = Field(default=None)  # JSON array
-    pending_reasoning_log_collection: Optional[str] = Field(default=None)  # JSON
-    gather_more_feedback: Optional[str] = Field(default=None)
+    collection_state: str | None = Field(default=None)
+    pir: str | None = Field(default=None)  # PIR text for collection/processing
+    collection_plan: str | None = Field(default=None)
+    selected_sources: str | None = Field(default=None)  # JSON array
+    pending_reasoning_log_collection: str | None = Field(default=None)  # JSON
+    gather_more_feedback: str | None = Field(default=None)
 
     # Processing flow state
-    processing_state: Optional[str] = Field(default=None)
-    pending_reasoning_log_processing: Optional[str] = Field(default=None)  # JSON
+    processing_state: str | None = Field(default=None)
+    pending_reasoning_log_processing: str | None = Field(default=None)  # JSON
 
     # Analysis flow state
-    analysis_state: Optional[str] = Field(default=None)
-    analysis_result: Optional[str] = Field(default=None)  # JSON
+    analysis_state: str | None = Field(default=None)
+    analysis_result: str | None = Field(default=None)  # JSON
 
     # Council flow state
-    council_state: Optional[str] = Field(default=None)
-    latest_council_note: Optional[str] = Field(default=None)  # JSON
+    council_state: str | None = Field(default=None)
+    latest_council_note: str | None = Field(default=None)  # JSON
 
     # Shared
-    sub_state: Optional[str] = Field(default=None)
+    sub_state: str | None = Field(default=None)
 
 
 class CollectionAttemptTable(SQLModel, table=True):
@@ -56,7 +55,7 @@ class CollectionAttemptTable(SQLModel, table=True):
 
     __tablename__ = "collection_attempts"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     session_id: str = Field(index=True, foreign_key="sessions.id")
     attempt_number: int = Field(default=1)
     pir: str = Field(default="")
@@ -69,7 +68,7 @@ class ProcessingAttemptTable(SQLModel, table=True):
 
     __tablename__ = "processing_attempts"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     session_id: str = Field(index=True, foreign_key="sessions.id")
     attempt_number: int = Field(default=1)
     pir: str = Field(default="")
@@ -89,17 +88,17 @@ class UploadedFileTable(SQLModel, table=True):
     stored_filename: str = Field(default="")
     stored_path: str = Field(default="")
     extension: str = Field(default="")
-    mime_type: Optional[str] = Field(default=None)
+    mime_type: str | None = Field(default=None)
     size_bytes: int = Field(default=0)
     sha256: str = Field(default="")
     uploaded_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     parse_status: str = Field(default="pending")
     searchable: bool = Field(default=False)
-    search_skip_reason: Optional[str] = Field(default=None)
-    parsed_content: Optional[str] = Field(default=None)  # Full parsed markdown
-    parsed_markdown_path: Optional[str] = Field(default=None)
-    citation: Optional[str] = Field(default=None)  # JSON
-    metadata_flags: Optional[str] = Field(default=None)  # JSON array
+    search_skip_reason: str | None = Field(default=None)
+    parsed_content: str | None = Field(default=None)  # Full parsed markdown
+    parsed_markdown_path: str | None = Field(default=None)
+    citation: str | None = Field(default=None)  # JSON
+    metadata_flags: str | None = Field(default=None)  # JSON array
 
 
 class AnalysisSessionTable(SQLModel, table=True):
@@ -107,11 +106,11 @@ class AnalysisSessionTable(SQLModel, table=True):
 
     __tablename__ = "analysis_sessions"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     session_id: str = Field(unique=True, index=True, foreign_key="sessions.id")
-    processing_result: Optional[str] = Field(default=None)  # JSON
-    analysis_draft: Optional[str] = Field(default=None)  # JSON
-    latest_council_note: Optional[str] = Field(default=None)  # JSON
+    processing_result: str | None = Field(default=None)  # JSON
+    analysis_draft: str | None = Field(default=None)  # JSON
+    latest_council_note: str | None = Field(default=None)  # JSON
 
 
 class ResearchLogEntryTable(SQLModel, table=True):
@@ -119,10 +118,12 @@ class ResearchLogEntryTable(SQLModel, table=True):
 
     __tablename__ = "research_log_entries"
 
-    id: Optional[int] = Field(default=None, primary_key=True)
+    id: int | None = Field(default=None, primary_key=True)
     session_id: str = Field(index=True, foreign_key="sessions.id")
-    entry_type: str = Field(default="")  # "ai_generation", "user_action", "reasoning_log"
-    phase: Optional[str] = Field(default=None)
+    entry_type: str = Field(
+        default=""
+    )  # "ai_generation", "user_action", "reasoning_log"
+    phase: str | None = Field(default=None)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     content: str = Field(default="{}")  # JSON blob of the full entry
 
@@ -134,7 +135,7 @@ class CollectionStatusTable(SQLModel, table=True):
 
     session_id: str = Field(primary_key=True)
     status: str = Field(default="collecting")
-    current_source: Optional[str] = Field(default=None)
-    current_activity: Optional[str] = Field(default=None)
+    current_source: str | None = Field(default=None)
+    current_activity: str | None = Field(default=None)
     sources: str = Field(default="{}")  # JSON dict of per-source counts
     updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))

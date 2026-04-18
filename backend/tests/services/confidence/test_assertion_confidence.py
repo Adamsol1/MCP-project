@@ -6,10 +6,16 @@ that maps PerspectiveAssertion.supporting_finding_ids → AssertionConfidence.
 
 import pytest
 
-from src.models.analysis import FindingModel, ProcessingResult
-from src.models.confidence import AssertionConfidence, ConfidenceTier, PerspectiveAssertion
-from src.services.confidence.assertion_enrichment import enrich_assertions, validate_finding_ids
-
+from src.models.analysis import FindingModel
+from src.models.confidence import (
+    AssertionConfidence,
+    ConfidenceTier,
+    PerspectiveAssertion,
+)
+from src.services.confidence.assertion_enrichment import (
+    enrich_assertions,
+    validate_finding_ids,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -57,13 +63,17 @@ class TestValidateFindingIds:
         assert result[0]["supporting_finding_ids"] == ["F-001", "F-002"]
 
     def test_invalid_ids_stripped(self):
-        assertions = [{"assertion": "A", "supporting_finding_ids": ["F-001", "FAKE-99"]}]
+        assertions = [
+            {"assertion": "A", "supporting_finding_ids": ["F-001", "FAKE-99"]}
+        ]
         valid = {"F-001"}
         result = validate_finding_ids(assertions, valid)
         assert result[0]["supporting_finding_ids"] == ["F-001"]
 
     def test_all_invalid_ids_leaves_empty_list(self):
-        assertions = [{"assertion": "A", "supporting_finding_ids": ["FAKE-1", "FAKE-2"]}]
+        assertions = [
+            {"assertion": "A", "supporting_finding_ids": ["FAKE-1", "FAKE-2"]}
+        ]
         valid = {"F-001"}
         result = validate_finding_ids(assertions, valid)
         assert result[0]["supporting_finding_ids"] == []
@@ -112,7 +122,10 @@ class TestEnrichAssertionsMultiSource:
         ]
         assertions = [_make_assertion("Some claim.", ["F-001", "F-002"])]
         enriched = enrich_assertions(assertions, findings)
-        assert enriched[0].confidence.tier in (ConfidenceTier.HIGH, ConfidenceTier.ASSESSED)
+        assert enriched[0].confidence.tier in (
+            ConfidenceTier.HIGH,
+            ConfidenceTier.ASSESSED,
+        )
 
     def test_source_types_populated(self):
         findings = [
@@ -161,8 +174,12 @@ class TestCircularReportingInAssertions:
 
     def test_circular_flag_raised(self):
         findings = [
-            _make_finding("F-001", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}),
-            _make_finding("F-002", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}),
+            _make_finding(
+                "F-001", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}
+            ),
+            _make_finding(
+                "F-002", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}
+            ),
         ]
         assertions = [_make_assertion("Claim.", ["F-001", "F-002"])]
         enriched = enrich_assertions(assertions, findings)
@@ -170,18 +187,28 @@ class TestCircularReportingInAssertions:
 
     def test_score_lower_with_circular(self):
         findings_circular = [
-            _make_finding("F-001", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}),
-            _make_finding("F-002", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}),
+            _make_finding(
+                "F-001", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}
+            ),
+            _make_finding(
+                "F-002", "otx", supporting_data={"kb_refs": ["https://same.com/report"]}
+            ),
         ]
         findings_clean = [
-            _make_finding("F-001", "otx", supporting_data={"kb_refs": ["https://report-a.com"]}),
-            _make_finding("F-002", "otx", supporting_data={"kb_refs": ["https://report-b.com"]}),
+            _make_finding(
+                "F-001", "otx", supporting_data={"kb_refs": ["https://report-a.com"]}
+            ),
+            _make_finding(
+                "F-002", "otx", supporting_data={"kb_refs": ["https://report-b.com"]}
+            ),
         ]
         a_circular = [_make_assertion("Claim.", ["F-001", "F-002"])]
         a_clean = [_make_assertion("Claim.", ["F-001", "F-002"])]
         enriched_circular = enrich_assertions(a_circular, findings_circular)
         enriched_clean = enrich_assertions(a_clean, findings_clean)
-        assert enriched_circular[0].confidence.score < enriched_clean[0].confidence.score
+        assert (
+            enriched_circular[0].confidence.score < enriched_clean[0].confidence.score
+        )
 
 
 # ---------------------------------------------------------------------------

@@ -120,7 +120,9 @@ async def test_generate_clarifying_question_asks_about_scope_when_missing(monkey
 
 
 @pytest.mark.asyncio
-async def test_generate_clarifying_question_asks_about_timeframe_when_scope_set(monkeypatch):
+async def test_generate_clarifying_question_asks_about_timeframe_when_scope_set(
+    monkeypatch,
+):
     service, mcp_client = _build_service(monkeypatch)
 
     context = DialogueContext()
@@ -137,7 +139,9 @@ async def test_generate_clarifying_question_asks_about_timeframe_when_scope_set(
 
 
 @pytest.mark.asyncio
-async def test_generate_clarifying_question_asks_about_actors_when_remaining(monkeypatch):
+async def test_generate_clarifying_question_asks_about_actors_when_remaining(
+    monkeypatch,
+):
     service, mcp_client = _build_service(monkeypatch)
 
     context = DialogueContext()
@@ -152,7 +156,9 @@ async def test_generate_clarifying_question_asks_about_actors_when_remaining(mon
 
     assert result.question.question_type == "actors"
     assert result.question.is_final is False
-    assert "threat_actors" in json.loads(mcp_client.calls[0]["params"]["missing_fields"])
+    assert "threat_actors" in json.loads(
+        mcp_client.calls[0]["params"]["missing_fields"]
+    )
 
 
 @pytest.mark.asyncio

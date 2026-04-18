@@ -1,6 +1,6 @@
 """Repository for the sessions table."""
 
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

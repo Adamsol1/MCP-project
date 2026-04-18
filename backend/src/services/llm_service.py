@@ -32,9 +32,9 @@ def _repair_json(text: str) -> str:
     # Repair 1: typographic quotes → ASCII
     text = (
         text.replace("\u201c", '"')
-            .replace("\u201d", '"')
-            .replace("\u2018", "'")
-            .replace("\u2019", "'")
+        .replace("\u201d", '"')
+        .replace("\u2018", "'")
+        .replace("\u2019", "'")
     )
 
     # Repair 2: invalid escape sequences (e.g. \' → ')
@@ -139,7 +139,9 @@ class LLMService:
         text = await self.generate_text(prompt)
         text = self._strip_fences(text)
         try:
-            return json.loads(text)
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return result
         except json.JSONDecodeError:
             pass
 
@@ -148,7 +150,9 @@ class LLMService:
         try:
             result = json.loads(repaired)
             logger.debug("[LLMService] JSON parsed after repair pass")
-            return result
+            if isinstance(result, dict):
+                return result
+            raise json.JSONDecodeError("Expected a JSON object", repaired, 0)
         except json.JSONDecodeError as e:
             logger.error(
                 f"[LLMService] Model did not return valid JSON: {e}\nResponse: {text[:200]}"

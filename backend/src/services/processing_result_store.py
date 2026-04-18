@@ -74,9 +74,7 @@ def _convert_legacy_processing_result(
             for source in entity.sources
         ]
         timestamps = [
-            value
-            for value in [entity.first_observed, entity.last_updated]
-            if value
+            value for value in [entity.first_observed, entity.last_updated] if value
         ]
 
         supporting_data: dict[str, list[str]] = {
@@ -110,7 +108,7 @@ def _convert_legacy_processing_result(
             }
         )
 
-    return ProcessingResult(findings=findings, gaps=list(legacy_result.gaps))
+    return ProcessingResult(findings=findings, gaps=list(legacy_result.gaps))  # type: ignore[arg-type]
 
 
 def _convert_grouped_pmesii_result(payload: dict) -> ProcessingResult | None:
@@ -165,7 +163,7 @@ def _convert_grouped_pmesii_result(payload: dict) -> ProcessingResult | None:
 
     gaps = payload.get("gaps")
     return ProcessingResult(
-        findings=findings,
+        findings=findings,  # type: ignore[arg-type]
         gaps=[str(gap) for gap in gaps] if isinstance(gaps, list) else [],
     )
 

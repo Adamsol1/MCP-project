@@ -10,8 +10,8 @@ from pathlib import Path
 
 from sqlalchemy import event
 from sqlalchemy.ext.asyncio import create_async_engine
-from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 from sqlalchemy.orm import sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession as SQLModelAsyncSession
 
 # ---------------------------------------------------------------------------
 # Default DB directory: <backend>/data/
@@ -112,6 +112,7 @@ def get_knowledge_session_factory():
 # ---------------------------------------------------------------------------
 # Sync DB path helpers (for MCP server / CollectionStatusTracker)
 # ---------------------------------------------------------------------------
+
 
 def get_sessions_db_path() -> Path:
     return _db_path("SESSIONS_DB_PATH", "sessions.db")

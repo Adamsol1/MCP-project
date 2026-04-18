@@ -50,7 +50,9 @@ class TestReasoningLogEntry:
                 session_id=session_id,
                 model_used="test-model",
             )
-        assert any(error["loc"] == ("attempt_number",) for error in exc_info.value.errors())
+        assert any(
+            error["loc"] == ("attempt_number",) for error in exc_info.value.errors()
+        )
 
     def test_log_entry_requires_model_used(self):
         session_id = str(uuid4())

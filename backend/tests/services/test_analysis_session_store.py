@@ -115,9 +115,9 @@ class TestAnalysisSessionStore:
         store.save_draft("session-reload", processing_result, draft)
         store.save_council_note("session-reload", note)
 
-        reloaded = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions").load(
-            "session-reload"
-        )
+        reloaded = AnalysisSessionStore(
+            sessions_dir=tmp_path / "analysis-sessions"
+        ).load("session-reload")
 
         assert reloaded is not None
         assert reloaded.analysis_draft == draft

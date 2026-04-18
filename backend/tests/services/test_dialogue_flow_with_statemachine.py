@@ -19,9 +19,7 @@ class MockDialogueService:
         self.raise_on_pir = raise_on_pir
         self.raise_on_summary = raise_on_summary
 
-    async def generate_clarifying_question(
-        self, user_message, context, language="en"
-    ):  # noqa: ARG002
+    async def generate_clarifying_question(self, user_message, _context, language="en"):
         if self.raise_on_clarifying:
             raise RuntimeError("Service unavailable")
         self.clarifying_calls.append(
@@ -38,11 +36,11 @@ class MockDialogueService:
 
     async def generate_pir(
         self,
-        context,
+        _context,
         modifications=None,
         language=None,
         current_pir=None,
-    ):  # noqa: ARG002
+    ):
         if self.raise_on_pir:
             raise RuntimeError("Service unavailable")
         self.pir_calls.append(
@@ -56,10 +54,10 @@ class MockDialogueService:
 
     async def generate_summary(
         self,
-        context,
+        _context,
         modifications=None,
         language="en",
-    ):  # noqa: ARG002
+    ):
         if self.raise_on_summary:
             raise RuntimeError("Service unavailable")
         self.summary_calls.append(
@@ -205,6 +203,7 @@ async def test_state_stays_gathering_when_context_is_insufficient():
 
 # ── Error handling ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_initial_input_returns_error_when_service_raises():
     # Arrange
@@ -265,7 +264,9 @@ async def test_summary_confirming_approve_returns_error_when_pir_generation_fail
 
     # Assert
     assert result.action == "error"
-    assert flow.state == DirectionState.SUMMARY_CONFIRMING  # state must not advance on error
+    assert (
+        flow.state == DirectionState.SUMMARY_CONFIRMING
+    )  # state must not advance on error
 
 
 @pytest.mark.asyncio
@@ -276,7 +277,9 @@ async def test_summary_confirming_reject_returns_error_when_summary_fails():
     flow.state = DirectionState.SUMMARY_CONFIRMING
 
     # Act
-    result = await flow.process_user_message("add more detail", mock_service, approved=False)
+    result = await flow.process_user_message(
+        "add more detail", mock_service, approved=False
+    )
 
     # Assert
     assert result.action == "error"
@@ -290,14 +293,19 @@ async def test_pir_confirming_reject_returns_error_when_pir_regeneration_fails()
     flow.state = DirectionState.PIR_CONFIRMING
 
     # Act
-    result = await flow.process_user_message("focus on TTPs", mock_service, approved=False)
+    result = await flow.process_user_message(
+        "focus on TTPs", mock_service, approved=False
+    )
 
     # Assert
     assert result.action == "error"
-    assert flow.state == DirectionState.PIR_CONFIRMING  # state must not advance on error
+    assert (
+        flow.state == DirectionState.PIR_CONFIRMING
+    )  # state must not advance on error
 
 
 # ── Language parameter ─────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_language_forwarded_to_initial_input():
@@ -349,13 +357,16 @@ async def test_language_forwarded_to_summary_confirming_reject():
     flow.state = DirectionState.SUMMARY_CONFIRMING
 
     # Act
-    await flow.process_user_message("add more detail", mock_service, approved=False, language="no")
+    await flow.process_user_message(
+        "add more detail", mock_service, approved=False, language="no"
+    )
 
     # Assert
     assert mock_service.summary_calls[0]["language"] == "no"
 
 
 # ── Perspectives ───────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_perspectives_updated_via_process_user_message():
@@ -364,7 +375,9 @@ async def test_perspectives_updated_via_process_user_message():
     mock_service = MockDialogueService()
 
     # Act
-    await flow.process_user_message("Investigate x", mock_service, perspectives=["us", "eu"])
+    await flow.process_user_message(
+        "Investigate x", mock_service, perspectives=["us", "eu"]
+    )
 
     # Assert
     assert len(flow.context.perspectives) == 2
@@ -384,6 +397,7 @@ def test_update_perspectives_converts_strings_to_enum():
 
 # ── settings_timeframe ─────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_settings_timeframe_prefills_empty_context():
     # Arrange
@@ -391,7 +405,9 @@ async def test_settings_timeframe_prefills_empty_context():
     mock_service = MockDialogueService()
 
     # Act
-    await flow.process_user_message("Investigate x", mock_service, settings_timeframe="Last 30 days")
+    await flow.process_user_message(
+        "Investigate x", mock_service, settings_timeframe="Last 30 days"
+    )
 
     # Assert
     assert flow.context.timeframe == "Last 30 days"
@@ -405,13 +421,16 @@ async def test_settings_timeframe_does_not_overwrite_existing_timeframe():
     flow.context.timeframe = "Last 6 months"
 
     # Act
-    await flow.process_user_message("Investigate x", mock_service, settings_timeframe="Last 30 days")
+    await flow.process_user_message(
+        "Investigate x", mock_service, settings_timeframe="Last 30 days"
+    )
 
     # Assert — existing timeframe wins
     assert flow.context.timeframe == "Last 6 months"
 
 
 # ── sub_state ──────────────────────────────────────────────────────────────────
+
 
 @pytest.mark.asyncio
 async def test_sub_state_set_to_awaiting_decision_after_summary_reject():
@@ -458,6 +477,7 @@ async def test_sub_state_cleared_on_pir_approve():
 
 # ── COMPLETE state ─────────────────────────────────────────────────────────────
 
+
 @pytest.mark.asyncio
 async def test_complete_state_returns_complete_response():
     # Arrange
@@ -473,6 +493,7 @@ async def test_complete_state_returns_complete_response():
 
 
 # ── get_debug_state ────────────────────────────────────────────────────────────
+
 
 def test_get_debug_state_returns_expected_fields():
     # Arrange
@@ -527,6 +548,7 @@ def test_get_debug_state_reports_missing_fields():
 
 # ── force_state ────────────────────────────────────────────────────────────────
 
+
 def test_force_state_changes_state():
     # Arrange
     flow = DirectionFlow(session_id="test")
@@ -577,6 +599,7 @@ def test_force_state_resets_question_count_on_initial():
 
 
 # ── to_dict / from_dict ────────────────────────────────────────────────────────
+
 
 def test_to_dict_from_dict_roundtrip():
     # Arrange

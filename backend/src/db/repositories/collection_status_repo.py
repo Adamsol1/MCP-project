@@ -12,7 +12,7 @@ import logging
 import os
 import sqlite3
 import threading
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 from pathlib import Path
 
 logger = logging.getLogger("app")

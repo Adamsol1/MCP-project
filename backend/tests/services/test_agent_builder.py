@@ -3,7 +3,7 @@
 import pytest
 
 from src.models.dialogue import Perspective
-from src.services.agent_builder import get_display_name, _DISPLAY_NAMES
+from src.services.agent_builder import _DISPLAY_NAMES, get_display_name
 
 
 class TestGetDisplayName:

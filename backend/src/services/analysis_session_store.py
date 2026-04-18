@@ -44,20 +44,27 @@ class AnalysisSessionStore:
                 return AnalysisSessionState(
                     session_id=session_id,
                     processing_result=(
-                        ProcessingResult.model_validate(json.loads(row.processing_result))
-                        if row.processing_result else None
+                        ProcessingResult.model_validate(
+                            json.loads(row.processing_result)
+                        )
+                        if row.processing_result
+                        else None
                     ),
                     analysis_draft=(
                         AnalysisDraft.model_validate(json.loads(row.analysis_draft))
-                        if row.analysis_draft else None
+                        if row.analysis_draft
+                        else None
                     ),
                     latest_council_note=(
                         CouncilNote.model_validate(json.loads(row.latest_council_note))
-                        if row.latest_council_note else None
+                        if row.latest_council_note
+                        else None
                     ),
                 )
             except Exception:
-                logger.exception(f"[AnalysisSessionStore] DB load failed for {session_id}, trying file fallback")
+                logger.exception(
+                    f"[AnalysisSessionStore] DB load failed for {session_id}, trying file fallback"
+                )
 
         # Legacy file fallback
         path = self._session_path(session_id)
@@ -67,7 +74,9 @@ class AnalysisSessionStore:
             payload = json.loads(path.read_text(encoding="utf-8"))
             return AnalysisSessionState.model_validate(payload)
         except (OSError, json.JSONDecodeError, ValidationError) as exc:
-            raise ValueError(f"Failed to load analysis session state for {session_id}") from exc
+            raise ValueError(
+                f"Failed to load analysis session state for {session_id}"
+            ) from exc
 
     async def save(self, state: AnalysisSessionState) -> AnalysisSessionState:
         # Try DB first
@@ -75,26 +84,36 @@ class AnalysisSessionStore:
             try:
                 row = await self._uow.analysis_sessions.get_or_create(state.session_id)
                 row.processing_result = (
-                    state.processing_result.model_dump_json() if state.processing_result else None
+                    state.processing_result.model_dump_json()
+                    if state.processing_result
+                    else None
                 )
                 row.analysis_draft = (
-                    state.analysis_draft.model_dump_json() if state.analysis_draft else None
+                    state.analysis_draft.model_dump_json()
+                    if state.analysis_draft
+                    else None
                 )
                 row.latest_council_note = (
-                    state.latest_council_note.model_dump_json() if state.latest_council_note else None
+                    state.latest_council_note.model_dump_json()
+                    if state.latest_council_note
+                    else None
                 )
                 await self._uow.analysis_sessions.update(row)
                 await self._uow.commit()
                 return state
             except Exception:
-                logger.exception(f"[AnalysisSessionStore] DB save failed for {state.session_id}, trying file fallback")
+                logger.exception(
+                    f"[AnalysisSessionStore] DB save failed for {state.session_id}, trying file fallback"
+                )
 
         # Legacy file fallback
         path = self._session_path(state.session_id)
         try:
             path.write_text(state.model_dump_json(indent=2), encoding="utf-8")
         except OSError as exc:
-            raise ValueError(f"Failed to save analysis session state for {state.session_id}") from exc
+            raise ValueError(
+                f"Failed to save analysis session state for {state.session_id}"
+            ) from exc
         return state
 
     async def get_or_create(self, session_id: str) -> AnalysisSessionState:

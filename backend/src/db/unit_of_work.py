@@ -12,14 +12,14 @@ from collections.abc import AsyncGenerator
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from src.db.engine import get_sessions_session_factory, get_knowledge_session_factory
-from src.db.repositories.session_repo import SessionRepository
-from src.db.repositories.collection_repo import CollectionAttemptRepository
-from src.db.repositories.processing_repo import ProcessingAttemptRepository
-from src.db.repositories.upload_repo import UploadRepository
+from src.db.engine import get_knowledge_session_factory, get_sessions_session_factory
 from src.db.repositories.analysis_repo import AnalysisSessionRepository
-from src.db.repositories.research_log_repo import ResearchLogRepository
+from src.db.repositories.collection_repo import CollectionAttemptRepository
 from src.db.repositories.knowledge_repo import KnowledgeRepository
+from src.db.repositories.processing_repo import ProcessingAttemptRepository
+from src.db.repositories.research_log_repo import ResearchLogRepository
+from src.db.repositories.session_repo import SessionRepository
+from src.db.repositories.upload_repo import UploadRepository
 
 
 class UnitOfWork:
@@ -72,6 +72,7 @@ class KnowledgeUnitOfWork:
 # ---------------------------------------------------------------------------
 # FastAPI dependency providers
 # ---------------------------------------------------------------------------
+
 
 async def get_uow() -> AsyncGenerator[UnitOfWork, None]:
     """Yield a UnitOfWork backed by a fresh sessions.db AsyncSession."""

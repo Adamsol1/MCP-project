@@ -32,6 +32,7 @@ from src.services.reasearch_logger import ResearchLogger
 def _get_mcp_client() -> MCPClient:
     return MCPClient()
 
+
 logger = logging.getLogger(__name__)
 
 _SESSIONS_DIR = Path(__file__).resolve().parents[2] / "sessions"
@@ -46,7 +47,9 @@ class AnalysisDraftRequest(BaseModel):
     force_refresh: bool = False
 
 
-async def _load_pirs_for_session(session_id: str, uow: UnitOfWork | None = None) -> list[dict]:
+async def _load_pirs_for_session(
+    session_id: str, uow: UnitOfWork | None = None
+) -> list[dict]:
     """Load the approved PIR list from sessions.db or legacy JSON.
 
     Returns an empty list if the session is missing or malformed — coverage
@@ -142,7 +145,9 @@ class AnalysisCouncilRequest(BaseModel):
         return self
 
 
-async def _load_selected_perspectives(session_id: str, uow: UnitOfWork | None) -> list[str] | None:
+async def _load_selected_perspectives(
+    session_id: str, uow: UnitOfWork | None
+) -> list[str] | None:
     """Load selected perspectives from the session's direction context."""
     if not uow:
         return None
@@ -201,6 +206,7 @@ async def _build_draft(
             )
         processing_result = enriched_processing_result
 
+    assert state.processing_result is not None and state.analysis_draft is not None
     pirs = await _load_pirs_for_session(session_id, uow=uow)
     coverage = compute_collection_coverage(
         findings=processing_result.findings,
@@ -235,11 +241,7 @@ async def create_analysis_draft(
             mcp_client=mcp_client,
         )
     except ValueError as exc:
-        status_code = (
-            409
-            if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
-            else 500
-        )
+        status_code = 409 if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE else 500
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
 
@@ -262,11 +264,7 @@ async def create_analysis_council(
             mcp_client=mcp_client,
         )
     except ValueError as exc:
-        status_code = (
-            409
-            if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE
-            else 500
-        )
+        status_code = 409 if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE else 500
         raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
     available_finding_ids = {
@@ -280,9 +278,7 @@ async def create_analysis_council(
     if invalid_finding_ids:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Unknown finding_ids: " + ", ".join(invalid_finding_ids)
-            ),
+            detail=("Unknown finding_ids: " + ", ".join(invalid_finding_ids)),
         )
 
     try:

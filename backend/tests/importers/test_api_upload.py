@@ -73,7 +73,7 @@ class TestSessionScopedUploads:
         assert saved_path.read_bytes() == b"hello"
         assert str(mock_upload_path / "session-a" / "files") in str(saved_path)
 
-    def test_upload_empty_file(self, mock_upload_path):
+    def test_upload_empty_file(self, _mock_upload_path):
         response = client.post(
             "/api/import/upload",
             data={"session_id": "session-a"},
@@ -93,7 +93,9 @@ class TestSessionScopedUploads:
             data={"session_id": "session-list"},
             files={"file": ("one.txt", b"one", "text/plain")},
         )
-        response = client.get("/api/import/files", params={"session_id": "session-list"})
+        response = client.get(
+            "/api/import/files", params={"session_id": "session-list"}
+        )
 
         assert response.status_code == 200
         payload = response.json()
@@ -122,7 +124,7 @@ class TestSessionScopedUploads:
         assert len(response2.json()["files"]) == 1
         assert response2.json()["files"][0]["filename"] == "two.txt"
 
-    def test_delete_uploaded_file(self, mock_upload_path):
+    def test_delete_uploaded_file(self, _mock_upload_path):
         upload_response = client.post(
             "/api/import/upload",
             data={"session_id": "session-delete"},

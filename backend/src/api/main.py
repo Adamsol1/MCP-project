@@ -3,13 +3,22 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
 from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
-from src.db.engine import get_sessions_engine, get_knowledge_engine
+from src.db.engine import get_knowledge_engine, get_sessions_engine
 from src.db.unit_of_work import UnitOfWork, get_uow
 from src.importers.session_uploads import (
     default_uploads_root,
@@ -83,26 +92,26 @@ async def upload_file(
     file: UploadFile = File(...),
 ):
     """
-        Endpoint for uploading a file to the server
+    Endpoint for uploading a file to the server
 
-        The endpoint validates filetype and stores files under:
-        data/imports/{session_id}/
+    The endpoint validates filetype and stores files under:
+    data/imports/{session_id}/
 
-        Args:
-            session_id str: Session identifier used to scope uploaded sources.
-            file UploadFile: The file that is being uploaded.
+    Args:
+        session_id str: Session identifier used to scope uploaded sources.
+        file UploadFile: The file that is being uploaded.
 
-        Returns:
-            A dict containing:
-                - Status (str): "success" if upload was succesful
-                - file_upload_id (str): Stable ID used for list/delete/search
-                - session_id (str): Session scope for this file
-                - path (str): Stored file path
-                - searchable (bool): Whether content can be searched as evidence
+    Returns:
+        A dict containing:
+            - Status (str): "success" if upload was succesful
+            - file_upload_id (str): Stable ID used for list/delete/search
+            - session_id (str): Session scope for this file
+            - path (str): Stored file path
+            - searchable (bool): Whether content can be searched as evidence
 
-        Raises:
-            - HTTPException 400: If request validation fails
-            - HTTPException 500: If an error occurs while saving
+    Raises:
+        - HTTPException 400: If request validation fails
+        - HTTPException 500: If an error occurs while saving
     """
     try:
         result = save_session_upload(
@@ -115,8 +124,13 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"[upload_file] Failed to save upload for session {session_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to save uploaded file") from e
+        logger.error(
+            f"[upload_file] Failed to save upload for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to save uploaded file"
+        ) from e
     logger.info(f"[upload_file] Saved '{file.filename}' for session {session_id}")
     return {"status": "success", **result}
 
@@ -129,8 +143,13 @@ async def list_uploaded_files(session_id: str = Query(...)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"[list_uploaded_files] Failed to list uploads for session {session_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to list uploaded files") from e
+        logger.error(
+            f"[list_uploaded_files] Failed to list uploads for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to list uploaded files"
+        ) from e
 
     return {
         "status": "success",
@@ -151,12 +170,19 @@ async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"[delete_uploaded_file] Failed to delete {file_upload_id} for session {session_id}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to delete uploaded file") from e
+        logger.error(
+            f"[delete_uploaded_file] Failed to delete {file_upload_id} for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete uploaded file"
+        ) from e
 
     if not deleted:
         raise HTTPException(status_code=404, detail="Upload not found")
-    logger.info(f"[delete_uploaded_file] Deleted {file_upload_id} for session {session_id}")
+    logger.info(
+        f"[delete_uploaded_file] Deleted {file_upload_id} for session {session_id}"
+    )
     return Response(status_code=204)
 
 
@@ -195,16 +221,17 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
 
         # Clean up legacy session JSON file
         legacy_session_file = (
-            Path(__file__).resolve().parents[2]
-            / "sessions"
-            / f"{session_id}.json"
+            Path(__file__).resolve().parents[2] / "sessions" / f"{session_id}.json"
         )
         if legacy_session_file.exists():
             legacy_session_file.unlink()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"[delete_session] Failed to delete session {session_id}: {e}", exc_info=True)
+        logger.error(
+            f"[delete_session] Failed to delete session {session_id}: {e}",
+            exc_info=True,
+        )
         raise HTTPException(status_code=500, detail="Failed to delete session") from e
 
     logger.info(f"[delete_session] Deleted session {session_id}")

@@ -10,10 +10,9 @@ Written before implementation. Tests verify the scoring logic described in the p
 
 import pytest
 
-from src.models.analysis import FindingModel, ProcessingResult
+from src.models.analysis import FindingModel
 from src.models.confidence import CollectionCoverageResult, ConfidenceTier
 from src.services.confidence.collection_coverage import compute_collection_coverage
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -257,38 +256,47 @@ class TestTierBoundaries:
         # We verify through the actual function using a known setup, not internal mapping.
         # Use: coverage=score/0.45 trick won't work cleanly, so test the mapping separately.
         from src.services.confidence.collection_coverage import _score_to_tier as _map
+
         return _map(score)
 
     def test_score_039_is_low(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.39) == ConfidenceTier.LOW
 
     def test_score_040_is_moderate(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.40) == ConfidenceTier.MODERATE
 
     def test_score_069_is_moderate(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.69) == ConfidenceTier.MODERATE
 
     def test_score_070_is_high(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.70) == ConfidenceTier.HIGH
 
     def test_score_089_is_high(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.89) == ConfidenceTier.HIGH
 
     def test_score_090_is_assessed(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.90) == ConfidenceTier.ASSESSED
 
     def test_score_100_is_assessed(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(1.00) == ConfidenceTier.ASSESSED
 
     def test_score_000_is_low(self):
         from src.services.confidence.collection_coverage import _score_to_tier
+
         assert _score_to_tier(0.00) == ConfidenceTier.LOW
 
 

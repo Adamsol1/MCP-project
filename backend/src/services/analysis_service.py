@@ -23,7 +23,6 @@ _DEFAULT_PERSPECTIVES = tuple(p.value for p in Perspective)
 
 
 class AnalysisService:
-
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
 
@@ -66,11 +65,16 @@ class AnalysisService:
 
                     try:
                         if isinstance(raw, str):
-                            fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
+                            fence = re.search(
+                                r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE
+                            )
                             raw = fence.group(1).strip() if fence else raw.strip()
                         payload = json.loads(raw) if isinstance(raw, str) else raw
                     except (json.JSONDecodeError, TypeError):
-                        logger.warning("[AnalysisService] %s agent returned non-JSON — skipping.", perspective)
+                        logger.warning(
+                            "[AnalysisService] %s agent returned non-JSON — skipping.",
+                            perspective,
+                        )
                         continue
 
                     # First agent provides shared fields (title, summary, key_judgments, etc.)
@@ -78,36 +82,56 @@ class AnalysisService:
                         base_payload = payload
 
                     # Collect this perspective's implications
-                    raw_assertions = payload.get("per_perspective_implications", {}).get(perspective, [])
+                    raw_assertions = payload.get(
+                        "per_perspective_implications", {}
+                    ).get(perspective, [])
                     if isinstance(raw_assertions, list):
                         raw_assertions = [
-                            a if isinstance(a, dict) else {"assertion": str(a), "supporting_finding_ids": []}
+                            a
+                            if isinstance(a, dict)
+                            else {"assertion": str(a), "supporting_finding_ids": []}
                             for a in raw_assertions
                         ]
-                        merged_implications[perspective] = validate_finding_ids(raw_assertions, valid_ids)
+                        merged_implications[perspective] = validate_finding_ids(
+                            raw_assertions, valid_ids
+                        )
 
         except Exception:
-            logger.warning("[AnalysisService] MCP generation failed — using fallback draft.", exc_info=True)
-            return self._enrich_draft_assertions(fallback_draft, enriched_result), enriched_result
+            logger.warning(
+                "[AnalysisService] MCP generation failed — using fallback draft.",
+                exc_info=True,
+            )
+            return self._enrich_draft_assertions(
+                fallback_draft, enriched_result
+            ), enriched_result
 
         if base_payload is None:
-            logger.warning("[AnalysisService] No agents produced output — using fallback draft.")
-            return self._enrich_draft_assertions(fallback_draft, enriched_result), enriched_result
+            logger.warning(
+                "[AnalysisService] No agents produced output — using fallback draft."
+            )
+            return self._enrich_draft_assertions(
+                fallback_draft, enriched_result
+            ), enriched_result
 
         base_payload["per_perspective_implications"] = merged_implications
 
         try:
             llm_draft = AnalysisDraft.model_validate(base_payload)
         except Exception:
-            logger.warning("[AnalysisService] Invalid draft payload — using fallback draft.")
+            logger.warning(
+                "[AnalysisService] Invalid draft payload — using fallback draft."
+            )
             llm_draft = fallback_draft
 
         merged = self._merge_with_fallback(llm_draft, fallback_draft)
         filtered_implications = {
-            k: v for k, v in merged.per_perspective_implications.items()
+            k: v
+            for k, v in merged.per_perspective_implications.items()
             if k in normalized
         }
-        merged = merged.model_copy(update={"per_perspective_implications": filtered_implications})
+        merged = merged.model_copy(
+            update={"per_perspective_implications": filtered_implications}
+        )
         return self._enrich_draft_assertions(merged, enriched_result), enriched_result
 
     def _enrich_findings(self, processing_result: ProcessingResult) -> ProcessingResult:
@@ -137,13 +161,21 @@ class AnalysisService:
     ) -> AnalysisDraft:
         enriched_implications: dict[str, list[PerspectiveAssertion]] = {}
         for perspective, assertions in draft.per_perspective_implications.items():
-            enriched_implications[perspective] = enrich_assertions(assertions, processing_result.findings)
-        return draft.model_copy(update={"per_perspective_implications": enriched_implications})
+            enriched_implications[perspective] = enrich_assertions(
+                assertions, processing_result.findings
+            )
+        return draft.model_copy(
+            update={"per_perspective_implications": enriched_implications}
+        )
 
     def _normalize_perspectives(self, selected: list[str] | None) -> list[str]:
         if not selected:
             return list(_DEFAULT_PERSPECTIVES)
-        normalized = [p.strip().lower() for p in selected if p.strip().lower() in _DEFAULT_PERSPECTIVES]
+        normalized = [
+            p.strip().lower()
+            for p in selected
+            if p.strip().lower() in _DEFAULT_PERSPECTIVES
+        ]
         return normalized or list(_DEFAULT_PERSPECTIVES)
 
     def _build_fallback_draft(
@@ -161,33 +193,57 @@ class AnalysisService:
                 supporting_finding_ids=fids or ([first_id] if first_id else []),
             )
 
-        title_text = "; ".join(f.title for f in findings[:4]) or "limited processed reporting"
+        title_text = (
+            "; ".join(f.title for f in findings[:4]) or "limited processed reporting"
+        )
         first_gap = gaps[0] if gaps else "Attribution remains unresolved."
 
         all_implications: dict[str, list[PerspectiveAssertion]] = {
             "us": [
-                _a("The combination of credential-access activity and phishing staging is relevant to allied telecom providers and shared vendor-access pathways."),
-                _a(f"US analysts should track whether the pattern seen in {title_text} reflects a reusable access-development model against critical infrastructure."),
+                _a(
+                    "The combination of credential-access activity and phishing staging is relevant to allied telecom providers and shared vendor-access pathways."
+                ),
+                _a(
+                    f"US analysts should track whether the pattern seen in {title_text} reflects a reusable access-development model against critical infrastructure."
+                ),
             ],
             "norway": [
-                _a("The findings are directly relevant to Norwegian telecom and emergency communications operators."),
-                _a("Norwegian stakeholders should prioritize privileged-access review around network operations and identity services."),
+                _a(
+                    "The findings are directly relevant to Norwegian telecom and emergency communications operators."
+                ),
+                _a(
+                    "Norwegian stakeholders should prioritize privileged-access review around network operations and identity services."
+                ),
             ],
             "china": [
-                _a("The infrastructure-overlap findings provide a comparative baseline for state-style telecom targeting without establishing attribution."),
-                _a(f"From a China-focused lens, {first_gap.lower()} should limit any premature actor-specific conclusion."),
+                _a(
+                    "The infrastructure-overlap findings provide a comparative baseline for state-style telecom targeting without establishing attribution."
+                ),
+                _a(
+                    f"From a China-focused lens, {first_gap.lower()} should limit any premature actor-specific conclusion."
+                ),
             ],
             "eu": [
-                _a("Cross-border telecom dependencies increase the regional significance of credential theft and vendor-access compromise."),
-                _a("EU-level coordination would be relevant if the access activity affects shared carriers or interconnection partners."),
+                _a(
+                    "Cross-border telecom dependencies increase the regional significance of credential theft and vendor-access compromise."
+                ),
+                _a(
+                    "EU-level coordination would be relevant if the access activity affects shared carriers or interconnection partners."
+                ),
             ],
             "russia": [
-                _a("The focus on Northern European telecom resilience intersects with regional critical-infrastructure threat scenarios."),
+                _a(
+                    "The focus on Northern European telecom resilience intersects with regional critical-infrastructure threat scenarios."
+                ),
                 _a(f"The current record requires caution because {first_gap.lower()}"),
             ],
             "neutral": [
-                _a("The findings support a cautious assessment of coordinated access development rather than isolated opportunistic events."),
-                _a("Available evidence is stronger on targeting patterns than on final intent or actor identity."),
+                _a(
+                    "The findings support a cautious assessment of coordinated access development rather than isolated opportunistic events."
+                ),
+                _a(
+                    "Available evidence is stronger on targeting patterns than on final intent or actor identity."
+                ),
             ],
         }
 
@@ -204,19 +260,26 @@ class AnalysisService:
             key_judgments=[
                 f"{f.title}: {f.why_it_matters} Confidence: {f.confidence}/100."
                 for f in findings
-            ] or ["No validated findings available to support a draft judgment."],
+            ]
+            or ["No validated findings available to support a draft judgment."],
             per_perspective_implications={
                 k: v for k, v in all_implications.items() if k in selected_perspectives
             },
-            recommended_actions=["Review findings and prioritize follow-up collection against unresolved gaps."],
+            recommended_actions=[
+                "Review findings and prioritize follow-up collection against unresolved gaps."
+            ],
             information_gaps=gaps,
         )
 
-    def _merge_with_fallback(self, llm_draft: AnalysisDraft, fallback: AnalysisDraft) -> AnalysisDraft:
+    def _merge_with_fallback(
+        self, llm_draft: AnalysisDraft, fallback: AnalysisDraft
+    ) -> AnalysisDraft:
         merged_implications: dict[str, list[PerspectiveAssertion]] = {}
         for key in llm_draft.per_perspective_implications:
             llm_values = llm_draft.per_perspective_implications.get(key, [])
-            merged_implications[key] = llm_values or fallback.per_perspective_implications.get(key, [])
+            merged_implications[key] = (
+                llm_values or fallback.per_perspective_implications.get(key, [])
+            )
         for key in fallback.per_perspective_implications:
             if key not in merged_implications:
                 merged_implications[key] = fallback.per_perspective_implications[key]
@@ -225,6 +288,7 @@ class AnalysisService:
             summary=llm_draft.summary.strip() or fallback.summary,
             key_judgments=llm_draft.key_judgments or fallback.key_judgments,
             per_perspective_implications=merged_implications,
-            recommended_actions=llm_draft.recommended_actions or fallback.recommended_actions,
+            recommended_actions=llm_draft.recommended_actions
+            or fallback.recommended_actions,
             information_gaps=fallback.information_gaps,
         )

@@ -245,7 +245,7 @@ class DialogueService:
                 task="Generate a structured summary of the intelligence collection context.",
             )
 
-        return self._parse_json(raw)
+        return self._parse_json(raw)  # type: ignore[no-any-return]
 
     def _identify_missing_context(self, context: DialogueContext) -> list[str]:
         """Return a list of context field names that are not yet filled."""

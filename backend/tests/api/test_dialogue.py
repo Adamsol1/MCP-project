@@ -1,10 +1,15 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from src.api import dialogue as dialogue_api
 from src.api import main
 from src.api.main import app
-from src.api import dialogue as dialogue_api
-from src.models.dialogue import ClarifyingQuestion, PIRReview, QuestionResult, ReviewResult
+from src.models.dialogue import (
+    ClarifyingQuestion,
+    PIRReview,
+    QuestionResult,
+    ReviewResult,
+)
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.processing_flow import ProcessingFlow
 

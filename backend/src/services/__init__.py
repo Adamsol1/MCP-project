@@ -1,8 +1,8 @@
 """Services for MCP Threat Intelligence backend."""
 
+from src.services.ai_orchestrator import AIOrchestrator
 from src.services.analysis_service import AnalysisService
 from src.services.analysis_session_store import AnalysisSessionStore
-from src.services.ai_orchestrator import AIOrchestrator
 from src.services.council_service import CouncilService
 from src.services.dialogue_service import DialogueService
 from src.services.otx_collector import OTXCollector

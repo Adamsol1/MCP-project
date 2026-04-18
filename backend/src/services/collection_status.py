@@ -35,6 +35,7 @@ _RESULT_COUNT_TOOLS: set[str] = {"google_search", "google_news_search"}
 
 _repo = CollectionStatusRepository()
 
+
 class CollectionStatusTracker:
     """Writes live per-source tool-call counts to collection_status table for frontend polling.
 

@@ -12,10 +12,15 @@ States:
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
 
-from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse, PhaseReviewItem
+from src.models.dialogue import (
+    DialogueAction,
+    DialogueContext,
+    DialogueResponse,
+    PhaseReviewItem,
+)
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
@@ -27,7 +32,9 @@ _PHASE_PROCESSING = "processing"
 async def _read_collected(session_id: str, uow=None) -> dict | None:
     """Read collected data from DB via UoW."""
     if uow is None:
-        raise RuntimeError(f"[ProcessingFlow] UoW required to read collected data for {session_id}")
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to read collected data for {session_id}"
+        )
     try:
         attempts = await uow.collection_attempts.get_all(session_id)
         if not attempts:
@@ -35,19 +42,27 @@ async def _read_collected(session_id: str, uow=None) -> dict | None:
         return {
             "session_id": session_id,
             "pir": attempts[0].pir,
-            "collected_at": attempts[0].created_at.isoformat() if attempts[0].created_at else "",
-            "updated_at": attempts[-1].created_at.isoformat() if attempts[-1].created_at else "",
+            "collected_at": attempts[0].created_at.isoformat()
+            if attempts[0].created_at
+            else "",
+            "updated_at": attempts[-1].created_at.isoformat()
+            if attempts[-1].created_at
+            else "",
             "attempts": [a.raw_response for a in attempts],
         }
     except Exception:
-        logger.exception(f"[ProcessingFlow] Failed to read collected data from DB for {session_id}")
+        logger.exception(
+            f"[ProcessingFlow] Failed to read collected data from DB for {session_id}"
+        )
         return None
 
 
 async def _read_processed(session_id: str, uow=None) -> dict | None:
     """Read processed data from DB via UoW."""
     if uow is None:
-        raise RuntimeError(f"[ProcessingFlow] UoW required to read processed data for {session_id}")
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to read processed data for {session_id}"
+        )
     try:
         attempts = await uow.processing_attempts.get_all(session_id)
         if not attempts:
@@ -55,23 +70,33 @@ async def _read_processed(session_id: str, uow=None) -> dict | None:
         return {
             "session_id": session_id,
             "pir": attempts[0].pir,
-            "processed_at": attempts[0].created_at.isoformat() if attempts[0].created_at else "",
-            "updated_at": attempts[-1].created_at.isoformat() if attempts[-1].created_at else "",
+            "processed_at": attempts[0].created_at.isoformat()
+            if attempts[0].created_at
+            else "",
+            "updated_at": attempts[-1].created_at.isoformat()
+            if attempts[-1].created_at
+            else "",
             "attempts": [a.raw_result for a in attempts],
         }
     except Exception:
-        logger.exception(f"[ProcessingFlow] Failed to read processed data from DB for {session_id}")
+        logger.exception(
+            f"[ProcessingFlow] Failed to read processed data from DB for {session_id}"
+        )
         return None
 
 
-async def _write_processed(session_id: str, pir: str, raw_result: str, uow=None) -> None:
+async def _write_processed(
+    session_id: str, pir: str, raw_result: str, uow=None
+) -> None:
     """Append a processing agent result to the processing_attempts table.
 
     Does NOT commit — the caller (dialogue endpoint) is responsible for committing
     the full transaction after saving session state.
     """
     if uow is None:
-        raise RuntimeError(f"[ProcessingFlow] UoW required to persist processed data for {session_id}")
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to persist processed data for {session_id}"
+        )
     await uow.processing_attempts.append(session_id, pir, raw_result)
     logger.info(f"[ProcessingFlow] Appended processing attempt to DB for {session_id}")
     logger.info(f"[ProcessingFlow] Wrote processed.json for {session_id}")
@@ -154,7 +179,9 @@ class ProcessingFlow(BasePhaseFlow):
     ) -> DialogueResponse:
         """Start processing: read collected data, run agent, write to DB, go to REVIEWING."""
         if not self.session_id:
-            return DialogueResponse(action=DialogueAction.ERROR, content="No session ID set.")
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="No session ID set."
+            )
 
         collected = await _read_collected(self.session_id, uow=uow)
         if not collected:
@@ -167,9 +194,7 @@ class ProcessingFlow(BasePhaseFlow):
 
         previous = await _read_processed(self.session_id, uow=uow)
         previous_result = (
-            previous["attempts"][-1]
-            if previous and previous.get("attempts")
-            else None
+            previous["attempts"][-1] if previous and previous.get("attempts") else None
         )
 
         try:
@@ -202,14 +227,21 @@ class ProcessingFlow(BasePhaseFlow):
                     pir=self.pir,
                 )
         except Exception:
-            logger.error(f"[ProcessingFlow] Processing failed for {self.session_id}", exc_info=True)
-            return DialogueResponse(action=DialogueAction.ERROR, content="Processing failed")
+            logger.error(
+                f"[ProcessingFlow] Processing failed for {self.session_id}",
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Processing failed"
+            )
 
         self.state = ProcessingState.REVIEWING
         logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         await _write_processed(self.session_id, self.pir, raw_result, uow=uow)
 
-        response = DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
+        response = DialogueResponse(
+            action=DialogueAction.SHOW_PROCESSING, content=raw_result
+        )
 
         if orchestrator and orchestrator.review_results:
             response.review_activity = [
@@ -230,7 +262,7 @@ class ProcessingFlow(BasePhaseFlow):
 
         return response
 
-    async def process_user_message(
+    async def process_user_message(  # type: ignore[override]
         self,
         user_message,
         processing_service,
@@ -239,9 +271,13 @@ class ProcessingFlow(BasePhaseFlow):
     ) -> DialogueResponse:
         """Route the incoming message to the correct state handler."""
         if self.state == ProcessingState.REVIEWING:
-            return await self.handle_reviewing(user_message, processing_service, approved, uow=uow)
+            return await self.handle_reviewing(
+                user_message, processing_service, approved, uow=uow
+            )
         else:
-            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase completed")
+            return DialogueResponse(
+                action=DialogueAction.COMPLETE, content="Processing phase completed"
+            )
 
     async def handle_reviewing(
         self,
@@ -256,6 +292,7 @@ class ProcessingFlow(BasePhaseFlow):
           - Approve (approved=True)  → COMPLETE, write reasoning log
           - Modify (approved=False)  → Re-run with analyst feedback, self-loop
         """
+        assert self.session_id, "session_id must be set before reviewing"
         if approved:
             self._log_user_action(
                 action="approve", phase=self.state.value, modifications=None
@@ -270,8 +307,12 @@ class ProcessingFlow(BasePhaseFlow):
                 )
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = ProcessingState.COMPLETE
-            logger.info(f"[Session {self.session_id}] State: REVIEWING -> COMPLETE. Processing phase finished")
-            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase complete")
+            logger.info(
+                f"[Session {self.session_id}] State: REVIEWING -> COMPLETE. Processing phase finished"
+            )
+            return DialogueResponse(
+                action=DialogueAction.COMPLETE, content="Processing phase complete"
+            )
 
         else:
             self._log_user_action(
@@ -284,9 +325,19 @@ class ProcessingFlow(BasePhaseFlow):
                 else ""
             )
             try:
-                modified = await processing_service.modify_processing(last_result, user_message)
+                modified = await processing_service.modify_processing(
+                    last_result, user_message
+                )
             except Exception:
-                logger.error(f"[ProcessingFlow] Failed to modify processing result for {self.session_id}", exc_info=True)
-                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to modify processing result")
+                logger.error(
+                    f"[ProcessingFlow] Failed to modify processing result for {self.session_id}",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR,
+                    content="Failed to modify processing result",
+                )
             await _write_processed(self.session_id, self.pir, modified, uow=uow)
-            return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=modified)
+            return DialogueResponse(
+                action=DialogueAction.SHOW_PROCESSING, content=modified
+            )

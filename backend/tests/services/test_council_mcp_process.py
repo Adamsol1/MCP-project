@@ -40,9 +40,7 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
         return True
 
     monkeypatch.setattr(council_mcp_process, "_health_ok", lambda _server_url: False)
-    monkeypatch.setattr(
-        council_mcp_process, "_wait_for_health", fake_wait_for_health
-    )
+    monkeypatch.setattr(council_mcp_process, "_wait_for_health", fake_wait_for_health)
     monkeypatch.setattr(council_mcp_process.shutil, "which", lambda _cmd: "poetry.exe")
     monkeypatch.setattr(council_mcp_process.subprocess, "Popen", fake_popen)
 

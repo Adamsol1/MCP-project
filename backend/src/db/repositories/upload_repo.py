@@ -1,6 +1,6 @@
 """Repository for the uploaded_files table."""
 
-from typing import Sequence
+from collections.abc import Sequence
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

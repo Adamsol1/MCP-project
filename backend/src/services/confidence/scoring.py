@@ -188,7 +188,7 @@ def detect_circular_reporting(
 def compute_confidence(
     source_types: list[str],
     source_urls: list[str] | None = None,
-    source_publishers: list[str] | None = None,
+    _source_publishers: list[str] | None = None,
 ) -> ConfidenceBreakdown:
     """Compute structured confidence from source metadata.
 

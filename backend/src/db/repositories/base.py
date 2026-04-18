@@ -1,6 +1,7 @@
 """Generic base repository with common CRUD operations."""
 
-from typing import Generic, TypeVar, Type, Sequence
+from collections.abc import Sequence
+from typing import Generic, TypeVar
 
 from sqlmodel import SQLModel, select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -11,7 +12,7 @@ T = TypeVar("T", bound=SQLModel)
 class GenericRepository(Generic[T]):
     """Thin async wrapper around SQLModel session for a single table type."""
 
-    def __init__(self, model: Type[T], session: AsyncSession):
+    def __init__(self, model: type[T], session: AsyncSession):
         self._model = model
         self._session = session
 

@@ -116,9 +116,7 @@ class MISPCollector:
         }
         if ioc_type is not None:
             # Find matching MISP types for this IOCType
-            misp_types = [
-                mt for mt, it in self.MISP_TYPE_MAP.items() if it == ioc_type
-            ]
+            misp_types = [mt for mt, it in self.MISP_TYPE_MAP.items() if it == ioc_type]
             if misp_types:
                 kwargs["type_attribute"] = misp_types
 
@@ -274,9 +272,7 @@ class MISPCollector:
             Seconds to wait before making the next request (0 if none needed).
         """
         now = time.monotonic()
-        self._request_timestamps = [
-            t for t in self._request_timestamps if now - t < 60
-        ]
+        self._request_timestamps = [t for t in self._request_timestamps if now - t < 60]
         if len(self._request_timestamps) >= self.MAX_REQUESTS_PER_MINUTE:
             oldest = self._request_timestamps[0]
             wait = 60 - (now - oldest)
@@ -302,8 +298,7 @@ class MISPCollector:
         event_data = data.get("Event", data)
 
         attributes = [
-            self._parse_attribute(attr)
-            for attr in event_data.get("Attribute", [])
+            self._parse_attribute(attr) for attr in event_data.get("Attribute", [])
         ]
 
         # Extract tags — MISP tags are [{"name": "tag1"}, ...]
@@ -396,9 +391,7 @@ class MISPCollector:
         """
         ioc_type = self.MISP_TYPE_MAP.get(attr.type)
         if ioc_type is None:
-            logger.debug(
-                f"[MISPCollector] Skipping unknown MISP type: {attr.type}"
-            )
+            logger.debug(f"[MISPCollector] Skipping unknown MISP type: {attr.type}")
             return None
 
         value = self._extract_ioc_value(attr.type, attr.value)
@@ -407,9 +400,7 @@ class MISPCollector:
         if ioc_type == IOCType.IPV4 and ":" in value:
             ioc_type = IOCType.IPV6
 
-        threat_level = self.THREAT_LEVEL_MAP.get(
-            threat_level_id, ThreatLevel.UNKNOWN
-        )
+        threat_level = self.THREAT_LEVEL_MAP.get(threat_level_id, ThreatLevel.UNKNOWN)
 
         try:
             return NormalizedIndicator(
@@ -422,7 +413,6 @@ class MISPCollector:
             )
         except ValueError:
             logger.warning(
-                f"[MISPCollector] Validation failed for {value} "
-                f"(type={attr.type})"
+                f"[MISPCollector] Validation failed for {value} (type={attr.type})"
             )
             return None

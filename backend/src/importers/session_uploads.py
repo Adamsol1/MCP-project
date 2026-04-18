@@ -246,7 +246,9 @@ def _parse_pdf_to_markdown(
         tuple of (citation, parse_status, searchable, skip_reason, metadata_flags)
     """
     try:
-        from pypdf import PdfReader  # Imported lazily to avoid hard runtime import failures
+        from pypdf import (
+            PdfReader,  # Imported lazily to avoid hard runtime import failures
+        )
     except Exception:
         citation = {
             "author": _UNKNOWN,
@@ -277,7 +279,9 @@ def _parse_pdf_to_markdown(
     citation = {
         "author": str(author).strip() if author else _UNKNOWN,
         "year": _extract_year(creation_date),
-        "title": str(title).strip() if title else (Path(source_filename).stem or _UNKNOWN),
+        "title": str(title).strip()
+        if title
+        else (Path(source_filename).stem or _UNKNOWN),
         "publisher": (str(producer).strip() if producer else "")
         or (str(creator).strip() if creator else "")
         or _UNKNOWN,
@@ -389,13 +393,18 @@ def _sync_to_db(entry: dict[str, Any], parsed_path: Path) -> None:
                 parsed_content,
                 entry.get("parsed_markdown_path"),
                 json.dumps(entry.get("citation", {})),
-                json.dumps(entry.get("metadata_flags")) if entry.get("metadata_flags") else None,
+                json.dumps(entry.get("metadata_flags"))
+                if entry.get("metadata_flags")
+                else None,
             ),
         )
         conn.commit()
         conn.close()
     except Exception:
-        logger.warning("[session_uploads] Failed to sync upload to DB — manifest still has the data", exc_info=True)
+        logger.warning(
+            "[session_uploads] Failed to sync upload to DB — manifest still has the data",
+            exc_info=True,
+        )
 
 
 def save_session_upload(
@@ -487,12 +496,15 @@ def save_session_upload(
     return entry
 
 
-def list_session_uploads(*, session_id: str, uploads_root: Path) -> list[dict[str, Any]]:
+def list_session_uploads(
+    *, session_id: str, uploads_root: Path
+) -> list[dict[str, Any]]:
     """List uploads for a given session."""
     validated_session_id = validate_session_id(session_id)
     manifest_path = _session_paths(uploads_root, validated_session_id)["manifest_path"]
     manifest = _load_manifest(manifest_path, validated_session_id)
-    return manifest.get("files", [])
+    files = manifest.get("files", [])
+    return files if isinstance(files, list) else []
 
 
 def delete_session_upload(

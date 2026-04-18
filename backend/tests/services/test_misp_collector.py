@@ -422,9 +422,7 @@ class TestExtractIndicators:
 class TestSearchErrorHandling:
     @pytest.mark.asyncio
     async def test_raises_on_misp_error_response(self, collector):
-        collector._client.search.return_value = {
-            "errors": ["Authentication failed"]
-        }
+        collector._client.search.return_value = {"errors": ["Authentication failed"]}
 
         with pytest.raises(ValueError, match="MISP API error"):
             await collector._search(controller="events")

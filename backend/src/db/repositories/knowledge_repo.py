@@ -1,9 +1,8 @@
 """Repository for the knowledge_resources table."""
 
 import json
-from typing import Sequence
+from collections.abc import Sequence
 
-from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from src.db.models.knowledge_tables import KnowledgeResourceTable
@@ -14,7 +13,9 @@ class KnowledgeRepository(GenericRepository[KnowledgeResourceTable]):
     def __init__(self, session: AsyncSession):
         super().__init__(KnowledgeResourceTable, session)
 
-    async def search(self, scan_text: str, limit: int = 5) -> Sequence[KnowledgeResourceTable]:
+    async def search(
+        self, scan_text: str, limit: int = 5
+    ) -> Sequence[KnowledgeResourceTable]:
         """Match keywords in scan_text, return top matches sorted by priority."""
         all_resources = await self.list_all()
         text_lower = scan_text.lower()

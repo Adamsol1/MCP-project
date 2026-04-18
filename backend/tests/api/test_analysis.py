@@ -86,7 +86,9 @@ def _write_legacy_processed_json(tmp_path, session_id: str) -> None:
 
 
 class _FakeAnalysisService:
-    async def generate_draft(self, processing_result, selected_perspectives=None, pir=""):
+    async def generate_draft(
+        self, processing_result, selected_perspectives=None, _pir=""
+    ):
         del selected_perspectives
         return AnalysisDraft(
             summary="Live-style analysis summary grounded in the session processing result.",

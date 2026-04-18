@@ -5,7 +5,6 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # Shared tier enum
 # ---------------------------------------------------------------------------
@@ -41,9 +40,7 @@ class PirCoverageScore(BaseModel):
     source_types: list[str] = Field(
         default_factory=list, description="Distinct source types contributing"
     )
-    has_gap_flag: bool = Field(
-        ..., description="True if gaps mention this PIR's topic"
-    )
+    has_gap_flag: bool = Field(..., description="True if gaps mention this PIR's topic")
     rationale: str = Field(..., description="Human-readable explanation of the score")
     findings: list[CoverageFindingRef] = Field(
         default_factory=list,

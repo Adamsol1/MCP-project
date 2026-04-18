@@ -1,7 +1,7 @@
 """Repository for the collection_attempts table."""
 
-from datetime import datetime, UTC
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -14,7 +14,9 @@ class CollectionAttemptRepository(GenericRepository[CollectionAttemptTable]):
     def __init__(self, session: AsyncSession):
         super().__init__(CollectionAttemptTable, session)
 
-    async def append(self, session_id: str, pir: str, raw_response: str) -> CollectionAttemptTable:
+    async def append(
+        self, session_id: str, pir: str, raw_response: str
+    ) -> CollectionAttemptTable:
         """Append a new collection attempt, auto-numbering."""
         latest = await self.get_latest(session_id)
         next_num = (latest.attempt_number + 1) if latest else 1

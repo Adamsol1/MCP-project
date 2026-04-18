@@ -1,7 +1,7 @@
 """Repository for the research_log_entries table."""
 
-from datetime import datetime, UTC
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession

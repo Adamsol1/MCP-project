@@ -36,8 +36,18 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "geopolitical/norway_china": {
-        "keywords": ["norway", "norwegian", "chinese", "china", "huawei",
-                     "belt and road", "belt road", "bri", "new silk road", "obor"],
+        "keywords": [
+            "norway",
+            "norwegian",
+            "chinese",
+            "china",
+            "huawei",
+            "belt and road",
+            "belt road",
+            "bri",
+            "new silk road",
+            "obor",
+        ],
         "priority": 1,
         "citation": {
             "author": "Threat Intelligence System",
@@ -47,7 +57,14 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "geopolitical/eu_russia": {
-        "keywords": ["european union", "eu", "russian", "russia", "gazprom", "nord stream"],
+        "keywords": [
+            "european union",
+            "eu",
+            "russian",
+            "russia",
+            "gazprom",
+            "nord stream",
+        ],
         "priority": 1,
         "citation": {
             "author": "Threat Intelligence System",
@@ -67,8 +84,17 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "geopolitical/eu_china": {
-        "keywords": ["european union", "eu", "chinese", "china",
-                     "belt and road", "belt road", "bri", "new silk road", "obor"],
+        "keywords": [
+            "european union",
+            "eu",
+            "chinese",
+            "china",
+            "belt and road",
+            "belt road",
+            "bri",
+            "new silk road",
+            "obor",
+        ],
         "priority": 1,
         "citation": {
             "author": "Threat Intelligence System",
@@ -78,8 +104,20 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "geopolitical/usa_china": {
-        "keywords": ["american", "usa", "united states", "chinese", "china", "taiwan", "trade war",
-                     "belt and road", "belt road", "bri", "new silk road", "obor"],
+        "keywords": [
+            "american",
+            "usa",
+            "united states",
+            "chinese",
+            "china",
+            "taiwan",
+            "trade war",
+            "belt and road",
+            "belt road",
+            "bri",
+            "new silk road",
+            "obor",
+        ],
         "priority": 1,
         "citation": {
             "author": "Threat Intelligence System",
@@ -89,7 +127,15 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "geopolitical/usa_russia": {
-        "keywords": ["american", "usa", "united states", "russian", "russia", "nato", "sanctions"],
+        "keywords": [
+            "american",
+            "usa",
+            "united states",
+            "russian",
+            "russia",
+            "nato",
+            "sanctions",
+        ],
         "priority": 1,
         "citation": {
             "author": "Threat Intelligence System",
@@ -129,7 +175,16 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "threat_actors/russian_state": {
-        "keywords": ["apt28", "sandworm", "cozy bear", "fsb", "gru", "svr", "russia", "russian"],
+        "keywords": [
+            "apt28",
+            "sandworm",
+            "cozy bear",
+            "fsb",
+            "gru",
+            "svr",
+            "russia",
+            "russian",
+        ],
         "priority": 3,
         "citation": {
             "author": "Threat Intelligence System",
@@ -139,7 +194,14 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
         },
     },
     "threat_actors/chinese_state": {
-        "keywords": ["apt41", "volt typhoon", "mss", "double dragon", "china", "chinese"],
+        "keywords": [
+            "apt41",
+            "volt typhoon",
+            "mss",
+            "double dragon",
+            "china",
+            "chinese",
+        ],
         "priority": 3,
         "citation": {
             "author": "Threat Intelligence System",

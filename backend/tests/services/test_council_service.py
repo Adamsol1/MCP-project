@@ -137,14 +137,10 @@ class TestCouncilService:
         """Fewer than two unique perspectives should fail validation."""
         service = CouncilService()
 
-        with pytest.raises(
-            ValueError, match="At least 2 perspectives are required"
-        ):
+        with pytest.raises(ValueError, match="At least 2 perspectives are required"):
             service.build_participants(["neutral"])
 
-        with pytest.raises(
-            ValueError, match="At least 2 perspectives are required"
-        ):
+        with pytest.raises(ValueError, match="At least 2 perspectives are required"):
             service.build_participants(["neutral", "NEUTRAL"])
 
     def test_runtime_config_defaults(self, tmp_path):
@@ -181,7 +177,7 @@ class TestCouncilService:
             information_gaps=[],
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda profile: _FakeEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda _profile: _FakeEngine())
 
         result = await service.run_council(
             session_id="session-council",
@@ -220,7 +216,7 @@ class TestCouncilService:
             information_gaps=[],
         )
 
-        monkeypatch.setattr(service, "_build_engine", lambda profile: _ErrorEngine())
+        monkeypatch.setattr(service, "_build_engine", lambda _profile: _ErrorEngine())
 
         with pytest.raises(RuntimeError, match="Council runtime failed:"):
             await service.run_council(

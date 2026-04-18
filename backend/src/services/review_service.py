@@ -43,9 +43,7 @@ class ReviewService:
             suggestions=reason,
         )
 
-    async def review_pir(
-        self, content, context: BaseModel, phase: str
-    ) -> ReviewResult:
+    async def review_pir(self, content, context: BaseModel, phase: str) -> ReviewResult:
         """Review generated content against the dialogue context.
 
         Args:

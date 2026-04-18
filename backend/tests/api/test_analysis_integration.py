@@ -10,7 +10,9 @@ from src.services.analysis_session_store import AnalysisSessionStore
 
 
 class _FakeAnalysisService:
-    async def generate_draft(self, processing_result, selected_perspectives=None, pir=""):
+    async def generate_draft(
+        self, processing_result, selected_perspectives=None, _pir=""
+    ):
         del selected_perspectives
         return AnalysisDraft(
             summary="Integrated analysis summary.",
@@ -124,4 +126,7 @@ def test_analysis_and_council_flow_persists_across_reload(monkeypatch, tmp_path)
     reload_payload = reload_response.json()
     assert reload_payload["analysis_draft"] == draft_payload["analysis_draft"]
     assert reload_payload["processing_result"] == draft_payload["processing_result"]
-    assert reload_payload["latest_council_note"]["summary"] == "Integrated council summary."
+    assert (
+        reload_payload["latest_council_note"]["summary"]
+        == "Integrated council summary."
+    )

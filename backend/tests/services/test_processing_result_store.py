@@ -187,6 +187,4 @@ class TestProcessingResultStore:
         )
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingResultStore().get_processing_result(
-                "invalid-payload-session"
-            )
+            ProcessingResultStore().get_processing_result("invalid-payload-session")

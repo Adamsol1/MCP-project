@@ -15,7 +15,6 @@ class AnalysisState(str, Enum):
 
 
 class AnalysisFlow(BasePhaseFlow):
-
     def __init__(
         self,
         session_id: str | None = None,
@@ -54,7 +53,10 @@ class AnalysisFlow(BasePhaseFlow):
             pirs: list[dict] = pir_data.get("pirs", [])
             return [p for p in pirs if isinstance(p, dict) and "question" in p]
         except (json.JSONDecodeError, AttributeError):
-            logger.warning("[AnalysisFlow] Failed to parse PIR JSON for session %s", self.session_id)
+            logger.warning(
+                "[AnalysisFlow] Failed to parse PIR JSON for session %s",
+                self.session_id,
+            )
             return []
 
     async def initialize(
@@ -66,12 +68,20 @@ class AnalysisFlow(BasePhaseFlow):
         selected_perspectives: list[str] | None = None,
     ) -> DialogueResponse:
         if not self.session_id:
-            return DialogueResponse(action=DialogueAction.ERROR, content="No session ID set.")
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="No session ID set."
+            )
 
         try:
-            processing_result = await processing_service.get_processing_result(self.session_id)
+            processing_result = await processing_service.get_processing_result(
+                self.session_id
+            )
         except ValueError as exc:
-            logger.error("[AnalysisFlow] Failed to load processing result for %s: %s", self.session_id, exc)
+            logger.error(
+                "[AnalysisFlow] Failed to load processing result for %s: %s",
+                self.session_id,
+                exc,
+            )
             return DialogueResponse(action=DialogueAction.ERROR, content=str(exc))
 
         try:
@@ -90,8 +100,14 @@ class AnalysisFlow(BasePhaseFlow):
                     selected_perspectives=selected_perspectives,
                 )
         except Exception:
-            logger.error("[AnalysisFlow] Analysis generation failed for %s", self.session_id, exc_info=True)
-            return DialogueResponse(action=DialogueAction.ERROR, content="Analysis generation failed.")
+            logger.error(
+                "[AnalysisFlow] Analysis generation failed for %s",
+                self.session_id,
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Analysis generation failed."
+            )
 
         pirs = self._extract_pirs()
         coverage = compute_collection_coverage(
@@ -134,10 +150,12 @@ class AnalysisFlow(BasePhaseFlow):
 
         return response
 
-    async def process_user_message(self, **kwargs) -> DialogueResponse:
+    async def process_user_message(self, **_kwargs) -> DialogueResponse:
         if self.state == AnalysisState.COMPLETE and self.analysis_result:
             return DialogueResponse(
                 action=DialogueAction.SHOW_ANALYSIS,
                 content=json.dumps(self.analysis_result),
             )
-        return DialogueResponse(action=DialogueAction.ERROR, content="Analysis is not ready yet.")
+        return DialogueResponse(
+            action=DialogueAction.ERROR, content="Analysis is not ready yet."
+        )

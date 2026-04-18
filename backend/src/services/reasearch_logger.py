@@ -52,13 +52,15 @@ class ResearchLogger:
       - "reasoning_log" — full reasoning trace written via write_reasoning_log()
     """
 
-    def __init__(self, session_id: str | None = None, log_path=None):
+    def __init__(self, session_id: str | None = None, _log_path=None):
         # log_path is kept for backwards compatibility with existing callers;
         # it is ignored (all logs now go to DB).
         self.session_id = session_id
         # Some callers (e.g., main.py delete_session) read .log_path.parent to
         # clean up legacy files. Provide a harmless path for that.
-        self.log_path = _DEFAULT_DATA_DIR / "outputs" / f"research_log_{session_id}.jsonl"
+        self.log_path = (
+            _DEFAULT_DATA_DIR / "outputs" / f"research_log_{session_id}.jsonl"
+        )
 
     def create_log(self, log_entry) -> None:
         """Append a single research log entry (ai_generation or user_action)."""
@@ -69,7 +71,9 @@ class ResearchLogger:
         else:
             payload = {"raw": str(log_entry)}
 
-        entry_type = payload.get("entry_type") or payload.get("action") or "ai_generation"
+        entry_type = (
+            payload.get("entry_type") or payload.get("action") or "ai_generation"
+        )
         phase = payload.get("phase")
         session_id = payload.get("session_id") or self.session_id
         if not session_id:

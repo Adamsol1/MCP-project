@@ -119,6 +119,7 @@ class MCPClient:
             )
 
         result = await self.session.list_tools()
+
         def _schema(s):
             if s is None:
                 return {}
@@ -135,7 +136,9 @@ class MCPClient:
             for tool in result.tools
         ]
 
-    async def get_prompt(self, name: str, arguments: dict[str, str] | None = None) -> str:
+    async def get_prompt(
+        self, name: str, arguments: dict[str, str] | None = None
+    ) -> str:
         """Fetch a rendered prompt template from the MCP server.
 
         Args:

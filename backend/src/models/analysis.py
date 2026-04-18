@@ -48,7 +48,10 @@ class ProcessingResult(BaseModel):
 class AnalysisDraft(BaseModel):
     """Draft analysis produced from processed findings."""
 
-    title: str = Field(default="", description="Concise AI-generated title for the analysis (6-10 words)")
+    title: str = Field(
+        default="",
+        description="Concise AI-generated title for the analysis (6-10 words)",
+    )
     summary: str = Field(..., description="Short analytical summary")
     key_judgments: list[str] = Field(
         default_factory=list, description="Primary analytical judgments"
@@ -105,9 +108,7 @@ class CouncilRuntimeProfile(BaseModel):
     vote_retry_enabled: bool = Field(
         ..., description="Whether vote retry prompting is enabled"
     )
-    vote_retry_attempts: int = Field(
-        ..., description="Configured vote retry attempts"
-    )
+    vote_retry_attempts: int = Field(..., description="Configured vote retry attempts")
     working_directory: str = Field(..., description="Working directory for council")
     file_tree_injection_enabled: bool = Field(
         ..., description="Whether file-tree injection is enabled"
