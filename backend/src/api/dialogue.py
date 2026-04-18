@@ -487,6 +487,74 @@ def _build_dev_snapshot(session_id: str) -> DialogueDevSnapshot:
     )
 
 
+async def _build_dev_snapshot_db(
+    session_id: str, uow: UnitOfWork
+) -> DialogueDevSnapshot:
+    """Build a dev snapshot by checking both DB tables and filesystem for artifacts."""
+    paths = _session_artifact_paths(session_id)
+
+    # Check DB for data
+    has_collection = bool(await uow.collection_attempts.get_latest(session_id))
+    has_processing = bool(await uow.processing_attempts.get_latest(session_id))
+    analysis_row = await uow.analysis_sessions.get_by_session(session_id)
+    has_analysis = bool(analysis_row and (analysis_row.analysis_draft or analysis_row.processing_result))
+
+    # Determine stage/phase from DB session row
+    session_row = await uow.sessions.get(session_id)
+    stage, phase = DirectionState.INITIAL.value, Phase.DIRECTION.value
+    title = session_id
+    if session_row:
+        if session_row.analysis_state:
+            stage, phase = session_row.analysis_state, Phase.ANALYSIS.value
+        elif session_row.processing_state:
+            stage, phase = session_row.processing_state, Phase.PROCESSING.value
+        elif session_row.collection_state:
+            stage, phase = session_row.collection_state, Phase.COLLECTION.value
+        elif session_row.direction_state:
+            stage, phase = session_row.direction_state, Phase.DIRECTION.value
+        if session_row.direction_context:
+            try:
+                ctx = json.loads(session_row.direction_context)
+                initial_query = ctx.get("initial_query", "")
+                if initial_query:
+                    title = str(initial_query)[:90]
+            except (json.JSONDecodeError, AttributeError):
+                pass
+
+    # Merge with filesystem artifacts for legacy sessions
+    processed_path = paths["data"] / "processed.json"
+    collected_path = paths["data"] / "collected.json"
+    artifacts = {
+        "session": paths["session"].exists() or session_row is not None,
+        "analysis": paths["analysis"].exists() or has_analysis,
+        "collection": collected_path.exists() or has_collection,
+        "processing": processed_path.exists() or has_processing,
+        "collection_status": paths["collection_status"].exists(),
+        "research_log": paths["research_log"].exists(),
+        "reasoning_log": paths["reasoning_log"].exists(),
+    }
+
+    # Pick the most recent timestamp across DB and filesystem
+    updated_at = _latest_mtime([
+        paths["session"], paths["analysis"], collected_path,
+        processed_path, paths["collection_status"],
+        paths["research_log"], paths["reasoning_log"],
+    ])
+    if session_row and session_row.updated_at:
+        db_ts = session_row.updated_at.isoformat()
+        if not updated_at or db_ts > updated_at:
+            updated_at = db_ts
+
+    return DialogueDevSnapshot(
+        session_id=session_id,
+        title=title,
+        stage=stage,
+        phase=phase,
+        updated_at=updated_at,
+        artifacts=artifacts,
+    )
+
+
 def _replace_session_id_in_text(path: Path, source_id: str, target_id: str) -> None:
     text = path.read_text(encoding="utf-8")
     path.write_text(text.replace(source_id, target_id), encoding="utf-8")
@@ -521,12 +589,66 @@ def _copy_directory_artifact(
             _replace_session_id_in_text(child, source_id, target_id)
 
 
-def _clone_dev_artifacts(source_id: str, target_id: str) -> None:
+async def _clone_dev_artifacts(
+    source_id: str, target_id: str, uow: UnitOfWork
+) -> None:
+    """Clone all session data from source to target for dev/testing purposes.
+
+    Copies DB rows (collection, processing, analysis) first, then any legacy
+    filesystem artifacts for backwards compatibility with old sessions.
+    """
+    source_exists_in_db = await uow.sessions.exists(source_id)
     source_paths = _session_artifact_paths(source_id)
-    target_paths = _session_artifact_paths(target_id)
-    if not source_paths["session"].exists():
+
+    if not source_exists_in_db and not source_paths["session"].exists():
         raise HTTPException(status_code=404, detail="Source session not found")
 
+    # --- DB copy (primary path for all current sessions) ---
+    if source_exists_in_db:
+        # Ensure target session row exists before inserting child rows
+        target_row = await uow.sessions.get(source_id)
+        if target_row:
+            from src.db.models.session_tables import SessionTable
+            new_row = SessionTable(**{
+                k: v for k, v in target_row.model_dump().items() if k != "id"
+            })
+            new_row.id = target_id
+            await uow.sessions.upsert(new_row)
+
+        # Copy collection attempts
+        collection_attempts = await uow.collection_attempts.get_all(source_id)
+        for attempt in collection_attempts:
+            await uow.collection_attempts.append(
+                target_id, attempt.pir, attempt.raw_response
+            )
+
+        # Copy processing attempts
+        processing_attempts = await uow.processing_attempts.get_all(source_id)
+        for attempt in processing_attempts:
+            await uow.processing_attempts.append(
+                target_id, attempt.pir, attempt.raw_result
+            )
+
+        # Copy analysis session
+        analysis_row = await uow.analysis_sessions.get_by_session(source_id)
+        if analysis_row:
+            await uow.analysis_sessions.get_or_create(target_id)
+            if analysis_row.processing_result:
+                await uow.analysis_sessions.save_draft(
+                    target_id,
+                    analysis_row.processing_result,
+                    analysis_row.analysis_draft or "",
+                )
+            if analysis_row.latest_council_note:
+                await uow.analysis_sessions.save_council_note(
+                    target_id, analysis_row.latest_council_note
+                )
+
+        await uow.commit()
+        logger.info("[DevTools] Cloned DB data from %s to %s", source_id, target_id)
+
+    # --- Legacy filesystem copy (fallback for old sessions) ---
+    target_paths = _session_artifact_paths(target_id)
     _copy_text_artifact(
         source_paths["session"], target_paths["session"], source_id, target_id
     )
@@ -540,16 +662,10 @@ def _clone_dev_artifacts(source_id: str, target_id: str) -> None:
         target_id,
     )
     _copy_text_artifact(
-        source_paths["research_log"],
-        target_paths["research_log"],
-        source_id,
-        target_id,
+        source_paths["research_log"], target_paths["research_log"], source_id, target_id
     )
     _copy_text_artifact(
-        source_paths["reasoning_log"],
-        target_paths["reasoning_log"],
-        source_id,
-        target_id,
+        source_paths["reasoning_log"], target_paths["reasoning_log"], source_id, target_id
     )
     _copy_directory_artifact(
         source_paths["data"], target_paths["data"], source_id, target_id
@@ -593,12 +709,14 @@ def _ensure_analysis_flow(session: IntelligenceSession) -> AnalysisFlow:
     return session.analysis_flow
 
 
-async def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> None:
+async def _hydrate_analysis_flow_from_store(
+    session: IntelligenceSession, uow: UnitOfWork | None = None
+) -> None:
     analysis_flow = _ensure_analysis_flow(session)
     if analysis_flow.analysis_result:
         return
     try:
-        state = await AnalysisSessionStore().load(session.session_id)
+        state = await AnalysisSessionStore(uow=uow).load(session.session_id)
     except ValueError:
         return
     if not state or not state.processing_result or not state.analysis_draft:
@@ -617,7 +735,10 @@ async def _hydrate_analysis_flow_from_store(session: IntelligenceSession) -> Non
 
 
 async def _apply_dev_restore_stage(
-    session: IntelligenceSession, target_stage: str | None, target_phase: str | None
+    session: IntelligenceSession,
+    target_stage: str | None,
+    target_phase: str | None,
+    uow: UnitOfWork | None = None,
 ) -> None:
     if not target_stage:
         return
@@ -679,7 +800,7 @@ async def _apply_dev_restore_stage(
         analysis_flow = _ensure_analysis_flow(session)
         if target_stage == AnalysisState.COMPLETE.value:
             analysis_flow.state = AnalysisState.COMPLETE
-            await _hydrate_analysis_flow_from_store(session)
+            await _hydrate_analysis_flow_from_store(session, uow=uow)
             if session.council_flow is None:
                 session.council_flow = CouncilFlow(
                     session_id=session.session_id,
@@ -725,7 +846,19 @@ def _latest_attempt(path: Path) -> str | None:
     return None
 
 
-def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
+async def _collection_display_payload(
+    session_id: str, uow: UnitOfWork | None = None
+) -> dict[str, Any] | None:
+    # DB path (primary — all real sessions use DB)
+    if uow:
+        try:
+            attempts = await uow.collection_attempts.get_all(session_id)
+            if attempts:
+                return CollectionService.parse_collected_data(attempts[-1].raw_response)
+        except Exception:
+            logger.exception("[DevTools] DB collection load failed for %s", session_id)
+
+    # Legacy filesystem fallback for old sessions
     collected_path = _session_artifact_paths(session_id)["data"] / "collected.json"
     parsed = _try_parse_json(_latest_attempt(collected_path))
     if not isinstance(parsed, dict):
@@ -741,12 +874,7 @@ def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
         source = str(item.get("source") or "unknown")
         summary = summaries.setdefault(
             source,
-            {
-                "display_name": source,
-                "count": 0,
-                "resource_ids": [],
-                "has_content": False,
-            },
+            {"display_name": source, "count": 0, "resource_ids": [], "has_content": False},
         )
         summary["count"] += 1
         resource_id = item.get("resource_id")
@@ -755,23 +883,22 @@ def _collection_display_payload(session_id: str) -> dict[str, Any] | None:
         if item.get("content"):
             summary["has_content"] = True
 
-    return {
-        "collected_data": collected_data,
-        "source_summary": list(summaries.values()),
-    }
+    return {"collected_data": collected_data, "source_summary": list(summaries.values())}
 
 
-async def _processing_payload(session_id: str) -> dict[str, Any] | None:
+async def _processing_payload(
+    session_id: str, uow: UnitOfWork | None = None
+) -> dict[str, Any] | None:
     try:
-        from src.services.processing_result_store import ProcessingResultStore
-
-        result = await ProcessingResultStore().get_processing_result(session_id)
+        result = await ProcessingResultStore(uow=uow).get_processing_result(session_id)
     except Exception:
         return None
     return result.model_dump(mode="json")
 
 
-async def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | None:
+async def _analysis_payload(
+    session: IntelligenceSession, uow: UnitOfWork | None = None
+) -> dict[str, Any] | None:
     if session.analysis_flow and session.analysis_flow.analysis_result:
         payload = dict(session.analysis_flow.analysis_result)
         payload.setdefault("latest_council_note", None)
@@ -780,7 +907,7 @@ async def _analysis_payload(session: IntelligenceSession) -> dict[str, Any] | No
         return payload
 
     try:
-        state = await AnalysisSessionStore().load(session.session_id)
+        state = await AnalysisSessionStore(uow=uow).load(session.session_id)
     except ValueError:
         return None
     if not state or not state.processing_result or not state.analysis_draft:
@@ -813,7 +940,10 @@ def _summary_payload(session: IntelligenceSession) -> dict[str, str]:
 
 
 async def _build_dev_hydrated_messages(
-    session: IntelligenceSession, target_stage: str, target_phase: str
+    session: IntelligenceSession,
+    target_stage: str,
+    target_phase: str,
+    uow: UnitOfWork | None = None,
 ) -> list[dict[str, Any]]:
     messages: list[dict[str, Any]] = []
     initial_query = session.direction_flow.context.initial_query
@@ -867,7 +997,7 @@ async def _build_dev_hydrated_messages(
                     },
                 }
             )
-        collection_data = _collection_display_payload(session.session_id)
+        collection_data = await _collection_display_payload(session.session_id, uow=uow)
         if collection_data:
             messages.append(
                 {
@@ -879,7 +1009,7 @@ async def _build_dev_hydrated_messages(
             )
 
     if target_phase in {Phase.PROCESSING.value, Phase.ANALYSIS.value}:
-        processing_data = await _processing_payload(session.session_id)
+        processing_data = await _processing_payload(session.session_id, uow=uow)
         if processing_data:
             messages.append(
                 {
@@ -891,7 +1021,7 @@ async def _build_dev_hydrated_messages(
             )
 
     if target_phase == Phase.ANALYSIS.value:
-        analysis_data = await _analysis_payload(session)
+        analysis_data = await _analysis_payload(session, uow=uow)
         if analysis_data:
             messages.append(
                 {
@@ -1288,11 +1418,25 @@ async def get_dev_state(
 
 
 @router.get("/dev/snapshots")
-async def list_dev_snapshots() -> list[DialogueDevSnapshot]:
+async def list_dev_snapshots(
+    uow: UnitOfWork = Depends(get_uow),
+) -> list[DialogueDevSnapshot]:
     """DEV endpoint: list saved sessions with reusable artifacts."""
     _ensure_dev_tools_enabled()
-    ensure_sessions_dir()
+
     session_ids: set[str] = set()
+
+    # Primary: discover sessions from the DB
+    try:
+        db_rows = await uow.sessions.list_all()
+        for row in db_rows:
+            if _SESSION_ID_RE.fullmatch(row.id):
+                session_ids.add(row.id)
+    except Exception:
+        logger.exception("[DevTools] Failed to list sessions from DB")
+
+    # Legacy: also scan filesystem for old sessions not yet in DB
+    ensure_sessions_dir()
     for path in _SESSIONS_DIR.glob("*.json"):
         if path.name.endswith(".analysis.json"):
             continue
@@ -1303,38 +1447,26 @@ async def list_dev_snapshots() -> list[DialogueDevSnapshot]:
         )
     if _OUTPUTS_DIR.exists():
         for path in _OUTPUTS_DIR.glob("research_log_*.jsonl"):
-            session_ids.add(
-                path.name.removeprefix("research_log_").removesuffix(".jsonl")
-            )
+            session_ids.add(path.name.removeprefix("research_log_").removesuffix(".jsonl"))
         for path in _OUTPUTS_DIR.glob("reasoning_log_*.json"):
-            session_ids.add(
-                path.name.removeprefix("reasoning_log_").removesuffix(".json")
-            )
+            session_ids.add(path.name.removeprefix("reasoning_log_").removesuffix(".json"))
+
+    # Build snapshot for each session — check both DB and filesystem for artifacts
+    snapshots = []
+    for session_id in session_ids:
+        if not _SESSION_ID_RE.fullmatch(session_id):
+            continue
+        snapshot = await _build_dev_snapshot_db(session_id, uow)
+        snapshots.append(snapshot)
 
     snapshots = [
-        _build_dev_snapshot(session_id)
-        for session_id in session_ids
-        if _SESSION_ID_RE.fullmatch(session_id)
-    ]
-    snapshots = [
-        snapshot
-        for snapshot in snapshots
+        s for s in snapshots
         if any(
-            snapshot.artifacts.get(key, False)
-            for key in (
-                "analysis",
-                "collection",
-                "processing",
-                "research_log",
-                "reasoning_log",
-            )
+            s.artifacts.get(key, False)
+            for key in ("analysis", "collection", "processing", "research_log", "reasoning_log")
         )
     ]
-    return sorted(
-        snapshots,
-        key=lambda item: item.updated_at or "",
-        reverse=True,
-    )
+    return sorted(snapshots, key=lambda item: item.updated_at or "", reverse=True)
 
 
 @router.post("/dev/restore")
@@ -1348,14 +1480,14 @@ async def restore_dev_snapshot(
     target_id = _validate_dev_session_id(request.target_session_id)
 
     if source_id != target_id:
-        _clone_dev_artifacts(source_id, target_id)
+        await _clone_dev_artifacts(source_id, target_id, uow)
     _sessions.pop(target_id, None)
     session = await _get_or_create_session(target_id, uow)
-    await _apply_dev_restore_stage(session, request.target_stage, request.target_phase)
+    await _apply_dev_restore_stage(session, request.target_stage, request.target_phase, uow=uow)
     await _save_session(session, uow)
 
     state = _build_dev_state_response(target_id, session)
-    messages = await _build_dev_hydrated_messages(session, state.stage, state.phase)
+    messages = await _build_dev_hydrated_messages(session, state.stage, state.phase, uow=uow)
     return DialogueDevRestoreResponse(
         **state.model_dump(),
         source_session_id=source_id,
