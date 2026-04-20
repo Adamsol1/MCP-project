@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path  # used in __init__ for working_directory
+from urllib.parse import urlparse
 
 from src.mcp_client.client import MCPClient
 from src.models.analysis import (
@@ -25,10 +26,31 @@ from src.services.llm_config import (
 logger = logging.getLogger("app")
 
 _DEFAULT_COUNCIL_MCP_URL = "http://127.0.0.1:8003/sse"
+_LOCAL_NON_COUNCIL_PORTS = {8000, 8001, 8002, 8004}
 
 
 def get_council_mcp_url() -> str:
-    return os.getenv("COUNCIL_MCP_URL", _DEFAULT_COUNCIL_MCP_URL)
+    server_url = os.getenv("COUNCIL_MCP_URL")
+    if not server_url:
+        return _DEFAULT_COUNCIL_MCP_URL
+
+    parsed = urlparse(server_url)
+    path = parsed.path.rstrip("/")
+    points_at_llm_api = path == "/v1" or path.startswith("/v1/")
+    points_at_local_non_council = (
+        parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port in _LOCAL_NON_COUNCIL_PORTS
+    )
+    if points_at_llm_api or points_at_local_non_council:
+        logger.warning(
+            "[CouncilService] Ignoring COUNCIL_MCP_URL=%s because it points at "
+            "a local non-council service. Using %s.",
+            server_url,
+            _DEFAULT_COUNCIL_MCP_URL,
+        )
+        return _DEFAULT_COUNCIL_MCP_URL
+
+    return server_url
 
 
 def get_council_adapter() -> str:

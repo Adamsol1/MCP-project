@@ -4,7 +4,7 @@ import os
 
 import uvicorn
 
-_BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8003"))
+_BACKEND_PORT = int(os.getenv("BACKEND_PORT", "8004"))
 
 
 def dev():

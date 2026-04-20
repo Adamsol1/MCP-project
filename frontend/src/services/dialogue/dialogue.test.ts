@@ -29,7 +29,7 @@ import type {
 
 vi.mock("axios");
 
-const BASE = "http://127.0.0.1:8000";
+const BASE = "http://127.0.0.1:8004";
 const DIALOGUE_TIMEOUT = { timeout: 600000 };
 const DEV_TIMEOUT = { timeout: 30000 };
 const COLLECTION_STATUS_TIMEOUT = { timeout: 10000 };

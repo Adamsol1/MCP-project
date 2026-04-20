@@ -53,7 +53,7 @@ def _configure_local_openai_adapter() -> None:
     adapter_config = getattr(config, "adapters", {}).get("openai")
     if adapter_config is None:
         return
-    adapter_config.base_url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8001/v1")
+    adapter_config.base_url = os.getenv("LLM_BASE_URL", "http://127.0.0.1:8000/v1")
     adapter_config.api_key = os.getenv("LLM_API_KEY", "my-secret-key")
     timeout = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv("VLLM_TIMEOUT_SECONDS")
     if timeout:

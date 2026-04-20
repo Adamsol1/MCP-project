@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from src.services import council_mcp_process
@@ -31,9 +33,10 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
     launched = {}
     fake_process = FakeProcess()
 
-    def fake_popen(args, cwd):
+    def fake_popen(args, cwd, env):
         launched["args"] = args
         launched["cwd"] = cwd
+        launched["env"] = env
         return fake_process
 
     async def fake_wait_for_health(_server_url):
@@ -56,6 +59,42 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
         "server_http.py",
     ]
     assert launched["cwd"].endswith("council_mcp")
+    assert launched["env"]["COUNCIL_MCP_PORT"] == "8003"
+
+
+def test_health_ok_requires_council_identity(monkeypatch):
+    class FakeResponse:
+        status = 200
+
+        def __init__(self, payload):
+            self.payload = payload
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def read(self, _limit):
+            return json.dumps(self.payload).encode("utf-8")
+
+    monkeypatch.setattr(
+        council_mcp_process,
+        "urlopen",
+        lambda _url, **_kwargs: FakeResponse({"status": "ok"}),
+    )
+
+    assert council_mcp_process._health_ok("http://127.0.0.1:8003/sse") is False
+
+    monkeypatch.setattr(
+        council_mcp_process,
+        "urlopen",
+        lambda _url, **_kwargs: FakeResponse(
+            {"status": "ok", "server": "council"}
+        ),
+    )
+
+    assert council_mcp_process._health_ok("http://127.0.0.1:8003/sse") is True
 
 
 @pytest.mark.asyncio

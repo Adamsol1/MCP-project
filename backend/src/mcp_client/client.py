@@ -11,6 +11,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -20,6 +21,35 @@ from pydantic import AnyUrl
 logger = logging.getLogger("app")
 
 _DEFAULT_URL = "http://127.0.0.1:8001/sse"
+
+
+def get_mcp_server_url() -> str:
+    """Return the MCP tools SSE URL, ignoring obvious LLM/backend URLs."""
+
+    server_url = os.getenv("MCP_SERVER_URL")
+    if not server_url:
+        return _DEFAULT_URL
+
+    parsed = urlparse(server_url)
+    if parsed.scheme not in {"http", "https"}:
+        return server_url
+
+    path = parsed.path.rstrip("/")
+    is_local_8000_sse = (
+        parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port == 8000
+        and path == "/sse"
+    )
+    if path == "/v1" or path.startswith("/v1/") or is_local_8000_sse:
+        logger.warning(
+            "[MCP] Ignoring MCP_SERVER_URL=%s because it points at the local "
+            "LLM/backend port, not the MCP tools server. Using %s.",
+            server_url,
+            _DEFAULT_URL,
+        )
+        return _DEFAULT_URL
+
+    return server_url
 
 
 class MCPClient:
@@ -35,7 +65,7 @@ class MCPClient:
     """
 
     def __init__(self, server_url: str | None = None) -> None:
-        self.server_url = server_url or os.getenv("MCP_SERVER_URL", _DEFAULT_URL)
+        self.server_url = server_url or get_mcp_server_url()
         self.session: ClientSession | None = None
 
     @asynccontextmanager

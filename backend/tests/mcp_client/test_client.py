@@ -3,7 +3,7 @@
 import pytest
 from mcp.types import TextContent
 
-from src.mcp_client.client import MCPClient
+from src.mcp_client.client import MCPClient, get_mcp_server_url
 from src.models.dialogue import DialogueContext
 
 
@@ -19,6 +19,18 @@ class TestMCPClientInit:
         """Client session should be None before connecting."""
         client = MCPClient("/path/to/server.py")
         assert client.session is None
+
+    def test_default_server_url_ignores_llm_api_environment(self, monkeypatch) -> None:
+        monkeypatch.setenv("MCP_SERVER_URL", "http://127.0.0.1:8000/v1")
+
+        assert get_mcp_server_url() == "http://127.0.0.1:8001/sse"
+
+    def test_default_server_url_ignores_local_llm_sse_environment(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("MCP_SERVER_URL", "http://127.0.0.1:8000/sse")
+
+        assert MCPClient().server_url == "http://127.0.0.1:8001/sse"
 
 
 class TestMCPClientNotConnected:

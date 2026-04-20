@@ -3,7 +3,7 @@
 import pytest
 
 from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
-from src.services.council_service import CouncilService
+from src.services.council_service import CouncilService, get_council_mcp_url
 
 VALID_PROCESSING_PAYLOAD = {
     "findings": [
@@ -107,6 +107,16 @@ def _analysis_draft() -> AnalysisDraft:
 
 class TestCouncilService:
     """Test participant construction and runtime defaults."""
+
+    def test_council_url_ignores_local_llm_port(self, monkeypatch):
+        monkeypatch.setenv("COUNCIL_MCP_URL", "http://127.0.0.1:8000/sse")
+
+        assert get_council_mcp_url() == "http://127.0.0.1:8003/sse"
+
+    def test_council_url_accepts_explicit_council_port(self, monkeypatch):
+        monkeypatch.setenv("COUNCIL_MCP_URL", "http://127.0.0.1:8013/sse")
+
+        assert get_council_mcp_url() == "http://127.0.0.1:8013/sse"
 
     @pytest.mark.asyncio
     async def test_participant_construction(self):

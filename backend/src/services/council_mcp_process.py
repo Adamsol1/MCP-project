@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import shutil
@@ -36,8 +37,13 @@ def _health_url(server_url: str) -> str:
 def _health_ok(server_url: str, timeout_seconds: float = 0.5) -> bool:
     try:
         with urlopen(_health_url(server_url), timeout=timeout_seconds) as response:
-            return 200 <= response.status < 300  # type: ignore[no-any-return]
+            if not 200 <= response.status < 300:
+                return False
+            payload = json.loads(response.read(512).decode("utf-8"))
+            return payload.get("server") == "council"
     except (OSError, URLError):
+        return False
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return False
 
 
@@ -81,10 +87,15 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
         return None
 
     logger.info("[Council MCP] Starting local server for %s", server_url)
+    env = os.environ.copy()
+    parsed = urlparse(server_url)
+    if parsed.port is not None:
+        env["COUNCIL_MCP_PORT"] = str(parsed.port)
     try:
         process = subprocess.Popen(
             [poetry, "run", "python", "server_http.py"],
             cwd=str(council_dir),
+            env=env,
         )
     except OSError as e:
         logger.warning("[Council MCP] Cannot autostart; failed to launch: %s", e)
