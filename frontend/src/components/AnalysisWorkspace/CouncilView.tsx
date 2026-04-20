@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { pdf } from "@react-pdf/renderer";
 import { useChat } from "../../hooks/useChat/useChat";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import type {
@@ -6,6 +7,7 @@ import type {
   CouncilTranscriptEntry,
   ProcessingFinding,
 } from "../../types/analysis";
+import CouncilReportPDF from "./CouncilReportPDF";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -569,8 +571,30 @@ export default function CouncilView({
       ? null
       : (councilParticipantViews.find((view) => view.participant === activeCouncilView) ?? null);
 
+  async function handleDownloadPDF() {
+    if (!councilNote) return;
+    const blob = await pdf(<CouncilReportPDF councilNote={councilNote} />).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `council_${councilNote.question.slice(0, 50).replace(/[^a-z0-9 ]/gi, "").trim().replace(/\s+/g, "_")}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2 px-5">
+    <>
+      {councilNote && (
+        <div className="flex justify-end pb-2">
+          <button
+            onClick={handleDownloadPDF}
+            className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-text-inverse transition-opacity hover:opacity-80"
+          >
+            Download PDF
+          </button>
+        </div>
+      )}
+      <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2 px-5">
       {/* Back button */}
       <div>
         <button
@@ -826,5 +850,6 @@ export default function CouncilView({
         </article>
       </section>
     </div>
+    </>
   );
 }

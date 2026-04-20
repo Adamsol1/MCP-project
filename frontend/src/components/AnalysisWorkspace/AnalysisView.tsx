@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { pdf } from "@react-pdf/renderer";
 import type {
   AnalysisResponse,
   AssertionConfidence,
@@ -7,6 +8,7 @@ import type {
   ProcessingFinding,
 } from "../../types/analysis";
 import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverageView";
+import AnalysisReportPDF from "./AnalysisReportPDF";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -271,8 +273,30 @@ export default function AnalysisView({
     .sort((a, b) => a.localeCompare(b))
     .map((key) => [key, analysis.per_perspective_implications[key]] as const);
 
+  async function handleDownloadPDF() {
+    const blob = await pdf(
+      <AnalysisReportPDF data={data} title={analysisHeading} />
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${analysisHeading.slice(0, 60).replace(/[^a-z0-9 ]/gi, "").trim().replace(/\s+/g, "_")}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
-    <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
+    <>
+      <div className="flex justify-end pb-2">
+        <button
+          onClick={handleDownloadPDF}
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-text-inverse transition-opacity hover:opacity-80"
+        >
+          Download PDF
+        </button>
+      </div>
+
+      <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
 
       {/* ── Hero: document-style header ──────────────────────────────── */}
       <section className="space-y-4 px-5">
@@ -448,6 +472,7 @@ export default function AnalysisView({
         </button>
       </div>
     </div>
+    </>
   );
 }
 

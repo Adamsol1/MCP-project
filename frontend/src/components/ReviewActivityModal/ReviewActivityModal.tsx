@@ -232,8 +232,9 @@ function normalizePythonRepr(s: string): string {
   while (i < s.length) {
     if (s[i] === "'") {
       let j = i + 1;
-      while (j < s.length && s[j] !== "'") {
-        if (s[j] === "\\") j++;
+      while (j < s.length) {
+        if (s[j] === "\\") { j += 2; continue; } // skip escaped char
+        if (s[j] === "'") break;
         j++;
       }
       const inner = s.slice(i + 1, j).replace(/"/g, '\\"');
@@ -241,8 +242,9 @@ function normalizePythonRepr(s: string): string {
       i = j + 1;
     } else if (s[i] === '"') {
       let j = i + 1;
-      while (j < s.length && s[j] !== '"') {
-        if (s[j] === "\\") j++;
+      while (j < s.length) {
+        if (s[j] === "\\") { j += 2; continue; }
+        if (s[j] === '"') break;
         j++;
       }
       result += s.slice(i, j + 1);
@@ -258,9 +260,19 @@ function normalizePythonRepr(s: string): string {
     .replace(/\bNone\b/g, "null");
 }
 
+function stripCodeFence(s: string): string {
+  const trimmed = s.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  const newline = trimmed.indexOf("\n");
+  if (newline === -1) return trimmed;
+  const body = trimmed.slice(newline + 1);
+  return body.endsWith("```") ? body.slice(0, -3).trim() : body.trim();
+}
+
 function tryParseContent(content: string): unknown {
-  try { return JSON.parse(content); } catch { /* not valid JSON */ }
-  try { return JSON.parse(normalizePythonRepr(content)); } catch { /* not valid Python repr either */ }
+  const stripped = stripCodeFence(content);
+  try { return JSON.parse(stripped); } catch { /* not valid JSON */ }
+  try { return JSON.parse(normalizePythonRepr(stripped)); } catch { /* not valid Python repr either */ }
   return null;
 }
 

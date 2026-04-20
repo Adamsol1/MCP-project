@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { ToastContainer } from "../Toast";
 import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
@@ -61,7 +60,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 
   const sortedPirs = [...pirData.pirs].sort(
     (a, b) =>
-      (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3)
+      (PRIORITY_ORDER[a.priority] ?? 3) - (PRIORITY_ORDER[b.priority] ?? 3),
   );
 
   useEffect(() => {
@@ -140,7 +139,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
             />
           ) : (
             <p className="text-xs text-text-muted italic px-2">
-              No knowledge bank sources used — PIRs generated from the conversation context.
+              No knowledge bank sources used — PIRs generated from the
+              conversation context.
             </p>
           )}
         </div>
@@ -211,23 +211,24 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
                 <p className="pl-7 text-xs text-text-secondary leading-relaxed">
                   {step.description}
                 </p>
-                {step.suggested_sources && step.suggested_sources.length > 0 && (
-                  <div className="pl-7 pt-1.5 space-y-1">
-                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                      Suggested Sources
-                    </p>
-                    <div className="flex flex-wrap gap-1">
-                    {step.suggested_sources.map((src) => (
-                      <span
-                        key={src}
-                        className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary"
-                      >
-                        {src}
-                      </span>
-                    ))}
+                {step.suggested_sources &&
+                  step.suggested_sources.length > 0 && (
+                    <div className="pl-7 pt-1.5 space-y-1">
+                      <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                        Suggested Sources
+                      </p>
+                      <div className="flex flex-wrap gap-1">
+                        {step.suggested_sources.map((src) => (
+                          <span
+                            key={src}
+                            className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary/10 text-primary"
+                          >
+                            {src}
+                          </span>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
               </div>
             );
           })}
@@ -294,7 +295,6 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
   );
 }
 
-
 type ConfidenceTier = "low" | "moderate" | "high" | "assessed";
 
 function confidenceTierFromInt(score: number): ConfidenceTier {
@@ -306,23 +306,22 @@ function confidenceTierFromInt(score: number): ConfidenceTier {
 
 const FINDING_TIER_STYLES: Record<ConfidenceTier, string> = {
   assessed: "bg-purple-600 text-white",
-  high:     "bg-emerald-600 text-white",
+  high: "bg-emerald-600 text-white",
   moderate: "bg-amber-500 text-white",
-  low:      "bg-red-600 text-white",
+  low: "bg-red-600 text-white",
 };
 
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   knowledge_bank: "Knowledge Bank",
-  otx:            "AlienVault OTX",
-  web_gov:        "Government / Official",
+  otx: "AlienVault OTX",
+  web_gov: "Government / Official",
   web_think_tank: "Think Tank",
-  web_news:       "News",
-  web_search:     "Web Search",
-  web_other:      "Web",
-  pretrained:     "Pretrained Knowledge",
-  osint:          "OSINT",
+  web_news: "News",
+  web_search: "Web Search",
+  web_other: "Web",
+  pretrained: "Pretrained Knowledge",
+  osint: "OSINT",
 };
-
 
 function formatRelevantTo(values: string[]): string {
   return values.join(", ");
@@ -372,9 +371,13 @@ function FindingDetailModal({
                 {displayId ?? finding.id}
               </span>
               <div className="flex-1 min-w-0">
-                <h2 className="text-base font-semibold text-text-primary leading-snug">{finding.title}</h2>
+                <h2 className="text-base font-semibold text-text-primary leading-snug">
+                  {finding.title}
+                </h2>
                 <div className="flex flex-wrap items-center gap-2 mt-1.5">
-                  <span className={`rounded-md px-2 py-0.5 text-xs font-bold tracking-wide ${tierStyle}`}>
+                  <span
+                    className={`rounded-md px-2 py-0.5 text-xs font-bold tracking-wide ${tierStyle}`}
+                  >
                     {tier.toUpperCase()}
                   </span>
                   <span className="text-xs text-text-muted">{sourceLabel}</span>
@@ -407,15 +410,23 @@ function FindingDetailModal({
         <div className="px-6 py-5 space-y-5 text-sm">
           {/* Finding */}
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Finding</p>
-            <p className="text-text-secondary leading-relaxed">{finding.finding}</p>
+            <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">
+              Finding
+            </p>
+            <p className="text-text-secondary leading-relaxed">
+              {finding.finding}
+            </p>
           </div>
 
           {/* Why it matters */}
           {finding.why_it_matters && (
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">Why It Matters</p>
-              <p className="text-text-muted italic leading-relaxed">{finding.why_it_matters}</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">
+                Why It Matters
+              </p>
+              <p className="text-text-muted italic leading-relaxed">
+                {finding.why_it_matters}
+              </p>
             </div>
           )}
 
@@ -425,39 +436,66 @@ function FindingDetailModal({
             (sd.entities?.length ?? 0) > 0 ||
             (sd.domains?.length ?? 0) > 0) && (
             <div className="border-t border-border/50 pt-4 space-y-3">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Supporting Data</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                Supporting Data
+              </p>
               {(sd.kb_refs?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">Knowledge Base Refs</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">
+                    Knowledge Base Refs
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {sd.kb_refs!.map((r) => (
-                      <span key={r} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{r}</span>
+                      <span
+                        key={r}
+                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary"
+                      >
+                        {r}
+                      </span>
                     ))}
                   </div>
                 </div>
               )}
               {(sd.attack_ids?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">ATT&amp;CK Techniques</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">
+                    ATT&amp;CK Techniques
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {sd.attack_ids!.map((id) => (
-                      <span key={id} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary">{id}</span>
+                      <span
+                        key={id}
+                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary"
+                      >
+                        {id}
+                      </span>
                     ))}
                   </div>
                 </div>
               )}
               {(sd.entities?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">Entities</p>
-                  <p className="text-xs text-text-primary">{sd.entities!.join(", ")}</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">
+                    Entities
+                  </p>
+                  <p className="text-xs text-text-primary">
+                    {sd.entities!.join(", ")}
+                  </p>
                 </div>
               )}
               {(sd.domains?.length ?? 0) > 0 && (
                 <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">Domains</p>
+                  <p className="text-xs font-medium text-text-secondary mb-1">
+                    Domains
+                  </p>
                   <div className="flex flex-wrap gap-1">
                     {sd.domains!.map((d) => (
-                      <span key={d} className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary">{d}</span>
+                      <span
+                        key={d}
+                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary"
+                      >
+                        {d}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -468,7 +506,9 @@ function FindingDetailModal({
           {/* Uncertainties */}
           {(finding.uncertainties?.length ?? 0) > 0 && (
             <div className="border-t border-border/50 pt-4">
-              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2">Uncertainties</p>
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-2">
+                Uncertainties
+              </p>
               <ul className="list-disc pl-4 space-y-1 text-xs text-text-muted">
                 {finding.uncertainties.map((u, i) => (
                   <li key={i}>{u}</li>
@@ -489,7 +529,10 @@ function ProcessingMessage({
   data: ProcessingData;
   onGapCollect?: (gap: string) => void;
 }) {
-  const [selectedFinding, setSelectedFinding] = useState<{ finding: ProcessingData["findings"][number]; displayId: string } | null>(null);
+  const [selectedFinding, setSelectedFinding] = useState<{
+    finding: ProcessingData["findings"][number];
+    displayId: string;
+  } | null>(null);
   const [selectedGaps, setSelectedGaps] = useState<Set<number>>(new Set());
   const [collectMode, setCollectMode] = useState(false);
 
@@ -507,7 +550,9 @@ function ProcessingMessage({
     const gaps = data.gaps.filter((_, i) => selectedGaps.has(i));
     if (gaps.length === 0) return;
     const prompt = gaps.map((g, i) => `${i + 1}. ${g}`).join("\n");
-    onGapCollect(`Please collect additional intelligence to address the following gaps:\n\n${prompt}`);
+    onGapCollect(
+      `Please collect additional intelligence to address the following gaps:\n\n${prompt}`,
+    );
     setSelectedGaps(new Set());
     setCollectMode(false);
   };
@@ -515,7 +560,9 @@ function ProcessingMessage({
   const collectAll = () => {
     if (!onGapCollect || data.gaps.length === 0) return;
     const prompt = data.gaps.map((g, i) => `${i + 1}. ${g}`).join("\n");
-    onGapCollect(`Please collect additional intelligence to address the following gaps:\n\n${prompt}`);
+    onGapCollect(
+      `Please collect additional intelligence to address the following gaps:\n\n${prompt}`,
+    );
     setSelectedGaps(new Set());
     setCollectMode(false);
   };
@@ -532,50 +579,75 @@ function ProcessingMessage({
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="bg-surface-muted text-text-muted">
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">ID</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50">Title</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Source</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Confidence</th>
-              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">Relevant To</th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                ID
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50">
+                Title
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                Source
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                Confidence
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                Relevant To
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
             {[...data.findings]
               .sort((a, b) => b.confidence - a.confidence)
               .map((f, idx) => {
-              const tier = confidenceTierFromInt(f.confidence);
-              const tierStyle = FINDING_TIER_STYLES[tier];
-              const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
-              const displayId = `F-${String(idx + 1).padStart(2, "0")}`;
-              return (
-                <tr
-                  key={f.id}
-                  onClick={() => setSelectedFinding({ finding: f, displayId })}
-                  className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
-                >
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-mono text-xs font-semibold text-text-muted">{displayId}</span>
-                  </td>
-                  <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
-                    {f.title}
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{sourceLabel}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">
-                    <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${tierStyle}`}>
-                      {tier.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary whitespace-nowrap">{formatRelevantTo(f.relevant_to)}</td>
-                </tr>
-              );
-            })}
+                const tier = confidenceTierFromInt(f.confidence);
+                const tierStyle = FINDING_TIER_STYLES[tier];
+                const sourceLabel = SOURCE_DISPLAY_NAMES[f.source] ?? f.source;
+                const displayId = `F-${String(idx + 1).padStart(2, "0")}`;
+                return (
+                  <tr
+                    key={f.id}
+                    onClick={() =>
+                      setSelectedFinding({ finding: f, displayId })
+                    }
+                    className="cursor-pointer transition-colors hover:bg-primary-subtle group/row"
+                  >
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span className="font-mono text-xs font-semibold text-text-muted">
+                        {displayId}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
+                      {f.title}
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
+                      {sourceLabel}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <span
+                        className={`rounded-md px-2 py-0.5 text-xs font-semibold ${tierStyle}`}
+                      >
+                        {tier.toUpperCase()}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
+                      {formatRelevantTo(f.relevant_to)}
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
       {data.gaps.length > 0 && (
         <div className="border-t border-border/50 pt-3 space-y-3">
           <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-semibold text-text-primary">Gaps <span className="ml-1 text-xs font-normal text-text-muted">({data.gaps.length})</span></p>
+            <p className="text-sm font-semibold text-text-primary">
+              Gaps{" "}
+              <span className="ml-1 text-xs font-normal text-text-muted">
+                ({data.gaps.length})
+              </span>
+            </p>
             {onGapCollect && !collectMode && (
               <button
                 type="button"
@@ -588,7 +660,10 @@ function ProcessingMessage({
             {onGapCollect && collectMode && (
               <button
                 type="button"
-                onClick={() => { setCollectMode(false); setSelectedGaps(new Set()); }}
+                onClick={() => {
+                  setCollectMode(false);
+                  setSelectedGaps(new Set());
+                }}
                 className="text-xs text-text-muted hover:text-text-secondary transition-colors"
               >
                 Cancel
@@ -639,13 +714,16 @@ function ProcessingMessage({
           )}
         </div>
       )}
-      <FindingDetailModal finding={selectedFinding?.finding ?? null} displayId={selectedFinding?.displayId} onClose={() => setSelectedFinding(null)} />
+      <FindingDetailModal
+        finding={selectedFinding?.finding ?? null}
+        displayId={selectedFinding?.displayId}
+        onClose={() => setSelectedFinding(null)}
+      />
     </div>
   );
 }
 
 // ── Reviewer content extraction ────────────────────────────────────────────────
-
 
 interface ChatWindowProps {
   onSendMessage?: (message: string) => void;
@@ -723,7 +801,9 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
       <div className="space-y-2">
         <div>
           <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
-          <p className="mt-0.5 text-xs text-text-secondary">{t.collectionResultsSubtitle}</p>
+          <p className="mt-0.5 text-xs text-text-secondary">
+            {t.collectionResultsSubtitle}
+          </p>
         </div>
         <p className="text-sm text-error-text">{t.couldNotParseCollection}</p>
         <details className="group">
@@ -742,7 +822,9 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
     <div className="space-y-3">
       <div>
         <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
-        <p className="mt-0.5 text-xs text-text-secondary">{t.collectionResultsSubtitle}</p>
+        <p className="mt-0.5 text-xs text-text-secondary">
+          {t.collectionResultsSubtitle}
+        </p>
       </div>
       <SourceSummaryTable summaries={data.source_summary} />
     </div>
@@ -807,8 +889,6 @@ export default function ChatWindow({
     setTimeout(() => textareaRef.current?.focus(), 50);
   }, [inputPrefill, onInputPrefillConsumed]);
 
-
-
   const submitMessage = () => {
     if (inputValue.trim() === "") return;
     onSendMessage?.(inputValue);
@@ -855,7 +935,8 @@ export default function ChatWindow({
             {(message.data as { summary: string }).summary}
           </p>
           <p className="text-xs text-text-muted italic">
-            Review this summary and approve to continue to PIR generation, or reject to refine.
+            Review this summary and approve to continue to PIR generation, or
+            reject to refine.
           </p>
         </div>
       );
@@ -962,7 +1043,7 @@ export default function ChatWindow({
                   </div>
                   <p className="text-sm text-text-secondary">
                     {phase === "processing"
-                      ? "Processing collection data — this may take a moment…"
+                      ? "Processing collection data, this may take a moment…"
                       : phase === "analysis"
                         ? "Generating analysis…"
                         : phase === "collection"
@@ -1000,8 +1081,7 @@ export default function ChatWindow({
 
           <div className="w-full max-w-5xl px-6">
             <div className="relative">
-              <ToastContainer position="above-input" />
-              {isSourceSelecting ? (
+{isSourceSelecting ? (
                 <section className="rounded-lg border border-border bg-surface p-4">
                   <h3 className="text-sm font-semibold text-text-primary">
                     {t.selectSourcesHeader}

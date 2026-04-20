@@ -23,6 +23,7 @@ import {
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import StageTracker from "./components/StageTracker/StageTracker";
 import { useT } from "./i18n/useT";
+import { ToastContainer } from "./components/Toast";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
@@ -394,6 +395,7 @@ function AppShell() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+      <ToastContainer position="top-right" />
     </>
   );
 }

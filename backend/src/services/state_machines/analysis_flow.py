@@ -140,7 +140,7 @@ class AnalysisFlow(BasePhaseFlow):
                     reviewer_suggestions=review.get("suggestions"),
                     sources_used=[],
                     generated_content=(
-                        str(orchestrator.attempts[i])
+                        json.dumps(orchestrator.attempts[i])
                         if i < len(orchestrator.attempts)
                         else None
                     ),
