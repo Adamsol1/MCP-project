@@ -195,9 +195,6 @@ backend/data/outputs/*
 !backend/data/outputs/.gitkeep
 !backend/data/outputs/demo_processing_result.json
 
-# Session files (persisted dialogue state)
-backend/sessions/*
-!backend/sessions/.gitkeep
 
 # Local database files
 *.db

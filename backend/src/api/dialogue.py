@@ -25,18 +25,18 @@ from src.db.unit_of_work import UnitOfWork, get_uow
 from src.mcp_client.client import MCPClient
 from src.models.analysis import CouncilRunSettings
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
-from src.services.ai_orchestrator import AIOrchestrator
-from src.services.analysis_service import AnalysisService
-from src.services.analysis_session_store import AnalysisSessionStore
-from src.services.collection_service import CollectionService
-from src.services.collection_status import CollectionStatusTracker
-from src.services.council_service import CouncilService
-from src.services.dialogue_service import DialogueService
-from src.services.llm_service import LLMService
-from src.services.processing_result_store import ProcessingResultStore
-from src.services.processing_service import ProcessingService
+from src.services.AI.ai_orchestrator import AIOrchestrator
+from src.services.analysis.analysis_service import AnalysisService
+from src.services.analysis.analysis_session_store import AnalysisSessionStore
+from src.services.collectors.collection_service import CollectionService
+from src.services.collection.collection_status import CollectionStatusTracker
+from src.services.council.council_service import CouncilService
+from tests.services.collection.dialogue_service import DialogueService
+from src.services.AI.llm_service import LLMService
+from src.services.processing.processing_result_store import ProcessingResultStore
+from src.services.processing.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
-from src.services.review_service import ReviewService
+from src.services.AI.review_service import ReviewService
 from src.services.state_machines.analysis_flow import AnalysisFlow, AnalysisState
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.council_flow import CouncilFlow

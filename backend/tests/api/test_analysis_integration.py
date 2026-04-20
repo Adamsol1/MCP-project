@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from src.api import analysis as analysis_api
 from src.api.main import app
 from src.models.analysis import AnalysisDraft, CouncilNote
-from src.services.analysis_session_store import AnalysisSessionStore
+from src.services.analysis.analysis_session_store import AnalysisSessionStore
 
 
 class _FakeAnalysisService:

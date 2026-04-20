@@ -10,7 +10,7 @@ from src.models.dialogue import (
     PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
-from src.services.collection_service import CollectionService
+from src.services.collectors.collection_service import CollectionService
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")

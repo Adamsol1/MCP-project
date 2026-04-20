@@ -28,8 +28,8 @@ from src.importers.session_uploads import (
     save_session_upload,
 )
 from src.logging_config import setup_logging
-from src.services.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
-from src.services.council_service import get_council_mcp_url
+from src.services.council.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
+from src.services.council.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
 load_dotenv()
