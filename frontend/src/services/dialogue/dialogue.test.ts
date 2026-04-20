@@ -30,6 +30,9 @@ import type {
 vi.mock("axios");
 
 const BASE = "http://127.0.0.1:8000";
+const DIALOGUE_TIMEOUT = { timeout: 600000 };
+const DEV_TIMEOUT = { timeout: 30000 };
+const COLLECTION_STATUS_TIMEOUT = { timeout: 10000 };
 
 // Reset call history between tests so assertions don't bleed across tests.
 beforeEach(() => {
@@ -70,6 +73,7 @@ describe("sendMessage", () => {
         council_perspectives: [],
         council_settings: null,
       },
+      DIALOGUE_TIMEOUT,
     );
     expect(result).toEqual(mockResponse.data);
   });
@@ -173,6 +177,7 @@ describe("getCollectionStatus", () => {
 
     expect(axios.get).toHaveBeenCalledWith(
       `${BASE}/api/dialogue/collection-status/session-1`,
+      COLLECTION_STATUS_TIMEOUT,
     );
     expect(result).toEqual(mockStatus);
   });
@@ -217,7 +222,7 @@ describe("getDevDialogueState", () => {
 
     expect(axios.get).toHaveBeenCalledWith(
       `${BASE}/api/dialogue/dev/state`,
-      { params: { session_id: "session-1" } },
+      { params: { session_id: "session-1" }, ...DEV_TIMEOUT },
     );
     expect(result).toEqual(mockDevState);
   });
@@ -335,7 +340,7 @@ describe("resetDevDialogueState", () => {
     expect(axios.post).toHaveBeenCalledWith(
       `${BASE}/api/dialogue/dev/reset`,
       null,
-      { params: { session_id: "session-1" } },
+      { params: { session_id: "session-1" }, ...DEV_TIMEOUT },
     );
   });
 

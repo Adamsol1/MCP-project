@@ -7,6 +7,7 @@ the dialogue state machine (DirectionFlow), and returns structured responses.
 Sessions are cached in memory in `_sessions` and persisted to sessions.db.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -52,6 +53,7 @@ _GATHER_MORE_CONTENT = (
 )
 _SUB_STATE_GATHER_MORE = "awaiting_gather_more"
 _SUB_STATE_AWAITING_DECISION = "awaiting_decision"
+_DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS = 600.0
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
@@ -65,6 +67,28 @@ _SESSION_DATA_DIR = _DATA_DIR / "sessions"
 _OUTPUTS_DIR = _DATA_DIR / "outputs"
 _COLLECTION_STATUS_DIR = _DATA_DIR / "collection_status"
 _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
+
+
+def _dialogue_request_timeout_seconds(request: Any) -> float:
+    raw_timeout = os.getenv("DIALOGUE_REQUEST_TIMEOUT_SECONDS")
+    try:
+        timeout = (
+            float(raw_timeout)
+            if raw_timeout is not None
+            else _DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS
+        )
+    except ValueError:
+        timeout = _DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS
+
+    if request.council_settings is not None:
+        council_timeout = (
+            request.council_settings.timeout_seconds
+            * max(1, request.council_settings.rounds)
+            + 60
+        )
+        timeout = max(timeout, float(council_timeout))
+
+    return max(30.0, timeout)
 
 
 def ensure_sessions_dir() -> None:
@@ -1348,6 +1372,31 @@ async def _handle_council_phase(
     )
 
 
+async def _dispatch_message(
+    request: DialogueMessageRequest,
+    mcp_client: MCPClient,
+    review_service: ReviewService,
+    uow: UnitOfWork,
+) -> DialogueMessageResponse:
+    session = await _get_or_create_session(request.session_id, uow)
+    orchestrator = _build_orchestrator(session)
+    if session.analysis_flow:
+        if request.council_debate_point or request.council_finding_ids:
+            return await _handle_council_phase(session, request, uow)
+        return await _handle_analysis_phase(session, request)
+    if session.processing_flow:
+        return await _handle_processing_phase(
+            session, request, mcp_client, orchestrator, review_service, uow
+        )
+    if session.collection_flow:
+        return await _handle_collection_phase(
+            session, request, mcp_client, orchestrator, review_service, uow
+        )
+    return await _handle_direction_phase(
+        session, request, mcp_client, orchestrator, review_service, uow
+    )
+
+
 @router.post("/message")
 async def send_message(
     request: DialogueMessageRequest,
@@ -1374,23 +1423,33 @@ async def send_message(
     Raises:
         Any exception given by DirectionFlow or MCPClient
     """
-    session = await _get_or_create_session(request.session_id, uow)
-    orchestrator = _build_orchestrator(session)
-    if session.analysis_flow:
-        if request.council_debate_point or request.council_finding_ids:
-            return await _handle_council_phase(session, request, uow)
-        return await _handle_analysis_phase(session, request)
-    if session.processing_flow:
-        return await _handle_processing_phase(
-            session, request, mcp_client, orchestrator, review_service, uow
+    timeout_seconds = _dialogue_request_timeout_seconds(request)
+    try:
+        return await asyncio.wait_for(
+            _dispatch_message(request, mcp_client, review_service, uow),
+            timeout=timeout_seconds,
         )
-    if session.collection_flow:
-        return await _handle_collection_phase(
-            session, request, mcp_client, orchestrator, review_service, uow
+    except TimeoutError:
+        session = _sessions.get(request.session_id)
+        if session is not None:
+            stage, phase = _get_active_stage_and_phase(session)
+        else:
+            stage, phase = "timeout", Phase.DIRECTION
+        logger.error(
+            "[Session %s] Dialogue request timed out after %.1fs",
+            request.session_id,
+            timeout_seconds,
         )
-    return await _handle_direction_phase(
-        session, request, mcp_client, orchestrator, review_service, uow
-    )
+        return DialogueMessageResponse(
+            question=(
+                "The request timed out while waiting for the AI or an MCP tool. "
+                "Try again, or narrow the request if it was a large collection run."
+            ),
+            action=DialogueAction.ERROR,
+            stage=stage,
+            phase=phase.value,
+            sub_state=None,
+        )
 
 
 @router.get("/collection-status/{session_id}")

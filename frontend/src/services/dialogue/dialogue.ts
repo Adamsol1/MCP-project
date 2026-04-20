@@ -8,6 +8,10 @@ import type {
 import type { Message, PhaseReviewItem } from "../../types/conversation";
 import { API_BACKEND_URL } from "../apiConfig";
 
+const DIALOGUE_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+const DEV_REQUEST_TIMEOUT_MS = 30 * 1000;
+const COLLECTION_STATUS_TIMEOUT_MS = 10 * 1000;
+
 export interface DialogueApiResponse {
   question: string;
   action: DialogueAction;
@@ -112,6 +116,7 @@ export async function sendMessage(
       council_perspectives: options.councilPerspectives ?? [],
       council_settings: options.councilSettings ?? null,
     },
+    { timeout: DIALOGUE_REQUEST_TIMEOUT_MS },
   );
 
   return httpResonse.data;
@@ -134,6 +139,7 @@ export async function getCollectionStatus(sessionId: string): Promise<Collection
   try {
     const res = await axios.get<CollectionStatus>(
       `${API_BACKEND_URL}/api/dialogue/collection-status/${sessionId}`,
+      { timeout: COLLECTION_STATUS_TIMEOUT_MS },
     );
     return res.data;
   } catch {
@@ -146,6 +152,7 @@ export async function getDevDialogueState(sessionId: string) {
     `${API_BACKEND_URL}/api/dialogue/dev/state`,
     {
       params: { session_id: sessionId },
+      timeout: DEV_REQUEST_TIMEOUT_MS,
     },
   );
   return httpResponse.data;
@@ -154,6 +161,7 @@ export async function getDevDialogueState(sessionId: string) {
 export async function listDevDialogueSnapshots() {
   const httpResponse = await axios.get<DialogueDevSnapshot[]>(
     `${API_BACKEND_URL}/api/dialogue/dev/snapshots`,
+    { timeout: DEV_REQUEST_TIMEOUT_MS },
   );
   return httpResponse.data;
 }
@@ -172,6 +180,7 @@ export async function restoreDevDialogueSnapshot(
       target_stage: targetStage,
       target_phase: targetPhase,
     },
+    { timeout: DIALOGUE_REQUEST_TIMEOUT_MS },
   );
   return httpResponse.data;
 }
@@ -193,6 +202,7 @@ export async function setDevDialogueState(
       stage,
       sub_state: normalizedSubState,
     },
+    { timeout: DEV_REQUEST_TIMEOUT_MS },
   );
   return httpResponse.data;
 }
@@ -203,6 +213,7 @@ export async function resetDevDialogueState(sessionId: string) {
     null,
     {
       params: { session_id: sessionId },
+      timeout: DEV_REQUEST_TIMEOUT_MS,
     },
   );
   return httpResponse.data;
