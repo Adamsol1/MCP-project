@@ -15,7 +15,7 @@ from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.services.collection.collection_status import CollectionStatusTracker
-from src.services.AI.gemini_agent import GeminiAgent
+from src.services.ai.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
 

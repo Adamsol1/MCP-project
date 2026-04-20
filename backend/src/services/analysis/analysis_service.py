@@ -15,7 +15,7 @@ from src.services.confidence.assertion_enrichment import (
     validate_finding_ids,
 )
 from src.services.confidence.scoring import compute_confidence
-from src.services.AI.gemini_agent import GeminiAgent
+from src.services.ai.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
 

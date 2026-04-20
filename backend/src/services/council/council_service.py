@@ -15,7 +15,7 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.AI.agent_builder import get_display_name
+from src.services.ai.agent_builder import get_display_name
 
 logger = logging.getLogger("app")
 

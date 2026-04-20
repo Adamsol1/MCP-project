@@ -3,8 +3,8 @@ import json
 import pytest
 
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
-from tests.services.collection import dialogue_service as dialogue_service_module
-from tests.services.collection.dialogue_service import DialogueService
+from src.services.collection import dialogue_service as dialogue_service_module
+from src.services.collection.dialogue_service import DialogueService
 
 
 class MockMCPClient:
