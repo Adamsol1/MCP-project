@@ -17,7 +17,7 @@ def test_local_llm_defaults_use_expected_vllm_configuration(monkeypatch):
 
     config = get_llm_config()
 
-    assert config.base_url == "http://127.0.0.1:8000/v1"
+    assert config.base_url == "http://127.0.0.1:8001/v1"
     assert config.api_key == "my-secret-key"
     assert config.model == "Qwen/Qwen2.5-7B-Instruct"
 
@@ -35,7 +35,7 @@ def test_local_llm_ignores_openai_environment_fallbacks(monkeypatch):
 
     config = get_llm_config()
 
-    assert config.base_url == "http://127.0.0.1:8000/v1"
+    assert config.base_url == "http://127.0.0.1:8001/v1"
     assert config.api_key == "my-secret-key"
     assert config.model == "Qwen/Qwen2.5-7B-Instruct"
 

@@ -1,4 +1,4 @@
-"""MCP Threat Intelligence Server - Generation Server (port 8001)."""
+"""MCP Threat Intelligence Server - Generation Server (port 8011)."""
 
 import os
 from sys import stderr
@@ -58,7 +58,7 @@ def greet() -> str:
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("MCP_SERVER_PORT", "8001"))
+    port = int(os.getenv("MCP_SERVER_PORT", "8011"))
     mcp.run(
         transport="sse",
         host="127.0.0.1",

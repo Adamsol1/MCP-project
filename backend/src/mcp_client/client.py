@@ -20,7 +20,7 @@ from pydantic import AnyUrl
 
 logger = logging.getLogger("app")
 
-_DEFAULT_URL = "http://127.0.0.1:8001/sse"
+_DEFAULT_URL = "http://127.0.0.1:8011/sse"
 
 
 def get_mcp_server_url() -> str:
@@ -35,12 +35,12 @@ def get_mcp_server_url() -> str:
         return server_url
 
     path = parsed.path.rstrip("/")
-    is_local_8000_sse = (
+    is_local_llm_tunnel_sse = (
         parsed.hostname in {"127.0.0.1", "localhost"}
-        and parsed.port == 8000
+        and parsed.port in {8000, 8001}
         and path == "/sse"
     )
-    if path == "/v1" or path.startswith("/v1/") or is_local_8000_sse:
+    if path == "/v1" or path.startswith("/v1/") or is_local_llm_tunnel_sse:
         logger.warning(
             "[MCP] Ignoring MCP_SERVER_URL=%s because it points at the local "
             "LLM/backend port, not the MCP tools server. Using %s.",
@@ -61,7 +61,7 @@ class MCPClient:
     Args:
         server_url: SSE endpoint URL of the running MCP server.
                     Defaults to the MCP_SERVER_URL env var, or
-                    http://127.0.0.1:8001/sse if unset.
+                    http://127.0.0.1:8011/sse if unset.
     """
 
     def __init__(self, server_url: str | None = None) -> None:

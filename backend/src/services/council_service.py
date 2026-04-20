@@ -26,7 +26,7 @@ from src.services.llm_config import (
 logger = logging.getLogger("app")
 
 _DEFAULT_COUNCIL_MCP_URL = "http://127.0.0.1:8003/sse"
-_LOCAL_NON_COUNCIL_PORTS = {8000, 8001, 8002, 8004}
+_LOCAL_NON_COUNCIL_PORTS = {8000, 8001, 8002, 8004, 8011}
 
 
 def get_council_mcp_url() -> str:

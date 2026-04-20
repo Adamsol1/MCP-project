@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
 
-DEFAULT_LLM_BASE_URL = "http://127.0.0.1:8000/v1"
+DEFAULT_LLM_BASE_URL = "http://127.0.0.1:8001/v1"
 DEFAULT_LLM_API_KEY = "my-secret-key"
 DEFAULT_LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 DEFAULT_LLM_TIMEOUT_SECONDS = 180
