@@ -7,7 +7,7 @@ import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 
-vi.mock("../AnalysisPrototypeView/AnalysisPrototypeView", () => ({
+vi.mock("../AnalysisWorkspace/AnalysisWorkspace", () => ({
   default: () => <div>Inline analysis view</div>,
 }));
 
@@ -714,7 +714,7 @@ describe("PirMessage — rationale citation rendering", () => {
               author: "Threat Intelligence System",
               year: "2025",
               title: "Norwegian-Russian Geopolitical Relations",
-              publisher: "Internal Knowledge Bank",
+              publisher: "Knowledge Bank",
             },
           },
         ],

@@ -77,37 +77,46 @@ def test_pdf_missing_metadata_uses_unknown_and_flags(tmp_path):
     assert result["searchable"] is False
 
 
-@pytest.mark.parametrize("session_id", [
-    "valid-session",
-    "abc123",
-    "A_B-C",
-    "a" * 128,
-])
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "valid-session",
+        "abc123",
+        "A_B-C",
+        "a" * 128,
+    ],
+)
 def test_validate_session_id_accepts_valid_ids(session_id):
     # Arrange / Act / Assert
     assert validate_session_id(session_id) == session_id.strip()
 
 
-@pytest.mark.parametrize("session_id", [
-    "",
-    "   ",
-    "has spaces",
-    "has/slash",
-    "has.dot",
-    "a" * 129,
-])
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "",
+        "   ",
+        "has spaces",
+        "has/slash",
+        "has.dot",
+        "a" * 129,
+    ],
+)
 def test_validate_session_id_rejects_invalid_ids(session_id):
     # Arrange / Act / Assert
     with pytest.raises(ValueError):
         validate_session_id(session_id)
 
 
-@pytest.mark.parametrize("filename, expected_clean", [
-    ("normal.txt", "normal.txt"),
-    ("file with spaces.txt", "file with spaces.txt"),
-    ("../../etc/passwd.txt", "passwd.txt"),
-    ("file<>:*?.txt", "file_____.txt"),
-])
+@pytest.mark.parametrize(
+    "filename, expected_clean",
+    [
+        ("normal.txt", "normal.txt"),
+        ("file with spaces.txt", "file with spaces.txt"),
+        ("../../etc/passwd.txt", "passwd.txt"),
+        ("file<>:*?.txt", "file_____.txt"),
+    ],
+)
 def test_sanitize_filename_removes_dangerous_characters(filename, expected_clean):
     # Arrange / Act
     result = sanitize_filename(filename)

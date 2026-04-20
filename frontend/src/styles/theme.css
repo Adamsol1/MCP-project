@@ -1,33 +1,33 @@
 @theme {
-  /* ─── Primary — Void violet (shared across both modes) ──────── */
-  --color-primary: #7c3aed; /* violet-600  */
-  --color-primary-dark: #6d28d9; /* violet-700  */
-  --color-primary-hover: #5b21b6; /* violet-800  */
-  --color-primary-subtle: #f5f3ff; /* violet-50   */
+  /* ─── Primary — MD3 purple/mauve ────────────────────────────── */
+  --color-primary: #774f83;
+  --color-primary-dark: #5e386a;
+  --color-primary-hover: #2e0a3b;
+  --color-primary-subtle: #fad7ff;
 
   /* User chat bubbles */
-  --color-user-bubble: #7c3aed;
-  --color-user-bubble-text: #fafafa;
+  --color-user-bubble: #774f83;
+  --color-user-bubble-text: #ffffff;
 
   /* ─── Surfaces — Light mode defaults ───────────────────────── */
-  --color-surface: #fafafa; /* near-white — main content bg  */
-  --color-surface-muted: #f4f4f5; /* zinc-100 — panels             */
-  --color-surface-elevated: #e4e4e7; /* zinc-200 — modals, cards      */
-  --color-surface-inverse: #18181b; /* zinc-900 — sidebar            */
-  --color-surface-inverse-hover: #27272a; /* zinc-800 — sidebar hover      */
-  --color-surface-deep: #09090b; /* zinc-950 — deepest bg         */
+  --color-surface: #fff7fb;
+  --color-surface-muted: #fbf1f8;
+  --color-surface-elevated: #f5ebf2;
+  --color-surface-inverse: #342f34;
+  --color-surface-inverse-hover: #3d373d;
+  --color-surface-deep: #1f1a1f;
 
   /* ─── Text — Light mode ─────────────────────────────────────── */
-  --color-text-primary: #09090b; /* zinc-950 — main body text          */
-  --color-text-secondary: #52525b; /* zinc-600 — secondary text          */
-  --color-text-muted: #a1a1aa; /* zinc-400 — placeholder/hint        */
-  --color-text-inverse: #fafafa; /* near-white — text on dark bg       */
-  --color-text-on-inverse: #71717a; /* zinc-500 — secondary on sidebar    */
+  --color-text-primary: #1f1a1f;
+  --color-text-secondary: #4c444c;
+  --color-text-muted: #7e747d;
+  --color-text-inverse: #f8eef5;
+  --color-text-on-inverse: #988e97;
 
   /* ─── Borders — Light mode ──────────────────────────────────── */
-  --color-border: #d4d4d8; /* zinc-300 */
-  --color-border-muted: #e4e4e7; /* zinc-200 */
-  --color-border-inverse: #3f3f46; /* zinc-700 */
+  --color-border: #cfc3cd;
+  --color-border-muted: #efe5ed;
+  --color-border-inverse: #4c444c;
 
   /* ─── Status: Success ───────────────────────────────────────── */
   --color-success: #10b981;
@@ -36,10 +36,10 @@
   --color-success-text: #059669;
 
   /* ─── Status: Error ─────────────────────────────────────────── */
-  --color-error: #ef4444;
-  --color-error-dark: #dc2626;
-  --color-error-subtle: #fef2f2;
-  --color-error-text: #dc2626;
+  --color-error: #ba1a1a;
+  --color-error-dark: #93000a;
+  --color-error-subtle: #ffdad6;
+  --color-error-text: #ba1a1a;
 
   /* ─── Status: Warning ───────────────────────────────────────── */
   --color-warning: #f59e0b;
@@ -47,9 +47,9 @@
   --color-warning-text: #d97706;
 
   /* ─── Status: Info ──────────────────────────────────────────── */
-  --color-info: #7c3aed;
-  --color-info-subtle: #f5f3ff;
-  --color-info-text: #6d28d9;
+  --color-info: #774f83;
+  --color-info-subtle: #fad7ff;
+  --color-info-text: #5e386a;
 
   /* ─── Dev Tools ─────────────────────────────────────────────── */
   --color-dev: #d97706;
@@ -58,44 +58,44 @@
   --font-sans: "Lato", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
-/* ─── Dark mode — Void palette ───────────────────────────────────── */
+/* ─── Dark mode — MD3 purple/mauve ──────────────────────────────── */
 .dark {
-  --color-primary: #8b5cf6; /* violet-500 — slightly lighter on dark */
-  --color-primary-dark: #7c3aed;
-  --color-primary-hover: #6d28d9;
-  --color-primary-subtle: #150c28;
+  --color-primary: #e6b6f1;
+  --color-primary-dark: #d4a4e0;
+  --color-primary-hover: #be8dcc;
+  --color-primary-subtle: #452152;
 
-  --color-user-bubble: #7c3aed;
-  --color-user-bubble-text: #fafafa;
+  --color-user-bubble: #5e386a;
+  --color-user-bubble-text: #fad7ff;
 
-  --color-surface: #151515;
-  --color-surface-muted: #202020;
-  --color-surface-elevated: #202020;
-  --color-surface-inverse: #040404;
-  --color-surface-inverse-hover: #0a0a0a;
-  --color-surface-deep: #040404;
+  --color-surface: #161217;
+  --color-surface-muted: #1f1a1f;
+  --color-surface-elevated: #231e23;
+  --color-surface-inverse: #eae0e7;
+  --color-surface-inverse-hover: #cfc3cd;
+  --color-surface-deep: #110d12;
 
-  --color-text-primary: #fafafa;
-  --color-text-secondary: #888888;
-  --color-text-muted: #888888;
-  --color-text-inverse: #0a0a0a;
-  --color-text-on-inverse: #5a5a5a;
+  --color-text-primary: #eae0e7;
+  --color-text-secondary: #cfc3cd;
+  --color-text-muted: #988e97;
+  --color-text-inverse: #1f1a1f;
+  --color-text-on-inverse: #5a5057;
 
-  --color-border: #2e2e2e;
-  --color-border-muted: #252525;
-  --color-border-inverse: #1e1e1e;
+  --color-border: #4c444c;
+  --color-border-muted: #2d282e;
+  --color-border-inverse: #231e23;
 
   --color-success-subtle: #022c22;
   --color-success-text: #34d399;
 
-  --color-error-subtle: #2c0a0a;
-  --color-error-text: #f87171;
+  --color-error-subtle: #2c0808;
+  --color-error-text: #ffb4ab;
 
   --color-warning-subtle: #2c1800;
   --color-warning-text: #fcd34d;
 
-  --color-info-subtle: #150c28;
-  --color-info-text: #a78bfa;
+  --color-info-subtle: #452152;
+  --color-info-text: #e6b6f1;
 
   --color-dev: #fcd34d;
 }

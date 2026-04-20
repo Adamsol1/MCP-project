@@ -14,18 +14,18 @@ from pathlib import Path
 from typing import Any
 
 from src.mcp_client.client import MCPClient
+from src.services.agent_factory import create_tool_agent
 from src.services.collection_status import CollectionStatusTracker
-from src.services.tool_calling_agent import ToolCallingAgent
 
 logger = logging.getLogger("app")
 
-_DEFAULT_SOURCE = "Internal Knowledge Bank"
+_DEFAULT_SOURCE = "Knowledge Bank"
 _SESSIONS_DATA_DIR = Path(__file__).parent.parent.parent / "data" / "sessions"
 
 # Maps UI source names to the MCP tool names they are allowed to call.
 # Must stay in sync with SOURCE_TOOL_MAP in mcp_server/src/prompts/__init__.py.
 _SOURCE_TO_TOOLS: dict[str, list[str]] = {
-    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],
     "Web Search": ["google_search"],
@@ -36,20 +36,20 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
 # in the lowercased source string for the rule to fire (AND within a tuple,
 # first match wins across the list).
 _SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
-    (("otx",),               "AlienVault OTX"),
-    (("alienvault",),        "AlienVault OTX"),
-    (("knowledge", "bank"),  "Internal Knowledge Bank"),
-    (("misp",),              "MISP"),
-    (("upload",),            "Uploaded Documents"),
-    (("local document",),    "Uploaded Documents"),
-    (("web",),               "Web Search"),
-    (("google", "search"),   "Web Search"),
+    (("otx",), "AlienVault OTX"),
+    (("alienvault",), "AlienVault OTX"),
+    (("knowledge", "bank"), "Knowledge Bank"),
+    (("misp",), "MISP"),
+    (("upload",), "Uploaded Documents"),
+    (("local document",), "Uploaded Documents"),
+    (("web",), "Web Search"),
+    (("google", "search"), "Web Search"),
 ]
 
 _SOURCE_ALIASES = {
-    "internal knowledge bank": "Internal Knowledge Bank",
-    "knowledge bank": "Internal Knowledge Bank",
-    "local knowledge bank": "Internal Knowledge Bank",
+    "internal knowledge bank": "Knowledge Bank",
+    "knowledge bank": "Knowledge Bank",
+    "local knowledge bank": "Knowledge Bank",
     "otx": "AlienVault OTX",
     "alienvault": "AlienVault OTX",
     "alienvault otx": "AlienVault OTX",
@@ -63,8 +63,8 @@ _SOURCE_ALIASES = {
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
-    "list_knowledge_base": "Internal Knowledge Bank",
-    "read_knowledge_base": "Internal Knowledge Bank",
+    "list_knowledge_base": "Knowledge Bank",
+    "read_knowledge_base": "Knowledge Bank",
     "query_otx": "AlienVault OTX",
     "search_local_data": "Uploaded Documents",
     "list_uploads": "Uploaded Documents",
@@ -103,11 +103,15 @@ def _extract_search_urls(raw_data: str) -> list[str]:
 # when merging collected_data lists in parse_collected_data.
 _COLLECTION_SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
 
+# Web-fetch source tool names — used for title-based secondary deduplication.
+_WEB_FETCH_SOURCES = {"fetch_page", "google_news_search", "google_search"}
+
 
 def _try_parse_json_lenient(s: str) -> dict | None:
     """Try json.loads; on failure apply common LLM-output repairs and retry."""
     try:
-        return json.loads(s)
+        result = json.loads(s)
+        return result if isinstance(result, dict) else None
     except json.JSONDecodeError:
         pass
     # Remove invalid JSON escape sequences (e.g. \' produced by some LLMs —
@@ -116,7 +120,8 @@ def _try_parse_json_lenient(s: str) -> dict | None:
     # Strip trailing commas before ] or }
     repaired = re.sub(r",\s*([}\]])", r"\1", repaired)
     try:
-        return json.loads(repaired)
+        result = json.loads(repaired)
+        return result if isinstance(result, dict) else None
     except json.JSONDecodeError:
         return None
 
@@ -140,12 +145,15 @@ def _strip_search_snippet_items(raw_data: str) -> str:
 
     original_count = len(parsed.get("collected_data", []))
     parsed["collected_data"] = [
-        item for item in parsed.get("collected_data", [])
+        item
+        for item in parsed.get("collected_data", [])
         if item.get("source") not in _SEARCH_SNIPPET_SOURCES
     ]
     stripped_count = original_count - len(parsed["collected_data"])
     if stripped_count:
-        logger.info(f"[CollectionService] Stripped {stripped_count} Serper snippet items from collected_data")
+        logger.info(
+            f"[CollectionService] Stripped {stripped_count} Serper snippet items from collected_data"
+        )
     return json.dumps(parsed, ensure_ascii=False)
 
 
@@ -159,12 +167,17 @@ def _append_to_collected_data(raw_data: str, extra_items: list[dict]) -> str:
         parsed["collected_data"] = parsed.get("collected_data", []) + extra_items
         return json.dumps(parsed, ensure_ascii=False)
 
-    logger.warning("[CollectionService] _append_to_collected_data: could not parse base JSON, appending via separator")
-    return raw_data + f"\n{_COLLECTION_SEPARATOR}\n" + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
+    logger.warning(
+        "[CollectionService] _append_to_collected_data: could not parse base JSON, appending via separator"
+    )
+    return (
+        raw_data
+        + f"\n{_COLLECTION_SEPARATOR}\n"
+        + json.dumps({"collected_data": extra_items}, ensure_ascii=False)
+    )
 
 
 class CollectionService:
-
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
 
@@ -187,7 +200,9 @@ class CollectionService:
             pass
 
         # 2) fenced blocks (```json ... ``` or ``` ... ```)
-        for candidate in re.findall(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, flags=re.IGNORECASE):
+        for candidate in re.findall(
+            r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, flags=re.IGNORECASE
+        ):
             try:
                 parsed = json.loads(candidate)
                 if isinstance(parsed, dict):
@@ -240,7 +255,6 @@ class CollectionService:
                 deduped.append(normalized)
         return deduped
 
-
     @staticmethod
     def parse_collected_data(raw_data: str) -> dict[str, Any]:
         """Parse raw collected_data JSON into a structured display payload.
@@ -258,10 +272,16 @@ class CollectionService:
             # URL summaries) with _COLLECTION_SEPARATOR.  Split, parse each segment
             # independently, then merge all collected_data lists.
             if _COLLECTION_SEPARATOR in stripped:
-                segments = [s.strip() for s in stripped.split(_COLLECTION_SEPARATOR) if s.strip()]
+                segments = [
+                    s.strip()
+                    for s in stripped.split(_COLLECTION_SEPARATOR)
+                    if s.strip()
+                ]
                 items = []
                 for seg in segments:
-                    fence = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE)
+                    fence = re.search(
+                        r"```(?:json)?\s*([\s\S]*?)\s*```", seg, re.IGNORECASE
+                    )
                     seg_text = fence.group(1).strip() if fence else seg
                     seg_parsed = _try_parse_json_lenient(seg_text) if seg_text else None
                     # If fence regex failed (e.g. closing ``` split away), extract by braces
@@ -269,10 +289,14 @@ class CollectionService:
                         start, end = seg.find("{"), seg.rfind("}")
                         if 0 <= start < end:
                             seg_parsed = _try_parse_json_lenient(seg[start : end + 1])
-                    if seg_parsed and isinstance(seg_parsed.get("collected_data"), list):
+                    if seg_parsed and isinstance(
+                        seg_parsed.get("collected_data"), list
+                    ):
                         items.extend(seg_parsed["collected_data"])
             else:
-                fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE)
+                fence_match = re.search(
+                    r"```(?:json)?\s*([\s\S]*?)\s*```", stripped, re.IGNORECASE
+                )
                 if fence_match:
                     stripped = fence_match.group(1).strip()
                 parsed = _try_parse_json_lenient(stripped) if stripped else {}
@@ -280,13 +304,52 @@ class CollectionService:
                     # Last resort: extract largest {...} block
                     start, end = stripped.find("{"), stripped.rfind("}")
                     if 0 <= start < end:
-                        parsed = _try_parse_json_lenient(stripped[start:end + 1])
+                        parsed = _try_parse_json_lenient(stripped[start : end + 1])
                 if not parsed:
                     raise json.JSONDecodeError("Could not repair JSON", stripped, 0)
                 items = parsed.get("collected_data", [])
 
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
+
+            # Deduplicate items by (source, resource_id) — the agent may call
+            # search_local_data or read_upload multiple times across PIRs/attempts,
+            # returning the same document each time. Keep the last occurrence so
+            # later calls (with potentially fuller content) win.
+            if items:
+                deduped: dict[tuple, dict] = {}
+                for item in items:
+                    key = (
+                        str(item.get("source") or ""),
+                        str(item.get("resource_id") or ""),
+                    )
+                    deduped[key] = item
+                items = list(deduped.values())
+
+            # Secondary dedup for web sources: the same article can appear at
+            # slightly different URLs across retry attempts (UTM params, redirect
+            # chains, etc.).  When a title is available, deduplicate by
+            # (source, normalised_title), keeping whichever copy has more content.
+            if items:
+                seen_titles: dict[tuple, int] = {}  # (source, title) -> index in result
+                title_deduped: list[dict] = []
+                for item in items:
+                    source = str(item.get("source") or "")
+                    raw_title = str(item.get("title") or "").strip()
+                    if source in _WEB_FETCH_SOURCES and raw_title:
+                        title_key = (source, raw_title.lower()[:120])
+                        if title_key in seen_titles:
+                            idx = seen_titles[title_key]
+                            if len(str(item.get("content", ""))) > len(
+                                str(title_deduped[idx].get("content", ""))
+                            ):
+                                title_deduped[idx] = item  # replace with richer copy
+                        else:
+                            seen_titles[title_key] = len(title_deduped)
+                            title_deduped.append(item)
+                    else:
+                        title_deduped.append(item)
+                items = title_deduped
 
             # Unwrap MCP response wrappers the model occasionally embeds in content.
             # Pattern: {"result": "text"} or {"tool_response": {"result": "text"}}
@@ -300,7 +363,9 @@ class CollectionService:
                                 item["content"] = inner["result"]
                             elif len(inner) == 1:
                                 val = next(iter(inner.values()))
-                                if isinstance(val, dict) and isinstance(val.get("result"), str):
+                                if isinstance(val, dict) and isinstance(
+                                    val.get("result"), str
+                                ):
                                     item["content"] = val["result"]
                                 elif isinstance(val, str):
                                     item["content"] = val
@@ -313,7 +378,11 @@ class CollectionService:
                 tool_name: str = str(item.get("source") or "unknown")
                 display_name: str = TOOL_TO_DISPLAY_NAME.get(tool_name, tool_name)
                 if display_name not in stats:
-                    stats[display_name] = {"count": 0, "resource_ids": [], "has_content": False}
+                    stats[display_name] = {
+                        "count": 0,
+                        "resource_ids": [],
+                        "has_content": False,
+                    }
                 stats[display_name]["count"] += 1
                 rid = item.get("resource_id")
                 if rid and rid not in stats[display_name]["resource_ids"]:
@@ -357,18 +426,22 @@ class CollectionService:
                     if not isinstance(step, dict):
                         continue
                     step_sources = cls._normalize_sources(step.get("suggested_sources"))
-                    steps.append({
-                        "title": str(step.get("title", "")),
-                        "description": str(step.get("description", "")),
-                        "suggested_sources": step_sources,
-                    })
+                    steps.append(
+                        {
+                            "title": str(step.get("title", "")),
+                            "description": str(step.get("description", "")),
+                            "suggested_sources": step_sources,
+                        }
+                    )
                     for s in step_sources:
                         if s not in seen_sources:
                             seen_sources.append(s)
                 # Build a readable plan text from steps for the collect prompt.
                 plan_lines: list[str] = []
                 for i, step in enumerate(steps, 1):
-                    sources_str = ", ".join(step["suggested_sources"]) or "any available source"
+                    sources_str = (
+                        ", ".join(step["suggested_sources"]) or "any available source"
+                    )
                     plan_lines.append(
                         f"{i}. {step['title']}\n"
                         f"   {step['description']}\n"
@@ -382,11 +455,15 @@ class CollectionService:
                 }
 
             # Legacy format: flat plan text + global suggested_sources.
-            plan_text = parsed.get("plan")
+            plan_text = parsed.get("plan")  # type: ignore[assignment]
             if isinstance(plan_text, str):
                 normalized_plan = plan_text
             else:
-                normalized_plan = json.dumps(plan_text if plan_text is not None else parsed, ensure_ascii=False, indent=2)
+                normalized_plan = json.dumps(
+                    plan_text if plan_text is not None else parsed,
+                    ensure_ascii=False,
+                    indent=2,
+                )
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
             return {
@@ -407,7 +484,9 @@ class CollectionService:
                 inferred.append(canonical)
         return inferred
 
-    async def generate_collection_plan(self, pir: str, modifications: str | None = None) -> str:
+    async def generate_collection_plan(
+        self, pir: str, modifications: str | None = None
+    ) -> str:
         """Generate plan and always return canonical JSON for frontend/backend consumers."""
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
@@ -417,7 +496,7 @@ class CollectionService:
                     "modifications": modifications or "",
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a collection plan and suggest relevant sources for the given PIRs.",
@@ -428,7 +507,9 @@ class CollectionService:
         # Fallback: if the AI produced steps with no suggested_sources on any step,
         # fill each empty step from plan text inference, then aggregate global list.
         if not payload["suggested_sources"]:
-            fallback = self._infer_sources_from_plan_text(payload["plan"]) or [_DEFAULT_SOURCE]
+            fallback = self._infer_sources_from_plan_text(payload["plan"]) or [
+                _DEFAULT_SOURCE
+            ]
             payload["suggested_sources"] = fallback
             if "steps" in payload:
                 for step in payload["steps"]:
@@ -449,9 +530,11 @@ class CollectionService:
             if not sources:
                 return [_DEFAULT_SOURCE]
 
-            return sources
+            return sources if isinstance(sources, list) else [_DEFAULT_SOURCE]
         except Exception:
-            logger.exception("[CollectionService] Failed to parse suggested sources. Falling back to default source.")
+            logger.exception(
+                "[CollectionService] Failed to parse suggested sources. Falling back to default source."
+            )
             return [_DEFAULT_SOURCE]
 
     async def collect(
@@ -459,7 +542,7 @@ class CollectionService:
         selected_sources: list[str],
         pir: str,
         plan: str,
-        language: str = "en",
+        _language: str = "en",
         feedback: str | None = None,
         session_id: str | None = None,
         timeframe: str = "",
@@ -470,7 +553,7 @@ class CollectionService:
 
         existing_raw_data: data already gathered in previous attempts (passed for context).
         """
-        del language
+        del _language
         payload = self._coerce_plan_payload(plan)
         plan_text = payload.get("plan", plan)
         steps = payload.get("steps", [])
@@ -494,7 +577,9 @@ class CollectionService:
                         f"{' + ' + ', '.join(alt) if alt else ''} to cover this step instead."
                     )
                 else:
-                    line += f" — all intended sources available: {', '.join(available)}."
+                    line += (
+                        f" — all intended sources available: {', '.join(available)}."
+                    )
                 lines.append(line)
             step_source_guidance = "\n".join(lines)
 
@@ -521,7 +606,7 @@ class CollectionService:
             if session_id:
                 tracker = CollectionStatusTracker(session_id, selected_sources)
 
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
                 task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
@@ -543,7 +628,7 @@ class CollectionService:
         if "Web Search" in selected_sources:
             urls = _extract_search_urls(raw_data)
             if urls:
-                url_agent = ToolCallingAgent(self.mcp_client)
+                url_agent = create_tool_agent(self.mcp_client)
                 _url_buffer = min(len(urls), 25)
                 logger.info(
                     f"[CollectionService] fetch_page: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
@@ -579,7 +664,7 @@ class CollectionService:
                     "modifications": modifications,
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing intelligence summary.",

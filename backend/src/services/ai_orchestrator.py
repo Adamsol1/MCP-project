@@ -1,8 +1,9 @@
 import json
 import logging
 import time
+from collections.abc import Callable
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any
 
 from src.models.dialogue import CollectionContext
 from src.models.reasoning import ReasoningLogEntry
@@ -75,7 +76,9 @@ class AIOrchestrator:
             result = None
 
             # Step 1: Generate
-            logger.info(f"[Orchestrator] Attempt {attempt}/{self.max_attempts} — generating ({phase})...")
+            logger.info(
+                f"[Orchestrator] Attempt {attempt}/{self.max_attempts} — generating ({phase})..."
+            )
             generation_start = time.time()
             try:
                 generated = await generate_fn(feedback)
@@ -85,22 +88,29 @@ class AIOrchestrator:
                 while isinstance(e, ExceptionGroup) and e.exceptions:
                     e = e.exceptions[0]
                 if e is not original:
-                    logger.error(f"[Orchestrator] Unwrapped ExceptionGroup root cause: {type(e).__name__}: {e}")
+                    logger.error(
+                        f"[Orchestrator] Unwrapped ExceptionGroup root cause: {type(e).__name__}: {e}"
+                    )
                 generation_duration = time.time() - generation_start
                 error_type = type(e).__name__
-                logger.error(f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}", exc_info=True)
-                self._log_attempt(ReasoningLogEntry(
-                    attempt_number=attempt,
-                    timestamp=attempt_timestamp,
-                    phase=phase,
-                    generated_content="",
-                    generation_duration=generation_duration,
-                    review_result=None,
-                    review_duration=0.0,
-                    session_id=session_id,
-                    model_used=self.generator_model,
-                    error_type=error_type,
-                ))
+                logger.error(
+                    f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}",
+                    exc_info=True,
+                )
+                self._log_attempt(
+                    ReasoningLogEntry(
+                        attempt_number=attempt,
+                        timestamp=attempt_timestamp,
+                        phase=phase,
+                        generated_content="",
+                        generation_duration=generation_duration,
+                        review_result=None,
+                        review_duration=0.0,
+                        session_id=session_id,
+                        model_used=self.generator_model,
+                        error_type=error_type,
+                    )
+                )
                 raise
             self.attempts.append(generated)
             generation_duration = time.time() - generation_start
@@ -113,27 +123,35 @@ class AIOrchestrator:
             except Exception as e:
                 review_duration = time.time() - review_start
                 error_type = type(e).__name__
-                logger.error(f"[Orchestrator] Review failed on attempt {attempt}: {error_type}: {e}")
-                self._log_attempt(ReasoningLogEntry(
-                    attempt_number=attempt,
-                    timestamp=attempt_timestamp,
-                    phase=phase,
-                    generated_content=json.dumps(generated) if isinstance(generated, dict) else generated,
-                    generation_duration=generation_duration,
-                    review_result=None,
-                    review_duration=review_duration,
-                    session_id=session_id,
-                    model_used=self.generator_model,
-                    error_type=error_type,
-                ))
+                logger.error(
+                    f"[Orchestrator] Review failed on attempt {attempt}: {error_type}: {e}"
+                )
+                self._log_attempt(
+                    ReasoningLogEntry(
+                        attempt_number=attempt,
+                        timestamp=attempt_timestamp,
+                        phase=phase,
+                        generated_content=json.dumps(generated)
+                        if isinstance(generated, dict)
+                        else generated,
+                        generation_duration=generation_duration,
+                        review_result=None,
+                        review_duration=review_duration,
+                        session_id=session_id,
+                        model_used=self.generator_model,
+                        error_type=error_type,
+                    )
+                )
                 raise
             review_duration = time.time() - review_start
 
-            self.review_results.append({
-                "approved": result.overall_approved,
-                "severity": result.severity,
-                "suggestions": result.suggestions,
-            })
+            self.review_results.append(
+                {
+                    "approved": result.overall_approved,
+                    "severity": result.severity,
+                    "suggestions": result.suggestions,
+                }
+            )
             logger.info(
                 f"[Orchestrator] Review done in {review_duration:.2f}s — "
                 f"approved={result.overall_approved}, severity={result.severity}"
@@ -141,18 +159,22 @@ class AIOrchestrator:
             if result.suggestions:
                 logger.debug(f"[Orchestrator] Suggestions: {result.suggestions}")
 
-            self._log_attempt(ReasoningLogEntry(
-                attempt_number=attempt,
-                timestamp=attempt_timestamp,
-                phase=phase,
-                generated_content=json.dumps(generated) if isinstance(generated, dict) else generated,
-                generation_duration=generation_duration,
-                review_result=result,
-                review_duration=review_duration,
-                session_id=session_id,
-                model_used=self.generator_model,
-                error_type=error_type,
-            ))
+            self._log_attempt(
+                ReasoningLogEntry(
+                    attempt_number=attempt,
+                    timestamp=attempt_timestamp,
+                    phase=phase,
+                    generated_content=json.dumps(generated)
+                    if isinstance(generated, dict)
+                    else generated,
+                    generation_duration=generation_duration,
+                    review_result=result,
+                    review_duration=review_duration,
+                    session_id=session_id,
+                    model_used=self.generator_model,
+                    error_type=error_type,
+                )
+            )
 
             # Step 3: Accept or retry
             if result.severity != "major":
@@ -161,9 +183,13 @@ class AIOrchestrator:
 
             feedback = result.suggestions
             self.retry_explanations.append(result.suggestions)
-            logger.warning(f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback...")
+            logger.warning(
+                f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback..."
+            )
 
-        logger.warning(f"[Orchestrator] All {self.max_attempts} attempts exhausted. Returning last result.")
+        logger.warning(
+            f"[Orchestrator] All {self.max_attempts} attempts exhausted. Returning last result."
+        )
         return generated
 
     def _log_attempt(self, entry: ReasoningLogEntry) -> None:
@@ -189,7 +215,7 @@ class AIOrchestrator:
             Any exception from generate_pir or review_pir
         """
         return await self._run_with_review(
-            generate_fn=lambda feedback=None: generator.generate_pir(context),
+            generate_fn=lambda _feedback=None: generator.generate_pir(context),
             reviewer=reviewer,
             context=context,
             phase=phase,
@@ -197,7 +223,17 @@ class AIOrchestrator:
         )
 
     async def collect_and_review(
-        self, sources: list, pir: str, plan: str, collection_service, reviewer, session_id: str, direction_context=None, timeframe: str = "", perspectives: list[str] | None = None, feedback: str | None = None
+        self,
+        sources: list,
+        pir: str,
+        plan: str,
+        collection_service,
+        reviewer,
+        session_id: str,
+        direction_context=None,
+        timeframe: str = "",
+        perspectives: list[str] | None = None,
+        feedback: str | None = None,
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -225,7 +261,9 @@ class AIOrchestrator:
 
         async def collect_fn(reviewer_feedback=None):
             new_data = await collection_service.collect(
-                sources, pir, plan,
+                sources,
+                pir,
+                plan,
                 feedback=reviewer_feedback or feedback,
                 session_id=session_id,
                 timeframe=timeframe,
@@ -233,18 +271,58 @@ class AIOrchestrator:
                 perspectives=perspectives,
             )
             if accumulated["raw_data"]:
-                accumulated["raw_data"] += "\n\n--- NEW COLLECTION ATTEMPT ---\n\n" + new_data
+                accumulated["raw_data"] += (
+                    "\n\n--- NEW COLLECTION ATTEMPT ---\n\n" + new_data
+                )
             else:
                 accumulated["raw_data"] = new_data
             return accumulated["raw_data"]
 
-        return await self._run_with_review(
+        return await self._run_with_review(  # type: ignore[no-any-return]
             generate_fn=collect_fn,
             reviewer=reviewer,
-            context=CollectionContext(pir=pir, plan=plan, direction_context=direction_context),
+            context=CollectionContext(
+                pir=pir, plan=plan, direction_context=direction_context
+            ),
             phase="collection",
             session_id=session_id,
         )
+
+    async def analyse_and_review(
+        self,
+        processing_result,
+        analysis_service,
+        reviewer,
+        session_id: str,
+        pir: str = "",
+        selected_perspectives: list[str] | None = None,
+    ) -> tuple:
+        from src.models.analysis import AnalysisDraft, ProcessingResult
+        from src.models.dialogue import AnalysisContext
+
+        async def analyse_fn(_=None):
+            draft, enriched = await analysis_service.generate_draft(
+                processing_result, pir=pir, selected_perspectives=selected_perspectives
+            )
+            return {
+                "analysis_draft": draft.model_dump(),
+                "processing_result": enriched.model_dump(),
+            }
+
+        result = await self._run_with_review(
+            generate_fn=analyse_fn,
+            reviewer=reviewer,
+            context=AnalysisContext(
+                pir=pir,
+                processing_result=processing_result.model_dump(),
+            ),
+            phase="analysis",
+            session_id=session_id,
+        )
+
+        analysis_draft = AnalysisDraft.model_validate(result["analysis_draft"])
+        enriched_result = ProcessingResult.model_validate(result["processing_result"])
+        return analysis_draft, enriched_result
 
     async def process_and_review(
         self,
@@ -264,7 +342,8 @@ class AIOrchestrator:
             )
 
         from src.models.dialogue import ProcessingContext
-        return await self._run_with_review(
+
+        return await self._run_with_review(  # type: ignore[no-any-return]
             generate_fn=process_fn,
             reviewer=reviewer,
             context=ProcessingContext(pir=pir, collected_data=collected_data),

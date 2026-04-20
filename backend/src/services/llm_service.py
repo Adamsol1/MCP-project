@@ -9,9 +9,14 @@ communicates with the MCP server via the MCP protocol.
 
 import json
 import logging
+import os
 import re
 
-from src.services.llm_config import get_llm_config
+from src.services.llm_config import (
+    get_default_gemini_model,
+    get_llm_config,
+    get_llm_provider,
+)
 from src.services.openai_compatible_client import OpenAICompatibleClient
 
 logger = logging.getLogger("app")
@@ -32,9 +37,9 @@ def _repair_json(text: str) -> str:
     # Repair 1: typographic quotes → ASCII
     text = (
         text.replace("\u201c", '"')
-            .replace("\u201d", '"')
-            .replace("\u2018", "'")
-            .replace("\u2019", "'")
+        .replace("\u201d", '"')
+        .replace("\u2018", "'")
+        .replace("\u2019", "'")
     )
 
     # Repair 2: invalid escape sequences (e.g. \' → ')
@@ -89,6 +94,33 @@ def _repair_json(text: str) -> str:
     return "".join(result)
 
 
+class GeminiTextClient:
+    """Minimal async Gemini text client used for non-tool LLM calls."""
+
+    def __init__(self, model: str | None = None):
+        from google import genai
+
+        self.model = model or get_default_gemini_model()
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+
+    async def generate_text(self, prompt: str) -> str:
+        response = await self.client.aio.models.generate_content(
+            model=self.model,
+            contents=prompt,
+        )
+        text = getattr(response, "text", None)
+        if text:
+            return str(text)
+
+        candidates = getattr(response, "candidates", None) or []
+        if candidates and getattr(candidates[0], "content", None):
+            parts = getattr(candidates[0].content, "parts", []) or []
+            text = "".join(str(part.text) for part in parts if getattr(part, "text", None))
+            if text:
+                return text
+        raise ValueError(f"Model {self.model} returned empty response")
+
+
 class LLMService:
     """Direct OpenAI-compatible API wrapper for backend AI calls.
 
@@ -97,7 +129,12 @@ class LLMService:
     """
 
     def __init__(self, model: str | None = None):
-        self.client = OpenAICompatibleClient(config=get_llm_config(model=model))
+        provider = get_llm_provider()
+        if provider == "gemini":
+            self.client = GeminiTextClient(model=model)
+        else:
+            self.client = OpenAICompatibleClient(config=get_llm_config(model=model))
+        self.provider = provider
         self.model = self.client.model
 
     async def generate_text(self, prompt: str) -> str:
@@ -131,7 +168,9 @@ class LLMService:
         text = await self.generate_text(prompt)
         text = self._strip_fences(text)
         try:
-            return json.loads(text)
+            result = json.loads(text)
+            if isinstance(result, dict):
+                return result
         except json.JSONDecodeError:
             pass
 
@@ -140,7 +179,9 @@ class LLMService:
         try:
             result = json.loads(repaired)
             logger.debug("[LLMService] JSON parsed after repair pass")
-            return result
+            if isinstance(result, dict):
+                return result
+            raise json.JSONDecodeError("Expected a JSON object", repaired, 0)
         except json.JSONDecodeError as e:
             logger.error(
                 f"[LLMService] Model did not return valid JSON: {e}\nResponse: {text[:200]}"

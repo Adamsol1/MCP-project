@@ -1,7 +1,7 @@
 import logging
 
 from src.mcp_client.client import MCPClient
-from src.services.tool_calling_agent import ToolCallingAgent
+from src.services.agent_factory import create_tool_agent
 
 logger = logging.getLogger("app")
 
@@ -13,7 +13,6 @@ _PROCESSING_TOOLS = [
 
 
 class ProcessingService:
-
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
 
@@ -34,7 +33,7 @@ class ProcessingService:
                     "previous_result": previous_result or "",
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Process the collected intelligence data into structured PMESII entities.",
@@ -54,7 +53,7 @@ class ProcessingService:
                     "modifications": modifications,
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing processing result.",

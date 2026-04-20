@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import re
+import shutil
 from abc import ABC, abstractmethod
 from typing import Optional
 
@@ -50,7 +51,7 @@ class BaseCLIAdapter(ABC):
                 and claude (low/medium/high, Opus 4.6+ only).
                 Ignored by other adapters. Can be overridden per-participant.
         """
-        self.command = command
+        self.command = shutil.which(command) or command
         self.args = args
         self.timeout = timeout
         self.max_retries = max_retries

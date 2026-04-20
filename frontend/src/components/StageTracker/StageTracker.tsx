@@ -63,7 +63,7 @@ export default function StageTracker({
   const activeIdx = phaseIndex(activePhase);
 
   return (
-    <div className="shrink-0 h-14 flex items-center justify-center px-6 bg-surface border-b border-border">
+    <div className="flex items-center">
       <div className="flex items-center gap-1">
         {STAGES.map((stage, i) => {
           const isCompleted = i < activeIdx;

@@ -69,6 +69,9 @@ def _build_serper_payload(
     payload: dict = {
         "q": f"{query} {_SITE_EXCLUSION}",
         "num": min(max(1, num_results), 10),
+        # Always restrict to English-language pages so analysts can read results.
+        # Geographic perspective is preserved via the `gl` (region) parameter.
+        "lr": "lang_en",
     }
     if date_restrict:
         unit = date_restrict[0]  # d/w/m/y
@@ -131,7 +134,8 @@ def google_search(
               Perspective mapping:
                 us      → "us"   eu      → "gb"   norway  → "no"
                 china   → "cn"   russia  → "ru"   neutral → omit
-    - language: Serper hl parameter for language bias.
+    - language: Serper hl parameter for interface language bias (affects ranking, not
+                result language — results are always restricted to English via lr=lang_en).
                 Perspective mapping:
                 us      → "en"   eu      → "en"   norway  → "no"
                 china   → "zh-cn" russia → "ru"   neutral → omit

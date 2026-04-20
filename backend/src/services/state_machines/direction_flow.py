@@ -9,6 +9,7 @@ from src.models.dialogue import (
     DialogueContext,
     DialogueResponse,
     Perspective,
+    PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
@@ -69,7 +70,9 @@ class DirectionFlow(BasePhaseFlow):
             "question_count": self.question_count,
             "current_pir": self.current_pir,
             "pending_reasoning_log": (
-                self.pending_reasoning_log.model_dump() if self.pending_reasoning_log else None
+                self.pending_reasoning_log.model_dump()
+                if self.pending_reasoning_log
+                else None
             ),
         }
 
@@ -102,7 +105,9 @@ class DirectionFlow(BasePhaseFlow):
     def get_missing_context_fields(self) -> list[str]:
         """Return context fields that are still missing."""
         return [
-            field for field in self._required_context_fields() if not getattr(self.context, field)
+            field
+            for field in self._required_context_fields()
+            if not getattr(self.context, field)
         ]
 
     def _ensure_minimum_context(self):
@@ -146,12 +151,16 @@ class DirectionFlow(BasePhaseFlow):
             self._ensure_minimum_context()
 
         if state == DirectionState.PIR_CONFIRMING:
-            self.current_pir = current_pir or self.current_pir or (
-                '{"result":"DEV generated PIR","pirs":[],"reasoning":"DEV seed"}'
+            self.current_pir = (
+                current_pir
+                or self.current_pir
+                or ('{"result":"DEV generated PIR","pirs":[],"reasoning":"DEV seed"}')
             )
         elif state == DirectionState.COMPLETE:
-            self.current_pir = current_pir or self.current_pir or (
-                '{"result":"DEV approved PIR","pirs":[],"reasoning":"DEV seed"}'
+            self.current_pir = (
+                current_pir
+                or self.current_pir
+                or ('{"result":"DEV approved PIR","pirs":[],"reasoning":"DEV seed"}')
             )
         else:
             self.current_pir = None
@@ -179,11 +188,12 @@ class DirectionFlow(BasePhaseFlow):
             "max_questions": self.max_questions,
             "missing_context_fields": missing_fields,
             "has_sufficient_context": len(missing_fields) == 0,
-            "awaiting_user_decision": is_confirm_state and self.sub_state != _SUB_STATE_AWAITING_MODIFICATIONS,
+            "awaiting_user_decision": is_confirm_state
+            and self.sub_state != _SUB_STATE_AWAITING_MODIFICATIONS,
             "has_modifications": bool(self.context.modifications),
         }
 
-    async def process_user_message(
+    async def process_user_message(  # type: ignore[override]
         self,
         user_message,
         dialogue_service,
@@ -226,16 +236,25 @@ class DirectionFlow(BasePhaseFlow):
         # INITIAL PHASE
         if self.state == DirectionState.INITIAL:
             self.sub_state = None
-            return await self.handle_initial_input(user_message, dialogue_service, language)
+            return await self.handle_initial_input(
+                user_message, dialogue_service, language
+            )
         # GATHERING PHASE
         elif self.state == DirectionState.GATHERING:
             self.sub_state = None
-            return await self.handle_gathering_input(user_message, dialogue_service, language)
+            return await self.handle_gathering_input(
+                user_message, dialogue_service, language
+            )
 
         # SUMMARY CONFIRMING PHASE
         elif self.state == DirectionState.SUMMARY_CONFIRMING:
             return await self.handle_summary_confirming(
-                user_message, dialogue_service, approved, orchestrator, reviewer, language
+                user_message,
+                dialogue_service,
+                approved,
+                orchestrator,
+                reviewer,
+                language,
             )
 
         # PIR CONFIRMING PHASE
@@ -292,8 +311,13 @@ class DirectionFlow(BasePhaseFlow):
                 user_message=user_message, context=self.context, language=language
             )
         except Exception:
-            logger.error(f"[Session {self.session_id}] Failed to generate clarifying question", exc_info=True)
-            return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate question")
+            logger.error(
+                f"[Session {self.session_id}] Failed to generate clarifying question",
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Failed to generate question"
+            )
 
         # Update context
         self._apply_context_update(result.extracted_context)
@@ -347,8 +371,13 @@ class DirectionFlow(BasePhaseFlow):
                 user_message=user_message, context=self.context, language=language
             )
         except Exception:
-            logger.error(f"[Session {self.session_id}] Failed to generate clarifying question", exc_info=True)
-            return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate question")
+            logger.error(
+                f"[Session {self.session_id}] Failed to generate clarifying question",
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Failed to generate question"
+            )
 
         # Update context
         self._apply_context_update(result.extracted_context)
@@ -368,10 +397,17 @@ class DirectionFlow(BasePhaseFlow):
             )
             dialogue_response.action = DialogueAction.SHOW_SUMMARY
             try:
-                summary = await dialogue_service.generate_summary(self.context, language=language)
+                summary = await dialogue_service.generate_summary(
+                    self.context, language=language
+                )
             except Exception:
-                logger.error(f"[Session {self.session_id}] Failed to generate summary", exc_info=True)
-                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate summary")
+                logger.error(
+                    f"[Session {self.session_id}] Failed to generate summary",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR, content="Failed to generate summary"
+                )
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
             )
@@ -418,10 +454,16 @@ class DirectionFlow(BasePhaseFlow):
                     )
                 # If no orchestator just generate pir alone
                 else:
-                    pir = await dialogue_service.generate_pir(self.context, language=language)
+                    pir = await dialogue_service.generate_pir(
+                        self.context, language=language
+                    )
             except Exception:
-                logger.error(f"[Session {self.session_id}] Failed to generate PIR", exc_info=True)
-                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate PIR")
+                logger.error(
+                    f"[Session {self.session_id}] Failed to generate PIR", exc_info=True
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR, content="Failed to generate PIR"
+                )
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             if orchestrator:
                 retry_count = len(orchestrator.attempts) - 1
@@ -438,7 +480,12 @@ class DirectionFlow(BasePhaseFlow):
                     retry_triggered=retry_count > 0,
                     retry_count=retry_count,
                 )
-            self._log_user_action(action="approve", phase=self.state.value, modifications=None, perspectives=self.context.perspectives)
+            self._log_user_action(
+                action="approve",
+                phase=self.state.value,
+                modifications=None,
+                perspectives=self.context.perspectives,
+            )
             self.context.modifications = (
                 None  # Clear modifications so they don't leak into PIR phase
             )
@@ -450,18 +497,47 @@ class DirectionFlow(BasePhaseFlow):
             dialogue_response.content = (
                 json.dumps(pir) if isinstance(pir, dict) else pir
             )
+            if orchestrator and orchestrator.review_results:
+                dialogue_response.review_activity = [
+                    PhaseReviewItem(
+                        phase="direction",
+                        attempt=i + 1,
+                        reviewer_approved=review["approved"],
+                        reviewer_suggestions=review.get("suggestions"),
+                        sources_used=[],
+                        generated_content=(
+                            json.dumps(orchestrator.attempts[i])
+                            if i < len(orchestrator.attempts)
+                            and isinstance(orchestrator.attempts[i], dict)
+                            else str(orchestrator.attempts[i])
+                            if i < len(orchestrator.attempts)
+                            else None
+                        ),
+                    )
+                    for i, review in enumerate(orchestrator.review_results)
+                ]
         else:
             # User rejected with modifications. Save and self-loop
             self.context.modifications = user_message
-            self._log_user_action(action="reject", phase=self.state.value, modifications=user_message, perspectives=self.context.perspectives)
+            self._log_user_action(
+                action="reject",
+                phase=self.state.value,
+                modifications=user_message,
+                perspectives=self.context.perspectives,
+            )
             dialogue_response.action = DialogueAction.SHOW_SUMMARY
             try:
                 summary = await dialogue_service.generate_summary(
                     self.context, modifications=user_message, language=language
                 )
             except Exception:
-                logger.error(f"[Session {self.session_id}] Failed to generate summary", exc_info=True)
-                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to generate summary")
+                logger.error(
+                    f"[Session {self.session_id}] Failed to generate summary",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR, content="Failed to generate summary"
+                )
             dialogue_response.content = (
                 json.dumps(summary) if isinstance(summary, dict) else summary
             )
@@ -470,7 +546,11 @@ class DirectionFlow(BasePhaseFlow):
         return dialogue_response
 
     async def handle_pir_confirming(
-        self, user_message, dialogue_service, approved: bool | None = None, language: str = "en"
+        self,
+        user_message,
+        dialogue_service,
+        approved: bool | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         """
         State handler for PIR confirming phase.
@@ -482,7 +562,12 @@ class DirectionFlow(BasePhaseFlow):
         dialogue_response = DialogueResponse()
 
         if approved:
-            self._log_user_action(action="approve", phase=self.state.value, modifications=None, perspectives=self.context.perspectives)
+            self._log_user_action(
+                action="approve",
+                phase=self.state.value,
+                modifications=None,
+                perspectives=self.context.perspectives,
+            )
             self.state = DirectionState.COMPLETE
             self.sub_state = None
             logger.info(
@@ -499,12 +584,22 @@ class DirectionFlow(BasePhaseFlow):
         else:
             # User rejected with modifications. Regenerate PIR
             self.context.modifications = user_message
-            self._log_user_action(action="reject", phase=self.state.value, modifications=user_message, perspectives=self.context.perspectives)
+            self._log_user_action(
+                action="reject",
+                phase=self.state.value,
+                modifications=user_message,
+                perspectives=self.context.perspectives,
+            )
             try:
                 pir = await dialogue_service.generate_pir(self.context, language=language)
             except Exception:
-                logger.error(f"[Session {self.session_id}] Failed to regenerate PIR", exc_info=True)
-                return DialogueResponse(action=DialogueAction.ERROR, content="Failed to regenerate PIR")
+                logger.error(
+                    f"[Session {self.session_id}] Failed to regenerate PIR",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR, content="Failed to regenerate PIR"
+                )
             self.current_pir = json.dumps(pir) if isinstance(pir, dict) else pir
             dialogue_response.action = DialogueAction.SHOW_PIR
             dialogue_response.content = self.current_pir

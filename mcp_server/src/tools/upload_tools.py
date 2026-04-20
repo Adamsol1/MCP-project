@@ -1,16 +1,57 @@
+"""Upload file management MCP tools.
+
+Reads uploaded file metadata and parsed content from sessions.db
+(uploaded_files table). Falls back to file-based staging if DB is unavailable.
+"""
+
 import json
+import logging
 import os
 from pathlib import Path
 
+logger = logging.getLogger("mcp_server")
+
 
 def _default_uploads_dir() -> Path:
-    # mcp_server/src/tools/upload_tools.py → parents[2] = mcp_server root
     return Path(__file__).resolve().parents[1] / "resources" / "uploads"
 
 
-# Module-level staging directory. Tests can monkeypatch this attribute directly.
-# Uses MCP_UPLOADS_DIR env var when set, otherwise the default mcp_server/src/resources/uploads/.
 UPLOADS_DIR: Path = Path(os.getenv("MCP_UPLOADS_DIR", str(_default_uploads_dir())))
+
+
+def _db_list(session_id: str) -> str | None:
+    """List uploads from DB. Returns JSON string or None if DB unavailable."""
+    try:
+        from db import get_sessions_connection
+        conn = get_sessions_connection()
+        rows = conn.execute(
+            "SELECT id, original_filename, size_bytes FROM uploaded_files WHERE session_id = ? ORDER BY uploaded_at",
+            (session_id,),
+        ).fetchall()
+        conn.close()
+        return json.dumps([
+            {"file_id": r["id"], "filename": r["original_filename"], "size_bytes": r["size_bytes"]}
+            for r in rows
+        ])
+    except Exception:
+        return None
+
+
+def _db_read(session_id: str, file_upload_id: str) -> str | None:
+    """Read parsed content from DB. Returns content or None if unavailable."""
+    try:
+        from db import get_sessions_connection
+        conn = get_sessions_connection()
+        row = conn.execute(
+            "SELECT parsed_content, original_filename FROM uploaded_files WHERE id = ? AND session_id = ?",
+            (file_upload_id, session_id),
+        ).fetchone()
+        conn.close()
+        if row and row["parsed_content"]:
+            return row["parsed_content"]
+    except Exception:
+        pass
+    return None
 
 
 def upload_file(
@@ -30,13 +71,17 @@ def upload_file(
 
 
 def list_uploads(session_id: str) -> str:
-    """List all staged upload files for a session.
+    """List all uploaded files for a session.
 
+    Tries sessions.db first, falls back to filesystem staging directory.
     Returns a JSON array of objects with keys: file_id, size_bytes.
-    Returns an empty JSON array if the session directory does not exist.
     """
-    session_dir = UPLOADS_DIR / session_id
+    db_result = _db_list(session_id)
+    if db_result is not None:
+        return db_result
 
+    # Fallback to filesystem
+    session_dir = UPLOADS_DIR / session_id
     if not session_dir.exists() or not session_dir.is_dir():
         return json.dumps([])
 
@@ -49,12 +94,17 @@ def list_uploads(session_id: str) -> str:
 
 
 def read_upload(session_id: str, file_upload_id: str) -> str:
-    """Read the markdown content of a staged upload file.
+    """Read the parsed content of an uploaded file.
 
-    Returns the file content, or an error string if the file is not found.
+    Tries sessions.db first, falls back to filesystem staging directory.
+    Returns the file content, or an error string if not found.
     """
-    file_path = UPLOADS_DIR / session_id / f"{file_upload_id}.md"
+    db_content = _db_read(session_id, file_upload_id)
+    if db_content is not None:
+        return db_content
 
+    # Fallback to filesystem
+    file_path = UPLOADS_DIR / session_id / f"{file_upload_id}.md"
     if not file_path.exists() or not file_path.is_file():
         return "error: file not found"
 

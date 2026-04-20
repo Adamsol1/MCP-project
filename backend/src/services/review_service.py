@@ -43,9 +43,7 @@ class ReviewService:
             suggestions=reason,
         )
 
-    async def review_pir(
-        self, content, context: BaseModel, phase: str
-    ) -> ReviewResult:
+    async def review_pir(self, content, context: BaseModel, phase: str) -> ReviewResult:
         """Review generated content against the dialogue context.
 
         Args:
@@ -59,7 +57,7 @@ class ReviewService:
         Raises:
             ValueError: If phase is not a recognized value.
         """
-        valid_phases = {"direction", "collection", "processing"}
+        valid_phases = {"direction", "collection", "processing", "analysis"}
         if phase not in valid_phases:
             raise ValueError(
                 f"[ReviewService] Unknown phase: '{phase}'. Valid: {list(valid_phases)}"

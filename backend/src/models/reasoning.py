@@ -13,7 +13,9 @@ class ReasoningLogEntry(BaseModel):
 
     entry_type: Literal["ai_generation"] = "ai_generation"
     session_id: str | None = Field(default=None, description="session id. Uses UUID")
-    phase: str = Field(..., description="Dialogue phase, e.g. 'pir_generation', 'collection_planning'")
+    phase: str = Field(
+        ..., description="Dialogue phase, e.g. 'pir_generation', 'collection_planning'"
+    )
     attempt_number: int = Field(
         ..., ge=1, description="Attempt counter for current session. Starts at one"
     )
@@ -57,11 +59,17 @@ class ReasoningLog(BaseModel):
     """
 
     session_id: str | None
-    phase: str = Field(..., description="Dialogue phase, e.g. 'direction', 'collection'")
+    phase: str = Field(
+        ..., description="Dialogue phase, e.g. 'direction', 'collection'"
+    )
     model_used: str
     dialogue_turns: list[dict]
-    generated_content_attempts: list = Field(..., description="All generated content attempts before approval")
-    review_reasoning: list[dict] = Field(..., description="Review result per generation attempt")
+    generated_content_attempts: list = Field(
+        ..., description="All generated content attempts before approval"
+    )
+    review_reasoning: list[dict] = Field(
+        ..., description="Review result per generation attempt"
+    )
     retry_explanation: list[str]
     final_approved_content: str | None
     timestamps: dict

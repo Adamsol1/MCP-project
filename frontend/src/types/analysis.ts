@@ -91,7 +91,8 @@ export interface ProcessingResult {
   gaps: string[];
 }
 
-export interface AnalysisDraft {
+export interface Analysis {
+  title: string;
   summary: string;
   key_judgments: string[];
   per_perspective_implications: Record<string, PerspectiveAssertion[]>;
@@ -104,6 +105,7 @@ export interface CouncilTranscriptEntry {
   participant: string;
   response: string;
   timestamp: string;
+  summary?: string;
 }
 
 export interface CouncilNote {
@@ -119,9 +121,9 @@ export interface CouncilNote {
   transcript_path: string | null;
 }
 
-export interface AnalysisDraftResponse {
+export interface AnalysisResponse {
   processing_result: ProcessingResult;
-  analysis_draft: AnalysisDraft;
+  analysis_draft: Analysis;
   latest_council_note: CouncilNote | null;
   collection_coverage: CollectionCoverageResult | null;
   data_source: "session";

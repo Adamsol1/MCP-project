@@ -1,16 +1,14 @@
-import type { CollectionDisplayData, ActivitySummaryItem } from "../../types/conversation";
+import type { CollectionDisplayData } from "../../types/conversation";
 import { useT } from "../../i18n/useT";
 
 interface CollectionStatsViewProps {
   collectionData: CollectionDisplayData | null;
   onOpenModal: () => void;
-  onOpenActivityModal?: (attempt: number) => void;
 }
 
 export default function CollectionStatsView({
   collectionData,
   onOpenModal,
-  onOpenActivityModal,
 }: CollectionStatsViewProps) {
   const t = useT();
 
@@ -21,55 +19,16 @@ export default function CollectionStatsView({
   }
 
   const total = collectionData.source_summary.reduce((sum, source) => sum + source.count, 0);
-  const maxCount = Math.max(...collectionData.source_summary.map((s) => s.count), 1);
-  const activity = collectionData.activity_summary;
 
   return (
     <div className="space-y-4">
-
-      {/* Activity summary — what the collector and reviewer did */}
-      {activity && activity.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-            Collection Activity
-          </p>
-          {activity.map((item: ActivitySummaryItem) => (
-            <button
-              key={item.attempt}
-              type="button"
-              onClick={() => onOpenActivityModal?.(item.attempt)}
-              className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 space-y-1 text-left transition-colors hover:border-primary hover:bg-primary-subtle"
-            >
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
-                  Attempt {item.attempt}
-                </p>
-                <span
-                  className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
-                    item.reviewer_approved
-                      ? "bg-success-subtle text-success-text"
-                      : "bg-error-subtle text-error-text"
-                  }`}
-                >
-                  {item.reviewer_approved ? "Approved" : "Rejected"}
-                </span>
-              </div>
-              <p className="text-xs text-text-secondary truncate">
-                <span className="font-medium text-text-primary">Collector: </span>
-                {item.collector_sources.join(", ")}
-              </p>
-            </button>
-          ))}
-        </div>
-      )}
-
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-lg bg-surface border border-border-muted px-3 py-2">
+        <div className="rounded-lg bg-surface border border-border px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.tableItems}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{total}</p>
         </div>
-        <div className="rounded-lg bg-surface border border-border-muted px-3 py-2">
+        <div className="rounded-lg bg-surface border border-border px-3 py-2">
           <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.statsSources}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{collectionData.source_summary.length}</p>
         </div>
@@ -93,7 +52,7 @@ export default function CollectionStatsView({
       {/* CTA button */}
       <button
         onClick={onOpenModal}
-        className="w-full rounded-lg border border-border-muted bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
       >
         {t.viewRawData}
       </button>

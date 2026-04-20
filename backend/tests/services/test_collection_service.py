@@ -43,7 +43,11 @@ def test_coerce_plan_payload_keeps_plan_even_when_not_json():
 def test_parse_collected_data_handles_markdown_fenced_json():
     inner = {
         "collected_data": [
-            {"source": "read_knowledge_base", "resource_id": "geopolitical/eu_usa", "content": "EU–US relations..."},
+            {
+                "source": "read_knowledge_base",
+                "resource_id": "geopolitical/eu_usa",
+                "content": "EU–US relations...",
+            },
         ]
     }
     raw = f"```json\n{json.dumps(inner)}\n```"
@@ -56,13 +60,27 @@ def test_parse_collected_data_handles_markdown_fenced_json():
 
 
 def test_parse_collected_data_happy_path():
-    raw = json.dumps({
-        "collected_data": [
-            {"source": "read_knowledge_base", "resource_id": "geopolitical/eu_usa", "content": "EU–US relations..."},
-            {"source": "read_knowledge_base", "resource_id": "geopolitical/usa_russia", "content": "US–Russia relations..."},
-            {"source": "query_otx", "resource_id": None, "content": '{"total_results": 2, "enriched_pulses": [{"name": "APT29"}]}'},
-        ]
-    })
+    raw = json.dumps(
+        {
+            "collected_data": [
+                {
+                    "source": "read_knowledge_base",
+                    "resource_id": "geopolitical/eu_usa",
+                    "content": "EU–US relations...",
+                },
+                {
+                    "source": "read_knowledge_base",
+                    "resource_id": "geopolitical/usa_russia",
+                    "content": "US–Russia relations...",
+                },
+                {
+                    "source": "query_otx",
+                    "resource_id": None,
+                    "content": '{"total_results": 2, "enriched_pulses": [{"name": "APT29"}]}',
+                },
+            ]
+        }
+    )
 
     result = CollectionService.parse_collected_data(raw)
 
@@ -78,12 +96,18 @@ def test_parse_collected_data_happy_path():
 
 
 def test_parse_collected_data_empty_results_marked_as_no_content():
-    raw = json.dumps({
-        "collected_data": [
-            {"source": "query_otx", "resource_id": None, "content": '{"total_results": 0, "enriched_pulses": []}'},
-            {"source": "search_local_data", "resource_id": None, "content": ""},
-        ]
-    })
+    raw = json.dumps(
+        {
+            "collected_data": [
+                {
+                    "source": "query_otx",
+                    "resource_id": None,
+                    "content": '{"total_results": 0, "enriched_pulses": []}',
+                },
+                {"source": "search_local_data", "resource_id": None, "content": ""},
+            ]
+        }
+    )
 
     result = CollectionService.parse_collected_data(raw)
 
@@ -95,16 +119,30 @@ def test_parse_collected_data_empty_results_marked_as_no_content():
 
 
 def test_parse_collected_data_deduplicates_resource_ids():
-    raw = json.dumps({
-        "collected_data": [
-            {"source": "read_knowledge_base", "resource_id": "geopolitical/eu_usa", "content": "first read"},
-            {"source": "read_knowledge_base", "resource_id": "geopolitical/eu_usa", "content": "second read"},
-        ]
-    })
+    raw = json.dumps(
+        {
+            "collected_data": [
+                {
+                    "source": "read_knowledge_base",
+                    "resource_id": "geopolitical/eu_usa",
+                    "content": "first read",
+                },
+                {
+                    "source": "read_knowledge_base",
+                    "resource_id": "geopolitical/eu_usa",
+                    "content": "second read",
+                },
+            ]
+        }
+    )
 
     result = CollectionService.parse_collected_data(raw)
 
-    kb = next(s for s in result["source_summary"] if s["display_name"] == "Internal Knowledge Bank")
+    kb = next(
+        s
+        for s in result["source_summary"]
+        if s["display_name"] == "Internal Knowledge Bank"
+    )
     assert kb["count"] == 2
     assert kb["resource_ids"] == ["geopolitical/eu_usa"]
 

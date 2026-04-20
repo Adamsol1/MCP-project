@@ -1,14 +1,9 @@
 """Tests for the analysis-stage council service."""
 
-import json
-from types import SimpleNamespace
-
 import pytest
 
-from src.services import processing_prototype_service as processing_service_module
-from src.services.analysis_prototype_service import AnalysisPrototypeService
+from src.models.analysis import AnalysisDraft, CouncilNote, ProcessingResult
 from src.services.council_service import CouncilService
-from src.services.processing_prototype_service import ProcessingPrototypeService
 
 VALID_PROCESSING_PAYLOAD = {
     "findings": [
@@ -44,116 +39,116 @@ VALID_PROCESSING_PAYLOAD = {
 }
 
 
-def _write_processed_json(tmp_path, session_id: str) -> None:
-    session_dir = tmp_path / session_id
-    session_dir.mkdir(parents=True, exist_ok=True)
-    (session_dir / "processed.json").write_text(
-        json.dumps({"attempts": [json.dumps(VALID_PROCESSING_PAYLOAD)]}),
-        encoding="utf-8",
+class FakeCouncilMCPClient:
+    def __init__(self, deliberate_result: dict | None = None):
+        self.server_url = "memory://council"
+        self.deliberate_result = deliberate_result or {
+            "status": "complete",
+            "participants": ["US Strategic Analyst", "Neutral Evidence Analyst"],
+            "rounds_completed": 2,
+            "summary": {
+                "consensus": "Consensus summary.",
+                "key_agreements": ["Agreement A"],
+                "key_disagreements": ["Disagreement A"],
+                "final_recommendation": "Recommendation A",
+            },
+            "full_debate": [
+                {
+                    "round": 1,
+                    "participant": "US Strategic Analyst",
+                    "response": "Response A",
+                    "timestamp": "2026-03-20T10:00:00Z",
+                }
+            ],
+            "transcript_path": "/tmp/council_transcripts/demo.md",
+        }
+
+    def connect(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def get_prompt(self, name: str, args: dict | None = None):
+        if name == "council_behavior":
+            return "Use evidence quality as the debate anchor."
+        if name == "council_task":
+            return f"Task for {args['debate_point']}"
+        raise AssertionError(f"Unexpected prompt: {name}")
+
+    async def read_resource(self, uri: str):
+        perspective = uri.rsplit("/", 1)[-1]
+        return f"{perspective} persona"
+
+    async def call_tool(self, name: str, _args: dict):
+        if name == "summarize_entries":
+            return []
+        if name == "deliberate":
+            return self.deliberate_result
+        raise AssertionError(f"Unexpected tool: {name}")
+
+
+def _processing_result() -> ProcessingResult:
+    return ProcessingResult.model_validate(VALID_PROCESSING_PAYLOAD)
+
+
+def _analysis_draft() -> AnalysisDraft:
+    return AnalysisDraft(
+        summary="Test analysis summary.",
+        key_judgments=["Test judgment."],
+        per_perspective_implications={"us": [], "neutral": []},
+        recommended_actions=["Test action."],
+        information_gaps=[],
     )
-
-
-class _FakeEngine:
-    async def execute(self, request):
-        return SimpleNamespace(
-            status="complete",
-            participants=[p.display_name or p.model for p in request.participants],
-            rounds_completed=request.rounds,
-            summary=SimpleNamespace(
-                consensus="Consensus summary.",
-                key_agreements=["Agreement A"],
-                key_disagreements=["Disagreement A"],
-                final_recommendation="Recommendation A",
-            ),
-            full_debate=[
-                SimpleNamespace(
-                    round=1,
-                    participant=request.participants[0].display_name,
-                    response="Response A",
-                    timestamp="2026-03-20T10:00:00Z",
-                )
-            ],
-            transcript_path=str(
-                request.working_directory + "/council_transcripts/demo.md"
-            ),
-        )
-
-
-class _ErrorEngine:
-    async def execute(self, request):
-        return SimpleNamespace(
-            status="complete",
-            participants=[p.display_name or p.model for p in request.participants],
-            rounds_completed=request.rounds,
-            summary=SimpleNamespace(
-                consensus="[Summary generation not available]",
-                key_agreements=["No AI summary available"],
-                key_disagreements=[],
-                final_recommendation="Please review the full debate below.",
-            ),
-            full_debate=[
-                SimpleNamespace(
-                    round=1,
-                    participant=request.participants[0].display_name,
-                    response="[ERROR: RuntimeError: synthetic backend failure]",
-                    timestamp="2026-03-20T10:00:00Z",
-                ),
-                SimpleNamespace(
-                    round=1,
-                    participant=request.participants[1].display_name,
-                    response="[ERROR: RuntimeError: synthetic backend failure]",
-                    timestamp="2026-03-20T10:00:00Z",
-                ),
-            ],
-            transcript_path=str(
-                request.working_directory + "/council_transcripts/demo.md"
-            ),
-        )
 
 
 class TestCouncilService:
     """Test participant construction and runtime defaults."""
 
-    def test_participant_construction(self):
-        """One local LLM participant should be built per selected perspective."""
-        service = CouncilService()
+    @pytest.mark.asyncio
+    async def test_participant_construction(self):
+        """One configured participant should be built per selected perspective."""
+        service = CouncilService(mcp_client=FakeCouncilMCPClient())
 
-        participants = service.build_participants(["us", "neutral", "china"])
+        participants = await service.build_participants(["us", "neutral", "china"])
 
-        assert [participant.cli for participant in participants] == [
-            "openai",
-            "openai",
-            "openai",
+        assert [participant["cli"] for participant in participants] == [
+            service.DEFAULT_ADAPTER,
+            service.DEFAULT_ADAPTER,
+            service.DEFAULT_ADAPTER,
         ]
-        assert [participant.model for participant in participants] == [
+        assert [participant["model"] for participant in participants] == [
             service.DEFAULT_MODEL,
             service.DEFAULT_MODEL,
             service.DEFAULT_MODEL,
         ]
-        assert participants[0].display_name == "US Strategic Analyst"
-        assert "evidence quality" in participants[1].persona_prompt
+        assert participants[0]["display_name"] == "US Strategic Analyst"
+        assert "evidence quality" in participants[1]["persona_prompt"]
 
-    def test_validation_on_too_few_perspectives(self):
+    @pytest.mark.asyncio
+    async def test_validation_on_too_few_perspectives(self):
         """Fewer than two unique perspectives should fail validation."""
-        service = CouncilService()
+        service = CouncilService(mcp_client=FakeCouncilMCPClient())
 
-        with pytest.raises(
-            ValueError, match="At least 2 perspectives are required"
-        ):
-            service.build_participants(["neutral"])
+        with pytest.raises(ValueError, match="At least 2 perspectives are required"):
+            await service.build_participants(["neutral"])
 
-        with pytest.raises(
-            ValueError, match="At least 2 perspectives are required"
-        ):
-            service.build_participants(["neutral", "NEUTRAL"])
+        with pytest.raises(ValueError, match="At least 2 perspectives are required"):
+            await service.build_participants(["neutral", "NEUTRAL"])
 
     def test_runtime_config_defaults(self, tmp_path):
-        """Runtime profile should reflect the app council defaults."""
-        service = CouncilService(working_directory=tmp_path)
+        """Runtime profile should reflect the active app provider defaults."""
+        service = CouncilService(
+            working_directory=tmp_path,
+            mcp_client=FakeCouncilMCPClient(),
+        )
 
         profile = service.runtime_profile
 
-        assert profile.adapter == "openai"
+        assert profile.adapter == service.DEFAULT_ADAPTER
         assert profile.model == service.DEFAULT_MODEL
         assert profile.mode == "conference"
         assert profile.rounds == 2
@@ -164,41 +159,22 @@ class TestCouncilService:
         assert profile.file_tree_injection_enabled is False
         assert profile.decision_graph_enabled is False
 
-    def test_engine_uses_local_openai_adapter_for_summary(self, tmp_path):
-        """Council summaries should use the same local OpenAI-compatible adapter."""
-        service = CouncilService(working_directory=tmp_path)
-        engine = service._build_engine(service.runtime_profile)
-
-        assert len(engine.summarizer_chain) == 1
-        _adapter, model, display_name = engine.summarizer_chain[0]
-        assert model == service.DEFAULT_MODEL
-        assert display_name == "openai summary model"
-
     @pytest.mark.asyncio
-    async def test_run_council_returns_council_note(self, monkeypatch, tmp_path):
+    async def test_run_council_returns_council_note(self, tmp_path):
         """Council execution should return a stable CouncilNote."""
-        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
-        _write_processed_json(tmp_path, "session-council")
-        service = CouncilService(working_directory=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
-            "session-council"
+        service = CouncilService(
+            working_directory=tmp_path,
+            mcp_client=FakeCouncilMCPClient(),
         )
-        analysis_draft, _ = await AnalysisPrototypeService().generate_draft(
-            processing_result
-        )
-
-        monkeypatch.setattr(service, "_build_engine", lambda _profile: _FakeEngine())
 
         result = await service.run_council(
             session_id="session-council",
             debate_point="Assess the strongest interpretation of the selected findings.",
             selected_perspectives=["us", "neutral"],
-            processing_result=processing_result,
-            analysis_draft=analysis_draft,
+            processing_result=_processing_result(),
+            analysis_draft=_analysis_draft(),
             finding_ids=["F-001", "F-002"],
         )
-
-        from src.models.analysis import CouncilNote
 
         assert isinstance(result, CouncilNote)
         assert result.participants == [
@@ -208,28 +184,45 @@ class TestCouncilService:
         assert result.rounds_completed == 2
 
     @pytest.mark.asyncio
-    async def test_run_council_raises_runtime_error_for_all_error_responses(
-        self, monkeypatch, tmp_path
-    ):
-        """Council execution should fail clearly when all participant responses are runtime errors."""
-        monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
-        _write_processed_json(tmp_path, "session-council")
-        service = CouncilService(working_directory=tmp_path)
-        processing_result = ProcessingPrototypeService().get_processing_result(
-            "session-council"
+    async def test_run_council_raises_runtime_error_for_all_error_responses(self, tmp_path):
+        """Council execution should fail clearly when all responses are runtime errors."""
+        error_result = {
+            "status": "complete",
+            "participants": ["US Strategic Analyst", "Neutral Evidence Analyst"],
+            "rounds_completed": 2,
+            "summary": {
+                "consensus": "[Summary generation not available]",
+                "key_agreements": [],
+                "key_disagreements": [],
+                "final_recommendation": "Please review the full debate below.",
+            },
+            "full_debate": [
+                {
+                    "round": 1,
+                    "participant": "US Strategic Analyst",
+                    "response": "[ERROR: RuntimeError: synthetic backend failure]",
+                    "timestamp": "2026-03-20T10:00:00Z",
+                },
+                {
+                    "round": 1,
+                    "participant": "Neutral Evidence Analyst",
+                    "response": "[ERROR: RuntimeError: synthetic backend failure]",
+                    "timestamp": "2026-03-20T10:00:00Z",
+                },
+            ],
+            "transcript_path": "/tmp/council_transcripts/demo.md",
+        }
+        service = CouncilService(
+            working_directory=tmp_path,
+            mcp_client=FakeCouncilMCPClient(error_result),
         )
-        analysis_draft, _ = await AnalysisPrototypeService().generate_draft(
-            processing_result
-        )
-
-        monkeypatch.setattr(service, "_build_engine", lambda _profile: _ErrorEngine())
 
         with pytest.raises(RuntimeError, match="Council runtime failed:"):
             await service.run_council(
                 session_id="session-council",
-                debate_point="Assess the strongest interpretation of the selected findings.",
+                debate_point="Assess the strongest interpretation.",
                 selected_perspectives=["us", "neutral"],
-                processing_result=processing_result,
-                analysis_draft=analysis_draft,
+                processing_result=_processing_result(),
+                analysis_draft=_analysis_draft(),
                 finding_ids=["F-001", "F-002"],
             )

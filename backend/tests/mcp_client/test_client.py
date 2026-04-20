@@ -52,7 +52,12 @@ class TestMCPClientTools:
         class MockSession:
             async def call_tool(self, tool_name, arguments):  # noqa: ARG002
                 class MCPResult:
-                    content = [TextContent(type="text", text="Generated PIR: Investigate APT29 targeting Norway")]
+                    content = [
+                        TextContent(
+                            type="text",
+                            text="Generated PIR: Investigate APT29 targeting Norway",
+                        )
+                    ]
 
                 return MCPResult()
 
@@ -157,6 +162,7 @@ class TestMCPClientCallToolParsing:
             async def call_tool(self, tool_name, arguments):  # noqa: ARG002
                 class MCPResult:
                     content = [TextContent(type="text", text=response_text)]
+
                 return MCPResult()
 
         client.session = MockSession()  # type: ignore

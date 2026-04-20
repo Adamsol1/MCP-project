@@ -1,6 +1,8 @@
 """Models for analysis-phase processing results, drafts, and council output."""
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
 
 from src.models.confidence import FindingConfidence, PerspectiveAssertion
 
@@ -46,6 +48,10 @@ class ProcessingResult(BaseModel):
 class AnalysisDraft(BaseModel):
     """Draft analysis produced from processed findings."""
 
+    title: str = Field(
+        default="",
+        description="Concise AI-generated title for the analysis (6-10 words)",
+    )
     summary: str = Field(..., description="Short analytical summary")
     key_judgments: list[str] = Field(
         default_factory=list, description="Primary analytical judgments"
@@ -61,6 +67,24 @@ class AnalysisDraft(BaseModel):
         default_factory=list, description="Remaining information gaps"
     )
 
+    @field_validator("per_perspective_implications", mode="before")
+    @classmethod
+    def _coerce_legacy_implications(cls, value: Any) -> Any:
+        """Accept older drafts where implications were plain strings."""
+        if not isinstance(value, dict):
+            return value
+
+        normalized: dict[str, list[Any]] = {}
+        for perspective, implications in value.items():
+            if not isinstance(implications, list):
+                normalized[perspective] = implications
+                continue
+            normalized[perspective] = [
+                {"assertion": item} if isinstance(item, str) else item
+                for item in implications
+            ]
+        return normalized
+
 
 class CouncilTranscriptEntry(BaseModel):
     """A single council debate response."""
@@ -69,6 +93,7 @@ class CouncilTranscriptEntry(BaseModel):
     participant: str = Field(..., description="User-visible participant label")
     response: str = Field(..., description="Debate response text")
     timestamp: str = Field(..., description="ISO timestamp")
+    summary: str | None = Field(default=None, description="AI-generated 1-2 sentence summary")
 
 
 class CouncilRuntimeProfile(BaseModel):
@@ -84,9 +109,7 @@ class CouncilRuntimeProfile(BaseModel):
     vote_retry_enabled: bool = Field(
         ..., description="Whether vote retry prompting is enabled"
     )
-    vote_retry_attempts: int = Field(
-        ..., description="Configured vote retry attempts"
-    )
+    vote_retry_attempts: int = Field(..., description="Configured vote retry attempts")
     working_directory: str = Field(..., description="Working directory for council")
     file_tree_injection_enabled: bool = Field(
         ..., description="Whether file-tree injection is enabled"

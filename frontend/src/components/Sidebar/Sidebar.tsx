@@ -1,7 +1,8 @@
 import { useEffect, useState, useRef } from "react";
 import type { Conversation } from "../../types/conversation";
-import type { DialogueStage } from "../../types/dialogue";
+import type { DialoguePhase, DialogueStage } from "../../types/dialogue";
 import { useT } from "../../i18n/useT";
+import type { DialogueDevSnapshot } from "../../services/dialogue/dialogue";
 
 /** Props for the Sidebar component. */
 interface SidebarProps {
@@ -23,17 +24,23 @@ interface SidebarProps {
   onDevSendMessage: () => void;
   /** DEV: Forces chat into confirmation mode to preview approval UI. */
   onDevShowCollectionApproval?: () => void;
-  /** DEV: Force the backend/session to a specific stage. */
-  onDevJumpToStage?: (stage: DialogueStage) => void;
-  /** DEV: Pull latest stage snapshot from backend. */
-  onDevSyncStage?: () => void;
-  /** DEV: Reset session stage to initial. */
-  onDevResetStage?: () => void;
-  /** Called when the user clicks the settings gear icon. */
-  onOpenSettings: () => void;
+  /** DEV: Saved backend runs that can be restored into the active session. */
+  devSnapshots?: DialogueDevSnapshot[];
+  /** DEV: Whether saved runs are being loaded/restored. */
+  isDevSnapshotsLoading?: boolean;
+  /** DEV: Refresh saved backend runs. */
+  onDevRefreshSnapshots?: () => void;
+  /** DEV: Restore a saved run into the active session at a specific stage. */
+  onDevRestoreSnapshot?: (
+    sourceSessionId: string,
+    stage: DialogueStage,
+    phase: DialoguePhase,
+  ) => void;
+  /** Whether the sidebar is in its narrow rail mode (controlled by parent). */
+  isCollapsed?: boolean;
+  /** Whether expanded-only content is visible (controlled by parent). */
+  showExpandedContent?: boolean;
 }
-
-const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
 /**
  * Left-hand navigation sidebar showing all conversations.
@@ -54,7 +61,9 @@ const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
  *   openMenuId  — id of the conversation whose options dropdown is open, or null.
  *   renamingId  — id of the conversation currently being renamed, or null.
  *   draftTitle  — controlled value of the rename input field.
- *   isCollapsed — whether the sidebar is in its narrow rail mode.
+ *
+ * Collapse state (isCollapsed, showExpandedContent) is owned by the parent (App)
+ * so the toggle button can live in the full-width top bar.
  */
 export function Sidebar({
   conversations,
@@ -66,20 +75,14 @@ export function Sidebar({
   onDeleteAllConversations,
   onDevSendMessage,
   onDevShowCollectionApproval,
-  onDevJumpToStage,
-  onDevSyncStage,
-  onDevResetStage,
-  onOpenSettings,
+  devSnapshots = [],
+  isDevSnapshotsLoading = false,
+  onDevRefreshSnapshots,
+  onDevRestoreSnapshot,
+  isCollapsed = false,
+  showExpandedContent = true,
 }: SidebarProps) {
   const t = useT();
-
-  const DEV_STAGE_ACTIONS: Array<{ label: string; stage: DialogueStage }> = [
-    { label: t.jumpToInitial, stage: "initial" },
-    { label: t.jumpToGathering, stage: "gathering" },
-    { label: t.jumpToSummary, stage: "summary_confirming" },
-    { label: t.jumpToPir, stage: "pir_confirming" },
-    { label: t.jumpToComplete, stage: "complete" },
-  ];
 
   // Sort a copy so the original prop array is never mutated.
   const sortedConversations = [...conversations].sort(
@@ -89,15 +92,11 @@ export function Sidebar({
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [draftTitle, setDraftTitle] = useState("");
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showExpandedContent, setShowExpandedContent] = useState(true);
   const [isDevToolsMinimized, setIsDevToolsMinimized] = useState(true);
-  const [isCollectionPhaseMinimized, setIsCollectionPhaseMinimized] =
-    useState(true);
+  const [selectedSnapshotId, setSelectedSnapshotId] = useState("");
 
   // Ref attached to the dropdown menu div — used by the outside-click handler.
   const menuRef = useRef<HTMLDivElement | null>(null);
-  const revealTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   /**
    * Closes the options dropdown when the user clicks anywhere outside it.
@@ -118,33 +117,19 @@ export function Sidebar({
   }, [openMenuId]);
 
   useEffect(() => {
-    return () => {
-      if (revealTimeoutRef.current !== null) {
-        window.clearTimeout(revealTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleToggleSidebar = () => {
-    if (revealTimeoutRef.current !== null) {
-      window.clearTimeout(revealTimeoutRef.current);
-      revealTimeoutRef.current = null;
+    if (selectedSnapshotId) return;
+    if (devSnapshots.length > 0) {
+      setSelectedSnapshotId(devSnapshots[0].session_id);
     }
+  }, [devSnapshots, selectedSnapshotId]);
 
-    setIsCollapsed((prev) => {
-      const next = !prev;
+  const selectedSnapshot =
+    devSnapshots.find((snapshot) => snapshot.session_id === selectedSnapshotId) ??
+    devSnapshots[0];
 
-      if (next) {
-        setShowExpandedContent(false);
-      } else {
-        revealTimeoutRef.current = window.setTimeout(() => {
-          setShowExpandedContent(true);
-          revealTimeoutRef.current = null;
-        }, SIDEBAR_CONTENT_REVEAL_DELAY_MS);
-      }
-
-      return next;
-    });
+  const restoreSnapshot = (stage: DialogueStage, phase: DialoguePhase) => {
+    if (!selectedSnapshot || !onDevRestoreSnapshot) return;
+    onDevRestoreSnapshot(selectedSnapshot.session_id, stage, phase);
   };
 
   return (
@@ -153,35 +138,6 @@ export function Sidebar({
         isCollapsed ? "w-14" : "w-64"
       } bg-surface text-text-primary border-r border-border flex flex-col h-full overflow-hidden transition-[width] duration-300 ease-in-out motion-reduce:transition-none`}
     >
-      {/* Toggle button — SVG chevron, clearer than a Unicode character.
-          Points right (›) when collapsed to signal "expand",
-          left (‹) when expanded to signal "collapse". */}
-      <button
-        aria-label="Toggle sidebar"
-        onClick={handleToggleSidebar}
-        className="p-2 flex items-center justify-center shrink-0 hover:bg-surface-elevated rounded"
-      >
-        <svg
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-          className={`transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
-            isCollapsed ? "rotate-180" : "rotate-0"
-          }`}
-        >
-          {isCollapsed
-            ? <path d="M9 18l6-6-6-6" />   /* › chevron-right = expand */
-            : <path d="M15 18l-6-6 6-6" />  /* ‹ chevron-left  = collapse */
-          }
-        </svg>
-      </button>
-
       {/* New Chat button — always visible in both expanded and collapsed states.
           When collapsed, text is hidden and the button shows only the + icon.
           aria-label stays "New Chat" in both states so tests and screen readers
@@ -189,8 +145,10 @@ export function Sidebar({
       <button
         onClick={onNewChat}
         aria-label={t.newChat}
-        className={`mx-2 mb-2 py-1.5 px-2 bg-primary-dark text-white rounded flex items-center justify-center gap-1.5 shrink-0 ${
-          isCollapsed ? "" : "w-[calc(100%-1rem)]"
+        className={`bg-primary-dark text-white rounded flex items-center shrink-0 ${
+          isCollapsed
+            ? "w-8 h-8 mx-auto mt-2 mb-2 justify-center"
+            : "mx-2 mt-2 mb-2 py-1.5 px-2 justify-start gap-1.5 w-[calc(100%-1rem)]"
         }`}
       >
         <span className="text-lg leading-none">+</span>
@@ -314,21 +272,6 @@ export function Sidebar({
           )}
         </div>
       )}
-      {/* Settings gear — sits just above Dev Tools */}
-      <div className="shrink-0 border-t border-border p-2 flex justify-end">
-        <button
-          aria-label={t.openSettings}
-          onClick={onOpenSettings}
-          className="p-2 rounded text-text-muted hover:bg-surface-elevated hover:text-text-primary"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
-            stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-            aria-hidden="true">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-          </svg>
-        </button>
-      </div>
       {/* DEV TOOLS — only visible when the sidebar is expanded. */}
       {showExpandedContent && (
         <div className="shrink-0 border-t border-border p-2">
@@ -363,54 +306,105 @@ export function Sidebar({
                   {t.showCollectionApproval}
                 </button>
               )}
-              {onDevJumpToStage && (
-                <div className="mt-1">
-                  <button
-                    type="button"
-                    aria-label={
-                      isCollectionPhaseMinimized
-                        ? t.expandDirectionPhase
-                        : t.minimizeDirectionPhase
-                    }
-                    onClick={() =>
-                      setIsCollectionPhaseMinimized((prev) => !prev)
-                    }
-                    className="w-full rounded px-2 py-1.5 text-left text-sm text-text-primary hover:bg-surface-elevated"
-                  >
-                    <span className="flex items-center gap-2">
-                      <span aria-hidden="true" className="text-xs text-text-secondary">
-                        {isCollectionPhaseMinimized ? ">" : "v"}
-                      </span>
-                      <span>{t.directionPhase}</span>
-                    </span>
-                  </button>
-                  {!isCollectionPhaseMinimized &&
-                    DEV_STAGE_ACTIONS.map((item) => (
+              {onDevRestoreSnapshot && (
+                <div className="mt-2 rounded border border-border-muted p-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <label className="text-xs font-medium text-text-secondary">
+                      {t.previousRun}
+                    </label>
+                    {onDevRefreshSnapshots && (
                       <button
-                        key={item.stage}
-                        onClick={() => onDevJumpToStage(item.stage)}
-                        className="w-full pl-5 pr-2 py-1.5 rounded text-left text-sm text-text-secondary hover:bg-surface-elevated"
+                        type="button"
+                        onClick={onDevRefreshSnapshots}
+                        disabled={isDevSnapshotsLoading}
+                        className="rounded px-1.5 py-0.5 text-xs text-text-secondary hover:bg-surface-elevated disabled:opacity-50"
                       >
-                        {item.label}
+                        {isDevSnapshotsLoading ? t.loading : t.refresh}
                       </button>
-                    ))}
+                    )}
+                  </div>
+                  {devSnapshots.length > 0 ? (
+                    <>
+                      <select
+                        value={selectedSnapshot?.session_id ?? ""}
+                        onChange={(event) =>
+                          setSelectedSnapshotId(event.target.value)
+                        }
+                        className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary"
+                      >
+                        {devSnapshots.map((snapshot) => (
+                          <option
+                            key={snapshot.session_id}
+                            value={snapshot.session_id}
+                          >
+                            {snapshot.title || snapshot.session_id}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="mt-1 truncate font-mono text-[10px] text-text-muted">
+                        {selectedSnapshot?.session_id}
+                      </p>
+                      <div className="mt-2 grid grid-cols-2 gap-1">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("pir_confirming", "direction")
+                          }
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.session
+                          }
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadPir}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("reviewing", "collection")
+                          }
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.collection
+                          }
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadCollection}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("reviewing", "processing")
+                          }
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.processing
+                          }
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadProcessing}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            restoreSnapshot("complete", "analysis")
+                          }
+                          disabled={
+                            isDevSnapshotsLoading ||
+                            !selectedSnapshot?.artifacts.analysis
+                          }
+                          className="rounded bg-surface-elevated px-2 py-1 text-xs text-text-secondary hover:text-text-primary disabled:opacity-50"
+                        >
+                          {t.loadAnalysis}
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-xs text-text-muted">
+                      {isDevSnapshotsLoading ? t.loading : t.noPreviousRuns}
+                    </p>
+                  )}
                 </div>
-              )}
-              {onDevSyncStage && (
-                <button
-                  onClick={onDevSyncStage}
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
-                >
-                  {t.syncStage}
-                </button>
-              )}
-              {onDevResetStage && (
-                <button
-                  onClick={onDevResetStage}
-                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
-                >
-                  {t.resetStage}
-                </button>
               )}
               <button
                 onClick={onDeleteAllConversations}

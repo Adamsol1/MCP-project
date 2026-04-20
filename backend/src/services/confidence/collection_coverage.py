@@ -98,7 +98,7 @@ def _has_gap_mention(pir_question: str, gaps: list[str]) -> bool:
 
 
 def _build_rationale(
-    pir_index: int,
+    pir_index: int,  # noqa: ARG001
     priority: str,
     tier: ConfidenceTier,
     finding_count: int,
@@ -173,9 +173,7 @@ def compute_collection_coverage(
         finding_count = len(mapped_findings)
 
         # Source diversity
-        canonical_types = {
-            _normalise_source(f.source) for f in mapped_findings
-        }
+        canonical_types = {_normalise_source(f.source) for f in mapped_findings}
         source_types = sorted(canonical_types)
 
         # Gap flag
@@ -233,8 +231,10 @@ def compute_collection_coverage(
     # Human-readable summary
     low_count = sum(1 for ps in per_pir if ps.tier == ConfidenceTier.LOW)
     high_priority_low = [
-        ps for ps in per_pir
-        if ps.priority == "high" and ps.tier in (ConfidenceTier.LOW, ConfidenceTier.MODERATE)
+        ps
+        for ps in per_pir
+        if ps.priority == "high"
+        and ps.tier in (ConfidenceTier.LOW, ConfidenceTier.MODERATE)
     ]
 
     if low_count == len(per_pir):

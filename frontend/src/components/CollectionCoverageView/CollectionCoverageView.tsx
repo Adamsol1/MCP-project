@@ -38,9 +38,9 @@ const TIER_BADGE: Record<
   },
   assessed: {
     label: "Assessed",
-    bg: "bg-[#edf6f0]",
-    text: "text-[#1a6640]",
-    border: "border-[#1a6640]/20",
+    bg: "bg-success-subtle",
+    text: "text-success-text",
+    border: "border-success/30",
   },
 };
 
@@ -116,7 +116,7 @@ function PriorityBadge({ priority }: { priority: string }) {
         : "bg-surface text-text-muted border-border";
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-[0.1em] ${styles}`}
+      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest ${styles}`}
     >
       {priority}
     </span>
@@ -131,7 +131,7 @@ function AggregateBar({ score }: { score: number }) {
   const pct = Math.round(score * 100);
   const color =
     score >= 0.9
-      ? "bg-[#2a9d5c]"
+      ? "bg-success-dark"
       : score >= 0.7
         ? "bg-success"
         : score >= 0.4
@@ -165,30 +165,33 @@ function PirRow({
         onClick={() => setExpanded((v) => !v)}
         className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors hover:bg-surface/60"
       >
-        {/* Expand chevron */}
-        <span
-          className={`mt-0.5 shrink-0 text-text-muted transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
-        >
-          ▶
-        </span>
-
-        {/* PIR question (truncated) */}
-        <p className="flex-1 text-sm leading-5 text-text-primary line-clamp-2">
-          {pir.pir_question}
-        </p>
+        {/* PIR question (truncated) with inline low/moderate indicator */}
+        <div className="flex-1 min-w-0">
+          {(pir.tier === "low" || pir.tier === "moderate") && (
+            <span className={`mr-2 inline-flex items-center gap-1 text-[10px] font-medium ${pir.tier === "low" ? "text-error-text" : "text-warning-text"}`}>
+              <span className={`inline-block h-1.5 w-1.5 rounded-full ${pir.tier === "low" ? "bg-error" : "bg-warning"}`} />
+              {pir.tier === "low" ? "Low" : "Moderate"} coverage
+            </span>
+          )}
+          <p className="text-sm leading-5 text-text-primary line-clamp-2">
+            {pir.pir_question}
+          </p>
+        </div>
 
         {/* Meta badges */}
         <div className="ml-2 flex shrink-0 flex-col items-end gap-1.5">
           <TierBadge tier={pir.tier} score={pir.score} />
           <PriorityBadge priority={pir.priority} />
         </div>
+
+        {/* Expand chevron */}
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`mt-1 shrink-0 text-text-muted transition-transform duration-150 ${expanded ? "rotate-180" : ""}`}>
+          <path d="M6 9l6 6 6-6" />
+        </svg>
       </button>
 
       {expanded && (
-        <div className="px-4 pb-4 pt-1 space-y-3">
-          {/* Full question */}
-          <p className="text-xs leading-5 text-text-secondary">{pir.pir_question}</p>
-
+        <div className="border-t border-border/50 px-4 pb-4 pt-3 space-y-3">
           {/* Stats row */}
           <div className="flex flex-wrap gap-4 text-xs text-text-secondary">
             <span>
@@ -238,18 +241,21 @@ export default function CollectionCoverageView({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
+      <p className="px-5 text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
         Collection Coverage
       </p>
 
-      <div className="overflow-hidden rounded-[24px] border border-border bg-surface shadow-sm">
+      <div className="overflow-hidden rounded-xl border border-border bg-surface">
         {/* Header */}
         <div className="flex items-center justify-between gap-4 px-5 py-4">
           <div className="space-y-1 flex-1 min-w-0">
             <div className="flex items-center gap-2.5 flex-wrap">
               <TierBadge tier={aggregate_tier} score={aggregate_score} />
+              <span className="text-sm text-text-secondary">
+                {aggStyles.label} coverage
+              </span>
               <span className="text-[11px] text-text-muted">
-                {per_pir.length} PIR{per_pir.length !== 1 ? "s" : ""} assessed
+                · {per_pir.length} PIR{per_pir.length !== 1 ? "s" : ""} assessed
               </span>
             </div>
             <p className="text-sm leading-5 text-text-secondary">{summary}</p>

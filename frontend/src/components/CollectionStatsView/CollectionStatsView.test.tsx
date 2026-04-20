@@ -11,7 +11,7 @@ import { renderWithSettings } from "../../test/renderWithProviders";
 
 const SOURCE_SUMMARIES = [
   { display_name: "AlienVault OTX", count: 12, resource_ids: ["r1", "r2"], has_content: true },
-  { display_name: "Internal Knowledge Bank", count: 5, resource_ids: ["r3"], has_content: true },
+  { display_name: "Knowledge Bank", count: 5, resource_ids: ["r3"], has_content: true },
   { display_name: "Uploaded Documents", count: 0, resource_ids: [], has_content: false },
 ];
 
@@ -75,7 +75,7 @@ describe("CollectionStatsView", () => {
     );
 
     expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
-    expect(screen.getByText("Internal Knowledge Bank")).toBeInTheDocument();
+    expect(screen.getByText("Knowledge Bank")).toBeInTheDocument();
     expect(screen.getByText("Uploaded Documents")).toBeInTheDocument();
   });
 

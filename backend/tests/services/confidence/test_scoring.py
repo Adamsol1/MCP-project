@@ -62,7 +62,10 @@ class TestKBPlusTwoOTXClusters:
         # = 1.00*0.40 + 0.55*0.35 + 1.0*0.25 = 0.40 + 0.1925 + 0.25 = 0.8425 → HIGH
         result = compute_confidence(
             source_types=["knowledge_bank", "otx"],
-            source_urls=["https://kb.internal/doc1", "https://otx.alienvault.com/report1"],
+            source_urls=[
+                "https://kb.internal/doc1",
+                "https://otx.alienvault.com/report1",
+            ],
         )
         assert result.tier == ConfidenceTier.HIGH
         assert result.raw_score == pytest.approx(0.8425, abs=0.02)
@@ -70,7 +73,11 @@ class TestKBPlusTwoOTXClusters:
     def test_circular_flag_false(self):
         result = compute_confidence(
             source_types=["knowledge_bank", "otx", "otx"],
-            source_urls=["https://kb.internal/doc1", "https://otx.alienvault.com/1", "https://otx.alienvault.com/2"],
+            source_urls=[
+                "https://kb.internal/doc1",
+                "https://otx.alienvault.com/1",
+                "https://otx.alienvault.com/2",
+            ],
         )
         assert result.circular_flag is False
 
@@ -198,7 +205,7 @@ class TestMaxAuthorityAcrossSources:
     """Multiple sources → max authority (strong source not diluted by weaker)."""
 
     def test_kb_not_diluted_by_web_other(self):
-        result_kb_only = compute_confidence(source_types=["knowledge_bank"])
+        _ = compute_confidence(source_types=["knowledge_bank"])
         result_kb_and_web = compute_confidence(
             source_types=["knowledge_bank", "web_other"],
             source_urls=["https://kb.internal/a", "https://example.com/b"],
@@ -216,22 +223,27 @@ class TestTierBoundaries:
 
     def test_039_is_low(self):
         from src.services.confidence.scoring import _score_to_tier
+
         assert _score_to_tier(0.39) == ConfidenceTier.LOW
 
     def test_040_is_moderate(self):
         from src.services.confidence.scoring import _score_to_tier
+
         assert _score_to_tier(0.40) == ConfidenceTier.MODERATE
 
     def test_069_is_moderate(self):
         from src.services.confidence.scoring import _score_to_tier
+
         assert _score_to_tier(0.69) == ConfidenceTier.MODERATE
 
     def test_070_is_high(self):
         from src.services.confidence.scoring import _score_to_tier
+
         assert _score_to_tier(0.70) == ConfidenceTier.HIGH
 
     def test_090_is_assessed(self):
         from src.services.confidence.scoring import _score_to_tier
+
         assert _score_to_tier(0.90) == ConfidenceTier.ASSESSED
 
 

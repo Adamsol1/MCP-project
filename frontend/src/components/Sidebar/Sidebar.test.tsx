@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
@@ -38,7 +38,6 @@ function renderSidebar(
       onRenameConversation={vi.fn()}
       onDeleteAllConversations={vi.fn()}
       onDevSendMessage={vi.fn()}
-      onOpenSettings={vi.fn()}
       {...props}
     />,
   );
@@ -136,46 +135,18 @@ describe("Sidebar", () => {
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
   });
 
-  it("starts with direction phase minimized", async () => {
+  it("does not render legacy direction stage jump controls", async () => {
     const user = userEvent.setup();
-    renderSidebar({ onDevJumpToStage: vi.fn() });
+    renderSidebar();
     await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
 
+    expect(screen.queryByText(/direction phase/i)).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /jump to initial/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: /expand direction phase/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("renders stage jump dev buttons when callback is provided", async () => {
-    const user = userEvent.setup();
-    renderSidebar({ onDevJumpToStage: vi.fn() });
-    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
-    await user.click(
-      screen.getByRole("button", { name: /expand direction phase/i }),
-    );
-
-    expect(
-      screen.getByRole("button", { name: /jump to initial/i }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: /jump to complete/i }),
-    ).toBeInTheDocument();
-  });
-
-  it("calls onDevJumpToStage with stage when clicked", async () => {
-    const user = userEvent.setup();
-    const onDevJumpToStage = vi.fn();
-    renderSidebar({ onDevJumpToStage });
-    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
-    await user.click(
-      screen.getByRole("button", { name: /expand direction phase/i }),
-    );
-
-    await user.click(screen.getByRole("button", { name: /jump to pir/i }));
-    expect(onDevJumpToStage).toHaveBeenCalledWith("pir_confirming");
+      screen.queryByRole("button", { name: /jump to complete/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("calls onSwitchConversation with the conversation id when clicked", async () => {
@@ -401,17 +372,7 @@ describe("Sidebar", () => {
   });
 
   // ---------- Collapsible Sidebar ----------
-  // The sidebar has a toggle button that collapses and expands the conversation
-  // list. When collapsed the list is hidden but the New Chat button remains
-  // accessible. Collapse state is managed internally by Sidebar itself.
-
-  it("renders a toggle button for collapsing the sidebar", () => {
-    renderSidebar();
-
-    expect(
-      screen.getByRole("button", { name: /toggle sidebar/i }),
-    ).toBeInTheDocument();
-  });
+  // Collapse state is owned by App and passed into Sidebar as controlled props.
 
   it("shows the conversation list by default (sidebar starts expanded)", () => {
     const conversations = [makeConversation({ id: "c1", title: "My chat" })];
@@ -422,40 +383,32 @@ describe("Sidebar", () => {
     expect(screen.getByText("My chat")).toBeInTheDocument();
   });
 
-  it("hides the conversation list after clicking the toggle button", async () => {
-    const user = userEvent.setup();
+  it("hides the conversation list when collapsed content is hidden", () => {
     const conversations = [makeConversation({ id: "c1", title: "My chat" })];
 
-    renderSidebar({ conversations });
-
-    await user.click(screen.getByRole("button", { name: /toggle sidebar/i }));
+    renderSidebar({
+      conversations,
+      isCollapsed: true,
+      showExpandedContent: false,
+    });
 
     expect(screen.queryByText("My chat")).not.toBeInTheDocument();
   });
 
-  it("shows the conversation list again after toggling twice", async () => {
-    const user = userEvent.setup();
+  it("shows the conversation list when expanded content is visible", () => {
     const conversations = [makeConversation({ id: "c1", title: "My chat" })];
 
-    renderSidebar({ conversations });
-
-    const toggle = screen.getByRole("button", { name: /toggle sidebar/i });
-
-    // Collapse then expand
-    await user.click(toggle);
-    await user.click(toggle);
-
-    await waitFor(() => {
-      expect(screen.getByText("My chat")).toBeInTheDocument();
+    renderSidebar({
+      conversations,
+      isCollapsed: false,
+      showExpandedContent: true,
     });
+
+    expect(screen.getByText("My chat")).toBeInTheDocument();
   });
 
-  it("keeps the New Chat button accessible when the sidebar is collapsed", async () => {
-    const user = userEvent.setup();
-
-    renderSidebar();
-
-    await user.click(screen.getByRole("button", { name: /toggle sidebar/i }));
+  it("keeps the New Chat button accessible when the sidebar is collapsed", () => {
+    renderSidebar({ isCollapsed: true, showExpandedContent: false });
 
     expect(
       screen.getByRole("button", { name: /new chat/i }),

@@ -193,13 +193,73 @@ def _search_record(entry: dict, terms: list[str], max_results: int) -> list[dict
     ]
 
 
+def _db_search_uploads(session_id: str, terms: list[str], max_results: int) -> list[dict] | None:
+    """Search uploaded_files table for keyword matches. Returns None if DB unavailable."""
+    try:
+        from db import get_sessions_connection
+        conn = get_sessions_connection()
+        rows = conn.execute(
+            "SELECT id, original_filename, parsed_content, citation, searchable, search_skip_reason "
+            "FROM uploaded_files WHERE session_id = ? ORDER BY uploaded_at",
+            (session_id,),
+        ).fetchall()
+        conn.close()
+    except Exception:
+        return None
+
+    results: list[dict] = []
+    for row in rows:
+        if not row["searchable"]:
+            continue
+        content = row["parsed_content"] or ""
+        if not content:
+            continue
+        score = _score_text(content, terms)
+        if score <= 0:
+            continue
+        citation = json.loads(row["citation"]) if row["citation"] else _default_citation(row["original_filename"])
+        results.append({
+            "score": score,
+            "file_upload_id": row["id"],
+            "filename": row["original_filename"],
+            "page_reference": None,
+            "snippet": _make_snippet(content, terms),
+            "citation": citation,
+            "apa_citation": _format_apa_citation(citation),
+        })
+
+    results.sort(key=lambda x: x.get("score", 0), reverse=True)
+    return results[:max_results]
+
+
 def search_local_data(session_id: str, query: str, max_results: int = 20) -> str:
-    """Search uploaded session files for evidence snippets and citation metadata."""
+    """Search uploaded session files for evidence snippets and citation metadata.
+
+    Tries sessions.db (uploaded_files table) first, falls back to manifest.json.
+    """
     if not query.strip():
         raise ValueError("query cannot be empty")
     if max_results < 1:
         raise ValueError("max_results must be >= 1")
 
+    terms = _split_query_terms(query)
+    if not terms:
+        raise ValueError("query must contain searchable terms")
+
+    # Try DB first
+    db_results = _db_search_uploads(session_id, terms, max_results)
+    if db_results is not None:
+        for item in db_results:
+            item.pop("score", None)
+        return json.dumps({
+            "session_id": session_id,
+            "query": query,
+            "results": db_results,
+            "total_results": len(db_results),
+            "skipped": [],
+        })
+
+    # Fallback to manifest-based search
     manifest_path = UPLOADS_ROOT / session_id / "manifest.json"
     if not manifest_path.exists():
         return json.dumps(
@@ -216,10 +276,6 @@ def search_local_data(session_id: str, query: str, max_results: int = 20) -> str
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as exc:
         raise ValueError("manifest is not valid JSON") from exc
-
-    terms = _split_query_terms(query)
-    if not terms:
-        raise ValueError("query must contain searchable terms")
 
     combined_results: list[dict] = []
     skipped: list[str] = []

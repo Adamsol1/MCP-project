@@ -12,7 +12,7 @@ import type { CollectionDisplayData } from "../../types/conversation";
 const COLLECTION_DATA: CollectionDisplayData = {
   source_summary: [
     { display_name: "AlienVault OTX", count: 12, resource_ids: ["r1", "r2"], has_content: true },
-    { display_name: "Internal Knowledge Bank", count: 5, resource_ids: ["r3"], has_content: true },
+    { display_name: "Knowledge Bank", count: 5, resource_ids: ["r3"], has_content: true },
   ],
   collected_data: [
     { source: "query_otx", resource_id: "r1", content: "threat report about APT29" },
@@ -100,7 +100,7 @@ describe("CollectionStatsModal", () => {
     );
 
     expect(screen.getAllByText("AlienVault OTX").length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText("Internal Knowledge Bank").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("Knowledge Bank").length).toBeGreaterThanOrEqual(1);
   });
 
   it("shows the item count for each source", () => {

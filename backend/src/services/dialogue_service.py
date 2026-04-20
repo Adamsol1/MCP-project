@@ -2,7 +2,7 @@
 
 Each turn:
   1. Backend fetches the appropriate system prompt from the MCP server (Prompts primitive)
-  2. ToolCallingAgent runs with that system prompt + the user's message
+  2. The configured tool-loop agent runs with that system prompt + the user's message
   3. The model may autonomously call MCP tools (e.g. read_knowledge_base) during the turn
   4. Backend parses the result and updates state
 """
@@ -13,7 +13,7 @@ from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
-from src.services.tool_calling_agent import ToolCallingAgent
+from src.services.agent_factory import create_tool_agent
 
 logger = logging.getLogger("app")
 
@@ -55,7 +55,7 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(system_prompt=system_prompt, task=user_message)
 
         question_result = self._parse_json(raw)
@@ -117,7 +117,7 @@ class DialogueService:
             )
             # MCP Tools primitive: AI may still call read_knowledge_base()
             # autonomously during the tool-loop to explore additional knowledge.
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
@@ -239,13 +239,13 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = ToolCallingAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a structured summary of the intelligence collection context.",
             )
 
-        return self._parse_json(raw)
+        return self._parse_json(raw)  # type: ignore[no-any-return]
 
     def _identify_missing_context(self, context: DialogueContext) -> list[str]:
         """Return a list of context field names that are not yet filled."""

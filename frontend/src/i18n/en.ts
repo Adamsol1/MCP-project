@@ -15,16 +15,14 @@ export const en = {
   minimizeDevTools: "Minimize dev tools",
   sendTestMessage: "Send test message",
   showCollectionApproval: "Show collection approval",
-  directionPhase: "Direction Phase",
-  expandDirectionPhase: "Expand direction phase",
-  minimizeDirectionPhase: "Minimize direction phase",
-  jumpToInitial: "Jump to Initial",
-  jumpToGathering: "Jump to Gathering",
-  jumpToSummary: "Jump to Summary",
-  jumpToPir: "Jump to PIR",
-  jumpToComplete: "Jump to Complete",
-  syncStage: "Sync stage",
-  resetStage: "Reset stage",
+  previousRun: "Previous run",
+  refresh: "Refresh",
+  loading: "Loading...",
+  noPreviousRuns: "No previous runs found",
+  loadPir: "PIR",
+  loadCollection: "Collection",
+  loadProcessing: "Processing",
+  loadAnalysis: "Analysis",
   deleteAllConversations: "Delete all conversations",
 
   // ChatWindow
@@ -52,6 +50,7 @@ export const en = {
   accept: "Accept",
   collectMoreData: "Collect More Data",
   collectionResultsHeader: "Collection Results",
+  collectionResultsSubtitle: "Intelligence gathered from the following sources.",
   couldNotParseCollection: "Could not parse collection output.",
   rawOutput: "Raw output",
   selectSourcesHeader: "Select Sources",
@@ -61,13 +60,13 @@ export const en = {
   startCollecting: "Start Collecting",
   sourceNames: {
     "AlienVault OTX": "AlienVault OTX",
-    "Internal Knowledge Bank": "Internal Knowledge Bank",
+    "Knowledge Bank": "Knowledge Bank",
     "Uploaded Documents": "Uploaded Documents",
     "Web Search": "Web Search",
   } as Record<string, string>,
   sourceDescriptions: {
     "AlienVault OTX": "Open threat exchange feeds",
-    "Internal Knowledge Bank": "Your org's curated intel",
+    "Knowledge Bank": "Your org's curated intel",
     "Uploaded Documents": "PDFs, reports, etc.",
     "Web Search": "Searching the web for relevant information",
   } as Record<string, string>,
@@ -79,6 +78,7 @@ export const en = {
   tableStatus: "Status",
   dataFound: "Data found",
   empty: "Empty",
+  priority: "Priority",
   priorityHigh: "High",
   priorityMedium: "Medium",
   priorityLow: "Low",
@@ -88,7 +88,7 @@ export const en = {
   // PerspectiveSelector
   perspective: "Perspective",
   perspectiveLabels: {
-    NEUTRAL: "Neutral",
+    NEUTRAL: "Global",
     CHINA: "China",
     EU: "EU",
     NORWAY: "Norway",
@@ -129,6 +129,7 @@ export const en = {
     collection: "COLLECTION",
     processing: "PROCESSING",
     analysis: "ANALYSIS",
+    council: "COUNCIL",
   } as Record<string, string>,
 
   // SettingsModal
