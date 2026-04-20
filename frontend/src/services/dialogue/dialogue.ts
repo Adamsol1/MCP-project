@@ -30,6 +30,7 @@ export interface CouncilRunSettings {
 }
 
 export interface DialogueSendOptions {
+  aiProvider?: "local" | "gemini";
   selectedSources?: string[];
   gatherMore?: boolean;
   councilDebatePoint?: string;
@@ -109,6 +110,7 @@ export async function sendMessage(
       approved,
       language,
       settings_timeframe: settingsTimeframe,
+      ai_provider: options.aiProvider ?? "local",
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
       council_debate_point: options.councilDebatePoint ?? "",

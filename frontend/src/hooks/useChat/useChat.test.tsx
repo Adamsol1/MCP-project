@@ -139,7 +139,7 @@ describe("useChat", () => {
       undefined,
       "en",
       "",
-      {},
+      { aiProvider: "local" },
     );
   });
 

@@ -50,9 +50,6 @@ config = load_config(str(config_path))
 
 
 def _configure_local_openai_adapter() -> None:
-    provider = os.getenv("LLM_PROVIDER", "local").strip().lower()
-    if provider in {"gemini", "gemini-api", "gemini_api", "google"}:
-        return
     adapter_config = getattr(config, "adapters", {}).get("openai")
     if adapter_config is None:
         return

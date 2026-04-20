@@ -66,6 +66,7 @@ describe("sendMessage", () => {
         approved: undefined,
         language: "en",
         settings_timeframe: "",
+        ai_provider: "local",
         selected_sources: [],
         gather_more: false,
         council_debate_point: "",

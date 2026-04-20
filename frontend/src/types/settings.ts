@@ -4,6 +4,9 @@ export type Language = "en" | "no";
 /** Supported UI themes. */
 export type Theme = "light" | "dark";
 
+/** Supported backend AI providers. */
+export type AiProvider = "local" | "gemini";
+
 /**
  * Context parameters that are auto-injected into every prompt
  * so the AI has background information without needing to ask.
@@ -37,6 +40,8 @@ export interface Settings {
   language: Language;
   /** Language the AI will use in its responses (sent to backend). */
   aiLanguage: Language;
+  /** Backend model provider used for AI generation. */
+  aiProvider: AiProvider;
   /** Visual theme applied to the UI. */
   theme: Theme;
   /** Prompt context parameters auto-filled on every message send. */
@@ -52,6 +57,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   aiLanguage: "en",
+  aiProvider: "local",
   theme: "dark",
   inputParameters: {
     timeframe: "",

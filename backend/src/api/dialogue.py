@@ -32,7 +32,7 @@ from src.services.collection_service import CollectionService
 from src.services.collection_status import CollectionStatusTracker
 from src.services.council_service import CouncilService
 from src.services.dialogue_service import DialogueService
-from src.services.llm_config import get_default_model_name
+from src.services.llm_config import get_default_model_name, request_llm_provider
 from src.services.llm_service import LLMService
 from src.services.processing_result_store import ProcessingResultStore
 from src.services.processing_service import ProcessingService
@@ -48,7 +48,6 @@ from src.services.state_machines.processing_flow import ProcessingFlow, Processi
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
 
-_AI_MODEL = get_default_model_name()
 _GATHER_MORE_CONTENT = (
     "What gaps would you like to fill? Describe what additional information to gather."
 )
@@ -180,6 +179,8 @@ class DialogueMessageRequest(BaseModel):
     """Perspectives selected for the council run. Falls back to session perspectives if empty."""
     council_settings: CouncilRunSettings | None = None
     """Runtime settings for the council run (mode, rounds, timeout, vote retry)."""
+    ai_provider: str | None = None
+    """Model provider selected in Settings. Supported values: 'local' or 'gemini'."""
 
 
 # Response Model
@@ -1065,7 +1066,7 @@ def _get_mcp_client() -> MCPClient:
 
 
 def _get_review_service() -> ReviewService:
-    llm = LLMService(model=_AI_MODEL)
+    llm = LLMService()
     review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
     return ReviewService(llm, review_mcp_client)
 
@@ -1082,8 +1083,8 @@ def _build_orchestrator(session: IntelligenceSession) -> AIOrchestrator:
     """
     return AIOrchestrator(
         research_logger=session.research_logger,
-        generator_model=_AI_MODEL,
-        reviewer_model=_AI_MODEL,
+        generator_model=get_default_model_name(),
+        reviewer_model=get_default_model_name(),
     )
 
 
@@ -1402,7 +1403,6 @@ async def _dispatch_message(
 async def send_message(
     request: DialogueMessageRequest,
     mcp_client: MCPClient = Depends(_get_mcp_client),
-    review_service: ReviewService = Depends(_get_review_service),
     uow: UnitOfWork = Depends(get_uow),
 ) -> DialogueMessageResponse:
     """
@@ -1426,10 +1426,12 @@ async def send_message(
     """
     timeout_seconds = _dialogue_request_timeout_seconds(request)
     try:
-        return await asyncio.wait_for(
-            _dispatch_message(request, mcp_client, review_service, uow),
-            timeout=timeout_seconds,
-        )
+        with request_llm_provider(request.ai_provider):
+            review_service = _get_review_service()
+            return await asyncio.wait_for(
+                _dispatch_message(request, mcp_client, review_service, uow),
+                timeout=timeout_seconds,
+            )
     except TimeoutError:
         session = _sessions.get(request.session_id)
         if session is not None:

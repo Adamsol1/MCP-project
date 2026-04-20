@@ -193,6 +193,9 @@ describe("SettingsModal", () => {
       await user.click(screen.getByRole("button", { name: /parameters/i }));
 
       expect(
+        screen.getByRole("combobox", { name: /ai provider/i }),
+      ).toBeInTheDocument();
+      expect(
         screen.getByRole("textbox", { name: /timeframe/i }),
       ).toBeInTheDocument();
     });
@@ -206,6 +209,20 @@ describe("SettingsModal", () => {
       await user.type(input, "Q1 2025");
 
       expect(input).toHaveValue("Q1 2025");
+    });
+
+    it("selecting Gemini API updates the provider dropdown", async () => {
+      const user = userEvent.setup();
+      renderModal();
+
+      await user.click(screen.getByRole("button", { name: /parameters/i }));
+      const provider = screen.getByRole("combobox", { name: /ai provider/i });
+      await user.selectOptions(
+        provider,
+        screen.getByRole("option", { name: /gemini api/i }),
+      );
+
+      expect(provider).toHaveValue("gemini");
     });
   });
 

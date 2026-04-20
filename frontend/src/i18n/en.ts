@@ -144,6 +144,12 @@ export const en = {
   uiLanguageDesc: "The language used throughout the interface.",
   aiOutputLanguage: "AI Output Language",
   aiOutputLanguageDesc: "The language the AI will use in its responses.",
+  aiProviderLabel: "AI Provider",
+  aiProviderDesc: "Choose whether requests use Gemini API or the local LLM.",
+  aiProviderLabels: {
+    local: "Local LLM",
+    gemini: "Gemini API",
+  } as Record<string, string>,
   langEnglish: "English",
   langNorwegian: "Norwegian",
   themeLabel: "Theme",

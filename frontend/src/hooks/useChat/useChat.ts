@@ -574,7 +574,7 @@ export function useChat(initialPerspectives?: string[]) {
       approved,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
-      options,
+      { aiProvider: settings.aiProvider, ...options },
     );
 
     if (response.action === "start_collecting") {
@@ -599,6 +599,7 @@ export function useChat(initialPerspectives?: string[]) {
       undefined,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
+      { aiProvider: settings.aiProvider },
     );
 
     if (collectResponse.action === "error") {
@@ -930,6 +931,7 @@ export function useChat(initialPerspectives?: string[]) {
         settings.aiLanguage,
         "",
         {
+          aiProvider: settings.aiProvider,
           councilDebatePoint: params.debatePoint,
           councilFindingIds: params.findingIds,
           councilPerspectives: params.perspectives,

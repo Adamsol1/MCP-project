@@ -62,22 +62,20 @@ try:
     config_path = PROJECT_DIR / "config.yaml"
     logger.info(f"Loading config from: {config_path}")
     config = load_config(str(config_path))
-    provider = os.getenv("LLM_PROVIDER", "local").strip().lower()
-    if provider not in {"gemini", "gemini-api", "gemini_api", "google"}:
-        adapter_config = getattr(config, "adapters", {}).get("openai")
-        if adapter_config is not None:
-            adapter_config.base_url = os.getenv(
-                "LLM_BASE_URL", "http://127.0.0.1:8000/v1"
-            )
-            adapter_config.api_key = os.getenv("LLM_API_KEY", "my-secret-key")
-            timeout = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv(
-                "VLLM_TIMEOUT_SECONDS"
-            )
-            if timeout:
-                try:
-                    adapter_config.timeout = int(timeout)
-                except ValueError:
-                    logger.warning("Ignoring invalid LLM_TIMEOUT_SECONDS=%s", timeout)
+    adapter_config = getattr(config, "adapters", {}).get("openai")
+    if adapter_config is not None:
+        adapter_config.base_url = os.getenv(
+            "LLM_BASE_URL", "http://127.0.0.1:8000/v1"
+        )
+        adapter_config.api_key = os.getenv("LLM_API_KEY", "my-secret-key")
+        timeout = os.getenv("LLM_TIMEOUT_SECONDS") or os.getenv(
+            "VLLM_TIMEOUT_SECONDS"
+        )
+        if timeout:
+            try:
+                adapter_config.timeout = int(timeout)
+            except ValueError:
+                logger.warning("Ignoring invalid LLM_TIMEOUT_SECONDS=%s", timeout)
     logger.info("Configuration loaded successfully")
 except Exception as e:
     logger.error(f"Failed to load config: {e}", exc_info=True)

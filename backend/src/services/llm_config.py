@@ -3,6 +3,9 @@
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
 from dataclasses import dataclass
 
 DEFAULT_LLM_BASE_URL = "http://127.0.0.1:8000/v1"
@@ -11,6 +14,11 @@ DEFAULT_LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 DEFAULT_LLM_TIMEOUT_SECONDS = 180
 DEFAULT_LLM_PROVIDER = "local"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
+_request_llm_provider: ContextVar[str | None] = ContextVar(
+    "request_llm_provider",
+    default=None,
+)
 
 
 def _first_env(*names: str) -> str | None:
@@ -76,10 +84,11 @@ def get_llm_provider() -> str:
     gemini: Google Gemini API, configured by GEMINI_API_KEY/GEMINI_MODEL.
     """
 
-    provider = (
+    provider = _request_llm_provider.get() or (
         _first_env("LLM_PROVIDER", "AI_PROVIDER", "MODEL_PROVIDER")
         or DEFAULT_LLM_PROVIDER
-    ).strip().lower()
+    )
+    provider = provider.strip().lower()
     aliases = {
         "local": "local",
         "local_llm": "local",
@@ -102,3 +111,21 @@ def get_default_model_name() -> str:
     if get_llm_provider() == "gemini":
         return get_default_gemini_model()
     return get_default_llm_model()
+
+
+@contextmanager
+def request_llm_provider(provider: str | None) -> Iterator[None]:
+    """Temporarily override the provider for the current request/task."""
+
+    if provider is None:
+        yield
+        return
+
+    normalized_provider = provider.strip().lower()
+    token = _request_llm_provider.set(normalized_provider)
+    try:
+        # Validate early so API requests fail before any model call starts.
+        get_llm_provider()
+        yield
+    finally:
+        _request_llm_provider.reset(token)

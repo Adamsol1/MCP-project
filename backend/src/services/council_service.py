@@ -66,14 +66,16 @@ class CouncilService:
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
         self.mcp_client = mcp_client or MCPClient(server_url=get_council_mcp_url())
+        self.adapter = get_council_adapter()
+        self.model = get_council_model()
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
     ) -> CouncilRuntimeProfile:
         settings = council_settings or CouncilRunSettings()
         return CouncilRuntimeProfile(
-            adapter=self.DEFAULT_ADAPTER,
-            model=self.DEFAULT_MODEL,
+            adapter=self.adapter,
+            model=self.model,
             mode=settings.mode,
             rounds=settings.rounds,
             timeout_per_round_seconds=settings.timeout_seconds,
@@ -116,8 +118,8 @@ class CouncilService:
             )
             participants.append(
                 {
-                    "cli": self.DEFAULT_ADAPTER,
-                    "model": self.DEFAULT_MODEL,
+                    "cli": self.adapter,
+                    "model": self.model,
                     "display_name": get_display_name(perspective),
                     "persona_prompt": f"{persona}\n\n{behavior}",
                 }
@@ -186,8 +188,8 @@ class CouncilService:
                 "summarize_entries",
                 {
                     "entries": payload,
-                    "adapter": self.DEFAULT_ADAPTER,
-                    "model": self.DEFAULT_MODEL,
+                    "adapter": self.adapter,
+                    "model": self.model,
                 },
             )
             result_list = result if isinstance(result, list) else []

@@ -1,7 +1,12 @@
 import { useState } from "react";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import { useT } from "../../i18n/useT";
-import type { CouncilSettings, Language, Theme } from "../../types/settings";
+import type {
+  AiProvider,
+  CouncilSettings,
+  Language,
+  Theme,
+} from "../../types/settings";
 
 /** Props for the SettingsModal component. */
 interface SettingsModalProps {
@@ -34,6 +39,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     settings,
     updateLanguage,
     updateAiLanguage,
+    updateAiProvider,
     updateTheme,
     updateInputParameters,
     updateCouncilSettings,
@@ -108,6 +114,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <ParametersSection
                 aiLanguage={settings.aiLanguage}
                 onAiLanguageChange={updateAiLanguage}
+                aiProvider={settings.aiProvider}
+                onAiProviderChange={updateAiProvider}
                 timeframe={settings.inputParameters.timeframe}
                 onTimeframeChange={(v) => updateInputParameters({ timeframe: v })}
               />
@@ -242,11 +250,15 @@ function GeneralSection({
 function ParametersSection({
   aiLanguage,
   onAiLanguageChange,
+  aiProvider,
+  onAiProviderChange,
   timeframe,
   onTimeframeChange,
 }: {
   aiLanguage: Language;
   onAiLanguageChange: (l: Language) => void;
+  aiProvider: AiProvider;
+  onAiProviderChange: (p: AiProvider) => void;
   timeframe: string;
   onTimeframeChange: (v: string) => void;
 }) {
@@ -264,6 +276,22 @@ function ParametersSection({
           >
             <option value="en">{t.langEnglish}</option>
             <option value="no">{t.langNorwegian}</option>
+          </select>
+        }
+      />
+      <SettingRow
+        label={t.aiProviderLabel}
+        htmlFor="ai-provider"
+        description={t.aiProviderDesc}
+        control={
+          <select
+            id="ai-provider"
+            value={aiProvider}
+            onChange={(e) => onAiProviderChange(e.target.value as AiProvider)}
+            className={selectClass}
+          >
+            <option value="local">{t.aiProviderLabels.local}</option>
+            <option value="gemini">{t.aiProviderLabels.gemini}</option>
           </select>
         }
       />

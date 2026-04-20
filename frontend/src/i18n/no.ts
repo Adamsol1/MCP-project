@@ -147,6 +147,12 @@ export const no = {
   uiLanguageDesc: "Spr\u00e5ket som brukes i grensesnittet.",
   aiOutputLanguage: "AI-utdataspr\u00e5k",
   aiOutputLanguageDesc: "Spr\u00e5ket som AI vil bruke i sine svar.",
+  aiProviderLabel: "AI-leverand\u00f8r",
+  aiProviderDesc: "Velg om foresp\u00f8rsler bruker Gemini API eller lokal LLM.",
+  aiProviderLabels: {
+    local: "Lokal LLM",
+    gemini: "Gemini API",
+  } as Record<string, string>,
   langEnglish: "Engelsk",
   langNorwegian: "Norsk",
   themeLabel: "Tema",
