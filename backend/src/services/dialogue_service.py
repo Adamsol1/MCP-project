@@ -64,11 +64,24 @@ class DialogueService:
         if missing_fields:
             question_result["has_sufficient_context"] = False
 
+        # Defensive access — local models sometimes use variant key names
+        question_text = (
+            question_result.get("question")
+            or question_result.get("question_text")
+            or question_result.get("clarifying_question")
+        )
+        if not question_text:
+            logger.error(
+                "[DialogueService] LLM JSON missing 'question' key. Keys: %s",
+                list(question_result.keys()),
+            )
+            raise ValueError("LLM response missing required 'question' field")
+
         extracted_context = question_result.get("context", {})
         question = ClarifyingQuestion(
-            question_text=question_result["question"],
-            question_type=question_result["type"],
-            is_final=question_result["has_sufficient_context"],
+            question_text=question_text,
+            question_type=question_result.get("type", "clarifying"),
+            is_final=question_result.get("has_sufficient_context", False),
         )
         return QuestionResult(question=question, extracted_context=extracted_context)
 
@@ -264,9 +277,42 @@ class DialogueService:
 
     @staticmethod
     def _parse_json(raw: str) -> Any:
-        """Parse JSON from raw LLM output, stripping markdown code fences if present."""
+        """Parse JSON from raw LLM output, stripping markdown code fences if present.
+
+        Local models (e.g. Qwen 7B) often produce slightly malformed JSON
+        (smart quotes, trailing commas, extra prose around the object).
+        We reuse the robust repair pipeline from LLMService to handle this.
+        """
+        from src.services.llm_service import _repair_json
+
         text = raw.strip()
+
+        # Strip markdown code fences
         if text.startswith("```"):
             lines = text.splitlines()
-            text = "\n".join(lines[1:-1])
-        return json.loads(text)
+            text = "\n".join(lines[1:-1]).strip()
+
+        # Extract the outermost JSON object/array (ignore surrounding prose)
+        for start_char, end_char in (("{", "}"), ("[", "]")):
+            start = text.find(start_char)
+            end = text.rfind(end_char)
+            if start != -1 and end != -1 and end > start:
+                text = text[start : end + 1]
+                break
+
+        # Try parsing as-is first
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # Apply repair pipeline and retry
+        repaired = _repair_json(text)
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            logger.error(
+                "[DialogueService] Failed to parse JSON from LLM response: %s",
+                raw[:500],
+            )
+            raise

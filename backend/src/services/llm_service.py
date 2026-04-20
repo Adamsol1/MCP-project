@@ -25,16 +25,24 @@ logger = logging.getLogger("app")
 def _repair_json(text: str) -> str:
     """Apply a sequence of increasingly aggressive repairs to LLM-generated JSON.
 
-    Repair 1 — smart/curly quotes: replace typographic " " ' ' with ASCII equivalents.
-    Repair 2 — bad escape sequences: remove backslashes before characters that are not
+    Repair 1 — Python literals: local models often emit Python-style None, True,
+               False instead of JSON null, true, false.
+    Repair 2 — smart/curly quotes: replace typographic " " ' ' with ASCII equivalents.
+    Repair 3 — bad escape sequences: remove backslashes before characters that are not
                valid JSON escape targets (e.g. \' produced by some models).
-    Repair 3 — trailing commas: strip commas immediately before ] or }.
-    Repair 4 — unescaped inner quotes: scan character-by-character; when inside a JSON
+    Repair 4 — trailing commas: strip commas immediately before ] or }.
+    Repair 5 — unescaped inner quotes: scan character-by-character; when inside a JSON
                string, any " not immediately followed by a JSON structural character
                (, } ] : or end-of-input) is treated as an unescaped quote and gets
                escaped to \".
     """
-    # Repair 1: typographic quotes → ASCII
+    # Repair 1: Python literals → JSON equivalents
+    # Only replace when NOT inside a quoted string (word-boundary match).
+    text = re.sub(r'\bNone\b', 'null', text)
+    text = re.sub(r'\bTrue\b', 'true', text)
+    text = re.sub(r'\bFalse\b', 'false', text)
+
+    # Repair 2: typographic quotes → ASCII
     text = (
         text.replace("\u201c", '"')
         .replace("\u201d", '"')
@@ -42,13 +50,13 @@ def _repair_json(text: str) -> str:
         .replace("\u2019", "'")
     )
 
-    # Repair 2: invalid escape sequences (e.g. \' → ')
+    # Repair 3: invalid escape sequences (e.g. \' → ')
     text = re.sub(r"\\([^\"\\\/bfnrtu])", r"\1", text)
 
-    # Repair 3: trailing commas before } or ]
+    # Repair 4: trailing commas before } or ]
     text = re.sub(r",\s*([}\]])", r"\1", text)
 
-    # Repair 4: unescaped double quotes inside string values.
+    # Repair 5: unescaped double quotes inside string values.
     # Heuristic: when inside a string, a " is the closing quote only when
     # the next non-whitespace char is a JSON structural character (, } ] :)
     # or the text ends.  Otherwise it is escaped.

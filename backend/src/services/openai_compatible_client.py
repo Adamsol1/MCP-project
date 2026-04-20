@@ -20,6 +20,11 @@ class OpenAICompatibleClient:
     SDK.
     """
 
+    # Class-level flag: once we learn that the provider does not support tool
+    # calling, skip sending tools on all subsequent requests to avoid a
+    # wasted 400 round-trip on every single call.
+    _tools_supported: bool = True
+
     def __init__(self, config: LLMConfig | None = None, model: str | None = None):
         self.config = config or get_llm_config(model=model)
         self.base_url = self.config.base_url.rstrip("/")
@@ -31,6 +36,10 @@ class OpenAICompatibleClient:
         *,
         tools: list[dict[str, Any]] | None = None,
     ) -> dict[str, Any]:
+        # Strip tools if the provider already told us it doesn't support them.
+        if not OpenAICompatibleClient._tools_supported:
+            tools = None
+
         body: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
@@ -54,10 +63,11 @@ class OpenAICompatibleClient:
                 if not tools or not self._is_tool_support_error(exc.response):
                     raise
 
+                OpenAICompatibleClient._tools_supported = False
                 logger.warning(
                     "[OpenAICompatibleClient] Provider rejected tool-calling metadata; "
-                    "retrying without native tools. To enable MCP tool-calling with "
-                    "vLLM, start it with --enable-auto-tool-choice and the matching "
+                    "disabling tools for subsequent requests. To enable MCP tool-calling "
+                    "with vLLM, start it with --enable-auto-tool-choice and the matching "
                     "--tool-call-parser for the model."
                 )
                 fallback_body = dict(body)
