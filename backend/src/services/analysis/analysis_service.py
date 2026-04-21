@@ -70,7 +70,7 @@ class AnalysisService:
                     agent = GeminiAgent(self.mcp_client)
                     raw = await agent.run(
                         system_prompt=system_prompt,
-                        task=f"Generate an intelligence analysis from the {perspective} perspective.",
+                        task=f"Using your {perspective} persona, analyse the provided findings and develop substantive intelligence implications — focus on strategic meaning, not just description.",
                         allowed_tool_names=set(),
                     )
 
