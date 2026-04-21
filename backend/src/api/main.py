@@ -62,6 +62,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
+
 # Cors middleware to allow request from frontend
 app.add_middleware(
     CORSMiddleware,

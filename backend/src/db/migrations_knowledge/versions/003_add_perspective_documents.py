@@ -17,6 +17,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    existing = sa.inspect(bind).get_table_names()
+    if "perspective_documents" in existing:
+        return
     op.create_table(
         "perspective_documents",
         sa.Column("id", sa.String(), primary_key=True),

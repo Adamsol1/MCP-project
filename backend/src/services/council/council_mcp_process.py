@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -75,15 +74,10 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
         logger.warning("[Council MCP] Cannot autostart; missing %s", server_file)
         return None
 
-    poetry = shutil.which("poetry")
-    if poetry is None:
-        logger.warning("[Council MCP] Cannot autostart; poetry is not on PATH")
-        return None
-
     logger.info("[Council MCP] Starting local server for %s", server_url)
     try:
         process = subprocess.Popen(
-            [poetry, "run", "python", "server_http.py"],
+            [sys.executable, "server_http.py"],
             cwd=str(council_dir),
         )
     except OSError as e:

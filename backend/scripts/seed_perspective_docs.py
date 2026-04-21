@@ -4,12 +4,19 @@ Each perspective (us, norway, eu, china, russia) gets three documents covering
 Political, Economic, and Military sections. Content represents key positions and
 doctrines that a threat analyst would reference when interpreting state behaviour.
 
+Two sources are combined:
+  1. PERSPECTIVE_DOCUMENTS list below — hand-authored baseline entries.
+  2. perspective_docs/ directory — one Markdown file per document with YAML
+     frontmatter containing metadata (id, perspective, section, title, source,
+     date_published). Files in this directory override list entries with the same id.
+
 Usage:
     cd backend
     python scripts/seed_perspective_docs.py
 """
 
 import os
+import re
 import sqlite3
 from datetime import datetime, UTC
 from pathlib import Path
@@ -489,6 +496,48 @@ Russia's demonstrated willingness to use nuclear signalling as a coercive tool �
 ]
 
 
+DOCS_DIR = SCRIPT_DIR / "perspective_docs"
+
+
+def _parse_frontmatter(text: str) -> tuple[dict, str]:
+    """Split YAML frontmatter from markdown body. Returns (meta, body)."""
+    if not text.startswith("---"):
+        return {}, text
+    end = text.index("---", 3)
+    fm_block = text[3:end].strip()
+    body = text[end + 3:].strip()
+    meta: dict = {}
+    for line in fm_block.splitlines():
+        if ":" not in line:
+            continue
+        key, _, val = line.partition(":")
+        meta[key.strip()] = val.strip().strip('"')
+    return meta, body
+
+
+def _load_markdown_docs() -> list[dict]:
+    """Load all .md files from perspective_docs/ as seed entries."""
+    docs = []
+    for path in sorted(DOCS_DIR.glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        meta, body = _parse_frontmatter(text)
+        if not meta.get("id"):
+            continue
+        raw_date = meta.get("date_published", "2000-01-01")
+        parts = [int(p) for p in raw_date.split("-")]
+        date_published = datetime(*parts, tzinfo=UTC)
+        docs.append({
+            "id": meta["id"],
+            "perspective": meta["perspective"],
+            "section": meta["section"],
+            "title": meta["title"],
+            "source": meta.get("source", ""),
+            "date_published": date_published,
+            "markdown_content": body,
+        })
+    return docs
+
+
 def seed() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     db_path = Path(os.getenv("KNOWLEDGE_DB_PATH", str(DATA_DIR / "knowledge.db")))
@@ -511,8 +560,13 @@ def seed() -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS idx_persp_docs_perspective ON perspective_documents(perspective)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_persp_docs_section ON perspective_documents(section)")
 
+    # Merge: file-based docs override list entries with the same id
+    file_docs = _load_markdown_docs()
+    file_ids = {d["id"] for d in file_docs}
+    all_docs = [d for d in PERSPECTIVE_DOCUMENTS if d["id"] not in file_ids] + file_docs
+
     inserted = 0
-    for doc in PERSPECTIVE_DOCUMENTS:
+    for doc in all_docs:
         conn.execute(
             """INSERT INTO perspective_documents
                    (id, perspective, section, title, source, date_published, markdown_content, is_active)
@@ -540,6 +594,8 @@ def seed() -> None:
     conn.commit()
     conn.close()
     print(f"Seeded {inserted} perspective documents into {db_path}")
+    print(f"  {len(file_docs)} from perspective_docs/ markdown files")
+    print(f"  {inserted - len(file_docs)} from inline PERSPECTIVE_DOCUMENTS list")
 
 
 if __name__ == "__main__":
