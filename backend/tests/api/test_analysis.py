@@ -7,8 +7,8 @@ from fastapi.testclient import TestClient
 from src.api import analysis as analysis_api
 from src.api.main import app
 from src.models.analysis import AnalysisDraft, CouncilNote
-from src.services.analysis_session_store import AnalysisSessionStore
-from src.services.processing_prototype_service import (
+from src.services.analysis.analysis_session_store import AnalysisSessionStore
+from src.services.processing.processing_result_store import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
 )
 
@@ -85,8 +85,10 @@ def _write_legacy_processed_json(tmp_path, session_id: str) -> None:
     )
 
 
-class _FakeAnalysisPrototypeService:
-    async def generate_draft(self, processing_result, selected_perspectives=None):
+class _FakeAnalysisService:
+    async def generate_draft(
+        self, processing_result, selected_perspectives=None, _pir=""
+    ):
         del selected_perspectives
         return AnalysisDraft(
             summary="Live-style analysis summary grounded in the session processing result.",
@@ -174,8 +176,8 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
     monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda: store)
     monkeypatch.setattr(
         analysis_api,
-        "AnalysisPrototypeService",
-        lambda: _FakeAnalysisPrototypeService(),
+        "AnalysisService",
+        lambda _: _FakeAnalysisService(),
     )
     monkeypatch.setattr(analysis_api, "CouncilService", lambda: _FakeCouncilService())
     monkeypatch.setattr(analysis_api, "ResearchLogger", logger_factory)
@@ -186,7 +188,7 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "src.services.processing_prototype_service._SESSIONS_DATA_DIR",
+        "src.services.processing_result_store._SESSIONS_DATA_DIR",
         tmp_path,
     )
 

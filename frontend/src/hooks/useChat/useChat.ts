@@ -1,10 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getDevDialogueState,
+  listDevDialogueSnapshots,
   resetDevDialogueState,
+  restoreDevDialogueSnapshot,
   sendMessage,
   setDevDialogueState,
+  type CouncilRunSettings,
   type DialogueApiResponse,
+  type DialogueDevSnapshot,
   type DialogueSendOptions,
 } from "../../services/dialogue/dialogue";
 import type {
@@ -15,6 +19,7 @@ import type {
 } from "../../types/dialogue";
 import { useConversation } from "../useConversation/useConversation";
 import { useToast } from "../useToast/useToast";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type {
   CollectionPlanData,
   CollectionPlanStep,
@@ -26,7 +31,10 @@ import type {
   SuggestedSourcesData,
   SummaryData,
 } from "../../types/conversation";
+import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+
+let didRequestInitialDevSnapshots = false;
 
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
@@ -48,6 +56,8 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   start_collecting: "question",
   show_collection: "collection",
   show_processing: "processing",
+  show_analysis: "analysis",
+  show_council: "council",
   select_gaps: "question",
   error: "error",
   complete: "complete",
@@ -107,7 +117,7 @@ function normalizeSourceLabel(raw: string): string {
     return "AlienVault OTX";
   }
   if (lower.includes("knowledge") && lower.includes("bank")) {
-    return "Internal Knowledge Bank";
+    return "Knowledge Bank";
   }
   if (lower.includes("misp")) {
     return "MISP";
@@ -184,10 +194,19 @@ function parsePlanData(raw: string): CollectionPlanData {
       ? jsonSteps
       : parseStepsFromPlanText(plan);
 
+  // Aggregate suggested_sources: prefer per-step sources (deduplicated union),
+  // fall back to top-level suggested_sources for legacy payloads.
+  const stepSources: string[] =
+    steps && steps.some((s) => s.suggested_sources && s.suggested_sources.length > 0)
+      ? [...new Set(steps.flatMap((s) => s.suggested_sources ?? []))]
+      : [];
+  const globalSources = parseSourcesFromUnknown(parsed.suggested_sources);
+  const suggested_sources = stepSources.length > 0 ? stepSources : globalSources;
+
   return {
     plan,
     steps,
-    suggested_sources: parseSourcesFromUnknown(parsed.suggested_sources),
+    suggested_sources,
   };
 }
 
@@ -247,6 +266,12 @@ function inferStageFromResponse(
   }
   if (response.action === "show_processing") {
     return { stage: "processing", subState: "awaiting_decision" };
+  }
+  if (response.action === "show_analysis") {
+    return { stage: "pending", subState: null };
+  }
+  if (response.action === "show_council") {
+    return { stage: "idle", subState: null };
   }
   if (response.action === "select_gaps") {
     return { stage: "reviewing", subState: "awaiting_gather_more" };
@@ -363,6 +388,24 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       break;
     }
 
+    case "analysis": {
+      const parsed = tryParseJson<AnalysisResponse>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Analysis complete";
+      break;
+    }
+
+    case "council": {
+      const parsed = tryParseJson<CouncilNote>(response.question);
+      if (parsed) {
+        message.data = parsed;
+      }
+      message.text = "Council deliberation complete";
+      break;
+    }
+
     case "suggested_sources": {
       const sources = parseSuggestedSources(response.question);
       if (sources.length > 0) {
@@ -389,14 +432,41 @@ function getFeedbackPrompt(stage: DialogueStage): string {
   return "What should be modified in the collected summary?";
 }
 
-export function useChat() {
-  const { activeConversation, createNewConversation, addMessage, setStage } =
-    useConversation();
+export function useChat(initialPerspectives?: string[]) {
+  const {
+    activeConversation,
+    createNewConversation,
+    addMessage,
+    replaceMessages,
+    setStage,
+  } = useConversation();
   const { settings } = useSettings();
   const { success, info, error } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isDecisionPending, setIsDecisionPending] = useState(false);
+  const { setReviewActivity } = useWorkspace();
+  const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
+  const [decisionPendingIds, setDecisionPendingIds] = useState<Set<string>>(new Set());
+
+  const setIsLoading = (id: string, value: boolean) => {
+    setLoadingIds((prev) => {
+      const next = new Set(prev);
+      value ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const setIsDecisionPending = (id: string, value: boolean) => {
+    setDecisionPendingIds((prev) => {
+      const next = new Set(prev);
+      value ? next.add(id) : next.delete(id);
+      return next;
+    });
+  };
+
+  const isLoading = loadingIds.has(activeConversation?.id ?? "");
+  const isDecisionPending = decisionPendingIds.has(activeConversation?.id ?? "");
+
   const [devPrefill, setDevPrefill] = useState<string | null>(null);
+  const [inputPrefill, setInputPrefill] = useState<string | null>(null);
   const [suggestedSources, setSuggestedSources] = useState<string[]>([]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [localSourceContext, setLocalSourceContext] = useState<
@@ -405,6 +475,8 @@ export function useChat() {
   const [pendingGatherMoreText, setPendingGatherMoreText] = useState<
     string | null
   >(null);
+  const [devSnapshots, setDevSnapshots] = useState<DialogueDevSnapshot[]>([]);
+  const [isDevSnapshotsLoading, setIsDevSnapshotsLoading] = useState(false);
 
   const messages = useMemo(
     () => activeConversation?.messages ?? [],
@@ -467,15 +539,21 @@ export function useChat() {
     fallbackSubState: DialogueSubState,
     fallbackPhase: DialoguePhase,
   ) => {
-    addMessage(buildSystemMessage(response), conversationId);
+    if (response.action !== "complete") {
+      addMessage(buildSystemMessage(response), conversationId);
+    }
 
-    const next = inferStageFromResponse(
-      response,
-      fallbackStage,
-      fallbackSubState,
-    );
+    const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
     const nextPhase = inferPhaseFromResponse(response, next.stage, fallbackPhase);
-    setStage(next.stage, next.subState, nextPhase);
+
+    // Reset review activity when phase changes, then apply new data if present
+    if (nextPhase !== fallbackPhase) {
+      setReviewActivity(response.review_activity ?? []);
+    } else if (response.review_activity && response.review_activity.length > 0) {
+      setReviewActivity(response.review_activity);
+    }
+
+    setStage(conversationId, next.stage, next.subState, nextPhase);
   };
 
   const sendAndHandle = async (
@@ -499,15 +577,18 @@ export function useChat() {
       options,
     );
 
-    applyResponse(
-      response,
-      conversationId,
-      fallbackStage,
-      fallbackSubState,
-      fallbackPhase,
-    );
-
-    if (response.action !== "start_collecting") {
+    if (response.action === "start_collecting") {
+      // Skip the "Collecting from: ..." message — the Collection Results card
+      // already shows the sources used.  Just advance the stage.
+      setStage(conversationId, "collecting", null, "collection");
+    } else {
+      applyResponse(
+        response,
+        conversationId,
+        fallbackStage,
+        fallbackSubState,
+        fallbackPhase,
+      );
       return;
     }
 
@@ -538,11 +619,13 @@ export function useChat() {
   };
 
   const handleSendMessage = async (text: string, approved?: boolean) => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
+    const conversationId = conversation.id;
 
     addMessage(
       { id: crypto.randomUUID(), text, sender: "user" },
-      conversation.id,
+      conversationId,
     );
 
     // Intercept gather_more text — store locally and show source selection instead of backend call
@@ -556,10 +639,10 @@ export function useChat() {
       return;
     }
 
-    setIsLoading(true);
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
-        conversation.id,
+        conversationId,
         conversation.sessionId,
         text,
         approved,
@@ -572,15 +655,16 @@ export function useChat() {
     } catch (e) {
       error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+        setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
   const approve = async () => {
     if (!activeConversation) return;
+    const conversationId = activeConversation.id;
 
     // For plan_confirming: show local source selection instead of calling backend
     if (stage === "plan_confirming") {
@@ -588,11 +672,19 @@ export function useChat() {
       return;
     }
 
-    setIsDecisionPending(true);
-    setIsLoading(true);
+    setIsDecisionPending(conversationId, true);
+    setIsLoading(conversationId, true);
+
+    // Optimistically advance the phase so the stage tracker updates immediately
+    if (stage === "reviewing" && activeConversation.phase === "collection") {
+      setStage(conversationId, "pending", null, "processing");
+    } else if (stage === "processing" && subState === "awaiting_decision") {
+      setStage(conversationId, "pending", null, "analysis");
+    }
+
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         "approve",
         true,
@@ -602,15 +694,20 @@ export function useChat() {
         activeConversation.phase,
         activeConversation.perspectives,
       );
-      success("Request approved");
+      // Only show toast if the user is still viewing the same conversation
+      if (activeConversation?.id === conversationId) {
+        success("Request approved");
+      }
     } catch (e) {
-      error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
-      if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+      if (activeConversation?.id === conversationId) {
+        error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
+        if (activeConversation.stage === "collecting") {
+          setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
+        }
       }
     } finally {
-      setIsLoading(false);
-      setIsDecisionPending(false);
+      setIsLoading(conversationId, false);
+      setIsDecisionPending(conversationId, false);
     }
   };
 
@@ -628,16 +725,17 @@ export function useChat() {
       activeConversation.id,
     );
 
-    setStage(stage, "awaiting_modifications");
+    setStage(activeConversation.id, stage, "awaiting_modifications");
     info("Add your feedback in chat.");
   };
 
   const gatherMoreFromProcessing = async () => {
     if (!activeConversation) return;
-    setIsLoading(true);
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         "",
         undefined,
@@ -652,7 +750,7 @@ export function useChat() {
         `Gather more failed: ${e instanceof Error ? e.message : String(e)}`,
       );
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
@@ -669,7 +767,7 @@ export function useChat() {
       },
       activeConversation.id,
     );
-    setStage("reviewing", "awaiting_gather_more");
+    setStage(activeConversation.id, "reviewing", "awaiting_gather_more");
     info("Describe what to gather more on.");
   };
 
@@ -699,10 +797,11 @@ export function useChat() {
     setLocalSourceContext(null);
     setPendingGatherMoreText(null);
 
-    setIsLoading(true);
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
     try {
       await sendAndHandle(
-        activeConversation.id,
+        conversationId,
         activeConversation.sessionId,
         message,
         approved,
@@ -719,10 +818,10 @@ export function useChat() {
         }`,
       );
       if (activeConversation?.stage === "collecting") {
-        setStage("plan_confirming", "awaiting_decision", "collection");
+        setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
     } finally {
-      setIsLoading(false);
+      setIsLoading(conversationId, false);
     }
   };
 
@@ -734,8 +833,17 @@ export function useChat() {
     setDevPrefill(null);
   };
 
+  const prefillGapPrompt = (message: string) => {
+    setInputPrefill(message);
+  };
+
+  const clearInputPrefill = () => {
+    setInputPrefill(null);
+  };
+
   const debugConfirm = () => {
-    const conversation = activeConversation ?? createNewConversation();
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
     addMessage(
       {
         id: crypto.randomUUID(),
@@ -744,7 +852,7 @@ export function useChat() {
       },
       conversation.id,
     );
-    setStage("summary_confirming", "awaiting_decision", "direction");
+    setStage(conversation.id, "summary_confirming", "awaiting_decision", "direction");
   };
 
   const jumpToDevStage = async (
@@ -759,6 +867,7 @@ export function useChat() {
         nextSubState,
       );
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -774,6 +883,7 @@ export function useChat() {
     try {
       const response = await getDevDialogueState(activeConversation.sessionId);
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -791,6 +901,7 @@ export function useChat() {
         activeConversation.sessionId,
       );
       setStage(
+        activeConversation.id,
         response.stage,
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
@@ -801,9 +912,114 @@ export function useChat() {
     }
   };
 
+  const sendCouncilRequest = async (params: {
+    debatePoint: string;
+    findingIds: string[];
+    perspectives: string[];
+    councilSettings: CouncilRunSettings;
+  }) => {
+    if (!activeConversation) return;
+    const conversationId = activeConversation.id;
+    setIsLoading(conversationId, true);
+    try {
+      const response = await sendMessage(
+        "",
+        activeConversation.sessionId,
+        activeConversation.perspectives,
+        undefined,
+        settings.aiLanguage,
+        "",
+        {
+          councilDebatePoint: params.debatePoint,
+          councilFindingIds: params.findingIds,
+          councilPerspectives: params.perspectives,
+          councilSettings: params.councilSettings,
+        },
+      );
+      if (response.action === "error") {
+        throw new Error(response.question || "Council run failed.");
+      }
+      applyResponse(response, conversationId, "idle", null, "analysis");
+    } finally {
+      setIsLoading(conversationId, false);
+    }
+  };
+
+  const refreshDevSnapshots = async () => {
+    setIsDevSnapshotsLoading(true);
+    try {
+      const snapshots = await listDevDialogueSnapshots();
+      setDevSnapshots(snapshots);
+      if (snapshots.length === 0) {
+        info("No previous backend runs found.");
+      }
+    } catch (e) {
+      const status =
+        typeof e === "object" && e !== null && "response" in e
+          ? (e as { response?: { status?: number } }).response?.status
+          : undefined;
+      error(
+        status === 404
+          ? "Previous-run dev endpoint not found. Restart the backend."
+          : "Failed to load previous runs",
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (didRequestInitialDevSnapshots) return;
+    didRequestInitialDevSnapshots = true;
+    void refreshDevSnapshots();
+    // Dev snapshot loading is intentionally one-shot on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const restoreDevSnapshot = async (
+    sourceSessionId: string,
+    targetStage: DialogueStage,
+    targetPhase: DialoguePhase,
+  ) => {
+    const conversation =
+      activeConversation ?? createNewConversation(initialPerspectives);
+    setIsDevSnapshotsLoading(true);
+    try {
+      const response = await restoreDevDialogueSnapshot(
+        sourceSessionId,
+        conversation.sessionId,
+        targetStage,
+        targetPhase,
+      );
+      replaceMessages(
+        conversation.id,
+        response.messages.map((message) => ({
+          ...message,
+          id: crypto.randomUUID(),
+        })),
+      );
+      setStage(
+        conversation.id,
+        response.stage,
+        response.sub_state ?? defaultSubStateForStage(response.stage),
+        response.phase,
+      );
+      success(`Loaded previous run: ${sourceSessionId.slice(0, 8)}`);
+    } catch (e) {
+      error(
+        `Failed to restore previous run: ${
+          e instanceof Error ? e.message : String(e)
+        }`,
+      );
+    } finally {
+      setIsDevSnapshotsLoading(false);
+    }
+  };
+
   return {
     messages,
     sendMessage: handleSendMessage,
+    sendCouncilRequest,
     isConfirming,
     stage,
     subState,
@@ -822,8 +1038,15 @@ export function useChat() {
     jumpToDevStage,
     syncDevStage,
     resetDevStage,
+    devSnapshots,
+    isDevSnapshotsLoading,
+    refreshDevSnapshots,
+    restoreDevSnapshot,
     devPrefill,
     triggerDevMessage,
     clearDevPrefill,
+    inputPrefill,
+    prefillGapPrompt,
+    clearInputPrefill,
   };
 }

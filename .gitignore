@@ -195,12 +195,11 @@ backend/data/outputs/*
 !backend/data/outputs/.gitkeep
 !backend/data/outputs/demo_processing_result.json
 
-# Session files (persisted dialogue state)
-backend/sessions/*
-!backend/sessions/.gitkeep
 
 # Local database files
 *.db
+*.db-wal
+*.db-shm
 *.sqlite
 *.sqlite3
 
@@ -271,7 +270,6 @@ site/
 /backend/data/imports
 /mcp_server/uploads
 /backend/data/web_search
-install.sh
 /backend/data/web_search
 /backend/data
 !/backend/data/

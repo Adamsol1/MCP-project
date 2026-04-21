@@ -4,10 +4,6 @@ Run with:
     cd backend && pytest tests/services/test_mcp_staging.py -v
 """
 
-from pathlib import Path
-
-import pytest
-
 from src.services import mcp_staging
 
 
@@ -41,7 +37,10 @@ class TestStageToMcp:
         mcp_staging.stage_to_mcp("session-1", "file-abc", str(source))
 
         staged = mcp_dir / "session-1" / "file-abc.md"
-        assert staged.read_text(encoding="utf-8") == "# Intelligence Report\n\nSome content."
+        assert (
+            staged.read_text(encoding="utf-8")
+            == "# Intelligence Report\n\nSome content."
+        )
 
     def test_stage_creates_session_subdir_if_missing(self, tmp_path, monkeypatch):
         mcp_dir = tmp_path / "mcp_uploads"
@@ -65,7 +64,9 @@ class TestStageToMcp:
 
     def test_stage_returns_false_if_source_does_not_exist(self, tmp_path, monkeypatch):
         monkeypatch.setenv("MCP_UPLOADS_DIR", str(tmp_path))
-        result = mcp_staging.stage_to_mcp("session-1", "file-abc", str(tmp_path / "nonexistent.md"))
+        result = mcp_staging.stage_to_mcp(
+            "session-1", "file-abc", str(tmp_path / "nonexistent.md")
+        )
         assert result is False
 
     def test_stage_does_not_modify_source_file(self, tmp_path, monkeypatch):

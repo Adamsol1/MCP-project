@@ -33,12 +33,12 @@ export default function PerspectiveSelector({
   const t = useT();
 
   const perspectives = [
-    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL" },
-    { label: t.perspectiveLabels["CHINA"], value: "CHINA" },
-    { label: t.perspectiveLabels["EU"], value: "EU" },
-    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY" },
-    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA" },
-    { label: t.perspectiveLabels["US"], value: "US" },
+    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL", icon: "🌐" },
+    { label: t.perspectiveLabels["CHINA"], value: "CHINA", icon: "🇨🇳" },
+    { label: t.perspectiveLabels["EU"], value: "EU", icon: "🇪🇺" },
+    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY", icon: "🇳🇴" },
+    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA", icon: "🇷🇺" },
+    { label: t.perspectiveLabels["US"], value: "US", icon: "🇺🇸" },
   ];
 
   /**
@@ -69,10 +69,6 @@ export default function PerspectiveSelector({
 
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
-        {t.perspective}
-      </p>
-
       <div className="grid grid-cols-2 gap-1">
         {perspectives.map((perspective) => {
           const isActive = selected.includes(perspective.value);
@@ -82,13 +78,14 @@ export default function PerspectiveSelector({
               onClick={() => togglePerspective(perspective.value)}
               aria-pressed={isActive}
               data-selected={isActive.toString()}
-              className={`py-1.5 rounded text-[11px] font-semibold uppercase tracking-[0.08em] border transition-colors cursor-pointer ${
+              className={`py-1.5 rounded text-[11px] font-semibold uppercase tracking-[0.08em] border transition-colors cursor-pointer flex items-center justify-center gap-1.5 ${
                 isActive
                   ? "bg-primary border-primary-dark text-text-inverse"
                   : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
               }`}
             >
-              {perspective.label}
+              <span className="text-base leading-none">{perspective.icon}</span>
+              <span>{perspective.label}</span>
             </button>
           );
         })}

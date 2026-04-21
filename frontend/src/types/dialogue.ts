@@ -2,7 +2,8 @@ export type DialoguePhase =
   | "direction"
   | "collection"
   | "processing"
-  | "analysis";
+  | "analysis"
+  | "council";
 
 export type DialogueStage =
   | "initial"
@@ -15,6 +16,8 @@ export type DialogueStage =
   | "collecting"
   | "reviewing"
   | "processing"
+  | "pending"
+  | "idle"
   | "complete";
 
 export type DialogueSubState =
@@ -32,6 +35,8 @@ export type DialogueAction =
   | "start_collecting"
   | "show_collection"
   | "show_processing"
+  | "show_analysis"
+  | "show_council"
   | "select_gaps"
   | "error"
   | "complete";

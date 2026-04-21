@@ -4,16 +4,25 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
+import os
 import re
+import shutil
+import sqlite3
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from src.services.mcp_staging import stage_to_mcp, unstage_from_mcp, unstage_session_from_mcp
+logger = logging.getLogger("app")
 
 ALLOWED_FILETYPES = {".txt", ".pdf", ".json", ".csv"}
 SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,128}$")
+
+_UNKNOWN = "Unknown"
+_READY = "ready"
+_FAILED = "failed"
+_SKIPPED = "skipped"
 
 
 def default_uploads_root() -> Path:
@@ -55,6 +64,9 @@ def _now_iso() -> str:
 
 
 def _session_paths(root: Path, session_id: str) -> dict[str, Path]:
+    """
+    Return file paths for session
+    """
     session_dir = root / session_id
     return {
         "session_dir": session_dir,
@@ -65,6 +77,9 @@ def _session_paths(root: Path, session_id: str) -> dict[str, Path]:
 
 
 def _load_manifest(manifest_path: Path, session_id: str) -> dict[str, Any]:
+    """
+    Load manifest from disk. If it does not exist, create a new one based on session_id
+    """
     if manifest_path.exists():
         try:
             data = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -231,26 +246,28 @@ def _parse_pdf_to_markdown(
         tuple of (citation, parse_status, searchable, skip_reason, metadata_flags)
     """
     try:
-        from pypdf import PdfReader  # Imported lazily to avoid hard runtime import failures
+        from pypdf import (
+            PdfReader,  # Imported lazily to avoid hard runtime import failures
+        )
     except Exception:
         citation = {
-            "author": "Unknown",
-            "year": "Unknown",
-            "title": Path(source_filename).stem or "Unknown",
-            "publisher": "Unknown",
+            "author": _UNKNOWN,
+            "year": _UNKNOWN,
+            "title": Path(source_filename).stem or _UNKNOWN,
+            "publisher": _UNKNOWN,
         }
-        return citation, "failed", False, "pypdf_not_available", ["pypdf_not_available"]
+        return citation, _FAILED, False, "pypdf_not_available", ["pypdf_not_available"]
 
     try:
         reader = PdfReader(str(stored_pdf_path))
     except Exception:
         citation = {
-            "author": "Unknown",
-            "year": "Unknown",
-            "title": Path(source_filename).stem or "Unknown",
-            "publisher": "Unknown",
+            "author": _UNKNOWN,
+            "year": _UNKNOWN,
+            "title": Path(source_filename).stem or _UNKNOWN,
+            "publisher": _UNKNOWN,
         }
-        return citation, "failed", False, "pdf_read_failed", ["pdf_read_failed"]
+        return citation, _FAILED, False, "pdf_read_failed", ["pdf_read_failed"]
 
     metadata = reader.metadata
     title = getattr(metadata, "title", None) if metadata else None
@@ -260,22 +277,24 @@ def _parse_pdf_to_markdown(
     creator = getattr(metadata, "creator", None) if metadata else None
 
     citation = {
-        "author": str(author).strip() if author else "Unknown",
+        "author": str(author).strip() if author else _UNKNOWN,
         "year": _extract_year(creation_date),
-        "title": str(title).strip() if title else (Path(source_filename).stem or "Unknown"),
+        "title": str(title).strip()
+        if title
+        else (Path(source_filename).stem or _UNKNOWN),
         "publisher": (str(producer).strip() if producer else "")
         or (str(creator).strip() if creator else "")
-        or "Unknown",
+        or _UNKNOWN,
     }
 
     metadata_flags: list[str] = []
-    if citation["author"] == "Unknown":
+    if citation["author"] == _UNKNOWN:
         metadata_flags.append("missing_author")
-    if citation["year"] == "Unknown":
+    if citation["year"] == _UNKNOWN:
         metadata_flags.append("missing_year")
-    if citation["title"] == "Unknown":
+    if citation["title"] == _UNKNOWN:
         metadata_flags.append("missing_title")
-    if citation["publisher"] == "Unknown":
+    if citation["publisher"] == _UNKNOWN:
         metadata_flags.append("missing_publisher")
 
     page_texts: list[str] = []
@@ -311,18 +330,81 @@ def _parse_pdf_to_markdown(
     parsed_path.write_text(parsed_content, encoding="utf-8")
 
     if has_extractable_text:
-        return citation, "ready", True, None, metadata_flags
-    return citation, "skipped", False, "no_extractable_text", metadata_flags
+        return citation, _READY, True, None, metadata_flags
+    return citation, _SKIPPED, False, "no_extractable_text", metadata_flags
 
 
 def format_apa_citation(citation: dict[str, str]) -> str:
     """Format simple APA-like citation string from canonical citation fields."""
     return (
-        f"{citation.get('author', 'Unknown')}. "
-        f"({citation.get('year', 'Unknown')}). "
-        f"{citation.get('title', 'Unknown')}. "
-        f"{citation.get('publisher', 'Unknown')}."
+        f"{citation.get('author', _UNKNOWN)}. "
+        f"({citation.get('year', _UNKNOWN)}). "
+        f"{citation.get('title', _UNKNOWN)}. "
+        f"{citation.get('publisher', _UNKNOWN)}."
     )
+
+
+def _get_db_path() -> str:
+    """Resolve sessions.db path."""
+    override = os.getenv("SESSIONS_DB_PATH")
+    if override:
+        return override
+    return str(Path(__file__).resolve().parents[2] / "data" / "sessions.db")
+
+
+def _sync_to_db(entry: dict[str, Any], parsed_path: Path) -> None:
+    """Insert/update the uploaded_files row in sessions.db (sync)."""
+    try:
+        parsed_content = None
+        if parsed_path.exists():
+            parsed_content = parsed_path.read_text(encoding="utf-8", errors="ignore")
+
+        conn = sqlite3.connect(_get_db_path())
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        conn.execute(
+            """INSERT INTO uploaded_files
+                   (id, session_id, original_filename, filename, stored_filename,
+                    stored_path, extension, mime_type, size_bytes, sha256,
+                    uploaded_at, parse_status, searchable, search_skip_reason,
+                    parsed_content, parsed_markdown_path, citation, metadata_flags)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(id) DO UPDATE SET
+                    parsed_content=excluded.parsed_content,
+                    parse_status=excluded.parse_status,
+                    searchable=excluded.searchable,
+                    citation=excluded.citation
+            """,
+            (
+                entry["file_upload_id"],
+                entry["session_id"],
+                entry.get("original_filename", ""),
+                entry.get("filename", ""),
+                entry.get("stored_filename", ""),
+                entry.get("stored_path", "") or entry.get("path", ""),
+                entry.get("extension", ""),
+                entry.get("mime_type"),
+                entry.get("size_bytes", 0),
+                entry.get("sha256", ""),
+                entry.get("uploaded_at", datetime.now(UTC).isoformat()),
+                entry.get("parse_status", "pending"),
+                entry.get("searchable", False),
+                entry.get("search_skip_reason"),
+                parsed_content,
+                entry.get("parsed_markdown_path"),
+                json.dumps(entry.get("citation", {})),
+                json.dumps(entry.get("metadata_flags"))
+                if entry.get("metadata_flags")
+                else None,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        logger.warning(
+            "[session_uploads] Failed to sync upload to DB — manifest still has the data",
+            exc_info=True,
+        )
 
 
 def save_session_upload(
@@ -356,22 +438,21 @@ def save_session_upload(
         "original_filename": filename,
         "filename": safe_filename,
         "stored_filename": stored_filename,
-        "stored_path": stored_path.as_posix(),
         "path": stored_path.as_posix(),
         "extension": extension,
         "mime_type": mime_type,
         "size_bytes": size_bytes,
         "sha256": sha256,
         "uploaded_at": uploaded_at,
-        "parse_status": "ready",
+        "parse_status": _READY,
         "searchable": True,
         "search_skip_reason": None,
         "parsed_markdown_path": None,
         "citation": {
-            "author": "Unknown",
-            "year": "Unknown",
-            "title": Path(safe_filename).stem or "Unknown",
-            "publisher": "Unknown",
+            "author": _UNKNOWN,
+            "year": _UNKNOWN,
+            "title": Path(safe_filename).stem or _UNKNOWN,
+            "publisher": _UNKNOWN,
         },
     }
 
@@ -393,8 +474,6 @@ def save_session_upload(
         entry["citation"] = citation
         entry["parsed_markdown_path"] = parsed_path.as_posix()
         entry["metadata_flags"] = metadata_flags
-        if parse_status in ("ready", "skipped"):
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
     else:
         parse_status = _convert_to_markdown(
             file_upload_id=file_upload_id,
@@ -406,21 +485,26 @@ def save_session_upload(
         )
         entry["parse_status"] = parse_status
         entry["parsed_markdown_path"] = parsed_path.as_posix()
-        if parse_status == "ready":
-            stage_to_mcp(validated_session_id, file_upload_id, parsed_path.as_posix(), safe_filename)
 
     manifest = _load_manifest(paths["manifest_path"], validated_session_id)
     manifest["files"].append(entry)
     _write_manifest(paths["manifest_path"], manifest)
+
+    # Also persist to uploaded_files table in sessions.db
+    _sync_to_db(entry, parsed_path)
+
     return entry
 
 
-def list_session_uploads(*, session_id: str, uploads_root: Path) -> list[dict[str, Any]]:
+def list_session_uploads(
+    *, session_id: str, uploads_root: Path
+) -> list[dict[str, Any]]:
     """List uploads for a given session."""
     validated_session_id = validate_session_id(session_id)
     manifest_path = _session_paths(uploads_root, validated_session_id)["manifest_path"]
     manifest = _load_manifest(manifest_path, validated_session_id)
-    return manifest.get("files", [])
+    files = manifest.get("files", [])
+    return files if isinstance(files, list) else []
 
 
 def delete_session_upload(
@@ -445,7 +529,7 @@ def delete_session_upload(
     if removed_entry is None:
         return False
 
-    for path_key in ("stored_path", "parsed_markdown_path"):
+    for path_key in ("path", "parsed_markdown_path"):
         value = removed_entry.get(path_key)
         if not value:
             continue
@@ -455,20 +539,16 @@ def delete_session_upload(
 
     manifest["files"] = kept
     _write_manifest(paths["manifest_path"], manifest)
-    unstage_from_mcp(validated_session_id, file_upload_id, removed_entry.get("filename", ""))
     return True
 
 
 def delete_session_uploads(*, session_id: str, uploads_root: Path) -> bool:
     """Delete all upload artifacts for a session and remove the session directory.
 
-    Removes the entire {uploads_root}/{session_id}/ directory tree and
-    clears the MCP staging directory for the session.
+    Removes the entire {uploads_root}/{session_id}/ directory tree.
 
     Returns True if the session directory existed and was removed, False otherwise.
     """
-    import shutil
-
     validated_session_id = validate_session_id(session_id)
     session_dir = _session_paths(uploads_root, validated_session_id)["session_dir"]
 
@@ -476,5 +556,4 @@ def delete_session_uploads(*, session_id: str, uploads_root: Path) -> bool:
     if existed:
         shutil.rmtree(session_dir)
 
-    unstage_session_from_mcp(validated_session_id)
     return existed

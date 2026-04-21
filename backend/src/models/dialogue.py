@@ -4,7 +4,6 @@ from typing import Literal
 from pydantic import BaseModel
 
 
-
 class Perspective(str, Enum):
     US = "us"
     NORWAY = "norway"
@@ -29,6 +28,10 @@ class DialogueAction(str, Enum):
     # Processing phase
     SHOW_PROCESSING = "show_processing"
     SELECT_GAPS = "select_gaps"
+    # Analysis phase
+    SHOW_ANALYSIS = "show_analysis"
+    # Council phase
+    SHOW_COUNCIL = "show_council"
     # Shared
     COMPLETE = "complete"
 
@@ -71,11 +74,28 @@ class ProcessingContext(BaseModel):
     collected_data: str
 
 
+class AnalysisContext(BaseModel):
+    """Context passed to the reviewer during the analysis phase."""
+
+    pir: str
+    processing_result: dict
+
+
+class PhaseReviewItem(BaseModel):
+    phase: Literal["direction", "collection", "processing", "analysis"]
+    attempt: int
+    reviewer_approved: bool
+    reviewer_suggestions: str | None = None
+    sources_used: list[str] = []
+    generated_content: str | None = None
+
+
 class DialogueResponse(BaseModel):
     """Response object returned by dialogue flow to frontend"""
 
     action: DialogueAction = DialogueAction.ASK_QUESTION
     content: str = ""
+    review_activity: list[PhaseReviewItem] | None = None
 
 
 class ClarifyingQuestion(BaseModel):
@@ -99,6 +119,7 @@ class Phase(str, Enum):
     COLLECTION = "collection"
     PROCESSING = "processing"
     ANALYSIS = "analysis"
+    COUNCIL = "council"
 
 
 class PIRReview(BaseModel):

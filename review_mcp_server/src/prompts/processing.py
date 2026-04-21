@@ -43,9 +43,16 @@ CONTENT includes: entities (PMESIIEntity list), gaps, processing_summary, assess
 - Entities must be relevant to at least one PIR from CONTEXT.pir.
 - If a high-priority PIR has no associated entities, flag as MAJOR.
 
-### 4. Confidence Calibration
-- Confidence scores must reflect actual source quality and quantity.
-- Over-inflated confidence (e.g. 90+ from a single web source) is MAJOR.
+### 4. Confidence Calibration (Algorithm-Computed)
+- The system computes confidence algorithmically from source type, corroboration, and independence.
+  Each finding may carry a `computed_confidence` field with `tier`, `score`, `authority`,
+  `corroboration`, `independence`, and `circular_flag`.
+- Flag as MAJOR if `computed_confidence.tier` is HIGH or ASSESSED but the finding has only
+  one source type (single-source claim presented as strongly supported).
+- Flag as MAJOR if `computed_confidence.circular_flag` is true but `tier` is above MODERATE
+  (circular reporting should not yield high confidence).
+- If `computed_confidence` is absent, fall back to checking the AI-generated `confidence`
+  integer: over-inflated values (e.g. 90+ from a single web source) are MAJOR.
 
 ### 5. Gap Completeness
 - If PIRs remain unanswered after processing, gaps must reflect that.

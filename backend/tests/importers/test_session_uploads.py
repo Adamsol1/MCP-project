@@ -5,8 +5,11 @@ import pytest
 
 from src.importers.session_uploads import (
     default_uploads_root,
+    delete_session_upload,
     format_apa_citation,
+    sanitize_filename,
     save_session_upload,
+    validate_session_id,
 )
 
 
@@ -72,6 +75,89 @@ def test_pdf_missing_metadata_uses_unknown_and_flags(tmp_path):
     assert result["citation"]["publisher"] == "Unknown"
     assert result["parse_status"] in {"failed", "skipped"}
     assert result["searchable"] is False
+
+
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "valid-session",
+        "abc123",
+        "A_B-C",
+        "a" * 128,
+    ],
+)
+def test_validate_session_id_accepts_valid_ids(session_id):
+    # Arrange / Act / Assert
+    assert validate_session_id(session_id) == session_id.strip()
+
+
+@pytest.mark.parametrize(
+    "session_id",
+    [
+        "",
+        "   ",
+        "has spaces",
+        "has/slash",
+        "has.dot",
+        "a" * 129,
+    ],
+)
+def test_validate_session_id_rejects_invalid_ids(session_id):
+    # Arrange / Act / Assert
+    with pytest.raises(ValueError):
+        validate_session_id(session_id)
+
+
+@pytest.mark.parametrize(
+    "filename, expected_clean",
+    [
+        ("normal.txt", "normal.txt"),
+        ("file with spaces.txt", "file with spaces.txt"),
+        ("../../etc/passwd.txt", "passwd.txt"),
+        ("file<>:*?.txt", "file_____.txt"),
+    ],
+)
+def test_sanitize_filename_removes_dangerous_characters(filename, expected_clean):
+    # Arrange / Act
+    result = sanitize_filename(filename)
+
+    # Assert
+    assert result == expected_clean
+    assert ".." not in result
+    assert "/" not in result
+
+
+def test_save_session_upload_txt_creates_manifest_entry(tmp_path):
+    # Arrange
+    content = b"intelligence report content"
+
+    # Act
+    result = save_session_upload(
+        file_obj=io.BytesIO(content),
+        filename="report.txt",
+        session_id="session-txt",
+        uploads_root=tmp_path,
+    )
+
+    # Assert
+    assert result["filename"] == "report.txt"
+    assert result["parse_status"] == "ready"
+    assert result["searchable"] is True
+    assert Path(result["parsed_markdown_path"]).exists()
+    manifest_path = tmp_path / "session-txt" / "manifest.json"
+    assert manifest_path.exists()
+
+
+def test_delete_session_upload_returns_false_when_not_found(tmp_path):
+    # Arrange / Act
+    deleted = delete_session_upload(
+        session_id="session-missing",
+        file_upload_id="nonexistent-id",
+        uploads_root=tmp_path,
+    )
+
+    # Assert
+    assert deleted is False
 
 
 def test_format_apa_citation_from_canonical_fields():

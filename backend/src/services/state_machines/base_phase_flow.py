@@ -1,5 +1,3 @@
-
-
 from abc import ABC, abstractmethod
 from datetime import datetime
 
@@ -7,15 +5,27 @@ from src.models.reasoning import ReasoningLogEntry, UserActionLogEntry
 
 
 class BasePhaseFlow(ABC):
-  def __init__(self, session_id: str | None = None, research_logger=None):
-    self.session_id = session_id
-    self.research_logger = research_logger
-    self.question_count = 0
-    self.max_questions = 15
+    """Base class for all phase flows (Direction, Collection, Processing).
+    Provides shared logging helpers and enforces the process_user_message interface."""
 
+    def __init__(self, session_id: str | None = None, research_logger=None):
+        self.session_id = session_id
+        self.research_logger = research_logger
+        self.question_count = 0
+        self.max_questions = 15
 
-
-  def _log_reasoning(self, phase: str, attempt_number: int, generated_content: str, generation_duration: float, review_duration: float, model_used: str, review_result=None, error_type: str | None = None):
+    # TODO: Remove when DB migration is complete — replaced by DB write
+    def _log_reasoning(
+        self,
+        phase: str,
+        attempt_number: int,
+        generated_content: str,
+        generation_duration: float,
+        review_duration: float,
+        model_used: str,
+        review_result=None,
+        error_type: str | None = None,
+    ):
         log_entry = ReasoningLogEntry(
             session_id=self.session_id,
             phase=phase,
@@ -31,23 +41,22 @@ class BasePhaseFlow(ABC):
         if self.research_logger:
             self.research_logger.create_log(log_entry)
 
-  def _log_user_action(self, action, phase, modifications, perspectives=None):
+    # TODO: Remove when DB migration is complete — replaced by DB write
+    def _log_user_action(self, action, phase, modifications, perspectives=None):
         log_user_interaction = UserActionLogEntry(
-                session_id=self.session_id,
-                timestamp=datetime.now(),
-                action=action,
-                phase=phase,
-                modifications=modifications,
-                perspectives_selected= [p.value for p in perspectives] if perspectives else None
-
-            )
+            session_id=self.session_id,
+            timestamp=datetime.now(),
+            action=action,
+            phase=phase,
+            modifications=modifications,
+            perspectives_selected=[p.value for p in perspectives]
+            if perspectives
+            else None,
+        )
         if self.research_logger:
-          self.research_logger.create_log(log_user_interaction)
+            self.research_logger.create_log(log_user_interaction)
 
-  @abstractmethod
-  async def process_user_message(self):
-      """"""
-
-
-
-
+    @abstractmethod
+    async def process_user_message(self, **kwargs):
+        """Process a single user message and return a DialogueResponse.
+        Each phase flow implements this to drive its own state machine."""

@@ -3,12 +3,23 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, HTTPException, Query, Response, UploadFile
+from fastapi import (
+    Depends,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
-from src.api.dialogue import evict_session
+from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
+from src.db.engine import get_knowledge_engine, get_sessions_engine
+from src.db.unit_of_work import UnitOfWork, get_uow
 from src.importers.session_uploads import (
     default_uploads_root,
     delete_session_upload,
@@ -17,6 +28,8 @@ from src.importers.session_uploads import (
     save_session_upload,
 )
 from src.logging_config import setup_logging
+from src.services.council.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
+from src.services.council.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
 load_dotenv()
@@ -28,17 +41,19 @@ logger = logging.getLogger("app")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """
-    Method for logging lifecycle events of the FASTAPI application.
-    The method will log:
-        - Start of the application
-        - End of the application
-
-    Does not have any input of output
-    """
-    logger.info("Application started")
-    yield
-    logger.info("Application stopped")
+    """Application lifecycle: initialize DB engines and start council MCP."""
+    # Initialize DB engines so connectivity issues surface at startup
+    get_sessions_engine()
+    get_knowledge_engine()
+    # Keep legacy sessions/ dir creation for dev-tool snapshot endpoints
+    ensure_sessions_dir()
+    council_mcp_process = await maybe_start_council_mcp(get_council_mcp_url())
+    logger.info("Application started — database engines initialized")
+    try:
+        yield
+    finally:
+        await stop_council_mcp(council_mcp_process)
+        logger.info("Application stopped")
 
 
 app = FastAPI(lifespan=lifespan)
@@ -77,26 +92,26 @@ async def upload_file(
     file: UploadFile = File(...),
 ):
     """
-        Endpoint for uploading a file to the server
+    Endpoint for uploading a file to the server
 
-        The endpoint validates filetype and stores files under:
-        data/imports/{session_id}/
+    The endpoint validates filetype and stores files under:
+    data/imports/{session_id}/
 
-        Args:
-            session_id str: Session identifier used to scope uploaded sources.
-            file UploadFile: The file that is being uploaded.
+    Args:
+        session_id str: Session identifier used to scope uploaded sources.
+        file UploadFile: The file that is being uploaded.
 
-        Returns:
-            A dict containing:
-                - Status (str): "success" if upload was succesful
-                - file_upload_id (str): Stable ID used for list/delete/search
-                - session_id (str): Session scope for this file
-                - path (str): Stored file path
-                - searchable (bool): Whether content can be searched as evidence
+    Returns:
+        A dict containing:
+            - Status (str): "success" if upload was succesful
+            - file_upload_id (str): Stable ID used for list/delete/search
+            - session_id (str): Session scope for this file
+            - path (str): Stored file path
+            - searchable (bool): Whether content can be searched as evidence
 
-        Raises:
-            - HTTPException 400: If request validation fails
-            - HTTPException 500: If an error occurs while saving
+    Raises:
+        - HTTPException 400: If request validation fails
+        - HTTPException 500: If an error occurs while saving
     """
     try:
         result = save_session_upload(
@@ -109,7 +124,14 @@ async def upload_file(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(
+            f"[upload_file] Failed to save upload for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to save uploaded file"
+        ) from e
+    logger.info(f"[upload_file] Saved '{file.filename}' for session {session_id}")
     return {"status": "success", **result}
 
 
@@ -121,7 +143,13 @@ async def list_uploaded_files(session_id: str = Query(...)):
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(
+            f"[list_uploaded_files] Failed to list uploads for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to list uploaded files"
+        ) from e
 
     return {
         "status": "success",
@@ -142,27 +170,37 @@ async def delete_uploaded_file(file_upload_id: str, session_id: str = Query(...)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(
+            f"[delete_uploaded_file] Failed to delete {file_upload_id} for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete uploaded file"
+        ) from e
 
     if not deleted:
         raise HTTPException(status_code=404, detail="Upload not found")
+    logger.info(
+        f"[delete_uploaded_file] Deleted {file_upload_id} for session {session_id}"
+    )
     return Response(status_code=204)
 
 
 @app.delete("/api/sessions/{session_id}")
-async def delete_session(session_id: str):
+async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
     """Delete all backend and MCP artifacts for a session.
 
     Removes:
-    - Session state file (sessions/{session_id}.json)
+    - Session DB rows (cascade delete across all tables)
     - All uploaded files and parsed artifacts (data/imports/{session_id}/)
     - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
-    - MCP staged files (mcp_server/uploads/{session_id}/)
+    - Legacy: analysis state file and session JSON if they exist
     """
     try:
-        evict_session(session_id)
+        await evict_session(session_id, uow)
         delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
 
+        # Clean up legacy log files (will be removed once Phase 3 is complete)
         outputs_dir = ResearchLogger(session_id=session_id).log_path.parent
         for log_name in (
             f"research_log_{session_id}.jsonl",
@@ -172,6 +210,7 @@ async def delete_session(session_id: str):
             if log_file.exists():
                 log_file.unlink()
 
+        # Clean up legacy analysis state file
         analysis_state_file = (
             Path(__file__).resolve().parents[2]
             / "sessions"
@@ -179,9 +218,21 @@ async def delete_session(session_id: str):
         )
         if analysis_state_file.exists():
             analysis_state_file.unlink()
+
+        # Clean up legacy session JSON file
+        legacy_session_file = (
+            Path(__file__).resolve().parents[2] / "sessions" / f"{session_id}.json"
+        )
+        if legacy_session_file.exists():
+            legacy_session_file.unlink()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+        logger.error(
+            f"[delete_session] Failed to delete session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to delete session") from e
 
+    logger.info(f"[delete_session] Deleted session {session_id}")
     return Response(status_code=204)

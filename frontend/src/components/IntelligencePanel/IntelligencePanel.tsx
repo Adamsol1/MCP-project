@@ -1,10 +1,13 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { DialoguePhase } from "../../types/dialogue";
+import type { PhaseReviewItem, ProcessingData } from "../../types/conversation";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
 import CollectionStatsView from "../CollectionStatsView/CollectionStatsView";
 import CollectionStatsModal from "../CollectionStatsModal/CollectionStatsModal";
+import ReviewActivityModal from "../ReviewActivityModal/ReviewActivityModal";
 import PerspectiveSelector from "../PerspectiveSelector/PerspectiveSelector";
 import type { UploadedFileRecord } from "../../services/upload/upload";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
@@ -32,9 +35,11 @@ export default function IntelligencePanel({
   isCollecting = false,
   collectionStatus = null,
 }: IntelligencePanelProps) {
-  const { collectionData } = useWorkspace();
+  const { collectionData, pirData, reviewActivity } = useWorkspace();
   const t = useT();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewFocusAttempt, setReviewFocusAttempt] = useState<number | undefined>(undefined);
   const [showAllFiles, setShowAllFiles] = useState(false);
 
   const visibleFiles = showAllFiles
@@ -50,86 +55,40 @@ export default function IntelligencePanel({
         return (
           <>
             {isCollecting && collectionStatus ? (
-              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <PanelSection label="Collecting" first>
                 <CollectionStatusDisplay status={collectionStatus} />
-              </section>
+              </PanelSection>
             ) : (
-              <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
+              <PanelSection label="Perspective" first>
                 <PerspectiveSelector
                   selected={selectedPerspectives}
                   onChange={onPerspectiveChange}
                 />
-              </section>
+              </PanelSection>
             )}
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <PirSourcesView />
-            </section>
+            {pirData && (
+              <PanelSection label="PIR Sources">
+                <PirSourcesView />
+              </PanelSection>
+            )}
           </>
         );
 
       case "collection":
-        return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <CollectionStatsView
-                collectionData={collectionData}
-                onOpenModal={() => setIsModalOpen(true)}
-              />
-            </section>
-          </>
-        );
-
       case "processing":
-        return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <p className="text-xs text-text-secondary">
-                {t.processingArtifacts}
-              </p>
-            </section>
-          </>
-        );
-
       case "analysis":
         return (
-          <>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <FileUploadSection
-                uploadedFiles={uploadedFiles}
-                visibleFiles={visibleFiles}
-                hiddenCount={hiddenCount}
-                showAllFiles={showAllFiles}
-                onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
-                onOpenFileUpload={onOpenFileUpload}
-                onFileRemove={onFileRemove}
-              />
-            </section>
-            <section className="rounded-lg border border-border-muted bg-surface-muted/70 p-2 shadow-sm">
-              <p className="text-xs text-text-secondary">{t.analysisOutputs}</p>
-            </section>
-          </>
+          <PanelSection label="Files" first>
+            <FileUploadSection
+              uploadedFiles={uploadedFiles}
+              visibleFiles={visibleFiles}
+              hiddenCount={hiddenCount}
+              showAllFiles={showAllFiles}
+              onToggleShowAll={() => setShowAllFiles((prev) => !prev)}
+              onOpenFileUpload={onOpenFileUpload}
+              onFileRemove={onFileRemove}
+            />
+          </PanelSection>
         );
 
       default:
@@ -139,7 +98,7 @@ export default function IntelligencePanel({
 
   return (
     <div className="h-full flex flex-col bg-surface">
-      <header className="border-b border-border-muted px-3 py-2">
+      <header className="h-14 border-b border-border px-3 flex flex-col justify-center">
         <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
           {t.intelligenceWorkspace}
         </p>
@@ -148,8 +107,29 @@ export default function IntelligencePanel({
         </h2>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-2 py-2 scrollbar-chatgpt">
-        <div className="flex flex-col gap-2">{renderPhaseContent()}</div>
+      <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-chatgpt">
+        <div className="flex flex-col">
+          {renderPhaseContent()}
+          {reviewActivity.length > 0 && (
+            <PanelSection label="Review Activity">
+              <ReviewActivitySection
+                activity={reviewActivity}
+                onOpenReviewModal={(attempt) => {
+                  setReviewFocusAttempt(attempt);
+                  setReviewModalOpen(true);
+                }}
+              />
+            </PanelSection>
+          )}
+          {collectionData && (
+            <PanelSection label="Collection Stats">
+              <CollectionStatsView
+                collectionData={collectionData}
+                onOpenModal={() => setIsModalOpen(true)}
+              />
+            </PanelSection>
+          )}
+        </div>
       </div>
 
       <CollectionStatsModal
@@ -157,7 +137,27 @@ export default function IntelligencePanel({
         onClose={() => setIsModalOpen(false)}
         collectionData={collectionData}
       />
+      <ReviewActivityModal
+        isOpen={reviewModalOpen}
+        onClose={() => setReviewModalOpen(false)}
+        activity={reviewActivity}
+        focusAttempt={reviewFocusAttempt}
+      />
     </div>
+  );
+}
+
+function PanelSection({ label, children, first = false }: { label: string; children: ReactNode; first?: boolean }) {
+  return (
+    <>
+      {!first && <hr className="border-border" />}
+      <section className={first ? "pb-4" : "py-4"}>
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          {label}
+        </p>
+        {children}
+      </section>
+    </>
   );
 }
 
@@ -231,6 +231,139 @@ function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
   );
 }
 
+interface ReviewActivitySectionProps {
+  activity: PhaseReviewItem[];
+  onOpenReviewModal: (attempt: number) => void;
+}
+
+function tryParseProcessingData(content: string | null): ProcessingData | null {
+  if (!content) return null;
+  try {
+    const parsed = JSON.parse(content);
+    if (parsed && typeof parsed === "object" && "findings" in parsed) {
+      return parsed as ProcessingData;
+    }
+  } catch { /* not JSON */ }
+  return null;
+}
+
+function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySectionProps) {
+  const [expandedAttempts, setExpandedAttempts] = useState<Set<number>>(new Set());
+
+  const toggleExpand = (attempt: number) => {
+    setExpandedAttempts((prev) => {
+      const next = new Set(prev);
+      if (next.has(attempt)) next.delete(attempt);
+      else next.add(attempt);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      {activity.map((item) => {
+        const isExpanded = expandedAttempts.has(item.attempt);
+        const processingData = item.phase === "processing" ? tryParseProcessingData(item.generated_content) : null;
+
+        return (
+          <div key={item.attempt} className="rounded-lg border border-border bg-surface overflow-hidden">
+            {/* Header row */}
+            <div className="flex items-stretch">
+              <button
+                type="button"
+                onClick={() => onOpenReviewModal(item.attempt)}
+                className="flex-1 px-3 py-2 space-y-1 text-left transition-colors hover:bg-primary-subtle"
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-text-muted">
+                    Attempt {item.attempt}
+                  </p>
+                  <span
+                    className={`rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                      item.reviewer_approved
+                        ? "bg-success-subtle text-success-text"
+                        : "bg-error-subtle text-error-text"
+                    }`}
+                  >
+                    {item.reviewer_approved ? "Approved" : "Rejected"}
+                  </span>
+                </div>
+                {item.sources_used.length > 0 && (
+                  <p className="text-xs text-text-secondary truncate">
+                    <span className="font-medium text-text-primary">Sources: </span>
+                    {item.sources_used.join(", ")}
+                  </p>
+                )}
+                {item.sources_used.length === 0 && (
+                  <p className="text-xs text-text-secondary capitalize">{item.phase} phase</p>
+                )}
+              </button>
+              {processingData && (
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(item.attempt)}
+                  className="shrink-0 border-l border-border px-2 text-text-muted hover:bg-primary-subtle hover:text-primary transition-colors"
+                  aria-label={isExpanded ? "Collapse" : "Expand"}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isExpanded ? "rotate-180" : ""}`}>
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+              )}
+            </div>
+            {/* Inline parsed processing content */}
+            {isExpanded && processingData && (
+              <div className="border-t border-border px-3 py-2 space-y-2 bg-surface-muted/50">
+                {processingData.findings && processingData.findings.length > 0 && (
+                  <div className="space-y-1.5">
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                      Findings ({processingData.findings.length})
+                    </p>
+                    {[...processingData.findings]
+                      .sort((a, b) => b.confidence - a.confidence)
+                      .map((f, idx) => (
+                        <div key={f.id ?? idx} className="rounded border border-border bg-surface p-2 space-y-1">
+                          <div className="flex items-start justify-between gap-1">
+                            <p className="text-[11px] font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
+                            {f.confidence != null && (
+                              <span className={`shrink-0 rounded px-1 py-0.5 text-[10px] font-semibold ${
+                                f.confidence >= 0.7 ? "bg-success-subtle text-success-text" :
+                                f.confidence >= 0.4 ? "bg-warning-subtle text-warning-text" :
+                                "bg-error-subtle text-error-text"
+                              }`}>
+                                {Math.round(f.confidence * 100)}%
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-text-secondary leading-relaxed">{f.finding}</p>
+                        </div>
+                      ))}
+                  </div>
+                )}
+                {processingData.gaps && processingData.gaps.length > 0 && (
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1">
+                      Gaps ({processingData.gaps.length})
+                    </p>
+                    <ul className="space-y-0.5">
+                      {processingData.gaps.map((gap, i) => (
+                        <li key={i} className="flex gap-1.5 text-[11px] text-text-secondary">
+                          <span className="shrink-0 text-text-muted">·</span>
+                          <span>{gap}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 interface FileUploadSectionProps {
   uploadedFiles: UploadedFileRecord[];
   visibleFiles: UploadedFileRecord[];
@@ -253,13 +386,9 @@ function FileUploadSection({
   const t = useT();
   return (
     <div>
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-text-secondary mb-2">
-        {t.files}
-      </p>
-
       <button
         onClick={onOpenFileUpload}
-        className="w-full py-1 px-2 bg-primary-dark text-text-inverse rounded text-xs font-medium hover:bg-primary-hover transition-colors"
+        className="w-full rounded-lg border border-border bg-surface px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
       >
         {t.uploadFiles}
       </button>

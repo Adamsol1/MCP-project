@@ -1,7 +1,5 @@
 import axios from "axios";
-
-/** Base URL for the backend REST API. */
-const API_BACKEND_URL = "http://localhost:8000";
+import { API_BACKEND_URL } from "../apiConfig";
 
 export interface CitationMetadata {
   author: string;

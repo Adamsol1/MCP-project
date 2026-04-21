@@ -1,8 +1,8 @@
 """ProcessingFlow — state machine for the Processing phase.
 
-Reads raw collected data from collected.json, runs the processing agent
+Reads raw collected data from collection_attempts table, runs the processing agent
 (normalize → enrich → correlate → synthesize), writes the result to
-processed.json, and presents it for analyst review.
+processing_attempts table, and presents it for analyst review.
 
 States:
     PROCESSING  — agent has not yet run (waiting for initialize)
@@ -12,67 +12,93 @@ States:
 
 import json
 import logging
-from datetime import UTC, datetime
+from datetime import datetime
 from enum import Enum
-from pathlib import Path
 
-from src.models.dialogue import DialogueAction, DialogueContext, DialogueResponse
+from src.models.dialogue import (
+    DialogueAction,
+    DialogueContext,
+    DialogueResponse,
+    PhaseReviewItem,
+)
 from src.models.reasoning import ReasoningLog
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
 
-_SESSIONS_DATA_DIR = Path(__file__).resolve().parents[3] / "data" / "sessions"
+_PHASE_PROCESSING = "processing"
 
 
-def _collected_path(session_id: str) -> Path:
-    return _SESSIONS_DATA_DIR / session_id / "collected.json"
-
-
-def _processed_path(session_id: str) -> Path:
-    return _SESSIONS_DATA_DIR / session_id / "processed.json"
-
-
-def _read_collected(session_id: str) -> dict | None:
-    path = _collected_path(session_id)
-    if not path.exists():
-        return None
+async def _read_collected(session_id: str, uow=None) -> dict | None:
+    """Read collected data from DB via UoW."""
+    if uow is None:
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to read collected data for {session_id}"
+        )
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        logger.exception(f"[ProcessingFlow] Failed to read collected.json for {session_id}")
-        return None
-
-
-def _read_processed(session_id: str) -> dict | None:
-    path = _processed_path(session_id)
-    if not path.exists():
-        return None
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
-        logger.exception(f"[ProcessingFlow] Failed to read processed.json for {session_id}")
-        return None
-
-
-def _write_processed(session_id: str, pir: str, raw_result: str) -> None:
-    """Append a processing agent result to processed.json."""
-    path = _processed_path(session_id)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    existing = _read_processed(session_id)
-    now = datetime.now(UTC).isoformat()
-    if existing:
-        existing["attempts"].append(raw_result)
-        existing["updated_at"] = now
-    else:
-        existing = {
+        attempts = await uow.collection_attempts.get_all(session_id)
+        if not attempts:
+            return None
+        return {
             "session_id": session_id,
-            "pir": pir,
-            "processed_at": now,
-            "updated_at": now,
-            "attempts": [raw_result],
+            "pir": attempts[0].pir,
+            "collected_at": attempts[0].created_at.isoformat()
+            if attempts[0].created_at
+            else "",
+            "updated_at": attempts[-1].created_at.isoformat()
+            if attempts[-1].created_at
+            else "",
+            "attempts": [a.raw_response for a in attempts],
         }
-    path.write_text(json.dumps(existing, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        logger.exception(
+            f"[ProcessingFlow] Failed to read collected data from DB for {session_id}"
+        )
+        return None
+
+
+async def _read_processed(session_id: str, uow=None) -> dict | None:
+    """Read processed data from DB via UoW."""
+    if uow is None:
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to read processed data for {session_id}"
+        )
+    try:
+        attempts = await uow.processing_attempts.get_all(session_id)
+        if not attempts:
+            return None
+        return {
+            "session_id": session_id,
+            "pir": attempts[0].pir,
+            "processed_at": attempts[0].created_at.isoformat()
+            if attempts[0].created_at
+            else "",
+            "updated_at": attempts[-1].created_at.isoformat()
+            if attempts[-1].created_at
+            else "",
+            "attempts": [a.raw_result for a in attempts],
+        }
+    except Exception:
+        logger.exception(
+            f"[ProcessingFlow] Failed to read processed data from DB for {session_id}"
+        )
+        return None
+
+
+async def _write_processed(
+    session_id: str, pir: str, raw_result: str, uow=None
+) -> None:
+    """Append a processing agent result to the processing_attempts table.
+
+    Does NOT commit — the caller (dialogue endpoint) is responsible for committing
+    the full transaction after saving session state.
+    """
+    if uow is None:
+        raise RuntimeError(
+            f"[ProcessingFlow] UoW required to persist processed data for {session_id}"
+        )
+    await uow.processing_attempts.append(session_id, pir, raw_result)
+    logger.info(f"[ProcessingFlow] Appended processing attempt to DB for {session_id}")
     logger.info(f"[ProcessingFlow] Wrote processed.json for {session_id}")
 
 
@@ -83,6 +109,12 @@ class ProcessingState(str, Enum):
 
 
 class ProcessingFlow(BasePhaseFlow):
+    """State machine for the Processing phase.
+
+    States: PROCESSING -> REVIEWING -> COMPLETE
+
+    Each state has a dedicated handler. All state transitions happen in these handlers.
+    """
 
     def __init__(
         self,
@@ -95,8 +127,12 @@ class ProcessingFlow(BasePhaseFlow):
         self.pir = pir
         self.direction_context = direction_context
         self.state = ProcessingState.PROCESSING
+        # TODO: DB migration — pending_reasoning_log written to DB on approval.
+        # Replace with a ReasoningLog table insert when DB is in place.
         self.pending_reasoning_log: ReasoningLog | None = None
 
+    # TODO: DB migration — to_dict and from_dict replace with SQLAlchemy model read/write.
+    # ProcessingFlow state (pir, state, direction_context) becomes columns in a sessions table.
     def to_dict(self) -> dict:
         """Serialize session state to a plain dict for JSON persistence."""
         return {
@@ -139,12 +175,15 @@ class ProcessingFlow(BasePhaseFlow):
         processing_service,
         orchestrator=None,
         reviewer=None,
+        uow=None,
     ) -> DialogueResponse:
-        """Start processing: read collected data, run agent, write processed.json, go to REVIEWING."""
+        """Start processing: read collected data, run agent, write to DB, go to REVIEWING."""
         if not self.session_id:
-            return DialogueResponse(action=DialogueAction.ERROR, content="No session ID set.")
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="No session ID set."
+            )
 
-        collected = _read_collected(self.session_id)
+        collected = await _read_collected(self.session_id, uow=uow)
         if not collected:
             return DialogueResponse(
                 action=DialogueAction.ERROR,
@@ -152,6 +191,11 @@ class ProcessingFlow(BasePhaseFlow):
             )
 
         raw_collected = "\n\n---\n\n".join(collected.get("attempts", []))
+
+        previous = await _read_processed(self.session_id, uow=uow)
+        previous_result = (
+            previous["attempts"][-1] if previous and previous.get("attempts") else None
+        )
 
         try:
             if orchestrator and reviewer:
@@ -161,11 +205,12 @@ class ProcessingFlow(BasePhaseFlow):
                     processing_service=processing_service,
                     reviewer=reviewer,
                     session_id=self.session_id,
+                    previous_result=previous_result,
                 )
                 retry_count = len(orchestrator.attempts) - 1
                 self.pending_reasoning_log = ReasoningLog(
                     session_id=self.session_id,
-                    phase="processing",
+                    phase=_PHASE_PROCESSING,
                     model_used=orchestrator.generator_model,
                     dialogue_turns=[],
                     generated_content_attempts=orchestrator.attempts,
@@ -181,31 +226,65 @@ class ProcessingFlow(BasePhaseFlow):
                     collected_data=raw_collected,
                     pir=self.pir,
                 )
-        except Exception as e:
-            logger.error(f"[ProcessingFlow] Processing failed for {self.session_id}: {e}")
-            return DialogueResponse(action=DialogueAction.ERROR, content=f"Processing failed: {e}")
+        except Exception:
+            logger.error(
+                f"[ProcessingFlow] Processing failed for {self.session_id}",
+                exc_info=True,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR, content="Processing failed"
+            )
 
         self.state = ProcessingState.REVIEWING
-        _write_processed(self.session_id, self.pir, raw_result)
+        logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
+        await _write_processed(self.session_id, self.pir, raw_result, uow=uow)
 
-        return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=raw_result)
+        response = DialogueResponse(
+            action=DialogueAction.SHOW_PROCESSING, content=raw_result
+        )
 
-    async def process_user_message(
+        if orchestrator and orchestrator.review_results:
+            response.review_activity = [
+                PhaseReviewItem(
+                    phase="processing",
+                    attempt=i + 1,
+                    reviewer_approved=review["approved"],
+                    reviewer_suggestions=review.get("suggestions"),
+                    sources_used=[],
+                    generated_content=(
+                        str(orchestrator.attempts[i])
+                        if i < len(orchestrator.attempts)
+                        else None
+                    ),
+                )
+                for i, review in enumerate(orchestrator.review_results)
+            ]
+
+        return response
+
+    async def process_user_message(  # type: ignore[override]
         self,
         user_message,
         processing_service,
         approved=None,
+        uow=None,
     ) -> DialogueResponse:
+        """Route the incoming message to the correct state handler."""
         if self.state == ProcessingState.REVIEWING:
-            return await self.handle_reviewing(user_message, processing_service, approved)
+            return await self.handle_reviewing(
+                user_message, processing_service, approved, uow=uow
+            )
         else:
-            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase completed")
+            return DialogueResponse(
+                action=DialogueAction.COMPLETE, content="Processing phase completed"
+            )
 
     async def handle_reviewing(
         self,
         user_message,
         processing_service,
         approved,
+        uow=None,
     ) -> DialogueResponse:
         """
         State handler for reviewing phase.
@@ -213,12 +292,13 @@ class ProcessingFlow(BasePhaseFlow):
           - Approve (approved=True)  → COMPLETE, write reasoning log
           - Modify (approved=False)  → Re-run with analyst feedback, self-loop
         """
+        assert self.session_id, "session_id must be set before reviewing"
         if approved:
             self._log_user_action(
-                action="approve", phase="reviewing", modifications=None
+                action="approve", phase=self.state.value, modifications=None
             )
             if self.pending_reasoning_log and self.research_logger:
-                processed = _read_processed(self.session_id)
+                processed = await _read_processed(self.session_id, uow=uow)
                 self.pending_reasoning_log.final_approved_content = (
                     json.dumps(processed) if processed else ""
                 )
@@ -227,18 +307,37 @@ class ProcessingFlow(BasePhaseFlow):
                 )
                 self.research_logger.write_reasoning_log(self.pending_reasoning_log)
             self.state = ProcessingState.COMPLETE
-            return DialogueResponse(action=DialogueAction.COMPLETE, content="Processing phase complete")
+            logger.info(
+                f"[Session {self.session_id}] State: REVIEWING -> COMPLETE. Processing phase finished"
+            )
+            return DialogueResponse(
+                action=DialogueAction.COMPLETE, content="Processing phase complete"
+            )
 
         else:
             self._log_user_action(
-                action="modify", phase="reviewing", modifications=user_message
+                action="modify", phase=self.state.value, modifications=user_message
             )
-            processed = _read_processed(self.session_id)
+            processed = await _read_processed(self.session_id, uow=uow)
             last_result = (
                 processed["attempts"][-1]
                 if processed and processed.get("attempts")
                 else ""
             )
-            modified = await processing_service.modify_processing(last_result, user_message)
-            _write_processed(self.session_id, self.pir, modified)
-            return DialogueResponse(action=DialogueAction.SHOW_PROCESSING, content=modified)
+            try:
+                modified = await processing_service.modify_processing(
+                    last_result, user_message
+                )
+            except Exception:
+                logger.error(
+                    f"[ProcessingFlow] Failed to modify processing result for {self.session_id}",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR,
+                    content="Failed to modify processing result",
+                )
+            await _write_processed(self.session_id, self.pir, modified, uow=uow)
+            return DialogueResponse(
+                action=DialogueAction.SHOW_PROCESSING, content=modified
+            )

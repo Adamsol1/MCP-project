@@ -4,10 +4,13 @@ import type {
   DialoguePhase,
   DialogueStage,
   DialogueSubState,
-} from "../types/dialogue";
+} from "../../types/dialogue";
+import type { Message, PhaseReviewItem } from "../../types/conversation";
+import { API_BACKEND_URL } from "../apiConfig";
 
-/** Base URL for the backend REST API. */
-const API_BACKEND_URL = "http://localhost:8000";
+const DIALOGUE_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
+const DEV_REQUEST_TIMEOUT_MS = 30 * 1000;
+const COLLECTION_STATUS_TIMEOUT_MS = 10 * 1000;
 
 export interface DialogueApiResponse {
   question: string;
@@ -15,11 +18,24 @@ export interface DialogueApiResponse {
   stage?: DialogueStage;
   phase?: DialoguePhase;
   sub_state?: DialogueSubState;
+  review_activity?: PhaseReviewItem[];
+}
+
+export interface CouncilRunSettings {
+  mode: string;
+  rounds: number;
+  timeout_seconds: number;
+  vote_retry_enabled: boolean;
+  vote_retry_attempts: number;
 }
 
 export interface DialogueSendOptions {
   selectedSources?: string[];
   gatherMore?: boolean;
+  councilDebatePoint?: string;
+  councilFindingIds?: string[];
+  councilPerspectives?: string[];
+  councilSettings?: CouncilRunSettings;
 }
 
 export interface DialogueDevStateResponse {
@@ -33,6 +49,22 @@ export interface DialogueDevStateResponse {
   has_sufficient_context: boolean;
   awaiting_user_decision: boolean;
   has_modifications: boolean;
+}
+
+export interface DialogueDevSnapshot {
+  session_id: string;
+  title: string;
+  stage: DialogueStage;
+  phase: DialoguePhase;
+  updated_at: string | null;
+  artifacts: Record<string, boolean>;
+}
+
+export type DialogueDevHydratedMessage = Omit<Message, "id">;
+
+export interface DialogueDevRestoreResponse extends DialogueDevStateResponse {
+  source_session_id: string;
+  messages: DialogueDevHydratedMessage[];
 }
 
 /**
@@ -79,7 +111,12 @@ export async function sendMessage(
       settings_timeframe: settingsTimeframe,
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
+      council_debate_point: options.councilDebatePoint ?? "",
+      council_finding_ids: options.councilFindingIds ?? [],
+      council_perspectives: options.councilPerspectives ?? [],
+      council_settings: options.councilSettings ?? null,
     },
+    { timeout: DIALOGUE_REQUEST_TIMEOUT_MS },
   );
 
   return httpResonse.data;
@@ -102,6 +139,7 @@ export async function getCollectionStatus(sessionId: string): Promise<Collection
   try {
     const res = await axios.get<CollectionStatus>(
       `${API_BACKEND_URL}/api/dialogue/collection-status/${sessionId}`,
+      { timeout: COLLECTION_STATUS_TIMEOUT_MS },
     );
     return res.data;
   } catch {
@@ -114,7 +152,35 @@ export async function getDevDialogueState(sessionId: string) {
     `${API_BACKEND_URL}/api/dialogue/dev/state`,
     {
       params: { session_id: sessionId },
+      timeout: DEV_REQUEST_TIMEOUT_MS,
     },
+  );
+  return httpResponse.data;
+}
+
+export async function listDevDialogueSnapshots() {
+  const httpResponse = await axios.get<DialogueDevSnapshot[]>(
+    `${API_BACKEND_URL}/api/dialogue/dev/snapshots`,
+    { timeout: DEV_REQUEST_TIMEOUT_MS },
+  );
+  return httpResponse.data;
+}
+
+export async function restoreDevDialogueSnapshot(
+  sourceSessionId: string,
+  targetSessionId: string,
+  targetStage: DialogueStage,
+  targetPhase: DialoguePhase,
+) {
+  const httpResponse = await axios.post<DialogueDevRestoreResponse>(
+    `${API_BACKEND_URL}/api/dialogue/dev/restore`,
+    {
+      source_session_id: sourceSessionId,
+      target_session_id: targetSessionId,
+      target_stage: targetStage,
+      target_phase: targetPhase,
+    },
+    { timeout: DIALOGUE_REQUEST_TIMEOUT_MS },
   );
   return httpResponse.data;
 }
@@ -136,6 +202,7 @@ export async function setDevDialogueState(
       stage,
       sub_state: normalizedSubState,
     },
+    { timeout: DEV_REQUEST_TIMEOUT_MS },
   );
   return httpResponse.data;
 }
@@ -146,6 +213,7 @@ export async function resetDevDialogueState(sessionId: string) {
     null,
     {
       params: { session_id: sessionId },
+      timeout: DEV_REQUEST_TIMEOUT_MS,
     },
   );
   return httpResponse.data;

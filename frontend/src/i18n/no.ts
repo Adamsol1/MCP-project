@@ -17,16 +17,14 @@ export const no = {
   minimizeDevTools: "Minimer utviklerverkt\u00f8y",
   sendTestMessage: "Send testmelding",
   showCollectionApproval: "Vis innsamlingsgodkjenning",
-  directionPhase: "Retningsfase",
-  expandDirectionPhase: "Utvid retningsfase",
-  minimizeDirectionPhase: "Minimer retningsfase",
-  jumpToInitial: "Hopp til start",
-  jumpToGathering: "Hopp til innsamling",
-  jumpToSummary: "Hopp til oppsummering",
-  jumpToPir: "Hopp til PIR",
-  jumpToComplete: "Hopp til ferdig",
-  syncStage: "Synkroniser fase",
-  resetStage: "Tilbakestill fase",
+  previousRun: "Tidligere kjøring",
+  refresh: "Oppdater",
+  loading: "Laster...",
+  noPreviousRuns: "Ingen tidligere kjøringer funnet",
+  loadPir: "PIR",
+  loadCollection: "Innsamling",
+  loadProcessing: "Behandling",
+  loadAnalysis: "Analyse",
   deleteAllConversations: "Slett alle samtaler",
 
   // ChatWindow
@@ -55,6 +53,7 @@ export const no = {
   accept: "Godta",
   collectMoreData: "Samle inn mer data",
   collectionResultsHeader: "Innsamlingsresultater",
+  collectionResultsSubtitle: "Etterretning samlet fra følgende kilder.",
   couldNotParseCollection: "Kunne ikke tolke innsamlingsresultater.",
   rawOutput: "R\u00e5data",
   selectSourcesHeader: "Velg kilder",
@@ -64,13 +63,13 @@ export const no = {
   startCollecting: "Start innsamling",
   sourceNames: {
     "AlienVault OTX": "AlienVault OTX",
-    "Internal Knowledge Bank": "Intern kunnskapsbank",
+    "Knowledge Bank": "Intern kunnskapsbank",
     "Uploaded Documents": "Opplastede dokumenter",
     "Web Search": "Nettsøk",
   } as Record<string, string>,
   sourceDescriptions: {
     "AlienVault OTX": "Åpne trusselinnmatinger",
-    "Internal Knowledge Bank": "Organisasjonens kuraterte intel",
+    "Knowledge Bank": "Organisasjonens kuraterte intel",
     "Uploaded Documents": "PDF-er, rapporter, o.l.",
     "Web Search": "Søker på nettet etter relevant informasjon",
   } as Record<string, string>,
@@ -82,6 +81,7 @@ export const no = {
   tableStatus: "Status",
   dataFound: "Data funnet",
   empty: "Tom",
+  priority: "Prioritet",
   priorityHigh: "H\u00f8y",
   priorityMedium: "Middels",
   priorityLow: "Lav",
@@ -91,7 +91,7 @@ export const no = {
   // PerspectiveSelector
   perspective: "Perspektiv",
   perspectiveLabels: {
-    NEUTRAL: "N\u00f8ytral",
+    NEUTRAL: "Global",
     CHINA: "Kina",
     EU: "EU",
     NORWAY: "Norge",
@@ -132,6 +132,7 @@ export const no = {
     collection: "INNSAMLING",
     processing: "BEHANDLING",
     analysis: "ANALYSE",
+    council: "RÅDSLAGNING",
   } as Record<string, string>,
 
   // SettingsModal
@@ -160,18 +161,18 @@ export const no = {
   timeframePlaceholder: "f.eks. Siste 30 dager",
 
   // ApprovalPrompt
-  approvalDefault: "Godkjenningsforesp\u00f8rsel",
+  approvalDefault: "Klar til \u00e5 fortsette?",
   approvalDefaultSubtitle:
-    "Gjennomg\u00e5 det genererte resultatet f\u00f8r du fortsetter.",
-  approvalSummary: "Godkjenning av oppsummering",
+    "Gjennomg\u00e5 resultatet ovenfor f\u00f8r du fortsetter.",
+  approvalSummary: "Stemmer dette med din intensjon?",
   approvalSummarySubtitle:
-    "Gjennomg\u00e5 den genererte oppsummeringen f\u00f8r du fortsetter til PIR.",
-  approvalPir: "Godkjenning av PIR",
+    "Godkjenn for \u00e5 generere prioriterte etterretningskrav, eller avvis for \u00e5 justere oppsummeringen.",
+  approvalPir: "Ser disse PIR-ene riktige ut?",
   approvalPirSubtitle:
-    "Gjennomg\u00e5 den genererte PIR-en f\u00f8r du fullf\u00f8rer Retning.",
-  approvalPlan: "Godkjenning av innsamlingsplan",
+    "Godkjenn for \u00e5 g\u00e5 til innsamlingsplanlegging, eller avvis for \u00e5 justere kravene.",
+  approvalPlan: "Klar til \u00e5 starte innsamling?",
   approvalPlanSubtitle:
-    "Gjennomg\u00e5 den genererte innsamlingsplanen f\u00f8r du velger kilder.",
+    "Godkjenn for \u00e5 velge kilder og starte innsamling, eller avvis for \u00e5 justere planen.",
   approveContinue: "Godkjenn og fortsett",
   rejectWithFeedback: "Avvis med tilbakemelding",
 } satisfies Translations;

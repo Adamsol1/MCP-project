@@ -36,7 +36,7 @@ export interface ConversationContextValue {
   /** The currently selected conversation, or null when none exist. */
   activeConversation: Conversation | null;
   /** Create a brand-new conversation, make it active, and return it. */
-  createNewConversation: () => Conversation;
+  createNewConversation: (initialPerspectives?: string[]) => Conversation;
   /** Switch the active conversation to the one with the given id. */
   switchConversation: (id: string) => void;
   /** Permanently delete the conversation with the given id. */
@@ -50,10 +50,13 @@ export interface ConversationContextValue {
    * When conversationId is omitted it falls back to the active conversation.
    */
   addMessage: (message: Message, conversationId?: string) => void;
+  /** DEV: Replace a conversation's visible message history with restored artifacts. */
+  replaceMessages: (conversationId: string, messages: Message[]) => void;
   /** Set whether the active conversation is awaiting user approval. */
   setIsConfirming: (value: boolean) => void;
-  /** Set canonical backend dialogue stage and optional sub-state. */
+  /** Set canonical backend dialogue stage and optional sub-state for a specific conversation. */
   setStage: (
+    conversationId: string,
     stage: DialogueStage,
     subState?: DialogueSubState,
     phase?: DialoguePhase,
@@ -76,10 +79,15 @@ type Action =
       type: "ADD_MESSAGE";
       payload: { conversationId: string; message: Message };
     }
+  | {
+      type: "REPLACE_MESSAGES";
+      payload: { conversationId: string; messages: Message[] };
+    }
   | { type: "SET_IS_CONFIRMING"; payload: boolean }
   | {
       type: "SET_STAGE";
       payload: {
+        conversationId: string;
         stage: DialogueStage;
         subState: DialogueSubState;
         phase?: DialoguePhase;
@@ -181,6 +189,25 @@ function conversationReducer(
       };
     }
 
+    case "REPLACE_MESSAGES": {
+      const { conversationId, messages } = action.payload;
+      return {
+        ...state,
+        conversations: state.conversations.map((conv) =>
+          conv.id === conversationId
+            ? {
+                ...conv,
+                messages,
+                title:
+                  messages.find((message) => message.sender === "user")
+                    ?.text.slice(0, 50) || conv.title,
+                updatedAt: Date.now(),
+              }
+            : conv,
+        ),
+      };
+    }
+
     case "SET_IS_CONFIRMING": {
       const stage: DialogueStage = action.payload
         ? "summary_confirming"
@@ -201,7 +228,7 @@ function conversationReducer(
       };
     }
     case "SET_STAGE": {
-      const { stage, subState, phase } = action.payload;
+      const { conversationId, stage, subState, phase } = action.payload;
       const isConfirming =
         (stage === "summary_confirming" ||
           stage === "pir_confirming" ||
@@ -212,7 +239,7 @@ function conversationReducer(
       return {
         ...state,
         conversations: state.conversations.map((conv) =>
-          conv.id === state.activeConversationId
+          conv.id === conversationId
             ? {
                 ...conv,
                 stage,
@@ -266,11 +293,14 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     state.conversations.find((c) => c.id === state.activeConversationId) ??
     null;
 
-  const createNewConversation = useCallback((): Conversation => {
-    const newConversation = createConversation();
-    dispatch({ type: "CREATE_CONVERSATION", payload: newConversation });
-    return newConversation;
-  }, []);
+  const createNewConversation = useCallback(
+    (initialPerspectives?: string[]): Conversation => {
+      const newConversation = createConversation(initialPerspectives);
+      dispatch({ type: "CREATE_CONVERSATION", payload: newConversation });
+      return newConversation;
+    },
+    [],
+  );
 
   const switchConversation = useCallback((id: string) => {
     dispatch({ type: "SWITCH_CONVERSATION", payload: id });
@@ -317,17 +347,28 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     [activeConversation],
   );
 
+  const replaceMessages = useCallback(
+    (conversationId: string, messages: Message[]) => {
+      dispatch({
+        type: "REPLACE_MESSAGES",
+        payload: { conversationId, messages },
+      });
+    },
+    [],
+  );
+
   const setIsConfirming = useCallback((value: boolean) => {
     dispatch({ type: "SET_IS_CONFIRMING", payload: value });
   }, []);
 
   const setStage = useCallback(
     (
+      conversationId: string,
       stage: DialogueStage,
       subState: DialogueSubState = null,
       phase?: DialoguePhase,
     ) => {
-      dispatch({ type: "SET_STAGE", payload: { stage, subState, phase } });
+      dispatch({ type: "SET_STAGE", payload: { conversationId, stage, subState, phase } });
     },
     [],
   );
@@ -345,6 +386,7 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     deleteAllConversations,
     renameConversation,
     addMessage,
+    replaceMessages,
     setIsConfirming,
     setStage,
     updatePerspectives,

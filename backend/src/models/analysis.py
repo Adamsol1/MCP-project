@@ -1,6 +1,10 @@
 """Models for analysis-phase processing results, drafts, and council output."""
 
-from pydantic import BaseModel, Field
+from typing import Any
+
+from pydantic import BaseModel, Field, field_validator
+
+from src.models.confidence import FindingConfidence, PerspectiveAssertion
 
 
 class FindingModel(BaseModel):
@@ -12,7 +16,7 @@ class FindingModel(BaseModel):
     evidence_summary: str = Field(..., description="Concise evidence summary")
     source: str = Field(..., description="Source category for the finding")
     confidence: int = Field(
-        ..., ge=0, le=100, description="Finding confidence from 0 to 100"
+        ..., ge=0, le=100, description="AI-generated confidence (legacy, 0–100)"
     )
     relevant_to: list[str] = Field(
         default_factory=list, description="Related PIR identifiers"
@@ -23,6 +27,10 @@ class FindingModel(BaseModel):
     why_it_matters: str = Field(..., description="Analytical significance of finding")
     uncertainties: list[str] = Field(
         default_factory=list, description="Known uncertainties or unresolved questions"
+    )
+    computed_confidence: FindingConfidence | None = Field(
+        default=None,
+        description="Algorithm-computed confidence breakdown (None until enrichment pass)",
     )
 
 
@@ -40,13 +48,17 @@ class ProcessingResult(BaseModel):
 class AnalysisDraft(BaseModel):
     """Draft analysis produced from processed findings."""
 
+    title: str = Field(
+        default="",
+        description="Concise AI-generated title for the analysis (6-10 words)",
+    )
     summary: str = Field(..., description="Short analytical summary")
     key_judgments: list[str] = Field(
         default_factory=list, description="Primary analytical judgments"
     )
-    per_perspective_implications: dict[str, list[str]] = Field(
+    per_perspective_implications: dict[str, list[PerspectiveAssertion]] = Field(
         default_factory=dict,
-        description="Implications grouped by analytical perspective",
+        description="Implications grouped by analytical perspective, with evidence trace",
     )
     recommended_actions: list[str] = Field(
         default_factory=list, description="Recommended follow-up actions"
@@ -54,6 +66,24 @@ class AnalysisDraft(BaseModel):
     information_gaps: list[str] = Field(
         default_factory=list, description="Remaining information gaps"
     )
+
+    @field_validator("per_perspective_implications", mode="before")
+    @classmethod
+    def _coerce_legacy_implications(cls, value: Any) -> Any:
+        """Accept older drafts where implications were plain strings."""
+        if not isinstance(value, dict):
+            return value
+
+        normalized: dict[str, list[Any]] = {}
+        for perspective, implications in value.items():
+            if not isinstance(implications, list):
+                normalized[perspective] = implications
+                continue
+            normalized[perspective] = [
+                {"assertion": item} if isinstance(item, str) else item
+                for item in implications
+            ]
+        return normalized
 
 
 class CouncilTranscriptEntry(BaseModel):
@@ -63,6 +93,7 @@ class CouncilTranscriptEntry(BaseModel):
     participant: str = Field(..., description="User-visible participant label")
     response: str = Field(..., description="Debate response text")
     timestamp: str = Field(..., description="ISO timestamp")
+    summary: str | None = Field(default=None, description="AI-generated 1-2 sentence summary")
 
 
 class CouncilRuntimeProfile(BaseModel):
@@ -78,9 +109,7 @@ class CouncilRuntimeProfile(BaseModel):
     vote_retry_enabled: bool = Field(
         ..., description="Whether vote retry prompting is enabled"
     )
-    vote_retry_attempts: int = Field(
-        ..., description="Configured vote retry attempts"
-    )
+    vote_retry_attempts: int = Field(..., description="Configured vote retry attempts")
     working_directory: str = Field(..., description="Working directory for council")
     file_tree_injection_enabled: bool = Field(
         ..., description="Whether file-tree injection is enabled"
