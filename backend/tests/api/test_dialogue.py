@@ -1,9 +1,16 @@
+import asyncio
+import sqlite3
+from datetime import UTC, datetime
+
 import pytest
 from fastapi.testclient import TestClient
+from sqlmodel import SQLModel
 
 from src.api import dialogue as dialogue_api
 from src.api import main
 from src.api.main import app
+from src.db import engine as db_engine
+from src.db.models.session_tables import SessionTable  # noqa: F401  (registers table)
 from src.models.dialogue import (
     ClarifyingQuestion,
     PIRReview,
@@ -240,6 +247,117 @@ def test_delete_nonexistent_session_returns_204(mock_upload_path):  # noqa: ARG0
 
     # Assert
     assert response.status_code == 204
+
+
+@pytest.fixture
+def _temp_sessions_db(monkeypatch, tmp_path):
+    """Point the sessions engine at a fresh sqlite file and init its schema."""
+    db_path = tmp_path / "sessions.db"
+    monkeypatch.setenv("SESSIONS_DB_PATH", str(db_path))
+    # Reset the engine/session-factory singletons so they pick up the new path
+    monkeypatch.setattr(db_engine, "_sessions_engine", None)
+    monkeypatch.setattr(db_engine, "_sessions_session_factory", None)
+
+    async def _init_schema():
+        engine = db_engine.get_sessions_engine()
+        async with engine.begin() as conn:
+            await conn.run_sync(SQLModel.metadata.create_all)
+
+    asyncio.run(_init_schema())
+    try:
+        yield db_path
+    finally:
+        # Drop singletons so other tests get a fresh engine pointed at the
+        # default DB path once the env var is un-set by monkeypatch.
+        monkeypatch.setattr(db_engine, "_sessions_engine", None, raising=False)
+        monkeypatch.setattr(
+            db_engine, "_sessions_session_factory", None, raising=False
+        )
+
+
+def _insert_session_row(db_path, session_id: str) -> None:
+    now = datetime.now(UTC).isoformat()
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        "INSERT INTO sessions (id, created_at, updated_at, direction_state, "
+        "question_count) VALUES (?, ?, ?, 'initial', 0)",
+        (session_id, now, now),
+    )
+    conn.execute(
+        "INSERT INTO collection_attempts "
+        "(session_id, attempt_number, pir, raw_response, created_at) "
+        "VALUES (?, 1, '', '', ?)",
+        (session_id, now),
+    )
+    conn.commit()
+    conn.close()
+
+
+def _count_session_rows(db_path, session_id: str) -> tuple[int, int]:
+    conn = sqlite3.connect(str(db_path))
+    sessions = conn.execute(
+        "SELECT COUNT(*) FROM sessions WHERE id = ?", (session_id,)
+    ).fetchone()[0]
+    children = conn.execute(
+        "SELECT COUNT(*) FROM collection_attempts WHERE session_id = ?",
+        (session_id,),
+    ).fetchone()[0]
+    conn.close()
+    return sessions, children
+
+
+def test_delete_session_removes_row_and_children(
+    mock_upload_path, _temp_sessions_db
+):  # noqa: ARG001
+    """DELETE must actually remove the session row and child rows from the DB."""
+    session_id = "delete-me-123"
+    _insert_session_row(_temp_sessions_db, session_id)
+    dialogue_api._deleted_sessions.discard(session_id)
+
+    assert _count_session_rows(_temp_sessions_db, session_id) == (1, 1)
+
+    client = TestClient(app)
+    response = client.delete(f"/api/sessions/{session_id}")
+
+    assert response.status_code == 204
+    assert _count_session_rows(_temp_sessions_db, session_id) == (0, 0)
+
+
+def test_deleted_session_cannot_be_resurrected_by_in_flight_save(
+    mock_upload_path, _temp_sessions_db
+):  # noqa: ARG001
+    """After DELETE, a concurrent _save_session must not re-insert the row.
+
+    Simulates the race where a long-running /api/dialogue/message handler holds
+    a reference to an IntelligenceSession object that pre-dates the DELETE and
+    tries to upsert it back into the DB when it finishes.
+    """
+    session_id = "race-target-456"
+    dialogue_api._deleted_sessions.discard(session_id)
+
+    # Seed the session in the DB, then delete it via the API
+    _insert_session_row(_temp_sessions_db, session_id)
+    client = TestClient(app)
+    assert client.delete(f"/api/sessions/{session_id}").status_code == 204
+    assert _count_session_rows(_temp_sessions_db, session_id) == (0, 0)
+
+    # Simulate the in-flight handler completing after the delete: build a
+    # stale IntelligenceSession and try to save it.
+    from src.api.dialogue import IntelligenceSession, _save_session
+    from src.db.unit_of_work import UnitOfWork
+    from src.services.reasearch_logger import ResearchLogger
+
+    async def _attempt_resave():
+        session = IntelligenceSession(session_id, ResearchLogger(session_id))
+        factory = db_engine.get_sessions_session_factory()
+        async with factory() as db_session:
+            uow = UnitOfWork(db_session)
+            await _save_session(session, uow)
+
+    asyncio.run(_attempt_resave())
+
+    # Row must still be gone — tombstone blocks the resurrection
+    assert _count_session_rows(_temp_sessions_db, session_id) == (0, 0)
 
 
 def test_dev_reset_sets_stage_initial():

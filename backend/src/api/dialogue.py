@@ -121,6 +121,12 @@ class IntelligenceSession:
 
 _sessions: dict[str, IntelligenceSession] = {}
 
+# Tombstone of session ids that were explicitly deleted.  Blocks in-flight
+# requests (e.g. a long-running /api/dialogue/message handler) from
+# re-inserting the row via _save_session after the user has already
+# deleted the session on the frontend.
+_deleted_sessions: set[str] = set()
+
 
 async def _save_session(session: IntelligenceSession, uow: UnitOfWork) -> None:
     """Persist session state to sessions.db so it survives server restarts.
@@ -129,6 +135,11 @@ async def _save_session(session: IntelligenceSession, uow: UnitOfWork) -> None:
         session: The active session to save
         uow: Unit of Work with an open DB transaction
     """
+    if session.session_id in _deleted_sessions:
+        logger.info(
+            f"[Session {session.session_id}] Skipping save: session was deleted"
+        )
+        return
     row = session_to_row(session)
     await uow.sessions.upsert(row)
     await uow.commit()
@@ -237,17 +248,24 @@ class DialogueDevRestoreResponse(DialogueDevStateResponse):
     messages: list[dict[str, Any]]
 
 
-async def evict_session(session_id: str, uow: UnitOfWork) -> None:
+async def evict_session(session_id: str, uow: UnitOfWork) -> bool:
     """Remove a session from the in-memory cache and delete it from the DB.
 
     Args:
         session_id: session identifier
         uow: Unit of Work with an open DB transaction
+
+    Returns:
+        True if a session row existed and was deleted, False otherwise.
     """
     _sessions.pop(session_id, None)
-    await uow.sessions.delete_cascade(session_id)
+    _deleted_sessions.add(session_id)
+    existed = await uow.sessions.delete_cascade(session_id)
     await uow.commit()
-    logger.info(f"[Session {session_id}] Evicted from cache and DB")
+    logger.info(
+        f"[Session {session_id}] Evicted from cache and DB (existed={existed})"
+    )
+    return existed
 
 
 def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
