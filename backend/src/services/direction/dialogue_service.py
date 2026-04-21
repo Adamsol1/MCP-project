@@ -122,7 +122,10 @@ class DialogueService:
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
             )
-            result = self._parse_json(raw)
+            try:
+                result = self._parse_json(raw)
+            except (json.JSONDecodeError, ValueError) as e:
+                raise ValueError(f"Agent returned unparseable response: {e}") from e
 
             # Enrich sources with citation metadata from the knowledge index.
             try:
@@ -266,6 +269,8 @@ class DialogueService:
     def _parse_json(raw: str) -> Any:
         """Parse JSON from raw LLM output, stripping markdown code fences if present."""
         text = raw.strip()
+        if not text:
+            raise ValueError("Agent returned empty response")
         if text.startswith("```"):
             lines = text.splitlines()
             text = "\n".join(lines[1:-1])

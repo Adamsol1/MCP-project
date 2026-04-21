@@ -130,7 +130,15 @@ class GeminiAgent:
                     raise e.exceptions[0] from e
                 raise
 
-            candidate = response.candidates[0]
+            candidate = response.candidates[0] if response.candidates else None
+            if candidate is None or candidate.content is None:
+                finish_reason = getattr(candidate, "finish_reason", "N/A") if candidate else "NO_CANDIDATES"
+                logger.warning(
+                    "[GeminiAgent] Empty or blocked response (finish_reason=%s) — returning empty string",
+                    finish_reason,
+                )
+                return ""
+
             tool_calls = [
                 part
                 for part in candidate.content.parts
@@ -138,12 +146,20 @@ class GeminiAgent:
             ]
 
             if not tool_calls:
+                finish_reason = getattr(candidate, "finish_reason", "N/A")
                 text = "".join(
                     part.text
                     for part in candidate.content.parts
                     if part.text is not None
                 )
-                logger.info(f"[GeminiAgent] Completed in {round_num + 1} round(s)")
+                if not text:
+                    logger.warning(
+                        "[GeminiAgent] Completed in %d round(s) but response text is empty (finish_reason=%s)",
+                        round_num + 1,
+                        finish_reason,
+                    )
+                else:
+                    logger.info("[GeminiAgent] Completed in %d round(s)", round_num + 1)
                 return text
 
             logger.info(

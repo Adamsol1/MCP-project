@@ -137,6 +137,37 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
             "publisher": "Internal Knowledge Bank",
         },
     },
+    # ── Analytical personas ──────────────────────────────────────────────────
+    "personas/us": {
+        "keywords": ["us", "united states", "american"],
+        "priority": 4,
+        "citation": None,
+    },
+    "personas/norway": {
+        "keywords": ["norway", "norwegian"],
+        "priority": 4,
+        "citation": None,
+    },
+    "personas/china": {
+        "keywords": ["china", "chinese"],
+        "priority": 4,
+        "citation": None,
+    },
+    "personas/eu": {
+        "keywords": ["eu", "european union"],
+        "priority": 4,
+        "citation": None,
+    },
+    "personas/russia": {
+        "keywords": ["russia", "russian"],
+        "priority": 4,
+        "citation": None,
+    },
+    "personas/neutral": {
+        "keywords": [],
+        "priority": 4,
+        "citation": None,
+    },
 }
 
 

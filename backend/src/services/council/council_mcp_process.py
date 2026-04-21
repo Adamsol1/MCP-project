@@ -69,7 +69,7 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
         return None
 
     project_root = Path(__file__).resolve().parents[3]
-    council_dir = project_root / "council_mcp"
+    council_dir = project_root / "council_mcp_server"
     server_file = council_dir / "server_http.py"
     if not server_file.exists():
         logger.warning("[Council MCP] Cannot autostart; missing %s", server_file)
