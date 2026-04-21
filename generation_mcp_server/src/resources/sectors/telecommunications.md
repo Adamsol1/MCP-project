@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2022-048
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: Telecommunications Sector Threat Landscape
+AUTHOR: Dr. Yuki Tanaka, Telecommunications Security Analyst
+DATE: 27 July 2022
+ORGANIZATION: Knowledge Base
+---
+
 # Telecommunications Sector Threat Landscape
 
 ## Strategic Overview

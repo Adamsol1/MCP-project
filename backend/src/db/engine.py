@@ -120,3 +120,27 @@ def get_sessions_db_path() -> Path:
 
 def get_knowledge_db_path() -> Path:
     return _db_path("KNOWLEDGE_DB_PATH", "knowledge.db")
+
+
+def seed_knowledge() -> None:
+    """Seed knowledge.db from .md files and perspective docs. Safe to call on every startup (upsert)."""
+    import sys
+    sys.path.insert(0, str(_BACKEND_ROOT))
+    from scripts.seed_knowledge import seed as seed_kb
+    from scripts.seed_perspective_docs import seed as seed_pdocs
+    seed_kb()
+    seed_pdocs()
+
+
+def run_migrations() -> None:
+    """Run alembic upgrade head for both DBs. Safe to call on every startup."""
+    from alembic import command
+    from alembic.config import Config
+
+    for ini_name, db_path in (
+        ("alembic_sessions.ini", get_sessions_db_path()),
+        ("alembic_knowledge.ini", get_knowledge_db_path()),
+    ):
+        cfg = Config(str(_BACKEND_ROOT / ini_name))
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+        command.upgrade(cfg, "head")

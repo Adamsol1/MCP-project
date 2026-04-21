@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2019-041
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: Norway–Russia Relations
+AUTHOR: Dr. Erik Haugen, Senior Intelligence Analyst
+DATE: 15 March 2019
+ORGANIZATION: Knowledge Base
+---
+
 # Norway–Russia Relations
 
 ## Strategic Overview

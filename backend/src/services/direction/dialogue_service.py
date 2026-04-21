@@ -197,13 +197,13 @@ class DialogueService:
             return ""
 
         logger.info(
-            f"[MCP] Pre-fetching {min(len(matches), 5)} resources via Resources primitive: "
-            f"{[m['id'] for m in matches[:5]]}"
+            f"[MCP] Pre-fetching {min(len(matches), 8)} resources via Resources primitive: "
+            f"{[m['id'] for m in matches[:8]]}"
         )
 
-        # Step 4: fetch top 5 matching resources
+        # Step 4: fetch top 8 matching resources
         parts = ["## Background Knowledge (pre-fetched via MCP Resources)"]
-        for entry in matches[:5]:
+        for entry in matches[:8]:
             try:
                 content = await self.mcp_client.read_resource(entry["uri"])
                 parts.append(f"### Source: {entry['id']}")

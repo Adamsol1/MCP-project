@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2022-006
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: EU–China Relations
+AUTHOR: Dr. Mei Lin Chen, Asia-Pacific Analyst
+DATE: 14 January 2022
+ORGANIZATION: Knowledge Base
+---
+
 # EU–China Relations
 
 ## Strategic Overview

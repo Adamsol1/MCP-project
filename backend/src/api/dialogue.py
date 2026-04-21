@@ -21,6 +21,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.db.mappers import row_to_session, session_to_row
+from src.db.engine import get_knowledge_session_factory
+from src.db.repositories.perspective_doc_repo import PerspectiveDocRepository
 from src.db.unit_of_work import UnitOfWork, get_uow
 from src.mcp_client.client import MCPClient
 from src.models.analysis import CouncilRunSettings
@@ -345,6 +347,39 @@ def _convert_to_message_response(
 def _ensure_dev_tools_enabled():
     if not DEV_TOOLS_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
+
+
+async def _load_perspective_docs(perspectives: list[str]) -> dict[str, str]:
+    """Load and format perspective documents for a list of perspectives.
+
+    Returns a dict mapping each perspective to a formatted markdown block
+    containing all its active Political / Economic / Military reference documents.
+    """
+    if not perspectives:
+        return {}
+    factory = get_knowledge_session_factory()
+    docs_by_perspective: dict[str, str] = {}
+    try:
+        async with factory() as session:
+            repo = PerspectiveDocRepository(session)
+            for perspective in perspectives:
+                docs = await repo.list_by_perspective(perspective)
+                if not docs:
+                    continue
+                sections: dict[str, list[str]] = {}
+                for doc in docs:
+                    sections.setdefault(doc.section, []).append(
+                        f"### {doc.title}\n*Source: {doc.source or 'Internal'}*\n\n{doc.markdown_content}"
+                    )
+                parts = ["## Official Reference Documents"]
+                for section in ("political", "economic", "military"):
+                    if section in sections:
+                        parts.append(f"### {section.capitalize()}")
+                        parts.extend(sections[section])
+                docs_by_perspective[perspective] = "\n\n".join(parts)
+    except Exception:
+        logger.warning("[_load_perspective_docs] Failed to load docs", exc_info=True)
+    return docs_by_perspective
 
 
 async def _get_or_create_session(
@@ -1164,7 +1199,6 @@ async def _handle_processing_phase(
             pir=session.processing_flow.pir,
             research_logger=session.research_logger,
         )
-        analysis_service = AnalysisService(mcp_client)
         selected_perspectives = (
             [
                 p.value.lower()
@@ -1173,6 +1207,8 @@ async def _handle_processing_phase(
             if session.direction_flow and session.direction_flow.context
             else None
         )
+        perspective_docs = await _load_perspective_docs(selected_perspectives or [])
+        analysis_service = AnalysisService(mcp_client, perspective_docs=perspective_docs)
         init_response = await session.analysis_flow.initialize(
             processing_service=ProcessingResultStore(uow=uow),
             analysis_service=analysis_service,
@@ -1374,11 +1410,14 @@ async def _handle_council_phase(
             phase=Phase.ANALYSIS,
         )
     perspectives = request.council_perspectives or request.perspectives
+    perspective_docs = await _load_perspective_docs(
+        [p.lower() for p in perspectives if p.lower() != "neutral"]
+    )
     response = await session.council_flow.process_user_message(
         debate_point=request.council_debate_point,
         finding_ids=request.council_finding_ids,
         selected_perspectives=perspectives,
-        council_service=CouncilService(),
+        council_service=CouncilService(perspective_docs=perspective_docs),
         analysis_flow=session.analysis_flow,
         council_settings=request.council_settings,
     )

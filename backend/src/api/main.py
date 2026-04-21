@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.analysis import router as analysis_router
 from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
-from src.db.engine import get_knowledge_engine, get_sessions_engine
+from src.db.engine import get_knowledge_engine, get_sessions_engine, run_migrations, seed_knowledge
+from src.db.unit_of_work import KnowledgeUnitOfWork, get_knowledge_uow
 from src.db.unit_of_work import UnitOfWork, get_uow
 from src.importers.session_uploads import (
     default_uploads_root,
@@ -42,6 +44,8 @@ logger = logging.getLogger("app")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Application lifecycle: initialize DB engines and start council MCP."""
+    await asyncio.to_thread(run_migrations)
+    await asyncio.to_thread(seed_knowledge)
     # Initialize DB engines so connectivity issues surface at startup
     get_sessions_engine()
     get_knowledge_engine()
@@ -73,6 +77,25 @@ app.include_router(dialogue_router)
 
 # Path for saving uploaded files.
 UPLOADS_ROOT = Path(default_uploads_root())
+
+
+@app.get("/api/knowledge/perspective-documents")
+async def list_perspective_documents(
+    kuow: KnowledgeUnitOfWork = Depends(get_knowledge_uow),
+):
+    """Return all active perspective documents grouped by perspective and section."""
+    docs = await kuow.perspective_docs.list_all_active()
+    grouped: dict[str, dict[str, list[dict]]] = {}
+    for doc in docs:
+        grouped.setdefault(doc.perspective, {}).setdefault(doc.section, []).append(
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "source": doc.source,
+                "date_published": doc.date_published.isoformat(),
+            }
+        )
+    return {"perspective_documents": grouped}
 
 
 # Health check endpoint used for checking system status

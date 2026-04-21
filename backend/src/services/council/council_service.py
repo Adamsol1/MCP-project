@@ -43,6 +43,7 @@ class CouncilService:
         self,
         working_directory: str | Path | None = None,
         mcp_client: MCPClient | None = None,
+        perspective_docs: dict[str, str] | None = None,
     ):
         if working_directory is None:
             working_directory = Path(__file__).resolve().parents[2] / "data" / "outputs"
@@ -51,6 +52,7 @@ class CouncilService:
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
         self.mcp_client = mcp_client or MCPClient(server_url=get_council_mcp_url())
+        self._perspective_docs: dict[str, str] = perspective_docs or {}
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
@@ -104,7 +106,11 @@ class CouncilService:
                     "cli": self.DEFAULT_ADAPTER,
                     "model": self.DEFAULT_MODEL,
                     "display_name": get_display_name(perspective),
-                    "persona_prompt": f"{persona}\n\n{behavior}",
+                    "persona_prompt": (
+                        f"{persona}\n\n{self._perspective_docs[perspective.value]}\n\n{behavior}"
+                        if perspective.value in self._perspective_docs
+                        else f"{persona}\n\n{behavior}"
+                    ),
                 }
             )
         return participants

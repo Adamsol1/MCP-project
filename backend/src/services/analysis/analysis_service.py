@@ -23,8 +23,14 @@ _DEFAULT_PERSPECTIVES = tuple(p.value for p in Perspective)
 
 
 class AnalysisService:
-    def __init__(self, mcp_client: MCPClient):
+    def __init__(
+        self,
+        mcp_client: MCPClient,
+        perspective_docs: dict[str, str] | None = None,
+    ):
         self.mcp_client = mcp_client
+        # Maps perspective name → formatted reference document markdown (may be empty)
+        self._perspective_docs: dict[str, str] = perspective_docs or {}
 
     async def generate_draft(
         self,
@@ -55,7 +61,12 @@ class AnalysisService:
                             "perspectives": perspective,
                         },
                     )
-                    system_prompt = f"{persona}\n\n{task_prompt}"
+                    ref_docs = self._perspective_docs.get(perspective, "")
+                    system_prompt = (
+                        f"{persona}\n\n{task_prompt}"
+                        if not ref_docs
+                        else f"{persona}\n\n{ref_docs}\n\n{task_prompt}"
+                    )
                     agent = GeminiAgent(self.mcp_client)
                     raw = await agent.run(
                         system_prompt=system_prompt,
