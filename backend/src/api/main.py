@@ -195,12 +195,27 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
     - All uploaded files and parsed artifacts (data/imports/{session_id}/)
     - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
     - Legacy: analysis state file and session JSON if they exist
+
+    The DB delete is attempted first and committed independently of the file
+    cleanups.  If file cleanup later fails we still return 204 — the
+    authoritative DB row is already gone and stale files can be pruned later.
     """
+    # --- DB delete (authoritative) ---
     try:
-        await evict_session(session_id, uow)
+        existed = await evict_session(session_id, uow)
+    except Exception as e:
+        logger.error(
+            f"[delete_session] DB delete failed for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete session from DB"
+        ) from e
+
+    # --- Filesystem cleanups (best-effort) ---
+    try:
         delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
 
-        # Clean up legacy log files (will be removed once Phase 3 is complete)
         outputs_dir = ResearchLogger(session_id=session_id).log_path.parent
         for log_name in (
             f"research_log_{session_id}.jsonl",
@@ -210,7 +225,6 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
             if log_file.exists():
                 log_file.unlink()
 
-        # Clean up legacy analysis state file
         analysis_state_file = (
             Path(__file__).resolve().parents[2]
             / "sessions"
@@ -219,20 +233,19 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
         if analysis_state_file.exists():
             analysis_state_file.unlink()
 
-        # Clean up legacy session JSON file
         legacy_session_file = (
             Path(__file__).resolve().parents[2] / "sessions" / f"{session_id}.json"
         )
         if legacy_session_file.exists():
             legacy_session_file.unlink()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(
-            f"[delete_session] Failed to delete session {session_id}: {e}",
+        # File cleanup failures do not mask the successful DB delete above.
+        logger.warning(
+            f"[delete_session] File cleanup failed for session {session_id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail="Failed to delete session") from e
 
-    logger.info(f"[delete_session] Deleted session {session_id}")
+    logger.info(
+        f"[delete_session] Deleted session {session_id} (db_existed={existed})"
+    )
     return Response(status_code=204)
