@@ -98,8 +98,8 @@ class CouncilService:
         behavior = await self.mcp_client.get_prompt("council_behavior")
         participants = []
         for perspective in normalized:
-            persona = await self.mcp_client.read_resource(
-                f"knowledge://personas/{perspective.value}"
+            persona = await self.mcp_client.get_prompt(
+                "persona", {"perspective": perspective.value}
             )
             participants.append(
                 {

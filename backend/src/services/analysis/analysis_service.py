@@ -70,7 +70,15 @@ class AnalysisService:
                     agent = GeminiAgent(self.mcp_client)
                     raw = await agent.run(
                         system_prompt=system_prompt,
-                        task=f"Using your {perspective} persona, analyse the provided findings and develop substantive intelligence implications — focus on strategic meaning, not just description.",
+                        task=(
+                            f"You are a {perspective} intelligence analyst. "
+                            f"Represent your perspective authentically and consistently. "
+                            f"Argue positions that align with your values and strategic priorities. "
+                            f"Be direct and concrete — avoid vague platitudes. "
+                            f"Develop each implication fully: explain why it matters, what consequences follow, "
+                            f"how it shifts your risk picture, second-order effects, and caveats. "
+                            f"Write as you would in a real intelligence assessment — not as a summary."
+                        ),
                         allowed_tool_names=set(),
                     )
 

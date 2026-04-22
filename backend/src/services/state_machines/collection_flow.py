@@ -232,7 +232,7 @@ class CollectionFlow(BasePhaseFlow):
             )
 
             self.collection_plan = await collection_service.generate_collection_plan(
-                self.pir, user_message
+                self.pir, user_message, current_plan=self.collection_plan
             )
 
             dialogue_response.action = DialogueAction.SHOW_PLAN

@@ -11,7 +11,6 @@ Architecture:
 """
 import logging
 import os
-import sqlite3
 import sys
 from pathlib import Path
 
@@ -29,6 +28,7 @@ from deliberation.summarizer import DeliberationSummarizer  # noqa: E402
 from deliberation.transcript import TranscriptManager  # noqa: E402
 from models.config import AdapterConfig, CLIToolConfig, load_config  # noqa: E402
 from models.schema import DeliberateRequest, Participant  # noqa: E402
+from personas import get_persona  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,31 +79,6 @@ engine.tool_execution_history = []
 logger.info("DeliberationEngine ready")
 
 # ---------------------------------------------------------------------------
-# Knowledge DB access
-# ---------------------------------------------------------------------------
-
-_DB_PATH = PROJECT_DIR.parent / "backend" / "data" / "knowledge.db"
-
-
-def _read_persona(perspective: str) -> str:
-    """Read persona markdown from knowledge.db for a given perspective."""
-    if not _DB_PATH.exists():
-        raise RuntimeError(f"knowledge.db not found at {_DB_PATH}")
-    conn = sqlite3.connect(str(_DB_PATH))
-    conn.row_factory = sqlite3.Row
-    try:
-        row = conn.execute(
-            "SELECT markdown_content FROM knowledge_resources WHERE id = ?",
-            (f"personas/{perspective.lower()}",),
-        ).fetchone()
-    finally:
-        conn.close()
-    if not row:
-        raise ValueError(f"No persona found for perspective: '{perspective}'")
-    return row["markdown_content"]
-
-
-# ---------------------------------------------------------------------------
 # FastMCP server
 # ---------------------------------------------------------------------------
 
@@ -117,25 +92,17 @@ mcp = FastMCP(
 
 
 # ---------------------------------------------------------------------------
-# Resources
+# Prompts
 # ---------------------------------------------------------------------------
 
-@mcp.resource("knowledge://personas/{perspective}", mime_type="text/markdown")
-def persona_resource(perspective: str) -> str:
+@mcp.prompt()
+def persona(perspective: str) -> str:
     """Analytical persona for a council participant.
-
-    Fetched by the backend for each selected perspective before building
-    the participants list for a deliberation.
 
     Args:
         perspective: One of: us, norway, china, eu, russia, neutral.
     """
-    return _read_persona(perspective)
-
-
-# ---------------------------------------------------------------------------
-# Prompts
-# ---------------------------------------------------------------------------
+    return get_persona(perspective)
 
 @mcp.prompt()
 def council_behavior() -> str:

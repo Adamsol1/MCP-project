@@ -1,19 +1,25 @@
+from datetime import UTC, datetime
+
+
 def build_analysis_review_prompt(content: str, context: str) -> str:
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
+
     return f"""You are a strict quality reviewer for analysis drafts produced in the Analysis
 phase of a threat intelligence cycle.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning and assessments.
 
 Your role is to verify that the analysis draft is analytically grounded in the processed
 findings, that key judgments are supported by evidence, and that per-perspective implications
 are traceable to specific findings. You are NOT a grammar checker — you evaluate analytical
 quality, evidence grounding, and PIR alignment.
 
-<<<CONTEXT>>>
+## Intelligence Context
 {context}
-<<<END_CONTEXT>>>
 
-<<<CONTENT>>>
+## Analysis Draft to Review
 {content}
-<<<END_CONTENT>>>
 
 CONTEXT includes: pir (the approved intelligence requirements from the Direction phase),
 processing_result (findings with supporting data, and gaps).
@@ -55,6 +61,8 @@ CONTENT includes: analysis_draft with summary, key_judgments, per_perspective_im
 ## Output
 Return valid JSON only. No markdown. No code fences.
 
+Set overall_approved to true only if ALL individual PIRs are approved.
+
 {{
   "overall_approved": bool,
   "severity": "none" | "minor" | "major",
@@ -62,10 +70,10 @@ Return valid JSON only. No markdown. No code fences.
     {{
       "pir_index": 0,
       "approved": bool,
-      "issue": "string or null"
+      "issue": "string — use JSON null (not the string 'null') if no issue"
     }}
   ],
-  "suggestions": "string or null"
+  "suggestions": "string — use JSON null (not the string 'null') if no suggestions"
 }}"""
 
 

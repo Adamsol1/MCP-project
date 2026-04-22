@@ -1,27 +1,26 @@
 """Direction phase review prompt builder and MCP adapter function."""
 
+from datetime import UTC, datetime
+
 
 def build_direction_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for PIRs generated in the Direction phase.
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
-    Args:
-        content: The generated PIRs to review (JSON string).
-        context: The dialogue context used to generate the PIRs (JSON string).
-
-    Returns:
-        Formatted prompt string ready to send to the AI reviewer.
-    """
-    return f"""
-You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)
+    return f"""You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)
 generated in the Direction phase of a threat intelligence cycle.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning, including timeliness assessments.
 
 Your role is to ensure PIRs meet professional intelligence standards before
 they are presented to the analyst. You are NOT a grammar checker — you
 evaluate substance, relevance, and analytical quality.
 
-You will receive:
-- CONTEXT: The analyst's intelligence problem and dialogue: {context}
-- Content: The generated PIRs to review: {content}
+## Intelligence Context
+{context}
+
+## PIRs to Review
+{content}
 
 ## Review each PIR against these criteria:
 
@@ -40,7 +39,7 @@ Does this PIR address a real gap in understanding — not something already
 known or trivially answerable? "Nice to know" is not enough.
 
 ### 4. Answers the actual problem
-Compare each PIR against the analyst's original intelligence problem in CONTEXT.
+Compare each PIR against the analyst's original intelligence problem in the context above.
 A technically correct PIR that answers the wrong question must be rejected.
 
 ### 5. Number of PIRs
@@ -59,6 +58,8 @@ intelligence cycle. When in doubt, mark as MAJOR.
 Return valid JSON only. No explanation outside the JSON.
 No markdown. No code fences.
 
+Set overall_approved to true only if ALL individual PIRs are approved.
+
 {{
   "overall_approved": bool,
   "severity": "none" | "minor" | "major",
@@ -66,12 +67,11 @@ No markdown. No code fences.
     {{
       "pir_index": int,
       "approved": bool,
-      "issue": "string or null"
+      "issue": "string — use JSON null (not the string 'null') if no issue"
     }}
   ],
-  "suggestions": "string or null"
-}}
-"""
+  "suggestions": "string — use JSON null (not the string 'null') if no suggestions"
+}}"""
 
 
 # ── MCP adapter function ──────────────────────────────────────────────────────

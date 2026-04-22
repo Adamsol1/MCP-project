@@ -9,29 +9,42 @@ from ._shared import SOURCE_TOOL_MAP, _language_instruction
 def build_collection_plan_prompt(
     pir: str,
     modifications: str | None = None,
+    current_plan: str | None = None,
     language: str = "en",
 ) -> str:
     available_sources = list(SOURCE_TOOL_MAP.keys())
     available_sources_str = ", ".join(f'"{s}"' for s in available_sources)
     lang_note = _language_instruction(language, "the 'plan' field")
 
+    existing_plan_section = (
+        f"\n## Existing Plan\n{current_plan}\n"
+        if current_plan else ""
+    )
+
     modifications_section = (
-        f"\n## Modification Request\n{modifications}\nIncorporate this change into the plan."
+        f"\n## Modification Request\n{modifications}\n"
+        f"Use the following rules to decide how to respond:\n"
+        f"- Additive (e.g. 'add a step for X', 'include a step on Y'):\n"
+        f"  Keep ALL existing steps unchanged and append only the new step(s). Do not modify, merge, or remove any existing steps.\n"
+        f"- Specific (e.g. 'change step 2', 'step 3 is too vague'):\n"
+        f"  Keep all other steps unchanged and only modify the ones explicitly mentioned.\n"
+        f"- General (e.g. 'too broad', 'not relevant'):\n"
+        f"  Regenerate all steps from scratch using the feedback as guidance.\n"
         if modifications else ""
     )
 
-    return f"""You are a professional threat intelligence analyst. Your task is to create a collection plan and suggest relevant sources for the given Priority Intelligence Requirements (PIRs).
+    return f"""{lang_note}You are a professional threat intelligence analyst. Your task is to create a collection plan and suggest relevant sources for the given Priority Intelligence Requirements (PIRs).
 
 ## Priority Intelligence Requirements
 {pir}
-{modifications_section}
+{existing_plan_section}{modifications_section}
 ## Available Sources
 The following sources are available: {available_sources_str}
 Only suggest sources that are genuinely relevant to the PIRs.
 
 ## Allowed Tools
-You MUST only use list_knowledge_base and read_knowledge_base.
-Do not call any other tools during planning.
+During planning, call ONLY list_knowledge_base and read_knowledge_base.
+Any other tool calls are not permitted at this stage.
 
 ## Instructions
 1. Read the knowledge bank (use list_knowledge_base and read_knowledge_base) to understand available background knowledge
@@ -51,9 +64,7 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
   ]
 }}
 
-Each step must have at least one suggested_source. Only use source names exactly as listed in Available Sources.
-
-{lang_note}"""
+Each step must have at least one suggested_source. Only use source names exactly as listed in Available Sources."""
 
 
 def build_collection_collect_prompt(
@@ -87,18 +98,20 @@ def build_collection_collect_prompt(
         f"(3) call read_upload(session_id, file_upload_id) to read the full content of relevant files."
         if session_id and _upload_tools_in_use else ""
     )
-    _min_lookback = (datetime.now(UTC).replace(year=datetime.now(UTC).year - 3)).strftime('%Y-%m-%d')
+    _now = datetime.now(UTC)
+    _min_lookback = _now.replace(year=_now.year - 3).strftime('%Y-%m-%d')
     since_note = (
-        f"\nNote: Today's date is {datetime.now(UTC).strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
+        f"\nNote: Today's date is {_now.strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
         f"For all query_otx calls, use since_date=\"{_min_lookback}\" (3 years ago) to ensure sufficient historical coverage."
         if since_date and "query_otx" in approved_tools else ""
     )
 
     existing_data_section = (
         f"\n## Already Collected Data\nThe following data was gathered in a previous attempt. "
-        f"Do NOT duplicate content already present here, but you MUST still query ALL approved sources — "
-        f"each source may have additional data not yet covered. "
-        f"Use different queries, angles, or resources to fill the gaps identified by the reviewer.\n{existing_data}"
+        f"Do NOT reproduce identical content already present here. "
+        f"A source is NOT considered covered if only partial data was collected — "
+        f"query it again with different search terms or angles to fill remaining gaps. "
+        f"You MUST still query ALL approved sources.\n{existing_data}"
         if existing_data else ""
     )
 
@@ -189,7 +202,8 @@ def build_collection_collect_prompt(
 {step_guidance_section}{existing_data_section}
 ## Approved Tools
 You MUST only use the following tools: {approved_tools_str}
-Do not query any source or tool not listed above.{unmapped_note}{session_note}{since_note}
+Do not query any source or tool not listed above.
+If you are unsure whether a tool is approved, do not call it — unauthorised tool calls will be rejected.{unmapped_note}{session_note}{since_note}
 {web_search_note}
 
 ## Instructions
@@ -244,7 +258,7 @@ def build_collection_summarize_prompt(
 ) -> str:
     lang_note = _language_instruction(language)
 
-    return f"""You are a professional threat intelligence analyst. Your task is to produce a factual summary of collected intelligence data. You have no tools — work only from the data provided.
+    return f"""{lang_note}You are a professional threat intelligence analyst. Your task is to produce a factual summary of collected intelligence data. You have no tools — work only from the data provided.
 
 ## Approved PIRs
 {pir}
@@ -263,10 +277,8 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
 {{
   "summary": "Factual narrative of what was found, from which sources, and which PIRs it is relevant to",
   "sources_used": ["source1", "source2"],
-  "gaps": "What was required by the PIRs but not found — or null if no gaps"
-}}
-
-{lang_note}"""
+  "gaps": "What was required by the PIRs but not found — use JSON null (not the string 'null') if no gaps were identified"
+}}"""
 
 
 def build_collection_modify_prompt(
@@ -276,7 +288,7 @@ def build_collection_modify_prompt(
 ) -> str:
     lang_note = _language_instruction(language, "the 'summary' and 'gaps' fields")
 
-    return f"""You are a professional threat intelligence analyst. Apply the requested modification to an existing intelligence summary.
+    return f"""{lang_note}You are a professional threat intelligence analyst. Apply the requested modification to an existing intelligence summary.
 
 ## Modification Request
 {modifications}
@@ -295,10 +307,8 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
 {{
   "summary": "The modified factual narrative",
   "sources_used": ["source1", "source2"],
-  "gaps": "Updated gaps — or null if no gaps"
-}}
-
-{lang_note}"""
+  "gaps": "Updated gaps — use JSON null (not the string 'null') if no gaps were identified"
+}}"""
 
 
 # ── MCP adapter functions ─────────────────────────────────────────────────────
@@ -307,6 +317,7 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown.
 def collection_plan(
     pir: str,
     modifications: str = "",
+    current_plan: str = "",
     language: str = "en",
 ) -> str:
     """Prompt for generating a collection plan and suggesting relevant sources.
@@ -314,11 +325,13 @@ def collection_plan(
     Args:
         pir: The approved PIRs from the Direction phase (JSON string).
         modifications: Optional user feedback to modify an existing plan.
+        current_plan: The existing plan to modify (JSON string).
         language: BCP-47 language code (e.g. "en", "no").
     """
     return build_collection_plan_prompt(
         pir=pir,
         modifications=modifications or None,
+        current_plan=current_plan or None,
         language=language,
     )
 

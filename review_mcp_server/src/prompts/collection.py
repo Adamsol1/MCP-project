@@ -1,33 +1,26 @@
 """Collection phase review prompt builder and MCP adapter function."""
 
+from datetime import UTC, datetime
+
 
 def build_collection_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for collected intelligence in the Collection phase.
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
-    Args:
-        content: The collected data package to review (JSON string).
-        context: The direction context and PIR plan used for collection (JSON string).
-
-    Returns:
-        Formatted prompt string ready to send to the AI reviewer.
-    """
-    return f"""
-You are a strict quality reviewer for collected intelligence in the Collection
+    return f"""You are a strict quality reviewer for collected intelligence in the Collection
 phase of a threat intelligence cycle.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning, including timeframe compliance assessments.
 
 Your role is to verify that collected output is decision-relevant, source-grounded,
 and sufficient to answer approved intelligence requirements. You are NOT a
 style editor. You evaluate analytical usefulness, source quality, and traceability.
 
-You will receive two JSON payloads:
-
-<<<CONTEXT>>>
+## Intelligence Context
 {context}
-<<<END_CONTEXT>>>
 
-<<<CONTENT>>>
+## Collected Output to Review
 {content}
-<<<END_CONTENT>>>
 
 Expected structure:
 - CONTEXT includes scope, timeframe, target_entities, threat_actors,
@@ -76,9 +69,10 @@ When in doubt, be strict because weak collection quality propagates errors downs
   - partial PIR coverage with recoverable gaps
   - generally valid findings lacking precision or prioritization
 
-## Output requirements
+## Output
 Return valid JSON only. No markdown. No code fences.
-The output schema must exactly match:
+
+Set overall_approved to true only if ALL individual PIRs are approved.
 
 {{
   "overall_approved": bool,
@@ -87,18 +81,11 @@ The output schema must exactly match:
     {{
       "pir_index": int,
       "approved": bool,
-      "issue": "string or null"
+      "issue": "string — use JSON null (not the string 'null') if no issue"
     }}
   ],
-  "suggestions": "string or null"
-}}
-
-Rules for fields:
-- pir_reviews must include one entry per PIR index in context.pirs.
-- If approved is false, issue must be concrete and collection-specific.
-- suggestions should provide actionable next collection steps
-  (sources, queries, and evidence needed), not generic advice.
-"""
+  "suggestions": "string — when overall_approved is true, write a brief justification explaining which criteria were met and why the collection is considered sufficient. Use JSON null (not the string 'null') only when overall_approved is false and no actionable guidance applies."
+}}"""
 
 
 # ── MCP adapter function ──────────────────────────────────────────────────────

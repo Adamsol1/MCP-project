@@ -1,5 +1,9 @@
 """Processing phase prompt builders and MCP adapter functions."""
 
+from datetime import UTC, datetime
+
+from ._shared import _language_instruction
+
 
 def build_processing_prompt(
     pir: str,
@@ -7,6 +11,8 @@ def build_processing_prompt(
     feedback: str | None = None,
     previous_result: str | None = None,
 ) -> str:
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
+
     feedback_section = (
         f"\n## Analyst Feedback from Previous Attempt\n{feedback}\nAddress this feedback in your processing."
         if feedback else ""
@@ -21,6 +27,9 @@ def build_processing_prompt(
     )
 
     return f"""You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning, including PIR timeframes and recency assessments.
 
 ## Priority Intelligence Requirements
 {pir}
@@ -73,9 +82,9 @@ otx, knowledge_base, web_search, csv_upload, pdf_upload, txt_upload, json_upload
 
 ## Confidence Scoring
 - 40-55: Single source, unverified
-- 60-70: Single reliable source (OTX or KB) with reasonable support
-- 70-80: Confirmed by OTX with multiple pulses, or two independent sources
-- 80-90: Confirmed by multiple independent sources
+- 60-69: Single reliable source (OTX or KB) with reasonable support
+- 70-79: Confirmed by OTX with multiple pulses, or two independent sources
+- 80-89: Confirmed by multiple independent sources
 - 90+: Three or more sources with consistent attribution
 
 ## PIR Numbering
@@ -90,7 +99,6 @@ PIR-2 (short description): Gap
   → No data found after 2023.
 PIR-3 (short description): Partially answered
   → EntityC (low confidence). Key gap: X unknown.
-
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
@@ -125,8 +133,11 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 def build_processing_modify_prompt(
     existing_result: str,
     modifications: str,
+    language: str = "en",
 ) -> str:
-    return f"""You are a professional threat intelligence analyst. Apply the requested modification to an existing processing result.
+    lang_note = _language_instruction(language, "the modified output")
+
+    return f"""{lang_note}You are a professional threat intelligence analyst. Apply the requested modification to an existing processing result.
 
 ## Modification Request
 {modifications}

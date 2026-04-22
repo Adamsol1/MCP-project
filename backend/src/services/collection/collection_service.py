@@ -485,7 +485,7 @@ class CollectionService:
         return inferred
 
     async def generate_collection_plan(
-        self, pir: str, modifications: str | None = None
+        self, pir: str, modifications: str | None = None, current_plan: str | None = None
     ) -> str:
         """Generate plan and always return canonical JSON for frontend/backend consumers."""
         async with self.mcp_client.connect():
@@ -494,6 +494,7 @@ class CollectionService:
                 {
                     "pir": pir,
                     "modifications": modifications or "",
+                    "current_plan": current_plan or "",
                 },
             )
             agent = GeminiAgent(self.mcp_client)

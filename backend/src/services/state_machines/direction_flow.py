@@ -583,7 +583,9 @@ class DirectionFlow(BasePhaseFlow):
                 perspectives=self.context.perspectives,
             )
             try:
-                pir = await dialogue_service.generate_pir(self.context)
+                pir = await dialogue_service.generate_pir(
+                    self.context, current_pir=self.current_pir
+                )
             except Exception:
                 logger.error(
                     f"[Session {self.session_id}] Failed to regenerate PIR",
