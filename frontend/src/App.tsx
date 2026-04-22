@@ -362,7 +362,7 @@ function AppShell() {
           />
         </main>
 
-        <div className={`bg-surface border-l border-border-muted flex flex-col overflow-hidden transition-all duration-200 ${isRightPanelCollapsed ? "w-0 border-l-0" : "w-72"}`}>
+        <div className={`bg-surface border-l border-border flex flex-col overflow-hidden transition-all duration-200 ${isRightPanelCollapsed ? "w-0 border-l-0" : "w-72"}`}>
           <IntelligencePanel
             phase={activePhase}
             selectedPerspectives={

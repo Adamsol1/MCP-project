@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useConversation } from "../../hooks/useConversation/useConversation";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 import AnalysisView from "./AnalysisView";
 import CouncilView from "./CouncilView";
@@ -22,6 +23,7 @@ function normalizePerspectives(perspectives: string[] | undefined) {
 export default function AnalysisWorkspace() {
   const { activeConversation } = useConversation();
   const { settings } = useSettings();
+  const { reviewActivity } = useWorkspace();
 
   const data = useMemo<AnalysisResponse | null>(() => {
     if (!activeConversation) return null;
@@ -98,6 +100,7 @@ export default function AnalysisWorkspace() {
       conversationTitle={activeConversation?.title}
       onStartCouncil={() => setShowCouncil(true)}
       timeframe={settings.inputParameters.timeframe}
+      reviewActivity={reviewActivity}
     />
   );
 }

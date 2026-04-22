@@ -181,7 +181,6 @@ function PirRow({
         {/* Meta badges */}
         <div className="ml-2 flex shrink-0 flex-col items-end gap-1.5">
           <TierBadge tier={pir.tier} score={pir.score} />
-          <PriorityBadge priority={pir.priority} />
         </div>
 
         {/* Expand chevron */}

@@ -9,6 +9,8 @@ import type {
 } from "../../types/analysis";
 import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverageView";
 import AnalysisReportPDF from "./AnalysisReportPDF";
+import ReviewFeedbackPDF from "./ReviewFeedbackPDF";
+import type { PhaseReviewItem } from "../../types/conversation";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -185,56 +187,6 @@ function AssertionRow({
         <p className="flex-1 text-sm leading-6 text-text-primary">{assertion.assertion}</p>
       </div>
 
-      {conf && (
-        <div className="mt-2 ml-18 space-y-2">
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                ["Authority", conf.authority],
-                ["Corroboration", conf.corroboration],
-                ["Independence", conf.independence],
-              ] as [string, number][]
-            ).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-[9px] font-medium uppercase tracking-widest text-text-muted">{label}</p>
-                <div className="mt-0.5 flex items-center gap-1">
-                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-border/40">
-                    <div className="h-full rounded-full bg-primary/60" style={{ width: `${Math.round(value * 100)}%` }} />
-                  </div>
-                  <span className="text-[9px] tabular-nums text-text-muted">{value.toFixed(2)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {assertion.source_types.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {assertion.source_types.map((st) => (
-                <span key={st} className="rounded-full border border-border bg-surface px-1.5 py-0.5 text-[9px] text-text-muted">
-                  {st.replace(/_/g, " ")}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {assertion.supporting_finding_ids.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {assertion.supporting_finding_ids.map((fid) => {
-                const finding = allFindings.find((f) => f.id === fid);
-                return (
-                  <span
-                    key={fid}
-                    title={finding?.title}
-                    className="rounded border border-primary/30 bg-primary-subtle/20 px-1.5 py-0.5 text-[9px] font-mono text-primary/70"
-                  >
-                    {fid}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -248,6 +200,7 @@ interface AnalysisViewProps {
   conversationTitle: string | undefined;
   onStartCouncil: () => void;
   timeframe?: string;
+  reviewActivity?: PhaseReviewItem[];
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +212,7 @@ export default function AnalysisView({
   conversationTitle,
   onStartCouncil,
   timeframe,
+  reviewActivity = [],
 }: AnalysisViewProps) {
   const { processing_result: processingResult, analysis_draft: analysis } = data;
   const findings = processingResult.findings;
@@ -285,9 +239,27 @@ export default function AnalysisView({
     URL.revokeObjectURL(url);
   }
 
+  async function handleDownloadFeedbackPDF() {
+    const blob = await pdf(
+      <ReviewFeedbackPDF reviewActivity={reviewActivity} reportTitle={analysisHeading} />
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `feedback_${analysisHeading.slice(0, 50).replace(/[^a-z0-9 ]/gi, "").trim().replace(/\s+/g, "_")}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <>
-      <div className="flex justify-end pb-2">
+      <div className="flex justify-end gap-2 pb-2">
+        <button
+          onClick={handleDownloadFeedbackPDF}
+          className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-secondary transition-opacity hover:opacity-80"
+        >
+          Download Feedback
+        </button>
         <button
           onClick={handleDownloadPDF}
           className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-text-inverse transition-opacity hover:opacity-80"
@@ -661,11 +633,11 @@ function PerspectiveSection({
   const firstAssertion = implications[0] ?? null;
 
   return (
-    <div>
+    <div className="py-2">
       {/* Clickable header row */}
       <button
         type="button"
-        className="flex w-full items-center gap-4 py-4 text-left group"
+        className="flex w-full items-center gap-4 py-3 text-left group"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -680,9 +652,12 @@ function PerspectiveSection({
 
       {/* Collapsed preview */}
       {!open && firstAssertion && (
-        <p className="pb-4 text-sm leading-6 text-text-secondary line-clamp-2">
-          {firstAssertion.assertion}
-        </p>
+        <div className="relative pb-5 overflow-hidden">
+          <p className="text-sm leading-6 text-text-secondary line-clamp-3">
+            {firstAssertion.assertion}
+          </p>
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-linear-to-t from-surface to-transparent" />
+        </div>
       )}
 
       {/* Expanded assertions — flat, separated by border-b, labeled */}

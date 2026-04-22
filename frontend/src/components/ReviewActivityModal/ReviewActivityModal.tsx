@@ -355,8 +355,13 @@ function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: Ph
     return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
   }
 
-  if (phase === "processing" && parsed && typeof parsed === "object" && "findings" in parsed) {
-    return <ProcessingTranscript data={parsed as ProcessingData} />;
+  if (phase === "processing" && parsed) {
+    if (Array.isArray(parsed) && parsed.length > 0 && "id" in parsed[0]) {
+      return <ProcessingTranscript data={{ findings: parsed as ProcessingFinding[], gaps: [] }} />;
+    }
+    if (typeof parsed === "object" && !Array.isArray(parsed) && "findings" in parsed) {
+      return <ProcessingTranscript data={parsed as ProcessingData} />;
+    }
   }
 
   if (phase === "analysis" && parsed && typeof parsed === "object") {

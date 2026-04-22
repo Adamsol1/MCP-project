@@ -22,6 +22,7 @@ from src.models.dialogue import (
     PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
+from src.services.processing.processing_result_store import normalize_raw_result
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
@@ -235,6 +236,7 @@ class ProcessingFlow(BasePhaseFlow):
                 action=DialogueAction.ERROR, content="Processing failed"
             )
 
+        raw_result = normalize_raw_result(raw_result)
         self.state = ProcessingState.REVIEWING
         logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         await _write_processed(self.session_id, self.pir, raw_result, uow=uow)
