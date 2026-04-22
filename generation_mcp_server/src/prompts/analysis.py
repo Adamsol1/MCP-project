@@ -36,7 +36,9 @@ Your role is synthesis and interpretation — not collection.
 - Summary must be 2–4 sentences.
 - Key judgments must be distinct and substantive — do not restate findings verbatim.
 - Only generate per_perspective_implications for the following perspectives: {perspectives}
-- For each perspective, provide 2 concise implications as objects with "assertion" and "supporting_finding_ids".
+- For each perspective, provide as many implications as the evidence warrants.
+- Each implication should be analytically substantive — develop the assertion fully rather than summarising it. Explain why it matters from this perspective, not just what the finding shows.
+- Each implication must be traceable to specific findings; do not assert implications you cannot support.
 - supporting_finding_ids must only contain finding IDs present in the findings above (e.g. "F-001").
 - If an implication cannot be traced to a specific finding, use an empty array [].
 - Recommended actions must be actionable and analyst-relevant.
