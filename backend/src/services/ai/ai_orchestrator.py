@@ -182,7 +182,7 @@ class AIOrchestrator:
                 return generated
 
             feedback = result.suggestions
-            self.retry_explanations.append(result.suggestions)
+            self.retry_explanations.append(result.suggestions or "")
             logger.warning(
                 f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback..."
             )
