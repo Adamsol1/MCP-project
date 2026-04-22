@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useT } from "../../i18n/useT";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
@@ -42,6 +42,89 @@ function Chevron() {
   );
 }
 
+/** Renders reasoning markdown into structured sections and bullet lists. */
+function ReasoningMarkdown({ text }: { text: string }) {
+  // Normalise: replace inline " * " separators (model sometimes omits newlines)
+  // with a real newline so each bullet lands on its own line.
+  const normalised = text
+    .replace(/\r\n/g, "\n")
+    .replace(/ \* /g, "\n* ");
+
+  const rawLines = normalised.split("\n");
+
+  type Block =
+    | { kind: "heading"; text: string }
+    | { kind: "bullet"; text: string }
+    | { kind: "prose"; text: string };
+
+  const blocks: Block[] = [];
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("* ") || line.startsWith("- ")) {
+      blocks.push({ kind: "bullet", text: line.slice(2).trim() });
+    } else if (/^[A-Z][^*\n]{0,80}:\s*$/.test(line)) {
+      // Line is only a section label like "Perspective Integration:"
+      blocks.push({ kind: "heading", text: line.replace(/:$/, "") });
+    } else {
+      blocks.push({ kind: "prose", text: line });
+    }
+  }
+
+  // Group consecutive bullets into <ul> runs
+  const rendered: React.ReactNode[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const block = blocks[i];
+    if (block.kind === "heading") {
+      rendered.push(
+        <p key={i} className="text-xs font-semibold uppercase tracking-wide text-text-muted mt-3 mb-1">
+          {block.text}
+        </p>
+      );
+      i++;
+    } else if (block.kind === "bullet") {
+      const bullets: React.ReactNode[] = [];
+      while (i < blocks.length && blocks[i].kind === "bullet") {
+        const b = blocks[i] as { kind: "bullet"; text: string };
+        bullets.push(
+          <li key={i} className="flex gap-2 items-start">
+            <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-text-muted/60" />
+            <span className="flex-1">{renderInline(b.text)}</span>
+          </li>
+        );
+        i++;
+      }
+      rendered.push(
+        <ul key={`ul-${i}`} className="space-y-1.5 ml-1">
+          {bullets}
+        </ul>
+      );
+    } else {
+      rendered.push(
+        <p key={i} className="leading-relaxed">
+          {renderInline(block.text)}
+        </p>
+      );
+      i++;
+    }
+  }
+
+  return <div className="space-y-1 text-sm text-text-secondary">{rendered}</div>;
+}
+
+/** Renders inline markdown: **bold** and plain text segments. */
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) {
+      return <strong key={i} className="font-semibold text-text-primary">{part.slice(2, -2)}</strong>;
+    }
+    // Strip any residual stray asterisks at boundaries
+    return <span key={i}>{part.replace(/^\*+|\*+$/g, "")}</span>;
+  });
+}
+
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
   const t = useT();
@@ -71,10 +154,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
   };
 
-  const reasoningPoints = (pirData.reasoning ?? "")
-    .split(/(?=\d+\.\s)/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const reasoningText = (pirData.reasoning ?? "").trim();
 
   return (
     <div className="space-y-3">
@@ -145,32 +225,15 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           )}
         </div>
       </details>
-      {reasoningPoints.length > 0 && (
+      {reasoningText && (
         <details className="group mt-3 border-t border-border/50 pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
             {t.showReasoning}
             <Chevron />
           </summary>
-          <ol className="mt-2 space-y-3 bg-surface-muted rounded-md p-3 list-none">
-            {reasoningPoints.map((point, i) => (
-              <li
-                key={i}
-                className="text-sm text-text-secondary leading-relaxed flex gap-2"
-              >
-                <span className="shrink-0 w-5 h-5 rounded-full bg-border/60 flex items-center justify-center text-[10px] font-bold text-text-muted mt-0.5">
-                  {i + 1}
-                </span>
-                <div className="flex-1">
-                  <CitationText
-                    text={point.replace(/^\d+\.\s*/, "")}
-                    claims={pirData.claims}
-                    highlightedRefs={highlightedRefs}
-                    onRefHover={handleHoveredRefs}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
         </details>
       )}
     </div>
@@ -968,7 +1031,7 @@ export default function ChatWindow({
       return (
         <ProcessingMessage
           data={message.data as ProcessingData}
-          onGapCollect={onGapCollect}
+          onGapCollect={onGapCollect ? (gap) => onSendMessage?.(gap) : undefined}
         />
       );
     }

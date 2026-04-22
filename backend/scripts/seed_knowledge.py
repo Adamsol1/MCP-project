@@ -35,6 +35,13 @@ def _random_created_at() -> str:
 
 
 KNOWLEDGE_REGISTRY: dict[str, dict] = {
+    # ── Personas ──────────────────────────────────────────────────────────
+    "personas/us": {"keywords": ["us", "united states", "american"], "priority": 0, "citation": None},
+    "personas/norway": {"keywords": ["norway", "norwegian"], "priority": 0, "citation": None},
+    "personas/china": {"keywords": ["china", "chinese"], "priority": 0, "citation": None},
+    "personas/eu": {"keywords": ["eu", "european union"], "priority": 0, "citation": None},
+    "personas/russia": {"keywords": ["russia", "russian"], "priority": 0, "citation": None},
+    "personas/neutral": {"keywords": ["neutral"], "priority": 0, "citation": None},
     # ── Original geopolitical ──────────────────────────────────────────────
     "geopolitical/norway_russia": {
         "keywords": ["norway", "norwegian", "svalbard", "arctic", "russian", "russia"],

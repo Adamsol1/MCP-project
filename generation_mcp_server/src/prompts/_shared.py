@@ -8,7 +8,7 @@ _LANGUAGE_NAMES: dict[str, str] = {
 
 # Maps human-readable source names (as shown in the UI) to their MCP tool names.
 SOURCE_TOOL_MAP: dict[str, list[str]] = {
-    "Internal Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
+    "Knowledge Bank": ["list_knowledge_base", "read_knowledge_base"],
     "AlienVault OTX": ["query_otx"],
     # "MISP": ["search_misp"],  # MISP not configured on external server
     "Uploaded Documents": ["list_uploads", "search_local_data", "read_upload"],

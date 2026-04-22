@@ -127,6 +127,12 @@ class DialogueService:
             except (json.JSONDecodeError, ValueError) as e:
                 raise ValueError(f"Agent returned unparseable response: {e}") from e
 
+            # Gemini 2.5 thinking models put internal reasoning into thought parts
+            # and may return an empty "reasoning" field in the JSON. Use the captured
+            # thought text as a fallback so the UI can always show reasoning.
+            if not result.get("reasoning") and agent.last_thought_text:
+                result["reasoning"] = agent.last_thought_text
+
             # Enrich sources with citation metadata from the knowledge index.
             try:
                 index_json = await self.mcp_client.read_resource("knowledge://index")
@@ -267,11 +273,36 @@ class DialogueService:
 
     @staticmethod
     def _parse_json(raw: str) -> Any:
-        """Parse JSON from raw LLM output, stripping markdown code fences if present."""
+        """Parse JSON from raw LLM output, with multiple fallback strategies.
+
+        Handles: bare JSON, markdown code fences, and responses where the model
+        prepends prose (e.g. thinking-model preamble) before the JSON block.
+        """
+        import re as _re
         text = raw.strip()
         if not text:
             raise ValueError("Agent returned empty response")
-        if text.startswith("```"):
-            lines = text.splitlines()
-            text = "\n".join(lines[1:-1])
-        return json.loads(text)
+
+        # 1. Try direct parse (model returned clean JSON)
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        # 2. Strip a leading code fence (```json … ```) and retry
+        fence_match = _re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, _re.IGNORECASE)
+        if fence_match:
+            try:
+                return json.loads(fence_match.group(1))
+            except json.JSONDecodeError:
+                pass
+
+        # 3. Extract the first {...} block — handles preamble text before JSON
+        brace_match = _re.search(r"\{[\s\S]*\}", text)
+        if brace_match:
+            try:
+                return json.loads(brace_match.group(0))
+            except json.JSONDecodeError:
+                pass
+
+        raise ValueError(f"Could not parse JSON from agent response (length={len(text)})")

@@ -39,7 +39,7 @@ const positionConfig: Record<
   "bottom-left": { positioning: "fixed", classes: "bottom-4 left-4" },
   "top-center": {
     positioning: "fixed",
-    classes: "top-4 left-1/2 -translate-x-1/2",
+    classes: "top-16 left-1/2 -translate-x-1/2",
   },
   "bottom-center": {
     positioning: "fixed",
