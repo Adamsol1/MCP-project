@@ -14,6 +14,14 @@ import CouncilReportPDF from "./CouncilReportPDF";
 // ---------------------------------------------------------------------------
 
 const PERSPECTIVE_ORDER = ["us", "norway", "china", "eu", "russia", "neutral"];
+const PERSPECTIVE_FLAGS: Record<string, string> = {
+  us: "🇺🇸",
+  norway: "🇳🇴",
+  china: "🇨🇳",
+  eu: "🇪🇺",
+  russia: "🇷🇺",
+  neutral: "🌐",
+};
 const COUNCIL_SUMMARY_VIEW = "council-summary";
 
 // ---------------------------------------------------------------------------
@@ -610,7 +618,7 @@ export default function CouncilView({
         {/* Council form */}
         <article className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-            Run council on a point
+            Run council
           </p>
           <p className="text-sm leading-6 text-text-secondary">
             The Council simulates structured deliberation between analytical perspectives, surfacing agreements, disagreements, and a final recommendation.
@@ -627,26 +635,31 @@ export default function CouncilView({
                       type="button"
                       onClick={() => togglePerspective(perspective)}
                       aria-pressed={isSelected}
-                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                         isSelected
-                          ? "border-primary bg-primary-subtle text-primary"
-                          : "border-border-muted text-text-secondary hover:border-border hover:text-text-primary"
+                          ? "border-primary-dark bg-primary text-text-inverse"
+                          : "border-border bg-surface text-text-secondary hover:border-primary hover:bg-primary-subtle hover:text-primary"
                       }`}
                     >
+                      <span className="text-sm leading-none">{PERSPECTIVE_FLAGS[perspective]}</span>
                       {formatPerspectiveLabel(perspective)}
                     </button>
                   );
                 })}
               </div>
-              <p className="text-xs text-text-secondary">
-                Runtime: {settings.councilSettings.mode},{" "}
-                {settings.councilSettings.rounds} round
-                {settings.councilSettings.rounds === 1 ? "" : "s"}, timeout{" "}
-                {settings.councilSettings.timeoutSeconds}s, vote retry{" "}
-                {settings.councilSettings.voteRetryEnabled
-                  ? `${settings.councilSettings.voteRetryAttempts}x`
-                  : "off"}
-              </p>
+              <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Runtime</span>
+                {[
+                  settings.councilSettings.mode,
+                  `${settings.councilSettings.rounds} round${settings.councilSettings.rounds === 1 ? "" : "s"}`,
+                  `${settings.councilSettings.timeoutSeconds}s timeout`,
+                  `retry ${settings.councilSettings.voteRetryEnabled ? `${settings.councilSettings.voteRetryAttempts}×` : "off"}`,
+                ].map((chip) => (
+                  <span key={chip} className="rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-[10px] text-text-muted">
+                    {chip}
+                  </span>
+                ))}
+              </div>
             </div>
 
             <div className="space-y-2">

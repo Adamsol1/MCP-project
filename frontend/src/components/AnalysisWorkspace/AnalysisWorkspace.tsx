@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useConversation } from "../../hooks/useConversation/useConversation";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
@@ -24,6 +24,7 @@ export default function AnalysisWorkspace() {
   const { activeConversation } = useConversation();
   const { settings } = useSettings();
   const { reviewActivity } = useWorkspace();
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const data = useMemo<AnalysisResponse | null>(() => {
     if (!activeConversation) return null;
@@ -57,6 +58,12 @@ export default function AnalysisWorkspace() {
     }
   }, [councilNote]);
 
+  useEffect(() => {
+    if (showCouncil) {
+      containerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [showCouncil]);
+
   // Reset to analysis view when switching conversations
   useEffect(() => {
     setShowCouncil(councilNote !== null);
@@ -83,24 +90,24 @@ export default function AnalysisWorkspace() {
     );
   }
 
-  if (showCouncil) {
-    return (
-      <CouncilView
-        processingFindings={data.processing_result.findings}
-        councilNote={councilNote}
-        defaultPerspectives={defaultPerspectives}
-        onBack={() => setShowCouncil(false)}
-      />
-    );
-  }
-
   return (
-    <AnalysisView
-      data={data}
-      conversationTitle={activeConversation?.title}
-      onStartCouncil={() => setShowCouncil(true)}
-      timeframe={settings.inputParameters.timeframe}
-      reviewActivity={reviewActivity}
-    />
+    <div ref={containerRef} className="scroll-mt-24">
+      {showCouncil ? (
+        <CouncilView
+          processingFindings={data.processing_result.findings}
+          councilNote={councilNote}
+          defaultPerspectives={defaultPerspectives}
+          onBack={() => setShowCouncil(false)}
+        />
+      ) : (
+        <AnalysisView
+          data={data}
+          conversationTitle={activeConversation?.title}
+          onStartCouncil={() => setShowCouncil(true)}
+          timeframe={settings.inputParameters.timeframe}
+          reviewActivity={reviewActivity}
+        />
+      )}
+    </div>
   );
 }

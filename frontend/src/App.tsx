@@ -395,7 +395,7 @@ function AppShell() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
-      <ToastContainer position="top-center" />
+      <ToastContainer position="top-right" />
     </>
   );
 }
