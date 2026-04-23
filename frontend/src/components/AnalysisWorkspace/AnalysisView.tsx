@@ -196,8 +196,10 @@ function AssertionTierBadge({
 
 function AssertionRow({
   assertion,
+  allFindings,
 }: {
   assertion: PerspectiveAssertion;
+  allFindings: ProcessingFinding[];
 }) {
   const conf = assertion.confidence;
 
@@ -540,7 +542,7 @@ export default function AnalysisView({
                   key={key}
                   perspectiveKey={key}
                   implications={implications}
-
+                  allFindings={findings}
                 />
               ))}
             </div>
@@ -812,9 +814,11 @@ function TechnicalDataAccordion({
 function PerspectiveSection({
   perspectiveKey,
   implications,
+  allFindings,
 }: {
   perspectiveKey: string;
   implications: PerspectiveAssertion[];
+  allFindings: ProcessingFinding[];
 }) {
   const [open, setOpen] = useState(false);
   const firstAssertion = implications[0] ?? null;
@@ -865,7 +869,7 @@ function PerspectiveSection({
               <p className="mb-1.5 text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
                 Assertion {idx + 1}
               </p>
-              <AssertionRow assertion={assertion} />
+              <AssertionRow assertion={assertion} allFindings={allFindings} />
             </div>
           ))}
         </div>
