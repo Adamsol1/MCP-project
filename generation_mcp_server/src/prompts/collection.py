@@ -1,9 +1,45 @@
 """Collection phase prompt builders and MCP adapter functions."""
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from ._shared import SOURCE_TOOL_MAP, _language_instruction
+
+
+def _code_to_date(code: str) -> str:
+    """Convert a timeframe code (e.g. 'y3', 'm3') to a YYYY-MM-DD cutoff date.
+    Falls back to 3 years ago for empty or unrecognised codes.
+    """
+    now = datetime.now(UTC)
+    fallback_year = now.year - 3
+    try:
+        fallback = now.replace(year=fallback_year).strftime("%Y-%m-%d")
+    except ValueError:
+        fallback = now.replace(year=fallback_year, day=28).strftime("%Y-%m-%d")
+    if not code:
+        return fallback
+    unit = code[0]  # d / w / m / y
+    try:
+        n = int(code[1:])
+    except (ValueError, IndexError):
+        return fallback
+    try:
+        if unit == "d":
+            dt = now - timedelta(days=n)
+        elif unit == "w":
+            dt = now - timedelta(weeks=n)
+        elif unit == "m":
+            dt = now - timedelta(days=n * 30)
+        elif unit == "y":
+            try:
+                dt = now.replace(year=now.year - n)
+            except ValueError:
+                dt = now.replace(year=now.year - n, day=28)
+        else:
+            return fallback
+    except Exception:
+        return fallback
+    return dt.strftime("%Y-%m-%d")
 
 
 def build_collection_plan_prompt(
@@ -76,6 +112,7 @@ def build_collection_collect_prompt(
     existing_data: str | None = None,
     perspectives: list[str] | None = None,
     step_source_guidance: str | None = None,
+    source_timeframes: dict[str, str] | None = None,
 ) -> str:
     approved_tools = [
         tool
@@ -99,11 +136,12 @@ def build_collection_collect_prompt(
         if session_id and _upload_tools_in_use else ""
     )
     _now = datetime.now(UTC)
-    _min_lookback = _now.replace(year=_now.year - 3).strftime('%Y-%m-%d')
+    _stf = source_timeframes or {}
+    _otx_lookback = _code_to_date(_stf.get("otx", ""))
     since_note = (
         f"\nNote: Today's date is {_now.strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
-        f"For all query_otx calls, use since_date=\"{_min_lookback}\" (3 years ago) to ensure sufficient historical coverage."
-        if since_date and "query_otx" in approved_tools else ""
+        f"For all query_otx calls, use since_date=\"{_otx_lookback}\"."
+        if "query_otx" in approved_tools else ""
     )
 
     existing_data_section = (
@@ -129,7 +167,6 @@ def build_collection_collect_prompt(
     _has_web_tools = "google_search" in approved_tools
     if _has_web_tools:
         _persp_str = ", ".join(perspectives) if perspectives else "neutral"
-        _timelimit_hint = since_date or "unspecified"
         _mapping_lines = "\n".join(
             f"  {p:<8} → region=\"{_PERSP_REGION_LANG.get(p, ('',''))[0] or 'omit'}\", language=\"{_PERSP_REGION_LANG.get(p, ('',''))[1] or 'omit'}\""
             for p in _active
@@ -182,8 +219,15 @@ def build_collection_collect_prompt(
             f"\ngoogle_search examples:"
             f"\n{_web_examples}"
             f"\n"
-            f"\nTimeframe hint: \"{_timelimit_hint}\""
-            f"\ndate_restrict codes: \"d1\"=day, \"w1\"=week, \"m1\"=month, \"m3\"=3 months, \"m6\"=6 months, \"y1\"=year. Omit for no restriction."
+            f"\n## Per-Source-Type Timeframes"
+            f"\nApply these date_restrict codes based on the type of source the query targets:"
+            f"\n  Government & official (.gov, .mil, ministry/agency, state media): date_restrict=\"{_stf.get('web_gov', '') or 'omit'}\""
+            f"\n  Think tanks & research (RAND, CSIS, Chatham House, RUSI, CFR):    date_restrict=\"{_stf.get('web_think_tank', '') or 'omit'}\""
+            f"\n  News & media (Reuters, BBC, AP, FT, national newspapers):          date_restrict=\"{_stf.get('web_news', '') or 'omit'}\""
+            f"\n  Other web sources:                                                  date_restrict=\"{_stf.get('web_other', '') or 'omit'}\""
+            f"\nIf the code is 'omit', do not pass date_restrict for that query."
+            f"\nWhen a query mixes types (no site: restriction), use the tier most likely to satisfy the PIR."
+            f"\ndate_restrict codes: d1=day, w1=week, m1=month, m3=3 months, m6=6 months, y1=year, y2=2 years, y3=3 years."
             f"\nSTRICT LIMITS: max {_max_web} google_search calls ({len(_active)} perspective(s) × 5 each)."
             f"\nSource authority: web search results carry LOWER authority than OTX. Always prefer OTX."
         )
@@ -345,6 +389,7 @@ def collection_collect(
     existing_data: str = "",
     perspectives: str = "[]",
     step_source_guidance: str = "",
+    source_timeframes: str = "{}",
 ) -> str:
     """Prompt for collecting raw intelligence data via tools in the Collection phase.
 
@@ -357,6 +402,7 @@ def collection_collect(
         existing_data: Raw data already collected in previous attempts (for retry context).
         perspectives: JSON array of geopolitical perspectives from the Direction phase.
         step_source_guidance: Per-step source availability guidance for the agent.
+        source_timeframes: JSON object mapping source-tier keys to date_restrict codes.
     """
     return build_collection_collect_prompt(
         pir=pir,
@@ -367,6 +413,7 @@ def collection_collect(
         existing_data=existing_data or None,
         perspectives=json.loads(perspectives) or None,
         step_source_guidance=step_source_guidance or None,
+        source_timeframes=json.loads(source_timeframes) or None,
     )
 
 

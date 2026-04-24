@@ -549,6 +549,7 @@ class CollectionService:
         timeframe: str = "",
         existing_raw_data: str | None = None,
         perspectives: list[str] | None = None,
+        source_timeframes: dict[str, str] | None = None,
     ) -> str:
         """Collect raw data only — no summarization.
 
@@ -595,6 +596,7 @@ class CollectionService:
                     "existing_data": existing_raw_data or "",
                     "perspectives": json.dumps(perspectives or []),
                     "step_source_guidance": step_source_guidance,
+                    "source_timeframes": json.dumps(source_timeframes or {}),
                 },
             )
             allowed_tool_names = {

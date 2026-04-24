@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useT } from "../../i18n/useT";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
@@ -22,6 +23,7 @@ import type {
 } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
+import type { SourceTimeframes } from "../../types/settings";
 
 function Chevron() {
   return (
@@ -806,7 +808,7 @@ interface ChatWindowProps {
   availableSources?: string[];
   selectedSources?: string[];
   onToggleSourceSelection?: (source: string) => void;
-  onSubmitSourceSelection?: () => void;
+  onSubmitSourceSelection?: (sourceTimeframes: Record<string, string>) => void;
   devPrefill?: string | null;
   onDevPrefillConsumed?: () => void;
   inputPrefill?: string | null;
@@ -920,8 +922,22 @@ export default function ChatWindow({
   onGapCollect,
 }: ChatWindowProps) {
   const t = useT();
+  const { settings } = useSettings();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
   const [inputValue, setInputValue] = useState("");
+  // Local per-tier timeframe overrides for the current source selection.
+  // Initialized from settings when source selection opens; adjustable per session.
+  const [localTimeframes, setLocalTimeframes] = useState<Record<string, string>>(
+    () => ({ ...settings.inputParameters.sourceTimeframes }),
+  );
+
+  // Re-sync with settings whenever source selection opens.
+  useEffect(() => {
+    if (isSourceSelecting) {
+      setLocalTimeframes({ ...settings.inputParameters.sourceTimeframes });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSourceSelecting]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -1222,10 +1238,43 @@ export default function ChatWindow({
                     </div>
                   )}
 
+                  {/* Date windows — per-tier timeframe overrides, pre-filled from settings */}
+                  <div className="mt-4 border-t border-border pt-3">
+                    <p className="text-xs font-semibold text-text-secondary mb-2">
+                      {t.dateWindowsLabel}
+                    </p>
+                    <p className="text-xs text-text-muted mb-3">{t.dateWindowsDesc}</p>
+                    <div className="flex flex-col gap-2">
+                      {(Object.keys(t.sourceTimeframeLabels) as (keyof SourceTimeframes)[]).map((key) => (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="w-44 shrink-0 text-xs text-text-secondary">
+                            {t.sourceTimeframeLabels[key]}
+                          </span>
+                          <select
+                            value={localTimeframes[key] ?? ""}
+                            onChange={(e) =>
+                              setLocalTimeframes((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            disabled={isLoading}
+                            className="rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                          >
+                            {(Object.entries(t.timeframeOptions) as [string, string][]).map(
+                              ([code, label]) => (
+                                <option key={code} value={code}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
-                      onClick={() => onSubmitSourceSelection?.()}
+                      onClick={() => onSubmitSourceSelection?.(localTimeframes)}
                       disabled={
                         isLoading ||
                         availableSources.length === 0 ||

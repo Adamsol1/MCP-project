@@ -234,6 +234,7 @@ class AIOrchestrator:
         timeframe: str = "",
         perspectives: list[str] | None = None,
         feedback: str | None = None,
+        source_timeframes: dict[str, str] | None = None,
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -269,6 +270,7 @@ class AIOrchestrator:
                 timeframe=timeframe,
                 existing_raw_data=accumulated["raw_data"] or None,
                 perspectives=perspectives,
+                source_timeframes=source_timeframes,
             )
             if accumulated["raw_data"]:
                 accumulated["raw_data"] += (

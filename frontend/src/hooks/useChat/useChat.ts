@@ -567,6 +567,12 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackPhase: DialoguePhase,
     perspectives: string[],
   ) => {
+    // Inject per-tier timeframes from settings if not already set by the caller.
+    const effectiveOptions: DialogueSendOptions = {
+      ...options,
+      sourceTimeframes: options.sourceTimeframes ?? settings.inputParameters.sourceTimeframes,
+    };
+
     const response = await sendMessage(
       message,
       sessionId,
@@ -574,7 +580,7 @@ export function useChat(initialPerspectives?: string[]) {
       approved,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
-      options,
+      effectiveOptions,
     );
 
     if (response.action === "start_collecting") {
@@ -599,6 +605,7 @@ export function useChat(initialPerspectives?: string[]) {
       undefined,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
+      { sourceTimeframes: effectiveOptions.sourceTimeframes },
     );
 
     if (collectResponse.action === "error") {
@@ -780,7 +787,7 @@ export function useChat(initialPerspectives?: string[]) {
     });
   };
 
-  const submitSourceSelection = async () => {
+  const submitSourceSelection = async (sourceTimeframes: Record<string, string> = {}) => {
     if (!activeConversation) return;
     if (selectedSources.length === 0) {
       error("Select at least one source to continue.");
@@ -791,8 +798,8 @@ export function useChat(initialPerspectives?: string[]) {
     const message = isGatherMore ? (pendingGatherMoreText ?? "") : "approve";
     const approved = isGatherMore ? undefined : true;
     const options = isGatherMore
-      ? { gatherMore: true, selectedSources }
-      : { selectedSources };
+      ? { gatherMore: true, selectedSources, sourceTimeframes }
+      : { selectedSources, sourceTimeframes };
 
     setLocalSourceContext(null);
     setPendingGatherMoreText(null);

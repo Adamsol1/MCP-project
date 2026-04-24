@@ -74,8 +74,7 @@ def _build_serper_payload(
         "lr": "lang_en",
     }
     if date_restrict:
-        unit = date_restrict[0]  # d/w/m/y
-        payload["tbs"] = f"qdr:{unit}"
+        payload["tbs"] = f"qdr:{date_restrict}"
     if region:
         payload["gl"] = region
     if language:

@@ -156,6 +156,29 @@ export const en = {
   timeframeDesc:
     "Auto-filled into each prompt so the AI knows the relevant period.",
   timeframePlaceholder: "e.g. Last 30 days",
+  sourceTimeframesLabel: "Source Timeframes",
+  sourceTimeframesDesc:
+    "Date limit per web authority tier. Overrides the global timeframe hint for each source type.",
+  sourceTimeframeLabels: {
+    web_gov:        "Government / Official",
+    web_think_tank: "Think Tanks / Research",
+    web_news:       "News & Media",
+    web_other:      "Other Web",
+    otx:            "AlienVault OTX",
+  } as Record<string, string>,
+  timeframeOptions: {
+    "":  "No restriction",
+    d1:  "Last 24 hours",
+    w1:  "Last week",
+    m1:  "Last month",
+    m3:  "Last 3 months",
+    m6:  "Last 6 months",
+    y1:  "Last year",
+    y2:  "Last 2 years",
+    y3:  "Last 3 years",
+  } as Record<string, string>,
+  dateWindowsLabel: "Date windows",
+  dateWindowsDesc: "Pre-filled from settings — adjustable per session.",
 
   // ApprovalPrompt
   approvalDefault: "Ready to continue?",

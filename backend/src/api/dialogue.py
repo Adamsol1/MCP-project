@@ -180,6 +180,10 @@ class DialogueMessageRequest(BaseModel):
     """Timeframe pre-set by the user in Settings → Parameters (e.g. 'Last 30 days').
     When non-empty and the session context has no timeframe yet, the backend pre-fills
     context.timeframe so the AI skips the timeframe clarifying question."""
+    settings_source_timeframes: dict[str, str] = {}
+    """Per-source-tier date window codes from Settings (e.g. {'web_news': 'm3', 'otx': 'y3'}).
+    When non-empty and context.source_timeframes is not yet set, the backend pre-fills it
+    so the collection prompt uses per-tier date restrictions."""
     selected_sources: list[str] = []
     """Sources selected by the user in the collection phase."""
     gather_more: bool = False
@@ -1269,6 +1273,7 @@ async def _handle_collection_phase(
         reviewer=review_service,
         gather_more=request.gather_more,
         uow=uow,
+        source_timeframes=request.settings_source_timeframes,
     )
     # Initialize processing state if finished with collection
     if (
@@ -1339,6 +1344,7 @@ async def _handle_direction_phase(
         reviewer=review_service,
         language=request.language,
         settings_timeframe=request.settings_timeframe,
+        settings_source_timeframes=request.settings_source_timeframes,
     )
 
     # Transition: DirectionFlow COMPLETE → start CollectionFlow

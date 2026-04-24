@@ -36,6 +36,8 @@ export interface DialogueSendOptions {
   councilFindingIds?: string[];
   councilPerspectives?: string[];
   councilSettings?: CouncilRunSettings;
+  /** Per-source-tier timeframe codes for this submission (overrides settings defaults). */
+  sourceTimeframes?: Record<string, string>;
 }
 
 export interface DialogueDevStateResponse {
@@ -109,6 +111,7 @@ export async function sendMessage(
       approved,
       language,
       settings_timeframe: settingsTimeframe,
+      settings_source_timeframes: options.sourceTimeframes ?? {},
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
       council_debate_point: options.councilDebatePoint ?? "",

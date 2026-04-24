@@ -203,6 +203,7 @@ class DirectionFlow(BasePhaseFlow):
         reviewer=None,
         language: str = "en",
         settings_timeframe: str = "",
+        settings_source_timeframes: dict[str, str] | None = None,
     ) -> DialogueResponse:
         """
         Route the incoming message to the correct state.
@@ -219,6 +220,8 @@ class DirectionFlow(BasePhaseFlow):
             settings_timeframe: Pre-set timeframe from the user's Settings → Parameters
                                  (e.g. "Last 30 days"). Pre-fills context.timeframe when
                                  it is currently empty, skipping the timeframe question.
+            settings_source_timeframes: Per-tier date codes from Settings (e.g. {'web_news': 'm3'}).
+                                        Pre-fills context.source_timeframes when not yet set.
         """
         # Update perspectives on every message if provided
         if perspectives:
@@ -231,6 +234,15 @@ class DirectionFlow(BasePhaseFlow):
             self.context.timeframe = settings_timeframe.strip()
             logger.info(
                 f"[Session {self.session_id}] Timeframe pre-populated from settings: '{self.context.timeframe}'"
+            )
+
+        # Pre-fill per-source-tier timeframes from settings if not yet set.
+        if settings_source_timeframes and not self.context.source_timeframes:
+            self.context.source_timeframes = {
+                k: v for k, v in settings_source_timeframes.items() if v
+            }
+            logger.info(
+                f"[Session {self.session_id}] Source timeframes pre-populated from settings: {self.context.source_timeframes}"
             )
 
         # INITIAL PHASE

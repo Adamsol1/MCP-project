@@ -163,6 +163,7 @@ class CollectionFlow(BasePhaseFlow):
         reviewer=None,
         gather_more: bool = False,
         uow=None,
+        source_timeframes: dict[str, str] | None = None,
     ) -> DialogueResponse:
         # PLAN PHASE
         if self.state == CollectionState.PLAN_CONFIRMING:
@@ -172,7 +173,8 @@ class CollectionFlow(BasePhaseFlow):
         # COLLECTING
         elif self.state == CollectionState.COLLECTING:
             return await self.handle_collecting(
-                collection_service, orchestrator, reviewer, uow=uow
+                collection_service, orchestrator, reviewer, uow=uow,
+                source_timeframes=source_timeframes,
             )
         # REVIEWING
         elif self.state == CollectionState.REVIEWING:
@@ -246,6 +248,7 @@ class CollectionFlow(BasePhaseFlow):
         orchestrator=None,
         reviewer=None,
         uow=None,
+        source_timeframes: dict[str, str] | None = None,
     ) -> DialogueResponse:
         assert self.session_id, "session_id must be set before collecting"
         timeframe = self.direction_context.timeframe if self.direction_context else ""
@@ -254,6 +257,10 @@ class CollectionFlow(BasePhaseFlow):
             if self.direction_context
             else []
         )
+        # Merge context source_timeframes (set in direction phase) with any
+        # per-submission overrides passed directly to this call.
+        _ctx_stf = (self.direction_context.source_timeframes if self.direction_context else {}) or {}
+        _effective_source_timeframes = {**_ctx_stf, **(source_timeframes or {})}
         feedback = self.gather_more_feedback
         self.gather_more_feedback = None  # consume once
         try:
@@ -269,6 +276,7 @@ class CollectionFlow(BasePhaseFlow):
                     timeframe=timeframe,
                     perspectives=perspectives,
                     feedback=feedback,
+                    source_timeframes=_effective_source_timeframes,
                 )
             else:
                 collection_summary = await collection_service.collect(
@@ -277,6 +285,7 @@ class CollectionFlow(BasePhaseFlow):
                     self.collection_plan,
                     timeframe=timeframe,
                     perspectives=perspectives,
+                    source_timeframes=_effective_source_timeframes,
                 )
         except Exception as e:
             logger.error(f"[Session {self.session_id}] Collection failed: {e}")
