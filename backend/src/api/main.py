@@ -52,6 +52,7 @@ async def lifespan(_app: FastAPI):
     # Keep legacy sessions/ dir creation for dev-tool snapshot endpoints
     ensure_sessions_dir()
     council_mcp_process = await maybe_start_council_mcp(get_council_mcp_url())
+    logger.info("Backend API started successfully: http://127.0.0.1:8000")
     print("Backend API started successfully: http://127.0.0.1:8000", flush=True)
     logger.info("Application started — database engines initialized")
     try:
