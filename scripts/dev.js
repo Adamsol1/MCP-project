@@ -36,10 +36,26 @@ const services = [
 ];
 
 const children = new Map();
+const startedServices = new Set();
 let shuttingDown = false;
+
+const BARBOSA_BANNER = [
+  " ____            _                     ",
+  "| __ )  __ _ _ __| |__   ___  ___  __ _",
+  "|  _ \\ / _ | '__| '_ \\ / _ \\/ __|/ _ |",
+  "| |_) | (_| | |  | |_) | (_) \\__ \\ (_| |",
+  "|____/ \\__,_|_|  |_.__/ \\___/|___/\\__,_|",
+].join("\n");
 
 function terminalLink(url) {
   return `\x1b[94m\x1b]8;;${url}\x1b\\${url}\x1b]8;;\x1b\\\x1b[0m`;
+}
+
+function maybePrintBanner(service) {
+  startedServices.add(service.key);
+  if (startedServices.size === services.length) {
+    console.log(BARBOSA_BANNER);
+  }
 }
 
 function stripAnsi(text) {
@@ -88,6 +104,7 @@ function handleLine(service, state, rawLine) {
       state.reported = true;
       const target = service.key === "frontend" ? terminalLink(match[1]) : match[1];
       console.log(`${service.name} started successfully: ${target}`);
+      maybePrintBanner(service);
       return;
     }
   }
