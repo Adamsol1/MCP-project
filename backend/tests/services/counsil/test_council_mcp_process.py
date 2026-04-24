@@ -55,7 +55,7 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
         "python",
         "server_http.py",
     ]
-    assert launched["cwd"].endswith("council_mcp")
+    assert launched["cwd"].endswith("council_mcp_server")
 
 
 @pytest.mark.asyncio
