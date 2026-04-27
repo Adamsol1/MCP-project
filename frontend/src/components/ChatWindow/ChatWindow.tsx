@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../../i18n/useT";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
@@ -974,7 +974,13 @@ function SourceSummaryTable({
   );
 }
 
-function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
+function CollectionDisplayMessage({
+  data,
+  runNumber,
+}: {
+  data: CollectionDisplayData;
+  runNumber: number;
+}) {
   const { mergeCollectionData } = useWorkspace();
   const t = useT();
 
@@ -982,11 +988,13 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
     mergeCollectionData(data);
   }, [data, mergeCollectionData]);
 
+  const header = t.collectionRunLabel(runNumber);
+
   if (data.parse_error) {
     return (
       <div className="space-y-2">
         <div>
-          <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+          <h3 className="font-semibold">{header}</h3>
           <p className="mt-0.5 text-xs text-text-secondary">
             {t.collectionResultsSubtitle}
           </p>
@@ -1007,7 +1015,7 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+        <h3 className="font-semibold">{header}</h3>
         <p className="mt-0.5 text-xs text-text-secondary">
           {t.collectionResultsSubtitle}
         </p>
@@ -1121,6 +1129,22 @@ export default function ChatWindow({
           ? t.placeholderGatherMore
           : t.placeholderDefault;
 
+  const collectionRunMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let count = 0;
+    for (const msg of messages) {
+      if (
+        msg.type === "collection" &&
+        msg.data &&
+        "collected_data" in (msg.data as object)
+      ) {
+        count++;
+        map.set(msg.id, count);
+      }
+    }
+    return map;
+  }, [messages]);
+
   function renderMessageContent(message: Message) {
     if (
       message.type === "summary" &&
@@ -1182,6 +1206,7 @@ export default function ChatWindow({
       return (
         <CollectionDisplayMessage
           data={message.data as CollectionDisplayData}
+          runNumber={collectionRunMap.get(message.id) ?? 1}
         />
       );
     }

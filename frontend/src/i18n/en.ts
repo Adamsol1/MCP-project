@@ -51,6 +51,7 @@ export const en = {
   collectMoreData: "Collect More Data",
   collectionResultsHeader: "Collection Results",
   collectionResultsSubtitle: "Intelligence gathered from the following sources.",
+  collectionRunLabel: (n: number) => `Collection Results — Run ${n}`,
   couldNotParseCollection: "Could not parse collection output.",
   rawOutput: "Raw output",
   selectSourcesHeader: "Select Sources",
@@ -101,6 +102,7 @@ export const en = {
   pirSources: (n: number) => `Sources (${n})`,
 
   // CollectionStatsView
+  statsItemsTotal: "Total Items",
   statsSources: "Sources",
   bySource: "By Source",
   viewRawData: "View Raw Data \u2192",

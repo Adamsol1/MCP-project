@@ -54,6 +54,7 @@ export const no = {
   collectMoreData: "Samle inn mer data",
   collectionResultsHeader: "Innsamlingsresultater",
   collectionResultsSubtitle: "Etterretning samlet fra følgende kilder.",
+  collectionRunLabel: (n: number) => `Innsamlingsresultater — Kjøring ${n}`,
   couldNotParseCollection: "Kunne ikke tolke innsamlingsresultater.",
   rawOutput: "R\u00e5data",
   selectSourcesHeader: "Velg kilder",
@@ -104,6 +105,7 @@ export const no = {
   pirSources: (n: number) => `Kilder (${n})`,
 
   // CollectionStatsView
+  statsItemsTotal: "Totalt",
   statsSources: "Kilder",
   bySource: "Kilder:",
   viewRawData: "Se r\u00e5data \u2192",

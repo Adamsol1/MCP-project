@@ -296,6 +296,11 @@ class DirectionFlow(BasePhaseFlow):
         if extracted_context.get("priority_focus"):
             pf = extracted_context["priority_focus"]
             self.context.priority_focus = ", ".join(pf) if isinstance(pf, list) else pf
+        if extracted_context.get("perspectives"):
+            try:
+                self.update_perspectives(extracted_context["perspectives"])
+            except (ValueError, KeyError):
+                pass
 
     async def handle_initial_input(
         self, user_message, dialogue_service, language: str = "en"
