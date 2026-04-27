@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { pdf } from "@react-pdf/renderer";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type {
   AnalysisResponse,
   AssertionConfidence,
@@ -315,6 +316,8 @@ export default function AnalysisView({
     findings,
   );
 
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   const { collectionData } = useWorkspace();
   const totalCollectedItems = collectionData
     ? collectionData.source_summary.reduce((sum, s) => sum + s.count, 0)
@@ -363,7 +366,8 @@ export default function AnalysisView({
 
   return (
     <>
-      <div className="flex justify-end gap-2 pb-2">
+      <div className="flex justify-end items-center gap-2 pb-2">
+        <HelpButton onClick={() => setIsHelpOpen(true)} label="Analysis report guide" />
         <button
           onClick={handleDownloadFeedbackPDF}
           className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-secondary transition-opacity hover:opacity-80"
@@ -377,6 +381,41 @@ export default function AnalysisView({
           Download PDF
         </button>
       </div>
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        title="Reading the Analysis Report"
+        sections={[
+          {
+            heading: "What is this report?",
+            body: "The Analysis Report is the final intelligence product synthesised from all collected and processed data. It brings together key judgments, recommended actions, and multi-perspective framing into a single structured document.",
+          },
+          {
+            heading: "Key Judgments",
+            body: "Key Judgments are the most important analytical conclusions drawn from the evidence. They represent the AI's highest-confidence assessments about the situation, ordered by significance.",
+          },
+          {
+            heading: "Recommended Actions",
+            body: "Recommended Actions are suggested next steps based on the intelligence picture. These are operationally oriented and directly tied to the key judgments.",
+          },
+          {
+            heading: "Avg Confidence and confidence tiers",
+            body: "Confidence is calculated per-finding based on the quality and corroboration of evidence. Low is below 40%, Moderate is 40–69%, High is 70–89%, and Assessed is 90%+. The average confidence shown in the stat strip reflects all findings in the report.",
+          },
+          {
+            heading: "Evidence Docket",
+            body: "The Evidence Docket lists every finding that went into the analysis. Click any finding to expand it and see the full evidence: core statement, why it matters, key indicators (ATT&CK IDs, entities, locations), and uncertainties.",
+          },
+          {
+            heading: "Perspective Implications",
+            body: "Perspective Implications show how the same intelligence picture is framed differently by each selected national or analytical perspective. Expand a perspective to see its specific assertions and confidence scores.",
+          },
+          {
+            heading: "Information Gaps",
+            body: "Information Gaps highlight areas where the evidence is insufficient to draw firm conclusions. These can be addressed by running additional collection on the highlighted topics.",
+          },
+        ]}
+      />
 
       <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
         {/* ── Hero: document-style header ──────────────────────────────── */}

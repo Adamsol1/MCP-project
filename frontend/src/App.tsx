@@ -24,6 +24,7 @@ import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel"
 import StageTracker from "./components/StageTracker/StageTracker";
 import { useT } from "./i18n/useT";
 import { ToastContainer } from "./components/Toast";
+import { HelpModal, HelpButton } from "./components/HelpModal/HelpModal";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
@@ -125,6 +126,7 @@ function AppShell() {
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] =
     useState<CollectionStatus | null>(null);
@@ -285,8 +287,9 @@ function AppShell() {
               <StageTracker activePhase={activePhase} />
             </div>
           </div>
-          {/* Right panel toggle — top-right */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+          {/* Right panel toggle + help button — top-right */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1">
+            <HelpButton onClick={() => setIsHelpOpen(true)} label="App guide" />
             <button
               aria-label="Toggle intelligence panel"
               onClick={() => setIsRightPanelCollapsed((v) => !v)}
@@ -396,6 +399,38 @@ function AppShell() {
         onClose={() => setIsSettingsOpen(false)}
       />
       <ToastContainer position="top-right" />
+
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        title="How This App Works"
+        sections={[
+          {
+            heading: "Overview",
+            body: "This app guides you through a structured intelligence analysis workflow in four phases: Direction, Collection, Processing, and Analysis. Each phase builds on the last to produce a rigorous, multi-source intelligence report.",
+          },
+          {
+            heading: "Phase 1 — Direction",
+            body: "Describe your intelligence question or topic. The AI will generate Priority Intelligence Requirements (PIRs) — the specific questions that need to be answered. You can approve these or ask for changes.",
+          },
+          {
+            heading: "Phase 2 — Collection",
+            body: "Select the data sources you want to query (AlienVault OTX, Web Search, Knowledge Bank, Uploaded Documents). The system collects raw intelligence items from each source. You can review, approve, or gather more data.",
+          },
+          {
+            heading: "Phase 3 — Processing",
+            body: "The AI analyses all collected items and extracts structured findings, each with a confidence score, supporting evidence, and references. You review the findings and approve or request additional collection.",
+          },
+          {
+            heading: "Phase 4 — Analysis",
+            body: "A full intelligence report is produced: key judgments, recommended actions, perspective implications, and an evidence docket. You can then launch a Council debate to get multi-perspective assessments from different national analyst viewpoints.",
+          },
+          {
+            heading: "Tips",
+            body: "Use the Intelligence Workspace panel on the right to track review activity, collection statistics, and uploaded files at any time. Click ? buttons throughout the app for section-specific guidance.",
+          },
+        ]}
+      />
     </>
   );
 }

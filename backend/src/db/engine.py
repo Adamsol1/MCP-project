@@ -132,15 +132,38 @@ def seed_knowledge() -> None:
     seed_pdocs()
 
 
-def run_migrations() -> None:
-    """Run alembic upgrade head for both DBs. Safe to call on every startup."""
+def _has_pending_migrations(cfg, db_url: str) -> bool:
+    """Return True if the DB is behind the current migration head."""
+    import sqlalchemy as sa
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+
+    script = ScriptDirectory.from_config(cfg)
+    heads = set(script.get_heads())
+    try:
+        engine = sa.create_engine(db_url)
+        with engine.connect() as conn:
+            context = MigrationContext.configure(conn)
+            current = set(context.get_current_heads())
+    except Exception:
+        return True
+    return heads != current
+
+
+def run_migrations() -> bool:
+    """Run alembic upgrade head for both DBs. Returns True if any new migrations were applied."""
     from alembic import command
     from alembic.config import Config
 
+    applied = False
     for ini_name, db_path in (
         ("alembic_sessions.ini", get_sessions_db_path()),
         ("alembic_knowledge.ini", get_knowledge_db_path()),
     ):
         cfg = Config(str(_BACKEND_ROOT / ini_name))
-        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
-        command.upgrade(cfg, "head")
+        db_url = f"sqlite:///{db_path}"
+        cfg.set_main_option("sqlalchemy.url", db_url)
+        if _has_pending_migrations(cfg, db_url):
+            command.upgrade(cfg, "head")
+            applied = True
+    return applied

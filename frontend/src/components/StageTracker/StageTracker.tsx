@@ -15,7 +15,9 @@ const PHASE_ORDER: DialoguePhase[] = [
 ];
 
 function phaseIndex(phase: DialoguePhase): number {
-  return PHASE_ORDER.indexOf(phase);
+  // Council is a sub-mode of analysis — show Analysis as active
+  const normalized = phase === "council" ? "analysis" : phase;
+  return PHASE_ORDER.indexOf(normalized);
 }
 
 function CheckIcon() {

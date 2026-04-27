@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { pdf } from "@react-pdf/renderer";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import { useChat } from "../../hooks/useChat/useChat";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import { useT } from "../../i18n/useT";
@@ -508,6 +509,7 @@ export default function CouncilView({
   const [councilErrorMessage, setCouncilErrorMessage] = useState<string | null>(null);
   const [validationMessage, setValidationMessage] = useState<string | null>(null);
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Reset form when switching between conversations (defaultPerspectives identity changes)
   useEffect(() => {
@@ -614,7 +616,7 @@ export default function CouncilView({
       )}
       <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2 px-5">
       {/* Back button */}
-      <div>
+      <div className="flex items-center gap-3">
         <button
           type="button"
           onClick={onBack}
@@ -622,6 +624,7 @@ export default function CouncilView({
         >
           ← {t.councilBackToAnalysis}
         </button>
+        <HelpButton onClick={() => setIsHelpOpen(true)} label="Council guide" />
       </div>
 
       <section className="grid gap-6 xl:grid-cols-[0.95fr,1.05fr]">
@@ -879,6 +882,37 @@ export default function CouncilView({
         </article>
       </section>
     </div>
+    <HelpModal
+      isOpen={isHelpOpen}
+      onClose={() => setIsHelpOpen(false)}
+      title="The Council"
+      sections={[
+        {
+          heading: "What is the Council?",
+          body: "The Council is a structured multi-perspective debate feature. Multiple AI analysts — each representing a distinct national or neutral perspective — evaluate the same intelligence question and provide their independent assessments, then vote on a conclusion.",
+        },
+        {
+          heading: "Available perspectives",
+          body: "You can include any combination of: US (🇺🇸), Norway (🇳🇴), China (🇨🇳), EU (🇪🇺), Russia (🇷🇺), and Global/Neutral (🌐). Select at least two perspectives to run a council session. Each perspective brings different geopolitical framing and analytical priorities.",
+        },
+        {
+          heading: "Writing a debate point",
+          body: "The debate point is the specific question or assertion you want the council to deliberate on. Make it precise — for example: 'Is the threat from X primarily state-sponsored or opportunistic?' You can also leave it blank and rely on selected findings to frame the discussion.",
+        },
+        {
+          heading: "Selecting findings",
+          body: "Attach specific findings from the Evidence Docket to give the council concrete evidence to debate. The council analysts will reference these findings in their responses. You can select all findings or just the most relevant ones.",
+        },
+        {
+          heading: "Conference vs Quick mode",
+          body: "Conference mode runs multiple deliberation rounds where analysts respond to each other's positions before voting — this produces more nuanced debate. Quick mode runs a single round for faster results. Both settings can be adjusted in the Settings panel.",
+        },
+        {
+          heading: "Reading the results",
+          body: "The Summary tab shows agreed positions, key disagreements, and the council's final recommendation. Each participant tab shows that analyst's full reasoning and vote (option, confidence %, rationale). The full debate transcript can be expanded to read every round in detail.",
+        },
+      ]}
+    />
     </>
   );
 }

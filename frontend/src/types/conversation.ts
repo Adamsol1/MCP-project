@@ -254,4 +254,6 @@ export interface CollectionDisplayData {
   collected_data: CollectedItem[];
   source_summary: CollectionSourceSummary[];
   parse_error?: string;
+  /** When true, replaces existing sidebar stats instead of merging. Set for initial collection and revisions; false only for gather-more additions. */
+  replace?: boolean;
 }

@@ -327,6 +327,7 @@ function translateBackendError(raw: string, t: Translations): string {
 function buildSystemMessage(
   response: DialogueApiResponse,
   t: Translations,
+  isGatherMore = false,
 ): Message {
   const text =
     response.action === "error"
@@ -376,7 +377,9 @@ function buildSystemMessage(
           "collected_data" in parsed &&
           Array.isArray((parsed as Record<string, unknown>).collected_data)
         ) {
-          message.data = parsed as CollectionDisplayData;
+          const collectionData = parsed as CollectionDisplayData;
+          collectionData.replace = !isGatherMore;
+          message.data = collectionData;
         } else if ("sources_used" in parsed) {
           message.data = parsed as CollectionSummaryData;
         }
@@ -388,6 +391,7 @@ function buildSystemMessage(
           collected_data: [],
           source_summary: [],
           parse_error: "Collection data could not be parsed for display.",
+          replace: !isGatherMore,
         } as CollectionDisplayData;
       }
       message.text = t.collectionComplete;
@@ -554,9 +558,10 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
     fallbackPhase: DialoguePhase,
+    isGatherMore = false,
   ) => {
     if (response.action !== "complete") {
-      addMessage(buildSystemMessage(response, t), conversationId);
+      addMessage(buildSystemMessage(response, t, isGatherMore), conversationId);
     }
 
     const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
@@ -625,6 +630,7 @@ export function useChat(initialPerspectives?: string[]) {
       { sourceTimeframes: effectiveOptions.sourceTimeframes },
     );
 
+    const isGatherMore = effectiveOptions.gatherMore ?? false;
     if (collectResponse.action === "error") {
       const errorStage: DialogueStage =
         collectResponse.stage === "collecting"
@@ -636,9 +642,10 @@ export function useChat(initialPerspectives?: string[]) {
         errorStage,
         "awaiting_decision",
         "collection",
+        isGatherMore,
       );
     } else {
-      applyResponse(collectResponse, conversationId, "collecting", null, "collection");
+      applyResponse(collectResponse, conversationId, "collecting", null, "collection", isGatherMore);
     }
   };
 

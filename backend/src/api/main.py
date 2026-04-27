@@ -44,8 +44,9 @@ logger = logging.getLogger("app")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Application lifecycle: initialize DB engines and start council MCP."""
-    await asyncio.to_thread(run_migrations)
-    await asyncio.to_thread(seed_knowledge)
+    migrations_applied = await asyncio.to_thread(run_migrations)
+    if migrations_applied:
+        await asyncio.to_thread(seed_knowledge)
     # Initialize DB engines so connectivity issues surface at startup
     get_sessions_engine()
     get_knowledge_engine()

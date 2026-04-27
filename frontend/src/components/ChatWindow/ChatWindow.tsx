@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../../i18n/useT";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
 import AnalysisWorkspace from "../AnalysisWorkspace/AnalysisWorkspace";
@@ -426,6 +427,8 @@ function FindingDetailModal({
   displayId?: string;
   onClose: () => void;
 }) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   useEffect(() => {
     if (!finding) return;
     const handler = (e: KeyboardEvent) => {
@@ -499,6 +502,7 @@ function FindingDetailModal({
     .filter((x): x is PirEntry => x !== null);
 
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
@@ -542,13 +546,16 @@ function FindingDetailModal({
                 </div>
               </div>
             </div>
-            <button
-              aria-label="close"
-              onClick={onClose}
-              className="shrink-0 rounded-lg p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
-            >
-              ✕
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <HelpButton onClick={() => setIsHelpOpen(true)} label="Finding guide" />
+              <button
+                aria-label="close"
+                onClick={onClose}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
 
@@ -701,6 +708,34 @@ function FindingDetailModal({
         </div>
       </div>
     </div>
+    <HelpModal
+      isOpen={isHelpOpen}
+      onClose={() => setIsHelpOpen(false)}
+      title="Understanding Findings"
+      sections={[
+        {
+          heading: "What is a Finding?",
+          body: "A finding is a structured intelligence conclusion extracted from the raw collected data. Each finding has a title, a core statement, a confidence score, and supporting evidence drawn from the sources that were queried.",
+        },
+        {
+          heading: "Confidence tiers",
+          body: "Confidence reflects how well the evidence supports the finding. Low (below 40%) means limited or conflicting evidence. Moderate (40–69%) means partial corroboration. High (70–89%) means strong, consistent corroboration. Assessed (90%+) means the finding is robustly supported across multiple independent sources.",
+        },
+        {
+          heading: "PIRs — Priority Intelligence Requirements",
+          body: "The PIR badges (e.g. PIR-1, PIR-2) show which of your original intelligence requirements this finding is relevant to. These were generated in the Direction phase based on your topic.",
+        },
+        {
+          heading: "ATT&CK techniques",
+          body: "ATT&CK IDs (e.g. T1190) reference the MITRE ATT&CK framework — a globally recognised taxonomy of adversary tactics and techniques. They help map findings to known threat behaviours.",
+        },
+        {
+          heading: "APA citations and source references",
+          body: "Sources are listed in APA 7th edition format where available. Web sources include the URL and publication details. Uploaded files are referenced by their filename. Knowledge Base references point to your organisation's internal intelligence store.",
+        },
+      ]}
+    />
+    </>
   );
 }
 
@@ -981,12 +1016,16 @@ function CollectionDisplayMessage({
   data: CollectionDisplayData;
   runNumber: number;
 }) {
-  const { mergeCollectionData } = useWorkspace();
+  const { mergeCollectionData, setCollectionData } = useWorkspace();
   const t = useT();
 
   useEffect(() => {
-    mergeCollectionData(data);
-  }, [data, mergeCollectionData]);
+    if (data.replace) {
+      setCollectionData({ collected_data: data.collected_data, source_summary: data.source_summary });
+    } else {
+      mergeCollectionData(data);
+    }
+  }, [data, mergeCollectionData, setCollectionData]);
 
   const header = t.collectionRunLabel(runNumber);
 

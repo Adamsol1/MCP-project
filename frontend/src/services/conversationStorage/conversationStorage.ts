@@ -29,6 +29,8 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
     rawStage === "collecting" ||
     rawStage === "reviewing" ||
     rawStage === "processing" ||
+    rawStage === "pending" ||
+    rawStage === "idle" ||
     rawStage === "complete"
   ) {
     return rawStage;
@@ -48,8 +50,13 @@ function inferPhaseFromConversation(raw: Conversation, stage: DialogueStage): Di
         ? "collection"
         : "processing";
     case "processing":
-    case "complete":
       return "processing";
+    case "pending":
+    case "idle":
+    case "complete":
+      return raw.messages.some((m) => m.type === "analysis" || m.type === "council")
+        ? "analysis"
+        : "processing";
     case "initial":
     case "gathering":
     case "summary_confirming":
@@ -68,7 +75,8 @@ function coercePhase(
     rawPhase === "direction" ||
     rawPhase === "collection" ||
     rawPhase === "processing" ||
-    rawPhase === "analysis"
+    rawPhase === "analysis" ||
+    rawPhase === "council"
   ) {
     return rawPhase;
   }

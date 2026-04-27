@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useT } from "../../i18n/useT";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type { DialoguePhase } from "../../types/dialogue";
 import type { PhaseReviewItem, ProcessingData } from "../../types/conversation";
 import PirSourcesView from "../PirSourcesView/PirSourcesView";
@@ -41,6 +42,8 @@ export default function IntelligencePanel({
   const [reviewModalOpen, setReviewModalOpen] = useState(false);
   const [reviewFocusAttempt, setReviewFocusAttempt] = useState<number | undefined>(undefined);
   const [showAllFiles, setShowAllFiles] = useState(false);
+  const [isReviewHelpOpen, setIsReviewHelpOpen] = useState(false);
+  const [isStatsHelpOpen, setIsStatsHelpOpen] = useState(false);
 
   const visibleFiles = showAllFiles
     ? uploadedFiles
@@ -111,7 +114,10 @@ export default function IntelligencePanel({
         <div className="flex flex-col">
           {renderPhaseContent()}
           {reviewActivity.length > 0 && (
-            <PanelSection label="Review Activity">
+            <PanelSection
+              label="Review Activity"
+              headerRight={<HelpButton onClick={() => setIsReviewHelpOpen(true)} label="Review Activity help" />}
+            >
               <ReviewActivitySection
                 activity={reviewActivity}
                 onOpenReviewModal={(attempt) => {
@@ -122,7 +128,10 @@ export default function IntelligencePanel({
             </PanelSection>
           )}
           {collectionData && (
-            <PanelSection label="Collection Stats">
+            <PanelSection
+              label="Collection Stats"
+              headerRight={<HelpButton onClick={() => setIsStatsHelpOpen(true)} label="Collection Stats help" />}
+            >
               <CollectionStatsView
                 collectionData={collectionData}
                 onOpenModal={() => setIsModalOpen(true)}
@@ -143,18 +152,59 @@ export default function IntelligencePanel({
         activity={reviewActivity}
         focusAttempt={reviewFocusAttempt}
       />
+      <HelpModal
+        isOpen={isReviewHelpOpen}
+        onClose={() => setIsReviewHelpOpen(false)}
+        title="Review Activity"
+        sections={[
+          {
+            heading: "What is Review Activity?",
+            body: "Between each phase, an AI reviewer evaluates the output before it's shown to you. This acts as an automatic quality gate — checking for completeness, accuracy, and alignment with your intelligence requirements.",
+          },
+          {
+            heading: "Approved vs Rejected",
+            body: "If the output meets quality standards it is marked Approved and passed to the next phase. If it falls short, it is Rejected and the AI regenerates the output using the reviewer's feedback. This loop can repeat up to a set number of attempts.",
+          },
+          {
+            heading: "Reading the entries",
+            body: "Each entry shows which phase it belongs to, the attempt number, and whether it was approved or rejected. Click an entry to open the full Review Activity modal where you can read the AI feedback and the complete generated transcript for that attempt.",
+          },
+        ]}
+      />
+      <HelpModal
+        isOpen={isStatsHelpOpen}
+        onClose={() => setIsStatsHelpOpen(false)}
+        title="Collection Stats"
+        sections={[
+          {
+            heading: "What are Collection Stats?",
+            body: "Collection Stats show a summary of all intelligence items gathered during the Collection phase, broken down by source. The total count and number of active sources are shown at a glance.",
+          },
+          {
+            heading: "Available sources",
+            body: "AlienVault OTX provides open threat exchange feeds. Web Search queries the live web for relevant articles and reports. Knowledge Bank is your organisation's curated internal intelligence. Uploaded Documents includes any PDFs or files you have uploaded to this session.",
+          },
+          {
+            heading: "Reading the breakdown",
+            body: "Each source row shows how many items were collected from it. A source marked Empty returned no usable content. Click 'View Raw Data' to open the full Collection Stats modal with a visual breakdown chart and all collected items.",
+          },
+        ]}
+      />
     </div>
   );
 }
 
-function PanelSection({ label, children, first = false }: { label: string; children: ReactNode; first?: boolean }) {
+function PanelSection({ label, children, first = false, headerRight }: { label: string; children: ReactNode; first?: boolean; headerRight?: ReactNode }) {
   return (
     <>
       {!first && <hr className="border-border" />}
       <section className={first ? "pb-4" : "py-4"}>
-        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-          {label}
-        </p>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+            {label}
+          </p>
+          {headerRight}
+        </div>
         {children}
       </section>
     </>
