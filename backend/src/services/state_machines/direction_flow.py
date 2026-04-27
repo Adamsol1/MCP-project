@@ -302,12 +302,10 @@ class DirectionFlow(BasePhaseFlow):
     ) -> DialogueResponse:
         """
         State handler for initial phase. Here we will save initial query, generate questions and change state to GATHERING
-        Possible state changes: INITIAL -> GATHERING
+        Possible state changes: INITIAL -> GATHERING, INITIAL -> SUMMARY_CONFIRMING (if initial query is already sufficient)
         """
         self.context.initial_query = user_message  # First user input is saved as initial query. This is the intended goal of the investigation
-        # Create response that is sent to frontend
         dialogue_response = DialogueResponse()
-        dialogue_response.action = DialogueAction.ASK_QUESTION
 
         # Generate question and extract context from user message
         try:
@@ -323,8 +321,35 @@ class DirectionFlow(BasePhaseFlow):
                 action=DialogueAction.ERROR, content="Failed to generate question"
             )
 
-        # Update context
+        # Update context with whatever was extractable from the initial query
         self._apply_context_update(result.extracted_context)
+
+        # If the initial query already contains sufficient context, skip gathering entirely
+        if self._has_sufficient_context():
+            self.state = DirectionState.SUMMARY_CONFIRMING
+            logger.info(
+                f"[Session {self.session_id}] State: INITIAL -> SUMMARY_CONFIRMING (initial query sufficient)"
+            )
+            dialogue_response.action = DialogueAction.SHOW_SUMMARY
+            try:
+                summary = await dialogue_service.generate_summary(
+                    self.context, language=language
+                )
+            except Exception:
+                logger.error(
+                    f"[Session {self.session_id}] Failed to generate summary",
+                    exc_info=True,
+                )
+                return DialogueResponse(
+                    action=DialogueAction.ERROR, content="Failed to generate summary"
+                )
+            dialogue_response.content = (
+                json.dumps(summary) if isinstance(summary, dict) else summary
+            )
+            return dialogue_response
+
+        # Context incomplete — record the turn, ask the generated question, move to GATHERING
+        dialogue_response.action = DialogueAction.ASK_QUESTION
         dialogue_response.content = result.question.question_text
         self.context.dialogue_turns.append(
             {
@@ -332,13 +357,10 @@ class DirectionFlow(BasePhaseFlow):
                 "answer": user_message,
             }
         )
-        # Increase counter
         self.question_count += 1
-        # Change state INITIAL -> GATHERING
         self.state = DirectionState.GATHERING
         logger.info(f"[Session {self.session_id}] State: INITIAL -> GATHERING")
 
-        # Return response to frontend
         return dialogue_response
 
     async def handle_gathering_input(
