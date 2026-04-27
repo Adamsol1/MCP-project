@@ -102,6 +102,14 @@ PIR-2 (short description): Gap
 PIR-3 (short description): Partially answered
   → EntityC (low confidence). Key gap: X unknown.
 
+## Source Attribution
+For every finding, record the specific collected items that directly support it:
+- Web articles (fetch_page / google_search / google_news_search): add full URLs to `supporting_data.source_urls`
+- Knowledge base entries: add the resource_id values to `supporting_data.kb_refs`
+- Uploaded files (pdf_upload / csv_upload / txt_upload / json_upload): add the resource_id (filename) to `supporting_data.source_refs`
+- OTX / IoC lookups: add the indicator values to `supporting_data.iocs`
+Always populate whichever fields are relevant. Multiple source types may be present in the same finding.
+
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 
@@ -120,6 +128,8 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
         "attack_ids": ["T1078", "T1110.003"],
         "entities": ["Organization", "System"],
         "domains": ["example.com"],
+        "source_urls": ["https://example.com/article-slug"],
+        "source_refs": ["uploaded_report.pdf"],
         "timestamps": ["2026-01-15T00:00:00Z"],
         "locations": ["Oslo, Norway"],
         "kb_refs": ["knowledge_base_reference"]

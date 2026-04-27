@@ -236,6 +236,9 @@ export interface ProcessingFinding {
     kb_refs?: string[];
     attack_ids?: string[];
     domains?: string[];
+    source_urls?: string[];
+    source_refs?: string[];
+    iocs?: string[];
   };
 }
 

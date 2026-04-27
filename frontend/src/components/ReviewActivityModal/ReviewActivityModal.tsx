@@ -187,7 +187,7 @@ function ProcessingTranscript({ data }: { data: ProcessingData }) {
                 <p className="text-xs font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
                 {f.confidence != null && (
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${CONFIDENCE_COLOR(f.confidence)}`}>
-                    {Math.round(f.confidence * 100)}%
+                    {Math.round(f.confidence)}%
                   </span>
                 )}
               </div>

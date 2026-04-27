@@ -392,6 +392,31 @@ function formatRelevantTo(values: string[]): string {
   return values.join(", ");
 }
 
+/** Renders an APA citation string, turning the trailing URL (if any) into a clickable link. */
+function ApaWithLink({ citation, url }: { citation: string; url: string }) {
+  const urlIdx = citation.lastIndexOf("https://");
+  if (urlIdx === -1) {
+    return (
+      <>
+        {citation}{" "}
+        <a href={url} target="_blank" rel="noopener noreferrer"
+           className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+          {url}
+        </a>
+      </>
+    );
+  }
+  return (
+    <>
+      {citation.slice(0, urlIdx)}
+      <a href={citation.slice(urlIdx)} target="_blank" rel="noopener noreferrer"
+         className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+        {citation.slice(urlIdx)}
+      </a>
+    </>
+  );
+}
+
 function FindingDetailModal({
   finding,
   displayId,
@@ -410,12 +435,68 @@ function FindingDetailModal({
     return () => document.removeEventListener("keydown", handler);
   }, [finding, onClose]);
 
+  const { pirData, collectionData } = useWorkspace();
+
   if (!finding) return null;
 
   const tier = confidenceTierFromInt(finding.confidence);
   const tierStyle = FINDING_TIER_STYLES[tier];
   const sourceLabel = SOURCE_DISPLAY_NAMES[finding.source] ?? finding.source;
   const sd = finding.supporting_data ?? {};
+
+  // Resolve all source references into a unified list for APA display.
+  const allItems = collectionData?.collected_data ?? [];
+
+  type ResolvedSource =
+    | { kind: "web"; url: string; apa: string | null; title: string | null }
+    | { kind: "kb"; ref: string }
+    | { kind: "file"; ref: string; apa: string | null; title: string | null }
+    | { kind: "otx"; indicator: string };
+
+  const resolvedSources: ResolvedSource[] = (() => {
+    const sources: ResolvedSource[] = [];
+
+    // 1. Web: explicit source_urls, then domain fallback
+    const webUrls = sd.source_urls?.length
+      ? sd.source_urls
+      : (sd.domains ?? []).map((d) => `https://${d}`);
+    for (const url of webUrls) {
+      const match = allItems.find(
+        (item) =>
+          item.resource_id === url ||
+          (item.resource_id && item.resource_id.startsWith(url)) ||
+          (item.resource_id && url.startsWith(item.resource_id))
+      );
+      sources.push({ kind: "web", url, apa: match?.apa_citation ?? null, title: match?.title ?? null });
+    }
+
+    // 2. Uploaded files via source_refs
+    for (const ref of sd.source_refs ?? []) {
+      const match = allItems.find((item) => item.resource_id === ref);
+      sources.push({ kind: "file", ref, apa: match?.apa_citation ?? null, title: match?.title ?? ref });
+    }
+
+    // 3. Knowledge base refs
+    for (const ref of sd.kb_refs ?? []) {
+      sources.push({ kind: "kb", ref });
+    }
+
+    // 4. OTX IoCs
+    for (const indicator of sd.iocs ?? []) {
+      sources.push({ kind: "otx", indicator });
+    }
+
+    return sources;
+  })();
+
+  type PirEntry = { label: string; item: PirData["pirs"][number] };
+  const referencedPirs = finding.relevant_to
+    .map((label): PirEntry | null => {
+      const idx = parseInt(label.replace(/^PIR-/i, ""), 10) - 1;
+      const item = pirData?.pirs?.[idx];
+      return item ? { label, item } : null;
+    })
+    .filter((x): x is PirEntry => x !== null);
 
   return (
     <div
@@ -495,32 +576,60 @@ function FindingDetailModal({
             </div>
           )}
 
-          {/* Supporting data */}
-          {((sd.kb_refs?.length ?? 0) > 0 ||
-            (sd.attack_ids?.length ?? 0) > 0 ||
-            (sd.entities?.length ?? 0) > 0 ||
-            (sd.domains?.length ?? 0) > 0) && (
-            <div className="border-t border-border/50 pt-4 space-y-3">
+          {/* Sources (APA 7th) */}
+          {resolvedSources.length > 0 && (
+            <div className="border-t border-border/50 pt-4 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                Supporting Data
+                Sources
               </p>
-              {(sd.kb_refs?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">
-                    Knowledge Base Refs
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {sd.kb_refs!.map((r) => (
-                      <span
-                        key={r}
-                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary"
-                      >
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <ol className="space-y-2 list-none">
+                {resolvedSources.map((src, idx) => (
+                  <li key={idx} className="flex gap-2 text-xs text-text-secondary leading-relaxed">
+                    <span className="shrink-0 font-mono text-text-muted">[{idx + 1}]</span>
+                    <span>
+                      {src.kind === "web" && (
+                        src.apa ? (
+                          <ApaWithLink citation={src.apa} url={src.url} />
+                        ) : (
+                          <>
+                            {src.title && <span className="italic">{src.title}. </span>}
+                            <a href={src.url} target="_blank" rel="noopener noreferrer"
+                               className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+                              {src.url}
+                            </a>
+                          </>
+                        )
+                      )}
+                      {src.kind === "file" && (
+                        src.apa ? (
+                          <span>{src.apa}</span>
+                        ) : (
+                          <span className="italic">{src.title ?? src.ref}</span>
+                        )
+                      )}
+                      {src.kind === "kb" && (
+                        <span>
+                          <span className="font-medium text-text-primary">Knowledge Base: </span>
+                          <span className="font-mono">{src.ref}</span>
+                        </span>
+                      )}
+                      {src.kind === "otx" && (
+                        <span>
+                          <span className="font-medium text-text-primary">AlienVault OTX — </span>
+                          <span className="font-mono">{src.indicator}</span>
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Supporting data — technical metadata only (sources moved above) */}
+          {((sd.attack_ids?.length ?? 0) > 0 ||
+            (sd.entities?.length ?? 0) > 0) && (
+            <div className="border-t border-border/50 pt-4 space-y-3">
               {(sd.attack_ids?.length ?? 0) > 0 && (
                 <div>
                   <p className="text-xs font-medium text-text-secondary mb-1">
@@ -548,23 +657,6 @@ function FindingDetailModal({
                   </p>
                 </div>
               )}
-              {(sd.domains?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">
-                    Domains
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {sd.domains!.map((d) => (
-                      <span
-                        key={d}
-                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary"
-                      >
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -581,6 +673,31 @@ function FindingDetailModal({
               </ul>
             </div>
           )}
+
+          {/* Referenced PIRs in full */}
+          {referencedPirs.length > 0 && (
+            <div className="border-t border-border/50 pt-4 space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                Priority Intelligence Requirements
+              </p>
+              {referencedPirs.map(({ label, item }) => (
+                <div key={label} className="rounded-lg bg-surface-muted border border-border/50 px-3 py-2.5 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary shrink-0">
+                      {label}
+                    </span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                      {item.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-primary leading-relaxed">{item.question}</p>
+                  {item.rationale && (
+                    <p className="text-[11px] text-text-muted italic leading-relaxed">{item.rationale}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -590,9 +707,11 @@ function FindingDetailModal({
 function ProcessingMessage({
   data,
   onGapCollect,
+  onCollectMore,
 }: {
   data: ProcessingData;
   onGapCollect?: (gap: string) => void;
+  onCollectMore?: () => void;
 }) {
   const [selectedFinding, setSelectedFinding] = useState<{
     finding: ProcessingData["findings"][number];
@@ -682,7 +801,7 @@ function ProcessingMessage({
                         {displayId}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
+                    <td title={f.title} className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
                       {f.title}
                     </td>
                     <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
@@ -717,7 +836,9 @@ function ProcessingMessage({
               <button
                 type="button"
                 onClick={() => setCollectMode(true)}
-                className="rounded-md border border-border/50 px-3 py-1 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                disabled={!!onCollectMore}
+                title={onCollectMore ? "Use the Collect More button below to proceed" : undefined}
+                className="rounded-md border border-border/50 px-3 py-1 text-xs font-medium text-text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:border-primary hover:enabled:text-primary"
               >
                 Collect More
               </button>
@@ -1048,6 +1169,7 @@ export default function ChatWindow({
         <ProcessingMessage
           data={message.data as ProcessingData}
           onGapCollect={onGapCollect ? (gap) => onSendMessage?.(gap) : undefined}
+          onCollectMore={onGatherMoreFromProcessing}
         />
       );
     }

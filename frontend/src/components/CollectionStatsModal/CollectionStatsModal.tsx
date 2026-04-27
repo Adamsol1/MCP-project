@@ -660,7 +660,7 @@ function KbContent({ content }: { content: string }) {
 }
 
 function InlineMarkdown({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*|<i>[^<]*<\/i>|<em>[^<]*<\/em>|<b>[^<]*<\/b>|<strong>[^<]*<\/strong>)/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -673,6 +673,14 @@ function InlineMarkdown({ text }: { text: string }) {
         }
         if (/^\*[^*]+\*$/.test(part)) {
           return <em key={i}>{part.slice(1, -1)}</em>;
+        }
+        if (/^<i>[^<]*<\/i>$/.test(part) || /^<em>[^<]*<\/em>$/.test(part)) {
+          const inner = part.replace(/^<(?:i|em)>/, "").replace(/<\/(?:i|em)>$/, "");
+          return <em key={i}>{inner}</em>;
+        }
+        if (/^<b>[^<]*<\/b>$/.test(part) || /^<strong>[^<]*<\/strong>$/.test(part)) {
+          const inner = part.replace(/^<(?:b|strong)>/, "").replace(/<\/(?:b|strong)>$/, "");
+          return <strong key={i} className="font-semibold text-text-primary">{inner}</strong>;
         }
         return <span key={i}>{part}</span>;
       })}
