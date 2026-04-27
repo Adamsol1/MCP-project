@@ -15,6 +15,13 @@ _MOCK_PROCESSED = {
 }
 
 
+def async_return(value):
+    async def _inner(*_, **__):
+        return value
+
+    return _inner
+
+
 class MockProcessingService:
     def __init__(
         self, *, raise_on_process: bool = False, raise_on_modify: bool = False
@@ -24,17 +31,25 @@ class MockProcessingService:
         self.raise_on_process = raise_on_process
         self.raise_on_modify = raise_on_modify
 
-    async def process(self, collected_data, pir):  # noqa: ARG002
+    async def process(self, collected_data, pir, language="en"):  # noqa: ARG002
         if self.raise_on_process:
             raise RuntimeError("Service unavailable")
-        self.process_calls.append({"collected_data": collected_data, "pir": pir})
+        self.process_calls.append(
+            {"collected_data": collected_data, "pir": pir, "language": language}
+        )
         return "raw processed result"
 
-    async def modify_processing(self, last_result, user_message):  # noqa: ARG002
+    async def modify_processing(
+        self, last_result, user_message, language="en"
+    ):  # noqa: ARG002
         if self.raise_on_modify:
             raise RuntimeError("Service unavailable")
         self.modify_calls.append(
-            {"last_result": last_result, "user_message": user_message}
+            {
+                "last_result": last_result,
+                "user_message": user_message,
+                "language": language,
+            }
         )
         return "modified processed result"
 
@@ -69,13 +84,13 @@ async def test_initialize_sets_state_to_reviewing(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -95,13 +110,13 @@ async def test_initialize_with_orchestrator_sets_pending_reasoning_log(monkeypat
     reviewer = MockReviewer()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -135,7 +150,7 @@ async def test_initialize_returns_error_when_no_collected_data(monkeypatch):
     flow = ProcessingFlow(session_id="s1", pir="Test PIR")
     service = MockProcessingService()
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_collected", lambda _: None
+        "src.services.state_machines.processing_flow._read_collected", async_return(None)
     )
 
     # Act
@@ -153,10 +168,10 @@ async def test_initialize_returns_error_when_processing_service_raises(monkeypat
     service = MockProcessingService(raise_on_process=True)
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
 
     # Act
@@ -175,10 +190,10 @@ async def test_initialize_error_does_not_leak_exception_details(monkeypatch):
     service = MockProcessingService(raise_on_process=True)
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
 
     # Act
@@ -197,10 +212,10 @@ async def test_initialize_returns_error_when_orchestrator_raises(monkeypatch):
     reviewer = MockReviewer()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
 
     # Act
@@ -224,10 +239,10 @@ async def test_process_user_message_routes_to_handle_reviewing(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -262,7 +277,7 @@ async def test_handle_reviewing_approve_sets_state_to_complete(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
 
     # Act
@@ -281,10 +296,10 @@ async def test_handle_reviewing_modify_stays_in_reviewing(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -307,10 +322,10 @@ async def test_handle_reviewing_modify_passes_last_attempt_to_service(monkeypatc
     processed_data = {"session_id": "s1", "pir": "p", "attempts": ["first", "second"]}
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: processed_data,
+        async_return(processed_data),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -328,7 +343,7 @@ async def test_handle_reviewing_modify_returns_error_when_service_raises(monkeyp
     service = MockProcessingService(raise_on_modify=True)
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
 
     # Act
@@ -346,10 +361,10 @@ async def test_handle_reviewing_modify_handles_empty_processed_data(monkeypatch)
     flow.state = ProcessingState.REVIEWING
     service = MockProcessingService()
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -410,13 +425,13 @@ async def test_initialize_response_content_is_raw_result(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -438,13 +453,13 @@ async def test_initialize_joins_multiple_attempts_with_separator(monkeypatch):
     }
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: collected_multi,
+        async_return(collected_multi),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -474,14 +489,14 @@ async def test_initialize_passes_previous_result_to_orchestrator(monkeypatch):
     previous = {"session_id": "s1", "pir": "p", "attempts": ["earlier result"]}
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: previous,
+        async_return(previous),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -500,13 +515,13 @@ async def test_initialize_without_orchestrator_leaves_pending_reasoning_log_none
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_collected",
-        lambda _: _MOCK_COLLECTED,
+        async_return(_MOCK_COLLECTED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._read_processed", lambda _: None
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act
@@ -554,7 +569,7 @@ async def test_handle_reviewing_approve_writes_reasoning_log(monkeypatch):
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
 
     # Act
@@ -574,7 +589,7 @@ async def test_handle_reviewing_approve_without_pending_reasoning_log(monkeypatc
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
 
     # Act
@@ -596,10 +611,10 @@ async def test_handle_reviewing_modify_response_content_is_modified_result(monke
     service = MockProcessingService()
     monkeypatch.setattr(
         "src.services.state_machines.processing_flow._read_processed",
-        lambda _: _MOCK_PROCESSED,
+        async_return(_MOCK_PROCESSED),
     )
     monkeypatch.setattr(
-        "src.services.state_machines.processing_flow._write_processed", lambda *_: None
+        "src.services.state_machines.processing_flow._write_processed", async_return(None)
     )
 
     # Act

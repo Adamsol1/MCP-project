@@ -37,10 +37,13 @@ class AnalysisService:
         processing_result: ProcessingResult,
         selected_perspectives: list[str] | None = None,
         pir: str = "",
+        language: str = "en",
     ) -> tuple[AnalysisDraft, ProcessingResult]:
         normalized = self._normalize_perspectives(selected_perspectives)
         enriched_result = self._enrich_findings(processing_result)
-        fallback_draft = self._build_fallback_draft(enriched_result, normalized)
+        fallback_draft = self._build_fallback_draft(
+            enriched_result, normalized, language=language
+        )
         findings_json = json.dumps(enriched_result.model_dump(), ensure_ascii=False)
         valid_ids = {f.id for f in enriched_result.findings}
 
@@ -59,6 +62,7 @@ class AnalysisService:
                             "pir": pir,
                             "findings": findings_json,
                             "perspectives": perspective,
+                            "language": language,
                         },
                     )
                     ref_docs = self._perspective_docs.get(perspective, "")
@@ -201,7 +205,13 @@ class AnalysisService:
         self,
         processing_result: ProcessingResult,
         selected_perspectives: list[str],
+        language: str = "en",
     ) -> AnalysisDraft:
+        if language == "no":
+            return self._build_norwegian_fallback_draft(
+                processing_result, selected_perspectives
+            )
+
         findings = processing_result.findings
         gaps = list(processing_result.gaps)
         first_id = findings[0].id if findings else None
@@ -286,6 +296,99 @@ class AnalysisService:
             },
             recommended_actions=[
                 "Review findings and prioritize follow-up collection against unresolved gaps."
+            ],
+            information_gaps=gaps,
+        )
+
+    def _build_norwegian_fallback_draft(
+        self,
+        processing_result: ProcessingResult,
+        selected_perspectives: list[str],
+    ) -> AnalysisDraft:
+        findings = processing_result.findings
+        gaps = list(processing_result.gaps)
+        first_id = findings[0].id if findings else None
+
+        def _a(text: str, fids: list[str] | None = None) -> PerspectiveAssertion:
+            return PerspectiveAssertion(
+                assertion=text,
+                supporting_finding_ids=fids or ([first_id] if first_id else []),
+            )
+
+        title_text = (
+            "; ".join(f.title for f in findings[:4]) or "begrenset behandlet rapportering"
+        )
+        first_gap = gaps[0] if gaps else "Attribusjon er fortsatt uavklart."
+
+        all_implications: dict[str, list[PerspectiveAssertion]] = {
+            "us": [
+                _a(
+                    "Kombinasjonen av legitimasjonstilgang og phishing-forberedelser er relevant for allierte telekomleverandører og delte leverandørtilganger."
+                ),
+                _a(
+                    f"Amerikanske analytikere bør følge med på om mønsteret i {title_text} viser en gjenbrukbar modell for tilgangsutvikling mot kritisk infrastruktur."
+                ),
+            ],
+            "norway": [
+                _a(
+                    "Funnene er direkte relevante for norske telekomoperatører og nødkommunikasjonsmiljøer."
+                ),
+                _a(
+                    "Norske aktører bør prioritere gjennomgang av privilegert tilgang rundt nettverksdrift og identitetstjenester."
+                ),
+            ],
+            "china": [
+                _a(
+                    "Funn om overlappende infrastruktur gir et sammenligningsgrunnlag for statslignende telekommålretting uten å fastslå attribusjon."
+                ),
+                _a(
+                    f"Fra et Kina-orientert perspektiv bør {first_gap.lower()} begrense for tidlige aktørspesifikke konklusjoner."
+                ),
+            ],
+            "eu": [
+                _a(
+                    "Grensekryssende telekomavhengigheter øker den regionale betydningen av legitimasjonstyveri og kompromittert leverandørtilgang."
+                ),
+                _a(
+                    "Koordinering på EU-nivå vil være relevant dersom tilgangsaktiviteten påvirker delte operatører eller sammenkoblingspartnere."
+                ),
+            ],
+            "russia": [
+                _a(
+                    "Vektleggingen av nord-europeisk telekomrobusthet berører regionale trusselscenarioer mot kritisk infrastruktur."
+                ),
+                _a(f"Det nåværende materialet krever varsomhet fordi {first_gap.lower()}"),
+            ],
+            "neutral": [
+                _a(
+                    "Funnene støtter en forsiktig vurdering av koordinert tilgangsutvikling heller enn isolerte opportunistiske hendelser."
+                ),
+                _a(
+                    "Tilgjengelig evidens er sterkere på målrettingsmønstre enn på endelig intensjon eller aktøridentitet."
+                ),
+            ],
+        }
+
+        summary = (
+            f"Analyse av {len(findings)} funn indikerer en sannsynlig tilgangsutviklingskampanje. "
+            f"{len(gaps)} informasjonsmangler gjenstår."
+            if findings
+            else f"Ingen behandlede funn er tilgjengelige. {len(gaps)} mangler gjenstår."
+        )
+
+        return AnalysisDraft(
+            title="",
+            summary=summary,
+            key_judgments=[
+                f"{f.title}: {f.why_it_matters} Konfidens: {f.confidence}/100."
+                for f in findings
+            ]
+            or ["Ingen validerte funn er tilgjengelige som grunnlag for en vurdering."],
+            per_perspective_implications={
+                k: v for k, v in all_implications.items() if k in selected_perspectives
+            },
+            recommended_actions=[
+                "Gjennomgå funnene og prioriter videre innsamling mot uløste mangler."
             ],
             information_gaps=gaps,
         )

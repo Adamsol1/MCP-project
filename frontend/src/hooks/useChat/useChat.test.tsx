@@ -139,7 +139,15 @@ describe("useChat", () => {
       undefined,
       "en",
       "",
-      {},
+      {
+        sourceTimeframes: {
+          web_gov: "",
+          web_think_tank: "",
+          web_news: "",
+          web_other: "",
+          otx: "",
+        },
+      },
     );
   });
 

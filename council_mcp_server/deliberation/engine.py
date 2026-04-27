@@ -1273,7 +1273,9 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
                     logger.info(f"Attempting summary generation with {display_name}...")
                     summarizer = DeliberationSummarizer(adapter, model_name)
                     summary = await summarizer.generate_summary(
-                        question=request.question, responses=all_responses
+                        question=request.question,
+                        responses=all_responses,
+                        language=getattr(request, "language", "en"),
                     )
                     logger.info(f"Summary generation completed successfully with {display_name}")
                     break

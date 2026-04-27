@@ -25,6 +25,7 @@ const services = [
     key: "backend",
     name: "Backend API",
     args: ["--silent", "run", "dev:backend"],
+    env: { COUNCIL_MCP_AUTOSTART: "0" },
     success: [/Backend API started successfully: (.+)/, /Backend API already running on (.+)/],
   },
   {
@@ -78,7 +79,18 @@ function portMessage(service, line) {
   return `${service.name} failed: ${match[1]}`;
 }
 
+function isKnownStartupNoise(line) {
+  return (
+    /AuthlibDeprecationWarning: authlib\.jose module is deprecated/i.test(line) ||
+    /Warning: You are sending unauthenticated requests to the HF Hub/i.test(line)
+  );
+}
+
 function shouldForwardRuntimeLine(state, line) {
+  if (isKnownStartupNoise(line)) {
+    return false;
+  }
+
   if (state.forwardLines > 0) {
     state.forwardLines -= 1;
     return true;
@@ -142,6 +154,7 @@ function startService(service) {
   const state = { reported: false, reportedFailure: false, forwardLines: 0 };
   const child = spawn(npm, service.args, {
     cwd: process.cwd(),
+    env: { ...process.env, ...(service.env || {}) },
     stdio: ["ignore", "pipe", "pipe"],
     shell: process.platform === "win32",
     windowsHide: true,

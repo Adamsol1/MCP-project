@@ -135,6 +135,7 @@ def analysis_generate(
     pir: str,
     findings: str,
     perspectives: str = "us, norway, china, eu, russia, neutral",
+    language: str = "en",
 ) -> str:
     """Prompt for synthesising processed findings into a structured intelligence analysis.
 
@@ -149,4 +150,5 @@ def analysis_generate(
         pir=pir,
         findings=findings,
         perspectives=perspectives,
+        language=language,
     )

@@ -22,6 +22,7 @@ class ProcessingService:
         pir: str,
         feedback: str | None = None,
         previous_result: str | None = None,
+        language: str = "en",
     ) -> str:
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
@@ -31,6 +32,7 @@ class ProcessingService:
                     "collected_data": collected_data,
                     "feedback": feedback or "",
                     "previous_result": previous_result or "",
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)
@@ -44,6 +46,7 @@ class ProcessingService:
         self,
         existing_result: str,
         modifications: str,
+        language: str = "en",
     ) -> str:
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
@@ -51,6 +54,7 @@ class ProcessingService:
                 {
                     "existing_result": existing_result,
                     "modifications": modifications,
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)

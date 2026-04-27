@@ -66,6 +66,7 @@ class AnalysisFlow(BasePhaseFlow):
         orchestrator=None,
         reviewer=None,
         selected_perspectives: list[str] | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         if not self.session_id:
             return DialogueResponse(
@@ -93,11 +94,13 @@ class AnalysisFlow(BasePhaseFlow):
                     session_id=self.session_id,
                     pir=self.pir,
                     selected_perspectives=selected_perspectives,
+                    language=language,
                 )
             else:
                 analysis_draft, enriched_result = await analysis_service.generate_draft(
                     processing_result,
                     selected_perspectives=selected_perspectives,
+                    language=language,
                 )
         except Exception:
             logger.error(

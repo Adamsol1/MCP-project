@@ -126,6 +126,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     );
   }, [settings.theme]);
 
+  useLayoutEffect(() => {
+    document.documentElement.lang = settings.language;
+  }, [settings.language]);
+
   const updateLanguage = useCallback((language: Language) => {
     setSettings((prev) => ({ ...prev, language }));
   }, []);

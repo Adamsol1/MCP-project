@@ -131,13 +131,16 @@ class CollectionFlow(BasePhaseFlow):
         )
         return flow
 
-    async def initialize(self, collection_service, uow=None) -> DialogueResponse:  # noqa: ARG002
+    async def initialize(
+        self, collection_service, uow=None, language: str = "en"
+    ) -> DialogueResponse:  # noqa: ARG002
         # Generate collection plan based on self.pir
         # Set state to PLAN_CONFIRMING
         # Return DialogueResponse with action="show_plan"
         try:
             self.collection_plan = await collection_service.generate_collection_plan(
-                self.pir
+                self.pir,
+                language=language,
             )
         except Exception as e:
             logger.error(
@@ -164,17 +167,19 @@ class CollectionFlow(BasePhaseFlow):
         gather_more: bool = False,
         uow=None,
         source_timeframes: dict[str, str] | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         # PLAN PHASE
         if self.state == CollectionState.PLAN_CONFIRMING:
             return await self.handle_plan_confirming(
-                user_message, collection_service, approved, selected_sources
+                user_message, collection_service, approved, selected_sources, language
             )
         # COLLECTING
         elif self.state == CollectionState.COLLECTING:
             return await self.handle_collecting(
                 collection_service, orchestrator, reviewer, uow=uow,
                 source_timeframes=source_timeframes,
+                language=language,
             )
         # REVIEWING
         elif self.state == CollectionState.REVIEWING:
@@ -185,6 +190,7 @@ class CollectionFlow(BasePhaseFlow):
                 gather_more,
                 selected_sources,
                 uow=uow,
+                language=language,
             )
         # COMPLETE
         else:
@@ -198,6 +204,7 @@ class CollectionFlow(BasePhaseFlow):
         collection_service,
         approved,
         selected_sources: list[str] | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         """
         State handler for plan confirming phase.
@@ -234,7 +241,10 @@ class CollectionFlow(BasePhaseFlow):
             )
 
             self.collection_plan = await collection_service.generate_collection_plan(
-                self.pir, user_message, current_plan=self.collection_plan
+                self.pir,
+                user_message,
+                current_plan=self.collection_plan,
+                language=language,
             )
 
             dialogue_response.action = DialogueAction.SHOW_PLAN
@@ -249,6 +259,7 @@ class CollectionFlow(BasePhaseFlow):
         reviewer=None,
         uow=None,
         source_timeframes: dict[str, str] | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         assert self.session_id, "session_id must be set before collecting"
         timeframe = self.direction_context.timeframe if self.direction_context else ""
@@ -277,6 +288,7 @@ class CollectionFlow(BasePhaseFlow):
                     perspectives=perspectives,
                     feedback=feedback,
                     source_timeframes=_effective_source_timeframes,
+                    language=language,
                 )
             else:
                 collection_summary = await collection_service.collect(
@@ -286,6 +298,7 @@ class CollectionFlow(BasePhaseFlow):
                     timeframe=timeframe,
                     perspectives=perspectives,
                     source_timeframes=_effective_source_timeframes,
+                    language=language,
                 )
         except Exception as e:
             logger.error(f"[Session {self.session_id}] Collection failed: {e}")
@@ -347,6 +360,7 @@ class CollectionFlow(BasePhaseFlow):
         gather_more: bool = False,
         selected_sources: list[str] | None = None,
         uow=None,
+        language: str = "en",
     ) -> DialogueResponse:
         """
         State handler for reviewing phase.
@@ -408,7 +422,9 @@ class CollectionFlow(BasePhaseFlow):
                 else ""
             )
             try:
-                modified = await collection_service.modify_summary(raw, user_message)
+                modified = await collection_service.modify_summary(
+                    raw, user_message, language=language
+                )
             except Exception as e:
                 logger.error(
                     f"[Session {self.session_id}] Failed to modify summary: {e}"

@@ -8,6 +8,8 @@ from models.schema import RoundResponse, Summary
 
 logger = logging.getLogger(__name__)
 
+_LANGUAGE_NAMES: Dict[str, str] = {"en": "English", "no": "Norwegian"}
+
 
 class DeliberationSummarizer:
     """
@@ -32,7 +34,7 @@ class DeliberationSummarizer:
         self.model = model
 
     async def generate_summary(
-        self, question: str, responses: List[RoundResponse]
+        self, question: str, responses: List[RoundResponse], language: str = "en"
     ) -> Summary:
         """
         Generate summary from deliberation responses.
@@ -40,6 +42,7 @@ class DeliberationSummarizer:
         Args:
             question: Original deliberation question
             responses: All responses from all rounds
+            language: BCP-47 language code for the summary content
 
         Returns:
             Summary object with consensus, agreements, disagreements, and recommendation
@@ -48,7 +51,7 @@ class DeliberationSummarizer:
         debate_text = self._format_debate(question, responses)
 
         # Create summarization prompt
-        prompt = self._create_summary_prompt(debate_text)
+        prompt = self._create_summary_prompt(debate_text, language)
 
         # Let exceptions propagate for fallback chain in engine
         summary_text = await self.adapter.invoke(
@@ -85,17 +88,24 @@ class DeliberationSummarizer:
 
         return "\n".join(lines)
 
-    def _create_summary_prompt(self, debate_text: str) -> str:
+    def _create_summary_prompt(self, debate_text: str, language: str = "en") -> str:
         """
         Create prompt for summary generation.
 
         Args:
             debate_text: Formatted debate text
+            language: BCP-47 language code for the summary content
 
         Returns:
             Prompt for AI model
         """
-        return f"""Analyze the following AI deliberation and provide a structured summary.
+        language_name = _LANGUAGE_NAMES.get(language, "English")
+        lang_note = (
+            f"LANGUAGE INSTRUCTION: Write the content under each header in {language_name}. "
+            f"Keep the section headers (CONSENSUS:, KEY AGREEMENTS:, KEY DISAGREEMENTS:, "
+            f"FINAL RECOMMENDATION:) in English exactly as shown — do not translate them.\n\n"
+        )
+        return f"""{lang_note}Analyze the following AI deliberation and provide a structured summary.
 
 {debate_text}
 

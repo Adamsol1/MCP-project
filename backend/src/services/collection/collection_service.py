@@ -485,7 +485,11 @@ class CollectionService:
         return inferred
 
     async def generate_collection_plan(
-        self, pir: str, modifications: str | None = None, current_plan: str | None = None
+        self,
+        pir: str,
+        modifications: str | None = None,
+        current_plan: str | None = None,
+        language: str = "en",
     ) -> str:
         """Generate plan and always return canonical JSON for frontend/backend consumers."""
         async with self.mcp_client.connect():
@@ -495,6 +499,7 @@ class CollectionService:
                     "pir": pir,
                     "modifications": modifications or "",
                     "current_plan": current_plan or "",
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)
@@ -543,7 +548,7 @@ class CollectionService:
         selected_sources: list[str],
         pir: str,
         plan: str,
-        _language: str = "en",
+        language: str = "en",
         feedback: str | None = None,
         session_id: str | None = None,
         timeframe: str = "",
@@ -597,6 +602,7 @@ class CollectionService:
                     "perspectives": json.dumps(perspectives or []),
                     "step_source_guidance": step_source_guidance,
                     "source_timeframes": json.dumps(source_timeframes or {}),
+                    "language": language,
                 },
             )
             allowed_tool_names = {
@@ -657,13 +663,16 @@ class CollectionService:
         if doc_path.exists():
             doc_path.unlink()
 
-    async def modify_summary(self, collected_data: str, modifications: str) -> str:
+    async def modify_summary(
+        self, collected_data: str, modifications: str, language: str = "en"
+    ) -> str:
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
                 "collection_modify",
                 {
                     "collected_data": collected_data,
                     "modifications": modifications,
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)

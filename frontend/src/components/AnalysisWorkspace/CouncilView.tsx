@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { pdf } from "@react-pdf/renderer";
 import { useChat } from "../../hooks/useChat/useChat";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+import { useT } from "../../i18n/useT";
+import type { Translations } from "../../i18n/en";
 import type {
   CouncilNote,
   CouncilTranscriptEntry,
@@ -241,16 +243,24 @@ function renderCouncilSectionItem(item: CouncilSectionItem, index: number) {
   );
 }
 
-function getCouncilRuntimeIssue(councilNote: CouncilNote | null) {
-  if (!councilNote || councilNote.full_debate.length === 0) return null;
-  const allErrors = councilNote.full_debate.every((entry) =>
-    entry.response.startsWith("[ERROR:"),
-  );
-  if (!allErrors) return null;
-  return "Latest saved council note contains only runtime errors. Re-run council after fixing Gemini access in the backend environment.";
+function shortenParticipantName(name: string, t: Translations): string {
+  const lower = name.toLowerCase();
+  for (const [perspective, analystName] of Object.entries(t.perspectiveAnalystNames)) {
+    if (lower.startsWith(perspective) || lower.includes(perspective)) {
+      return analystName;
+    }
+  }
+  return name.replace(/\b(Strategic|Policy|Senior|Junior|Chief|Lead)\b\s*/gi, "").trim();
 }
 
-function getErrorMessage(error: unknown) {
+function hasCouncilRuntimeIssue(councilNote: CouncilNote | null) {
+  if (!councilNote || councilNote.full_debate.length === 0) return false;
+  return councilNote.full_debate.every((entry) =>
+    entry.response.startsWith("[ERROR:"),
+  );
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
   if (
     typeof error === "object" &&
     error !== null &&
@@ -266,7 +276,7 @@ function getErrorMessage(error: unknown) {
     return error.response.data.detail;
   }
   if (error instanceof Error) return error.message;
-  return "Request failed.";
+  return fallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +284,7 @@ function getErrorMessage(error: unknown) {
 // ---------------------------------------------------------------------------
 
 function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
+  const t = useT();
   const hasDisagreements =
     councilNote.key_disagreements.length > 0 &&
     !(councilNote.key_disagreements.length === 1 &&
@@ -282,12 +293,12 @@ function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
   return (
     <div className="space-y-6">
       <div>
-        <p className="text-sm font-semibold text-text-primary">Summary</p>
+        <p className="text-sm font-semibold text-text-primary">{t.councilSummaryTab}</p>
         <p className="mt-2 text-sm leading-7 text-text-primary">{councilNote.summary}</p>
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-text-primary">Key Agreements</p>
+        <p className="text-sm font-semibold text-text-primary">{t.councilKeyAgreements}</p>
         <ul className="mt-2 space-y-2">
           {councilNote.key_agreements.map((item) => (
             <li key={item} className="flex gap-3 text-sm leading-6 text-text-primary">
@@ -299,7 +310,7 @@ function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-text-primary">Key Disagreements</p>
+        <p className="text-sm font-semibold text-text-primary">{t.councilKeyDisagreements}</p>
         {hasDisagreements ? (
           <ul className="mt-2 space-y-2">
             {councilNote.key_disagreements.map((item) => (
@@ -310,12 +321,12 @@ function CouncilSummaryPanel({ councilNote }: { councilNote: CouncilNote }) {
             ))}
           </ul>
         ) : (
-          <p className="mt-2 text-sm italic text-text-muted">No disagreements recorded.</p>
+          <p className="mt-2 text-sm italic text-text-muted">{t.councilNoDisagreements}</p>
         )}
       </div>
 
       <div>
-        <p className="text-sm font-semibold text-text-primary">Final Recommendation</p>
+        <p className="text-sm font-semibold text-text-primary">{t.councilFinalRecommendation}</p>
         <p className="mt-2 text-sm leading-7 text-text-primary">{councilNote.final_recommendation}</p>
       </div>
     </div>
@@ -327,6 +338,7 @@ function CouncilParticipantPanel({
 }: {
   participantView: CouncilParticipantView;
 }) {
+  const t = useT();
   return (
     <div className="space-y-6">
       {participantView.sections.map((section, si) => (
@@ -342,7 +354,7 @@ function CouncilParticipantPanel({
 
       {participantView.vote ? (
         <div>
-          <p className="mb-2 text-sm font-semibold text-text-primary">Vote</p>
+          <p className="mb-2 text-sm font-semibold text-text-primary">{t.councilVote}</p>
           <div className="flex flex-wrap items-start gap-3">
             <div className="flex-1 space-y-1">
               <p className="text-sm font-medium text-text-primary">{participantView.vote.option}</p>
@@ -350,7 +362,7 @@ function CouncilParticipantPanel({
             </div>
             {participantView.vote.confidence !== null ? (
               <span className="rounded-full border border-border bg-surface px-3 py-1 text-sm font-medium text-text-primary">
-                {Math.round(participantView.vote.confidence * 100)}% confidence
+                {t.councilConfidence(Math.round(participantView.vote.confidence * 100))}
               </span>
             ) : null}
           </div>
@@ -362,6 +374,7 @@ function CouncilParticipantPanel({
 
 function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entries: CouncilTranscriptEntry[] }) {
   const [isOpen, setIsOpen] = useState(false);
+  const t = useT();
 
   return (
     <div className="rounded-[14px] border border-border-muted overflow-hidden">
@@ -371,7 +384,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
         onClick={() => setIsOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface-muted/50 transition-colors"
       >
-        <span className="text-sm font-semibold text-text-primary">Round {roundNumber}</span>
+        <span className="text-sm font-semibold text-text-primary">{t.councilRound(roundNumber)}</span>
         <svg
           width="12"
           height="12"
@@ -392,9 +405,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
         {entries.map((entry, i) => {
           const { body, vote } = splitVoteFromResponse(entry.response);
           const summary = entry.summary ?? extractSummary(body);
-          const shortName = entry.participant
-            .replace(/\b(Strategic|Policy|Senior|Junior|Chief|Lead)\b\s*/gi, "")
-            .trim();
+          const shortName = shortenParticipantName(entry.participant, t);
           return (
             <div key={i} className="px-4 py-3 space-y-1">
               <p className="text-xs font-semibold text-text-primary">{shortName}</p>
@@ -441,7 +452,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
                   ))}
                   {vote ? (
                     <div>
-                      <p className="mb-2 text-sm font-semibold text-text-primary">Vote</p>
+                      <p className="mb-2 text-sm font-semibold text-text-primary">{t.councilVote}</p>
                       <div className="flex flex-wrap items-start gap-3">
                         <div className="flex-1 space-y-1">
                           <p className="text-sm font-medium text-text-primary">{vote.option}</p>
@@ -449,7 +460,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
                         </div>
                         {vote.confidence !== null ? (
                           <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-primary">
-                            {Math.round(vote.confidence * 100)}% confidence
+                            {t.councilConfidence(Math.round(vote.confidence * 100))}
                           </span>
                         ) : null}
                       </div>
@@ -488,6 +499,7 @@ export default function CouncilView({
 }: CouncilViewProps) {
   const { sendCouncilRequest, isLoading: isCouncilLoading } = useChat();
   const { settings } = useSettings();
+  const t = useT();
 
   const [activeCouncilView, setActiveCouncilView] = useState(COUNCIL_SUMMARY_VIEW);
   const [selectedPerspectives, setSelectedPerspectives] = useState<string[]>(defaultPerspectives);
@@ -517,14 +529,12 @@ export default function CouncilView({
     event.preventDefault();
 
     if (selectedPerspectives.length < 2) {
-      setValidationMessage("Select at least 2 perspectives before running council.");
+      setValidationMessage(t.councilValidationPerspectives);
       return;
     }
 
     if (debatePoint.trim() === "" && selectedFindingIds.length === 0) {
-      setValidationMessage(
-        "Enter a debate point or select at least one finding before running council.",
-      );
+      setValidationMessage(t.councilValidationDebate);
       return;
     }
 
@@ -546,7 +556,7 @@ export default function CouncilView({
       });
       setIsTranscriptExpanded(false);
     } catch (error) {
-      setCouncilErrorMessage(getErrorMessage(error));
+      setCouncilErrorMessage(getErrorMessage(error, t.councilRequestFailed));
     }
   }
 
@@ -573,7 +583,7 @@ export default function CouncilView({
     [councilNote],
   );
 
-  const councilRuntimeIssue = getCouncilRuntimeIssue(councilNote);
+  const councilHasRuntimeIssue = hasCouncilRuntimeIssue(councilNote);
   const activeParticipantView =
     activeCouncilView === COUNCIL_SUMMARY_VIEW
       ? null
@@ -598,7 +608,7 @@ export default function CouncilView({
             onClick={handleDownloadPDF}
             className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-text-inverse transition-opacity hover:opacity-80"
           >
-            Download PDF
+            {t.councilDownloadPDF}
           </button>
         </div>
       )}
@@ -610,7 +620,7 @@ export default function CouncilView({
           onClick={onBack}
           className="inline-flex items-center gap-2 rounded-[14px] border border-border bg-surface px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-muted transition-colors"
         >
-          ← Back to analysis
+          ← {t.councilBackToAnalysis}
         </button>
       </div>
 
@@ -618,14 +628,14 @@ export default function CouncilView({
         {/* Council form */}
         <article className="space-y-1">
           <p className="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-            Run council
+            {t.councilRunHeader}
           </p>
           <p className="text-sm leading-6 text-text-secondary">
-            The Council simulates structured deliberation between analytical perspectives, surfacing agreements, disagreements, and a final recommendation.
+            {t.councilRunBlurb}
           </p>
           <form className="pt-2 space-y-4" onSubmit={handleCouncilSubmit}>
             <div className="space-y-2">
-              <p className="text-sm font-medium text-text-primary">Perspectives</p>
+              <p className="text-sm font-medium text-text-primary">{t.councilPerspectivesLabel}</p>
               <div className="flex flex-wrap gap-2">
                 {PERSPECTIVE_ORDER.map((perspective) => {
                   const isSelected = selectedPerspectives.includes(perspective);
@@ -642,18 +652,24 @@ export default function CouncilView({
                       }`}
                     >
                       <span className="text-sm leading-none">{PERSPECTIVE_FLAGS[perspective]}</span>
-                      {formatPerspectiveLabel(perspective)}
+                      {t.perspectiveLabels[perspective.toUpperCase()] ?? formatPerspectiveLabel(perspective)}
                     </button>
                   );
                 })}
               </div>
               <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">Runtime</span>
+                <span className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.councilRuntimeLabel}</span>
                 {[
-                  settings.councilSettings.mode,
-                  `${settings.councilSettings.rounds} round${settings.councilSettings.rounds === 1 ? "" : "s"}`,
-                  `${settings.councilSettings.timeoutSeconds}s timeout`,
-                  `retry ${settings.councilSettings.voteRetryEnabled ? `${settings.councilSettings.voteRetryAttempts}×` : "off"}`,
+                  settings.councilSettings.mode === "conference"
+                    ? t.councilModeConference
+                    : t.councilModeQuick,
+                  settings.councilSettings.rounds === 1
+                    ? t.councilRoundsSingleChip(settings.councilSettings.rounds)
+                    : t.councilRoundsMultiChip(settings.councilSettings.rounds),
+                  t.councilTimeoutChip(settings.councilSettings.timeoutSeconds),
+                  settings.councilSettings.voteRetryEnabled
+                    ? t.councilRetryChip(settings.councilSettings.voteRetryAttempts)
+                    : t.councilRetryOffChip,
                 ].map((chip) => (
                   <span key={chip} className="rounded-full border border-border-muted bg-surface-muted px-2 py-0.5 text-[10px] text-text-muted">
                     {chip}
@@ -667,7 +683,7 @@ export default function CouncilView({
                 htmlFor="analysis-debate-point"
                 className="text-sm font-medium text-text-primary"
               >
-                Debate point
+                {t.councilDebatePointLabel}
               </label>
               <textarea
                 id="analysis-debate-point"
@@ -678,13 +694,13 @@ export default function CouncilView({
                 }}
                 rows={4}
                 className="w-full rounded-[18px] border border-border bg-background px-3 py-3 text-sm text-text-primary"
-                placeholder="State the analytical point the council should debate."
+                placeholder={t.councilDebatePointPlaceholder}
               />
             </div>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm font-medium text-text-primary">Findings in scope</p>
+                <p className="text-sm font-medium text-text-primary">{t.councilFindingsLabel}</p>
                 <button
                   type="button"
                   onClick={() =>
@@ -694,7 +710,7 @@ export default function CouncilView({
                   }
                   className="text-xs text-text-muted hover:text-text-primary transition-colors"
                 >
-                  {selectedFindingIds.length === processingFindings.length ? "Deselect all" : "Select all"}
+                  {selectedFindingIds.length === processingFindings.length ? t.councilDeselectAll : t.councilSelectAll}
                 </button>
               </div>
               <div className="overflow-hidden rounded-[18px] border border-border/50 divide-y divide-border/50">
@@ -746,7 +762,7 @@ export default function CouncilView({
               disabled={isCouncilLoading}
               className="rounded-[18px] border border-border bg-surface-muted px-4 py-2.5 text-sm font-medium text-text-primary disabled:opacity-60"
             >
-              {isCouncilLoading ? "Running council..." : "Run council"}
+              {isCouncilLoading ? t.councilRunButtonLoading : t.councilRunButton}
             </button>
           </form>
         </article>
@@ -756,32 +772,32 @@ export default function CouncilView({
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-                Council Note
+                {t.councilNoteEyebrow}
               </p>
-              <h2 className="mt-1 text-2xl font-semibold text-text-primary">Advisory note</h2>
+              <h2 className="mt-1 text-2xl font-semibold text-text-primary">{t.councilAdvisoryHeading}</h2>
             </div>
             {councilNote ? (
               <span className="rounded-full border border-primary/30 bg-primary-subtle px-3 py-1 text-xs font-medium text-primary">
-                {councilNote.rounds_completed} rounds
+                {t.councilRoundsChip(councilNote.rounds_completed)}
               </span>
             ) : null}
           </div>
 
           {!councilNote ? (
             <p className="text-sm leading-6 text-text-secondary">
-              Run a council deliberation to generate a separate advisory note for this assessment.
+              {t.councilAdvisoryEmpty}
             </p>
           ) : (
             <div className="space-y-4">
-              {councilRuntimeIssue ? (
+              {councilHasRuntimeIssue ? (
                 <div className="rounded-[18px] border border-error bg-error-subtle px-4 py-3">
-                  <p className="text-sm text-error-text">{councilRuntimeIssue}</p>
+                  <p className="text-sm text-error-text">{t.councilRuntimeIssue}</p>
                 </div>
               ) : null}
 
               <div className="rounded-[14px] border border-border-muted bg-surface-muted/40 px-4 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-text-muted">
-                  Debate point
+                  {t.councilDebatePointLabel}
                 </p>
                 <p className="mt-1.5 text-sm leading-6 text-text-primary">{councilNote.question}</p>
               </div>
@@ -797,7 +813,7 @@ export default function CouncilView({
                       : "rounded-[10px] border border-transparent px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
                   }
                 >
-                  Summary
+                  {t.councilSummaryTab}
                 </button>
                 <span className="h-4 w-px bg-border mx-1" />
                 {councilParticipantViews.map((participantView) => (
@@ -812,7 +828,7 @@ export default function CouncilView({
                         : "rounded-[10px] border border-transparent px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary"
                     }
                   >
-                    {participantView.participant.replace(/\b(Strategic|Policy|Senior|Junior|Chief|Lead)\b\s*/gi, "").trim()}
+                    {shortenParticipantName(participantView.participant, t)}
                   </button>
                 ))}
               </div>
@@ -832,11 +848,11 @@ export default function CouncilView({
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`text-text-muted transition-transform duration-150 ${isTranscriptExpanded ? "rotate-180" : ""}`}>
                     <path d="M6 9l6 6 6-6" />
                   </svg>
-                  {isTranscriptExpanded ? "Hide full debate" : "Show full debate"}
+                  {isTranscriptExpanded ? t.councilHideDebate : t.councilShowDebate}
                 </button>
                 {councilNote.transcript_path ? (
                   <p className="text-[11px] text-text-muted">
-                    Transcript path: {councilNote.transcript_path}
+                    {t.councilTranscriptPath(councilNote.transcript_path)}
                   </p>
                 ) : null}
               </div>

@@ -77,6 +77,10 @@ class DeliberateRequest(BaseModel):
         ...,
         description="Working directory for tool execution (tools resolve relative paths from here). Required for deliberations using evidence-based tools."
     )
+    language: str = Field(
+        default="en",
+        description="BCP-47 language code (e.g. 'en', 'no'). Summary output uses this language.",
+    )
 
 
 class RoundResponse(BaseModel):

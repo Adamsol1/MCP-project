@@ -1192,6 +1192,7 @@ async def _handle_processing_phase(
         processing_service=processing_service,
         approved=request.approved,
         uow=uow,
+        language=request.language,
     )
     # Transition: ProcessingFlow COMPLETE → start AnalysisFlow + CouncilFlow
     if (
@@ -1219,6 +1220,7 @@ async def _handle_processing_phase(
             orchestrator=orchestrator,
             reviewer=review_service,
             selected_perspectives=selected_perspectives,
+            language=request.language,
         )
         session.council_flow = CouncilFlow(
             session_id=request.session_id,
@@ -1274,6 +1276,7 @@ async def _handle_collection_phase(
         gather_more=request.gather_more,
         uow=uow,
         source_timeframes=request.settings_source_timeframes,
+        language=request.language,
     )
     # Initialize processing state if finished with collection
     if (
@@ -1292,6 +1295,7 @@ async def _handle_collection_phase(
             orchestrator=orchestrator,
             reviewer=review_service,
             uow=uow,
+            language=request.language,
         )
         await _save_session(session, uow)
         return _convert_to_message_response(
@@ -1361,7 +1365,7 @@ async def _handle_direction_phase(
             research_logger=session.research_logger,
         )
         init_response = await session.collection_flow.initialize(
-            collection_service, uow=uow
+            collection_service, uow=uow, language=request.language
         )
         await _save_session(session, uow)
         return _convert_to_message_response(
@@ -1426,6 +1430,7 @@ async def _handle_council_phase(
         council_service=CouncilService(perspective_docs=perspective_docs),
         analysis_flow=session.analysis_flow,
         council_settings=request.council_settings,
+        language=request.language,
     )
     await _save_session(session, uow)
     return _convert_to_message_response(

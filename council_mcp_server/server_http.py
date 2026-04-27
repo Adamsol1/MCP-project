@@ -80,6 +80,13 @@ from models.config import AdapterConfig, CLIToolConfig, load_config  # noqa: E40
 from models.schema import DeliberateRequest, Participant  # noqa: E402
 from personas import get_persona  # noqa: E402
 
+_LANGUAGE_NAMES: dict[str, str] = {"en": "English", "no": "Norwegian"}
+
+
+def _language_instruction(language: str, scope: str = "all output") -> str:
+    language_name = _LANGUAGE_NAMES.get(language, "English")
+    return f"LANGUAGE INSTRUCTION: You MUST write {scope} in {language_name}.\n\n"
+
 logging.basicConfig(
     level=logging.INFO,
     handlers=[file_handler, stream_handler],
@@ -129,15 +136,21 @@ mcp = FastMCP(
 
 
 @mcp.prompt()
-def persona(perspective: str) -> str:
+def persona(perspective: str, language: str = "en") -> str:
     """Analytical persona for a council participant."""
-    return get_persona(perspective)
+    lang_note = _language_instruction(language, "your responses")
+    return f"{lang_note}{get_persona(perspective)}"
 
 
 @mcp.prompt()
-def council_behavior() -> str:
+def council_behavior(language: str = "en") -> str:
     """Debate behavior instructions shared by all council participants."""
+    lang_note = _language_instruction(
+        language,
+        "your entire response including section headings, vote rationale, and every other field",
+    )
     return (
+        f"{lang_note}"
         "You are participating in a structured multi-round analytical debate.\n"
         "Represent your assigned perspective authentically and consistently.\n"
         "Argue positions that align with your values and strategic priorities.\n"
@@ -149,12 +162,21 @@ def council_behavior() -> str:
 
 
 @mcp.prompt()
-def council_task(analysis_draft: str, findings: str, debate_point: str) -> str:
+def council_task(
+    analysis_draft: str,
+    findings: str,
+    debate_point: str,
+    language: str = "en",
+) -> str:
     """Debate briefing shared with all council participants as context."""
+    lang_note = _language_instruction(
+        language, "your responses, section headings, and vote rationale"
+    )
     focus = debate_point.strip() or (
         "Assess the strongest interpretation and strategic implications of the findings above."
     )
     return (
+        f"{lang_note}"
         "## Intelligence Analysis Draft\n"
         f"{analysis_draft}\n\n"
         "## Key Findings\n"
@@ -174,12 +196,13 @@ async def deliberate(
     mode: str = "quick",
     context: str | None = None,
     working_directory: str | None = None,
+    language: str = "en",
 ) -> dict:
     """Run a multi-round deliberation between AI participants."""
     if working_directory is None:
         working_directory = str(PROJECT_DIR)
 
-    logger.info("deliberate called: %s...", question[:60])
+    logger.info("deliberate called: %s... (language=%s)", question[:60], language)
 
     request = DeliberateRequest(
         question=question,
@@ -188,6 +211,7 @@ async def deliberate(
         mode=mode,
         context=context,
         working_directory=working_directory,
+        language=language,
     )
 
     result = await engine.execute(request)
@@ -204,6 +228,7 @@ async def summarize_entries(
     entries: list[dict],
     adapter: str = "gemini",
     model: str = "gemini-2.5-flash",
+    language: str = "en",
 ) -> list[dict]:
     """Generate a one-sentence AI summary for each council transcript entry."""
     chosen_adapter = adapters.get(adapter) or (next(iter(adapters.values())) if adapters else None)
@@ -228,7 +253,9 @@ async def summarize_entries(
         for item in items
     )
 
+    lang_note = _language_instruction(language, "the 'summary' field of every element")
     prompt = (
+        f"{lang_note}"
         "For each analyst response below, write a single sentence (max 180 characters) "
         "capturing the analyst's core strategic position and key finding. "
         "Be specific - name the key claim, not just the topic.\n\n"

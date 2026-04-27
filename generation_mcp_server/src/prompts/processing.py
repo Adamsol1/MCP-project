@@ -10,8 +10,10 @@ def build_processing_prompt(
     collected_data: str,
     feedback: str | None = None,
     previous_result: str | None = None,
+    language: str = "en",
 ) -> str:
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
+    lang_note = _language_instruction(language, "all output fields")
 
     feedback_section = (
         f"\n## Analyst Feedback from Previous Attempt\n{feedback}\nAddress this feedback in your processing."
@@ -26,7 +28,7 @@ def build_processing_prompt(
         if previous_result else ""
     )
 
-    return f"""You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
+    return f"""{lang_note}You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
 
 TODAY'S DATE: {_today}
 Use this as the reference point for all temporal reasoning, including PIR timeframes and recency assessments.
@@ -163,6 +165,7 @@ def processing_process(
     collected_data: str,
     feedback: str = "",
     previous_result: str = "",
+    language: str = "en",
 ) -> str:
     """Prompt for processing raw collected data into structured PMESII entities.
 
@@ -178,12 +181,14 @@ def processing_process(
         collected_data=collected_data,
         feedback=feedback or None,
         previous_result=previous_result or None,
+        language=language,
     )
 
 
 def processing_modify(
     existing_result: str,
     modifications: str,
+    language: str = "en",
 ) -> str:
     """Prompt for applying analyst modifications to an existing processing result.
 
@@ -194,4 +199,5 @@ def processing_modify(
     return build_processing_modify_prompt(
         existing_result=existing_result,
         modifications=modifications,
+        language=language,
     )

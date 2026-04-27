@@ -11,6 +11,19 @@ _DISPLAY_NAMES: dict[Perspective, str] = {
     Perspective.NEUTRAL: "Neutral Evidence Analyst",
 }
 
+_DISPLAY_NAMES_BY_LANGUAGE: dict[str, dict[Perspective, str]] = {
+    "en": _DISPLAY_NAMES,
+    "no": {
+        Perspective.US: "USA-analytiker",
+        Perspective.NORWAY: "Norge-analytiker",
+        Perspective.CHINA: "Kina-analytiker",
+        Perspective.EU: "EU-analytiker",
+        Perspective.RUSSIA: "Russland-analytiker",
+        Perspective.NEUTRAL: "Nøytral bevisanalytiker",
+    },
+}
 
-def get_display_name(perspective: Perspective) -> str:
-    return _DISPLAY_NAMES[perspective]
+
+def get_display_name(perspective: Perspective, language: str = "en") -> str:
+    table = _DISPLAY_NAMES_BY_LANGUAGE.get(language, _DISPLAY_NAMES)
+    return table[perspective]

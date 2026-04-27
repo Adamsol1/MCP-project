@@ -113,6 +113,7 @@ def build_collection_collect_prompt(
     perspectives: list[str] | None = None,
     step_source_guidance: str | None = None,
     source_timeframes: dict[str, str] | None = None,
+    language: str = "en",  # noqa: ARG001 - raw source content must remain verbatim.
 ) -> str:
     approved_tools = [
         tool
@@ -390,6 +391,7 @@ def collection_collect(
     perspectives: str = "[]",
     step_source_guidance: str = "",
     source_timeframes: str = "{}",
+    language: str = "en",
 ) -> str:
     """Prompt for collecting raw intelligence data via tools in the Collection phase.
 
@@ -414,6 +416,7 @@ def collection_collect(
         perspectives=json.loads(perspectives) or None,
         step_source_guidance=step_source_guidance or None,
         source_timeframes=json.loads(source_timeframes) or None,
+        language=language,
     )
 
 

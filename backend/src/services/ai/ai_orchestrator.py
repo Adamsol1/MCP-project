@@ -235,6 +235,7 @@ class AIOrchestrator:
         perspectives: list[str] | None = None,
         feedback: str | None = None,
         source_timeframes: dict[str, str] | None = None,
+        language: str = "en",
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
@@ -271,6 +272,7 @@ class AIOrchestrator:
                 existing_raw_data=accumulated["raw_data"] or None,
                 perspectives=perspectives,
                 source_timeframes=source_timeframes,
+                language=language,
             )
             if accumulated["raw_data"]:
                 accumulated["raw_data"] += (
@@ -298,13 +300,17 @@ class AIOrchestrator:
         session_id: str,
         pir: str = "",
         selected_perspectives: list[str] | None = None,
+        language: str = "en",
     ) -> tuple:
         from src.models.analysis import AnalysisDraft, ProcessingResult
         from src.models.dialogue import AnalysisContext
 
         async def analyse_fn(_=None):
             draft, enriched = await analysis_service.generate_draft(
-                processing_result, pir=pir, selected_perspectives=selected_perspectives
+                processing_result,
+                pir=pir,
+                selected_perspectives=selected_perspectives,
+                language=language,
             )
             return {
                 "analysis_draft": draft.model_dump(),
@@ -334,6 +340,7 @@ class AIOrchestrator:
         reviewer,
         session_id: str,
         previous_result: str | None = None,
+        language: str = "en",
     ) -> str:
         async def process_fn(feedback=None):
             return await processing_service.process(
@@ -341,6 +348,7 @@ class AIOrchestrator:
                 pir=pir,
                 feedback=feedback,
                 previous_result=previous_result,
+                language=language,
             )
 
         from src.models.dialogue import ProcessingContext

@@ -39,7 +39,9 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
     async def fake_wait_for_health(_server_url):
         return True
 
+    monkeypatch.setenv("COUNCIL_MCP_STARTUP_WAIT_SECONDS", "0")
     monkeypatch.setattr(council_mcp_process, "_health_ok", lambda _server_url: False)
+    monkeypatch.setattr(council_mcp_process, "_port_in_use", lambda _server_url: False)
     monkeypatch.setattr(council_mcp_process, "_wait_for_health", fake_wait_for_health)
     monkeypatch.setattr(council_mcp_process.shutil, "which", lambda _cmd: "poetry.exe")
     monkeypatch.setattr(council_mcp_process.subprocess, "Popen", fake_popen)
@@ -56,6 +58,51 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
         "server_http.py",
     ]
     assert launched["cwd"].endswith("council_mcp_server")
+
+
+@pytest.mark.asyncio
+async def test_maybe_start_council_mcp_waits_for_existing_startup(monkeypatch):
+    calls = {}
+
+    async def fake_wait_for_health(server_url, timeout_seconds=15.0):
+        calls["server_url"] = server_url
+        calls["timeout_seconds"] = timeout_seconds
+        return True
+
+    def fail_popen(*_args, **_kwargs):
+        raise AssertionError("Popen should not be called")
+
+    monkeypatch.setenv("COUNCIL_MCP_STARTUP_WAIT_SECONDS", "4")
+    monkeypatch.setattr(council_mcp_process, "_health_ok", lambda _server_url: False)
+    monkeypatch.setattr(council_mcp_process, "_wait_for_health", fake_wait_for_health)
+    monkeypatch.setattr(council_mcp_process.subprocess, "Popen", fail_popen)
+
+    process = await council_mcp_process.maybe_start_council_mcp(
+        "http://127.0.0.1:8003/sse"
+    )
+
+    assert process is None
+    assert calls == {
+        "server_url": "http://127.0.0.1:8003/sse",
+        "timeout_seconds": 4.0,
+    }
+
+
+@pytest.mark.asyncio
+async def test_maybe_start_council_mcp_does_not_spawn_when_port_busy(monkeypatch):
+    def fail_popen(*_args, **_kwargs):
+        raise AssertionError("Popen should not be called")
+
+    monkeypatch.setenv("COUNCIL_MCP_STARTUP_WAIT_SECONDS", "0")
+    monkeypatch.setattr(council_mcp_process, "_health_ok", lambda _server_url: False)
+    monkeypatch.setattr(council_mcp_process, "_port_in_use", lambda _server_url: True)
+    monkeypatch.setattr(council_mcp_process.subprocess, "Popen", fail_popen)
+
+    process = await council_mcp_process.maybe_start_council_mcp(
+        "http://127.0.0.1:8003/sse"
+    )
+
+    assert process is None
 
 
 @pytest.mark.asyncio

@@ -354,12 +354,13 @@ function CouncilSection({
   settings: CouncilSettings;
   onChange: (params: Partial<CouncilSettings>) => void;
 }) {
+  const t = useT();
   return (
     <div>
       <SettingRow
-        label="Mode"
+        label={t.councilModeLabel}
         htmlFor="council-mode"
-        description="Conference runs the full debate. Quick runs a single round."
+        description={t.councilModeDesc}
         control={
           <select
             id="council-mode"
@@ -369,15 +370,15 @@ function CouncilSection({
             }
             className={selectClass}
           >
-            <option value="conference">Conference</option>
-            <option value="quick">Quick</option>
+            <option value="conference">{t.councilModeConference}</option>
+            <option value="quick">{t.councilModeQuick}</option>
           </select>
         }
       />
       <SettingRow
-        label="Rounds"
+        label={t.councilRoundsLabel}
         htmlFor="council-rounds"
-        description="How many deliberation rounds the council should run."
+        description={t.councilRoundsDesc}
         control={
           <select
             id="council-rounds"
@@ -398,9 +399,9 @@ function CouncilSection({
         }
       />
       <SettingRow
-        label="Round Timeout"
+        label={t.councilTimeoutLabel}
         htmlFor="council-timeout"
-        description="Maximum seconds to allow each round before timing out."
+        description={t.councilTimeoutDesc}
         control={
           <select
             id="council-timeout"
@@ -414,20 +415,20 @@ function CouncilSection({
           >
             {[60, 120, 180, 240, 300, 420, 600, 900].map((value) => (
               <option key={value} value={value}>
-                {value} seconds
+                {t.councilSeconds(value)}
               </option>
             ))}
           </select>
         }
       />
       <SettingRow
-        label="Vote Retry"
-        description="Retry once or more if a participant omits the required VOTE line."
+        label={t.councilVoteRetryLabel}
+        description={t.councilVoteRetryDesc}
         control={
           <div className="flex gap-2">
             {[
-              { label: "On", value: true },
-              { label: "Off", value: false },
+              { label: t.councilVoteRetryOn, value: true },
+              { label: t.councilVoteRetryOff, value: false },
             ].map((option) => (
               <button
                 key={option.label}
@@ -447,9 +448,9 @@ function CouncilSection({
         }
       />
       <SettingRow
-        label="Vote Retry Attempts"
+        label={t.councilVoteRetryAttemptsLabel}
         htmlFor="council-vote-retries"
-        description="How many retry prompts to send when vote formatting is missing."
+        description={t.councilVoteRetryAttemptsDesc}
         control={
           <select
             id="council-vote-retries"
