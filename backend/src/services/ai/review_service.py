@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ReviewResult
-from src.services.AI.llm_service import LLMService
+from src.services.ai.llm_service import LLMService
 
 logger = logging.getLogger("app")
 

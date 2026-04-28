@@ -57,6 +57,8 @@ class DialogueContext(BaseModel):
     perspectives: list[Perspective] = [Perspective.NEUTRAL]
     modifications: str | None = None
     dialogue_turns: list[dict] = []
+    source_timeframes: dict[str, str] = {}
+    """Per-source-tier date window codes. Keys: web_gov, web_think_tank, web_news, web_other, otx."""
 
 
 class CollectionContext(BaseModel):

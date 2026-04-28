@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2020-057
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: EU–Russia Relations
+AUTHOR: Dr. Sophie Brennan, European Security Analyst
+DATE: 22 November 2020
+ORGANIZATION: Knowledge Base
+---
+
 # EU–Russia Relations
 
 ## Strategic Overview

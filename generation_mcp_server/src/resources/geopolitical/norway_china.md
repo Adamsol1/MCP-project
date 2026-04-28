@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2021-029
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: Norway–China Relations
+AUTHOR: Dr. Ingrid Larsson, Nordic Affairs Specialist
+DATE: 7 June 2021
+ORGANIZATION: Knowledge Base
+---
+
 # Norway–China Relations
 
 ## Strategic Overview

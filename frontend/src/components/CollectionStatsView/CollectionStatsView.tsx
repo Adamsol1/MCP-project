@@ -25,7 +25,7 @@ export default function CollectionStatsView({
       {/* Summary stats */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-lg bg-surface border border-border px-3 py-2">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.tableItems}</p>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">{t.statsItemsTotal}</p>
           <p className="mt-0.5 text-xl font-bold tabular-nums text-text-primary">{total}</p>
         </div>
         <div className="rounded-lg bg-surface border border-border px-3 py-2">

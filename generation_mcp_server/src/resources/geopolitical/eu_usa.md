@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2018-023
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: EU–United States Relations
+AUTHOR: James Thornton, Transatlantic Affairs Analyst
+DATE: 3 August 2018
+ORGANIZATION: Knowledge Base
+---
+
 # EU–United States Relations
 
 ## Strategic Overview

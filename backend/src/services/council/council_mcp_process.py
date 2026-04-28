@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 import shutil
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -16,11 +17,27 @@ from urllib.request import urlopen
 logger = logging.getLogger("app")
 
 _FALSE_VALUES = {"0", "false", "no", "off"}
+_DEFAULT_STARTUP_WAIT_SECONDS = 8.0
 
 
 def _autostart_enabled() -> bool:
     value = os.getenv("COUNCIL_MCP_AUTOSTART", "1").strip().lower()
     return value not in _FALSE_VALUES
+
+
+def _startup_wait_seconds() -> float:
+    value = os.getenv(
+        "COUNCIL_MCP_STARTUP_WAIT_SECONDS", str(_DEFAULT_STARTUP_WAIT_SECONDS)
+    )
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        logger.warning(
+            "[Council MCP] Invalid COUNCIL_MCP_STARTUP_WAIT_SECONDS=%r; using %.1fs",
+            value,
+            _DEFAULT_STARTUP_WAIT_SECONDS,
+        )
+        return _DEFAULT_STARTUP_WAIT_SECONDS
 
 
 def _is_local_url(server_url: str) -> bool:
@@ -31,6 +48,18 @@ def _is_local_url(server_url: str) -> bool:
 def _health_url(server_url: str) -> str:
     parsed = urlparse(server_url)
     return urlunparse(parsed._replace(path="/health", params="", query="", fragment=""))
+
+
+def _port_in_use(server_url: str) -> bool:
+    parsed = urlparse(server_url)
+    if parsed.hostname is None or parsed.port is None:
+        return False
+
+    try:
+        with socket.create_connection((parsed.hostname, parsed.port), timeout=0.3):
+            return True
+    except OSError:
+        return False
 
 
 def _health_ok(server_url: str, timeout_seconds: float = 0.5) -> bool:
@@ -68,22 +97,42 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
         logger.info("[Council MCP] Already running at %s", server_url)
         return None
 
-    project_root = Path(__file__).resolve().parents[3]
-    council_dir = project_root / "council_mcp"
+    startup_wait_seconds = _startup_wait_seconds()
+    if startup_wait_seconds > 0:
+        logger.info(
+            "[Council MCP] Waiting up to %.1fs for an existing local server at %s",
+            startup_wait_seconds,
+            server_url,
+        )
+        if await _wait_for_health(server_url, startup_wait_seconds):
+            logger.info("[Council MCP] Already running at %s", server_url)
+            return None
+
+    if _port_in_use(server_url):
+        logger.warning(
+            "[Council MCP] Port is in use at %s, but health check did not become ready; "
+            "not starting a duplicate server",
+            server_url,
+        )
+        return None
+
+    project_root = Path(__file__).resolve().parents[4]
+    council_dir = project_root / "council_mcp_server"
     server_file = council_dir / "server_http.py"
     if not server_file.exists():
         logger.warning("[Council MCP] Cannot autostart; missing %s", server_file)
         return None
 
     poetry = shutil.which("poetry")
-    if poetry is None:
-        logger.warning("[Council MCP] Cannot autostart; poetry is not on PATH")
-        return None
-
+    command = (
+        [poetry, "run", "python", "server_http.py"]
+        if poetry
+        else [sys.executable, "server_http.py"]
+    )
     logger.info("[Council MCP] Starting local server for %s", server_url)
     try:
         process = subprocess.Popen(
-            [poetry, "run", "python", "server_http.py"],
+            command,
             cwd=str(council_dir),
         )
     except OSError as e:

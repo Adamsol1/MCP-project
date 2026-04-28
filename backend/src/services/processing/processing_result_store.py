@@ -23,6 +23,29 @@ PROCESSING_RESULT_UNAVAILABLE_MESSAGE = (
 )
 
 
+def _repair_array_with_gaps(candidate: str) -> dict | None:
+    """Repair the case where the model returned a bare findings array with gaps appended.
+
+    Handles: [...findings...],\n  "gaps": [...]\n}
+    instead of: {"findings": [...], "gaps": [...]}
+    """
+    m = re.match(
+        r"\s*(\[[\s\S]*\])\s*,\s*\"gaps\"\s*:\s*(\[[\s\S]*?\])\s*\}?\s*$",
+        candidate,
+        re.DOTALL,
+    )
+    if not m:
+        return None
+    try:
+        findings = json.loads(m.group(1))
+        gaps = json.loads(m.group(2))
+        if isinstance(findings, list) and isinstance(gaps, list):
+            return {"findings": findings, "gaps": gaps}
+    except json.JSONDecodeError:
+        pass
+    return None
+
+
 def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
     """Attempt to extract a ProcessingResult from raw LLM output."""
     match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", raw, re.IGNORECASE)
@@ -34,7 +57,9 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
     try:
         payload = json.loads(candidate)
     except json.JSONDecodeError:
-        return None
+        payload = _repair_array_with_gaps(candidate)
+        if payload is None:
+            return None
 
     if not isinstance(payload, dict):
         return None
@@ -56,6 +81,18 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
         return _convert_grouped_pmesii_result(payload)
 
     return None
+
+
+def normalize_raw_result(raw: str) -> str:
+    """Re-serialize malformed LLM output as canonical JSON if possible.
+
+    Returns the original string unchanged when parsing fails so callers always
+    get a usable value.
+    """
+    result = _try_parse_processing_result(raw)
+    if result is None:
+        return raw
+    return json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
 
 
 def _convert_legacy_processing_result(

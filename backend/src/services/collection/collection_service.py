@@ -15,7 +15,7 @@ from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.services.collection.collection_status import CollectionStatusTracker
-from src.services.AI.gemini_agent import GeminiAgent
+from src.services.ai.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
 
@@ -485,7 +485,11 @@ class CollectionService:
         return inferred
 
     async def generate_collection_plan(
-        self, pir: str, modifications: str | None = None
+        self,
+        pir: str,
+        modifications: str | None = None,
+        current_plan: str | None = None,
+        language: str = "en",
     ) -> str:
         """Generate plan and always return canonical JSON for frontend/backend consumers."""
         async with self.mcp_client.connect():
@@ -494,6 +498,8 @@ class CollectionService:
                 {
                     "pir": pir,
                     "modifications": modifications or "",
+                    "current_plan": current_plan or "",
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)
@@ -542,12 +548,13 @@ class CollectionService:
         selected_sources: list[str],
         pir: str,
         plan: str,
-        _language: str = "en",
+        language: str = "en",
         feedback: str | None = None,
         session_id: str | None = None,
         timeframe: str = "",
         existing_raw_data: str | None = None,
         perspectives: list[str] | None = None,
+        source_timeframes: dict[str, str] | None = None,
     ) -> str:
         """Collect raw data only — no summarization.
 
@@ -594,6 +601,8 @@ class CollectionService:
                     "existing_data": existing_raw_data or "",
                     "perspectives": json.dumps(perspectives or []),
                     "step_source_guidance": step_source_guidance,
+                    "source_timeframes": json.dumps(source_timeframes or {}),
+                    "language": language,
                 },
             )
             allowed_tool_names = {
@@ -654,13 +663,16 @@ class CollectionService:
         if doc_path.exists():
             doc_path.unlink()
 
-    async def modify_summary(self, collected_data: str, modifications: str) -> str:
+    async def modify_summary(
+        self, collected_data: str, modifications: str, language: str = "en"
+    ) -> str:
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
                 "collection_modify",
                 {
                     "collected_data": collected_data,
                     "modifications": modifications,
+                    "language": language,
                 },
             )
             agent = GeminiAgent(self.mcp_client)

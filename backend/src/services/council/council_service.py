@@ -15,7 +15,7 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.dialogue import Perspective
-from src.services.AI.agent_builder import get_display_name
+from src.services.ai.agent_builder import get_display_name
 
 logger = logging.getLogger("app")
 
@@ -43,6 +43,7 @@ class CouncilService:
         self,
         working_directory: str | Path | None = None,
         mcp_client: MCPClient | None = None,
+        perspective_docs: dict[str, str] | None = None,
     ):
         if working_directory is None:
             working_directory = Path(__file__).resolve().parents[2] / "data" / "outputs"
@@ -51,6 +52,7 @@ class CouncilService:
         self.transcript_dir = self.working_directory / "council_transcripts"
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
         self.mcp_client = mcp_client or MCPClient(server_url=get_council_mcp_url())
+        self._perspective_docs: dict[str, str] = perspective_docs or {}
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
@@ -86,25 +88,34 @@ class CouncilService:
             normalized.append(perspective)
         return normalized
 
-    async def build_participants(self, selected_perspectives: list[str]) -> list[dict]:
+    async def build_participants(
+        self, selected_perspectives: list[str], language: str = "en"
+    ) -> list[dict]:
         normalized = self._normalize_perspectives(selected_perspectives)
         if len(normalized) < 2:
             raise ValueError(
                 "At least 2 perspectives are required for council deliberation"
             )
 
-        behavior = await self.mcp_client.get_prompt("council_behavior")
+        behavior = await self.mcp_client.get_prompt(
+            "council_behavior", {"language": language}
+        )
         participants = []
         for perspective in normalized:
-            persona = await self.mcp_client.read_resource(
-                f"knowledge://personas/{perspective.value}"
+            persona = await self.mcp_client.get_prompt(
+                "persona",
+                {"perspective": perspective.value, "language": language},
             )
             participants.append(
                 {
                     "cli": self.DEFAULT_ADAPTER,
                     "model": self.DEFAULT_MODEL,
-                    "display_name": get_display_name(perspective),
-                    "persona_prompt": f"{persona}\n\n{behavior}",
+                    "display_name": get_display_name(perspective, language),
+                    "persona_prompt": (
+                        f"{persona}\n\n{self._perspective_docs[perspective.value]}\n\n{behavior}"
+                        if perspective.value in self._perspective_docs
+                        else f"{persona}\n\n{behavior}"
+                    ),
                 }
             )
         return participants
@@ -130,6 +141,7 @@ class CouncilService:
         analysis_draft: AnalysisDraft,
         council_settings: CouncilRunSettings | None = None,
         selected_findings=None,
+        language: str = "en",
     ) -> dict:
         runtime_profile = self.resolve_runtime_profile(council_settings)
         question = self.build_question(debate_point, selected_findings or [])
@@ -146,6 +158,7 @@ class CouncilService:
                     [f.model_dump() for f in findings], ensure_ascii=False
                 ),
                 "debate_point": debate_point,
+                "language": language,
             },
         )
 
@@ -156,10 +169,13 @@ class CouncilService:
             "mode": runtime_profile.mode,
             "context": context,
             "working_directory": runtime_profile.working_directory,
+            "language": language,
         }
 
     async def _generate_entry_summaries_via_mcp(
-        self, entries: list[CouncilTranscriptEntry]
+        self,
+        entries: list[CouncilTranscriptEntry],
+        language: str = "en",
     ) -> dict[tuple[int, str], str]:
         """Call the council MCP summarize_entries tool to generate per-entry summaries."""
         payload = [
@@ -173,6 +189,7 @@ class CouncilService:
                     "entries": payload,
                     "adapter": self.DEFAULT_ADAPTER,
                     "model": self.DEFAULT_MODEL,
+                    "language": language,
                 },
             )
             result_list = result if isinstance(result, list) else []
@@ -213,6 +230,7 @@ class CouncilService:
         analysis_draft: AnalysisDraft,
         finding_ids: list[str] | None = None,
         council_settings: CouncilRunSettings | None = None,
+        language: str = "en",
     ) -> CouncilNote:
         del session_id
         selected_findings = (
@@ -221,12 +239,15 @@ class CouncilService:
             else processing_result.findings
         )
         logger.info(
-            "[CouncilService] Calling deliberate tool via MCP at %s",
+            "[CouncilService] Calling deliberate tool via MCP at %s (language=%s)",
             self.mcp_client.server_url,
+            language,
         )
         try:
             async with self.mcp_client.connect():
-                participants = await self.build_participants(selected_perspectives)
+                participants = await self.build_participants(
+                    selected_perspectives, language=language
+                )
                 request = await self.build_request(
                     debate_point=debate_point,
                     participants=participants,
@@ -234,6 +255,7 @@ class CouncilService:
                     analysis_draft=analysis_draft,
                     council_settings=council_settings,
                     selected_findings=selected_findings,
+                    language=language,
                 )
                 result = await self.mcp_client.call_tool("deliberate", request)
 
@@ -247,7 +269,9 @@ class CouncilService:
                     for entry in result.get("full_debate", [])
                 ]
 
-                summaries = await self._generate_entry_summaries_via_mcp(debate_entries)
+                summaries = await self._generate_entry_summaries_via_mcp(
+                    debate_entries, language=language
+                )
                 for entry in debate_entries:
                     entry.summary = summaries.get((entry.round, entry.participant))
         except Exception as exc:

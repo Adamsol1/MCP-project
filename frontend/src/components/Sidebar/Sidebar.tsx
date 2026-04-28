@@ -148,7 +148,7 @@ export function Sidebar({
         className={`bg-primary-dark text-white rounded flex items-center shrink-0 ${
           isCollapsed
             ? "w-8 h-8 mx-auto mt-2 mb-2 justify-center"
-            : "mx-2 mt-2 mb-2 py-1.5 px-2 justify-start gap-1.5 w-[calc(100%-1rem)]"
+            : "mx-1 mt-2 mb-2 py-1.5 px-2 justify-start gap-1.5 w-[calc(100%-0.5rem)]"
         }`}
       >
         <span className="text-lg leading-none">+</span>

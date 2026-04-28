@@ -21,22 +21,24 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from src.db.mappers import row_to_session, session_to_row
+from src.db.engine import get_knowledge_session_factory
+from src.db.repositories.perspective_doc_repo import PerspectiveDocRepository
 from src.db.unit_of_work import UnitOfWork, get_uow
 from src.mcp_client.client import MCPClient
 from src.models.analysis import CouncilRunSettings
 from src.models.dialogue import DialogueAction, DialogueResponse, Phase
-from src.services.AI.ai_orchestrator import AIOrchestrator
+from src.services.ai.ai_orchestrator import AIOrchestrator
 from src.services.analysis.analysis_service import AnalysisService
 from src.services.analysis.analysis_session_store import AnalysisSessionStore
-from src.services.collectors.collection_service import CollectionService
+from src.services.collection.collection_service import CollectionService
 from src.services.collection.collection_status import CollectionStatusTracker
 from src.services.council.council_service import CouncilService
-from tests.services.collection.dialogue_service import DialogueService
-from src.services.AI.llm_service import LLMService
+from src.services.ai.llm_service import LLMService
+from src.services.direction.dialogue_service import DialogueService
 from src.services.processing.processing_result_store import ProcessingResultStore
 from src.services.processing.processing_service import ProcessingService
 from src.services.reasearch_logger import ResearchLogger
-from src.services.AI.review_service import ReviewService
+from src.services.ai.review_service import ReviewService
 from src.services.state_machines.analysis_flow import AnalysisFlow, AnalysisState
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
 from src.services.state_machines.council_flow import CouncilFlow
@@ -121,6 +123,12 @@ class IntelligenceSession:
 
 _sessions: dict[str, IntelligenceSession] = {}
 
+# Tombstone of session ids that were explicitly deleted.  Blocks in-flight
+# requests (e.g. a long-running /api/dialogue/message handler) from
+# re-inserting the row via _save_session after the user has already
+# deleted the session on the frontend.
+_deleted_sessions: set[str] = set()
+
 
 async def _save_session(session: IntelligenceSession, uow: UnitOfWork) -> None:
     """Persist session state to sessions.db so it survives server restarts.
@@ -129,6 +137,11 @@ async def _save_session(session: IntelligenceSession, uow: UnitOfWork) -> None:
         session: The active session to save
         uow: Unit of Work with an open DB transaction
     """
+    if session.session_id in _deleted_sessions:
+        logger.info(
+            f"[Session {session.session_id}] Skipping save: session was deleted"
+        )
+        return
     row = session_to_row(session)
     await uow.sessions.upsert(row)
     await uow.commit()
@@ -167,6 +180,10 @@ class DialogueMessageRequest(BaseModel):
     """Timeframe pre-set by the user in Settings → Parameters (e.g. 'Last 30 days').
     When non-empty and the session context has no timeframe yet, the backend pre-fills
     context.timeframe so the AI skips the timeframe clarifying question."""
+    settings_source_timeframes: dict[str, str] = {}
+    """Per-source-tier date window codes from Settings (e.g. {'web_news': 'm3', 'otx': 'y3'}).
+    When non-empty and context.source_timeframes is not yet set, the backend pre-fills it
+    so the collection prompt uses per-tier date restrictions."""
     selected_sources: list[str] = []
     """Sources selected by the user in the collection phase."""
     gather_more: bool = False
@@ -237,17 +254,24 @@ class DialogueDevRestoreResponse(DialogueDevStateResponse):
     messages: list[dict[str, Any]]
 
 
-async def evict_session(session_id: str, uow: UnitOfWork) -> None:
+async def evict_session(session_id: str, uow: UnitOfWork) -> bool:
     """Remove a session from the in-memory cache and delete it from the DB.
 
     Args:
         session_id: session identifier
         uow: Unit of Work with an open DB transaction
+
+    Returns:
+        True if a session row existed and was deleted, False otherwise.
     """
     _sessions.pop(session_id, None)
-    await uow.sessions.delete_cascade(session_id)
+    _deleted_sessions.add(session_id)
+    existed = await uow.sessions.delete_cascade(session_id)
     await uow.commit()
-    logger.info(f"[Session {session_id}] Evicted from cache and DB")
+    logger.info(
+        f"[Session {session_id}] Evicted from cache and DB (existed={existed})"
+    )
+    return existed
 
 
 def _normalize_dialogue_action(action: DialogueAction | str) -> DialogueAction:
@@ -327,6 +351,39 @@ def _convert_to_message_response(
 def _ensure_dev_tools_enabled():
     if not DEV_TOOLS_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
+
+
+async def _load_perspective_docs(perspectives: list[str]) -> dict[str, str]:
+    """Load and format perspective documents for a list of perspectives.
+
+    Returns a dict mapping each perspective to a formatted markdown block
+    containing all its active Political / Economic / Military reference documents.
+    """
+    if not perspectives:
+        return {}
+    factory = get_knowledge_session_factory()
+    docs_by_perspective: dict[str, str] = {}
+    try:
+        async with factory() as session:
+            repo = PerspectiveDocRepository(session)
+            for perspective in perspectives:
+                docs = await repo.list_by_perspective(perspective)
+                if not docs:
+                    continue
+                sections: dict[str, list[str]] = {}
+                for doc in docs:
+                    sections.setdefault(doc.section, []).append(
+                        f"### {doc.title}\n*Source: {doc.source or 'Internal'}*\n\n{doc.markdown_content}"
+                    )
+                parts = ["## Official Reference Documents"]
+                for section in ("political", "economic", "military"):
+                    if section in sections:
+                        parts.append(f"### {section.capitalize()}")
+                        parts.extend(sections[section])
+                docs_by_perspective[perspective] = "\n\n".join(parts)
+    except Exception:
+        logger.warning("[_load_perspective_docs] Failed to load docs", exc_info=True)
+    return docs_by_perspective
 
 
 async def _get_or_create_session(
@@ -1135,6 +1192,7 @@ async def _handle_processing_phase(
         processing_service=processing_service,
         approved=request.approved,
         uow=uow,
+        language=request.language,
     )
     # Transition: ProcessingFlow COMPLETE → start AnalysisFlow + CouncilFlow
     if (
@@ -1146,7 +1204,6 @@ async def _handle_processing_phase(
             pir=session.processing_flow.pir,
             research_logger=session.research_logger,
         )
-        analysis_service = AnalysisService(mcp_client)
         selected_perspectives = (
             [
                 p.value.lower()
@@ -1155,12 +1212,15 @@ async def _handle_processing_phase(
             if session.direction_flow and session.direction_flow.context
             else None
         )
+        perspective_docs = await _load_perspective_docs(selected_perspectives or [])
+        analysis_service = AnalysisService(mcp_client, perspective_docs=perspective_docs)
         init_response = await session.analysis_flow.initialize(
             processing_service=ProcessingResultStore(uow=uow),
             analysis_service=analysis_service,
             orchestrator=orchestrator,
             reviewer=review_service,
             selected_perspectives=selected_perspectives,
+            language=request.language,
         )
         session.council_flow = CouncilFlow(
             session_id=request.session_id,
@@ -1215,6 +1275,8 @@ async def _handle_collection_phase(
         reviewer=review_service,
         gather_more=request.gather_more,
         uow=uow,
+        source_timeframes=request.settings_source_timeframes,
+        language=request.language,
     )
     # Initialize processing state if finished with collection
     if (
@@ -1233,6 +1295,7 @@ async def _handle_collection_phase(
             orchestrator=orchestrator,
             reviewer=review_service,
             uow=uow,
+            language=request.language,
         )
         await _save_session(session, uow)
         return _convert_to_message_response(
@@ -1285,6 +1348,7 @@ async def _handle_direction_phase(
         reviewer=review_service,
         language=request.language,
         settings_timeframe=request.settings_timeframe,
+        settings_source_timeframes=request.settings_source_timeframes,
     )
 
     # Transition: DirectionFlow COMPLETE → start CollectionFlow
@@ -1301,7 +1365,7 @@ async def _handle_direction_phase(
             research_logger=session.research_logger,
         )
         init_response = await session.collection_flow.initialize(
-            collection_service, uow=uow
+            collection_service, uow=uow, language=request.language
         )
         await _save_session(session, uow)
         return _convert_to_message_response(
@@ -1356,13 +1420,17 @@ async def _handle_council_phase(
             phase=Phase.ANALYSIS,
         )
     perspectives = request.council_perspectives or request.perspectives
+    perspective_docs = await _load_perspective_docs(
+        [p.lower() for p in perspectives if p.lower() != "neutral"]
+    )
     response = await session.council_flow.process_user_message(
         debate_point=request.council_debate_point,
         finding_ids=request.council_finding_ids,
         selected_perspectives=perspectives,
-        council_service=CouncilService(),
+        council_service=CouncilService(perspective_docs=perspective_docs),
         analysis_flow=session.analysis_flow,
         council_settings=request.council_settings,
+        language=request.language,
     )
     await _save_session(session, uow)
     return _convert_to_message_response(

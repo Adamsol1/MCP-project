@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2023-071
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: United States–China Relations
+AUTHOR: Marcus Webb, Indo-Pacific Analyst
+DATE: 9 September 2023
+ORGANIZATION: Knowledge Base
+---
+
 # United States–China Relations
 
 ## Strategic Overview

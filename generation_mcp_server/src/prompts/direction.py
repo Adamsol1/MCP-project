@@ -42,6 +42,9 @@ def build_direction_dialogue_prompt(
                 - Do not infer or assume values that are not stated
                 - If a field is already filled in the existing context, do not overwrite
                 it unless the user explicitly changes it
+                - If the user's message is unrelated to the intelligence task, politely
+                redirect them back to the dialogue, do not update any context fields,
+                and return the existing context unchanged
 
                 QUESTION GENERATION RULES:
                 - Ask only ONE question per response
@@ -61,11 +64,9 @@ def build_direction_dialogue_prompt(
                 6. perspectives — analytical viewpoint
 
                 has_sufficient_context RULES:
-                - Set to true only when ALL of the following fields have values:
-                scope, target_entities, threat_actors, timeframe, priority_focus, perspectives
-                - Set to true when context is good enough to generate meaningful PIRs
-                — not when it is perfect. Intelligence analysts never have perfect information.
-                - Set to false if ANY required field is empty
+                - Set to true ONLY when ALL of the following fields have values:
+                scope, target_entities, threat_actors, timeframe, priority_focus
+                - Set to false if ANY of these fields is empty or an empty list
 
                 Return your response in the following JSON format:
                 {{
@@ -95,9 +96,6 @@ def build_direction_dialogue_prompt(
                 SELECTED PERSPECTIVES: {perspectives}
 
                 MISSING FIELDS: {missing_fields}
-
-                1. Extract any new context from the user message and update the context above
-                2. Generate one follow-up question targeting the most critical missing field
                 """
     )
 
@@ -153,7 +151,9 @@ provided. Each PIR must be:
 - Prioritized: Ranked by importance to the decision at hand
 - Perspective-aware: Framed through the selected analytical viewpoint(s)
 
-CITATION RULES (apply when BACKGROUND KNOWLEDGE is present):
+CITATION RULES (only apply if BACKGROUND KNOWLEDGE is provided below.
+If BACKGROUND KNOWLEDGE is absent or empty, skip all citation rules
+and return empty arrays for "sources" and "claims"):
 - Build a top-level "sources" list from the "### Source: <id>" headers in the
   background knowledge. Each entry must have:
     {{ "id": "<source id>", "ref": "[N]", "source_type": "kb" }}
@@ -209,6 +209,8 @@ Return your response in the following JSON format:
     "reasoning": "A transparent explanation of the logic and decisions behind why these specific PIRs were selected"
 }}
 
+The "pirs" list MUST be sorted by priority order: high first, then medium, then low.
+
 Respond ONLY in valid JSON.
 No markdown.
 No commentary.
@@ -224,20 +226,23 @@ PRIORITY FOCUS: {priority_focus}
 ANALYTICAL PERSPECTIVES: {perspectives}
 
 EXISTING PIRs: {current_pir or "None"}
-MODIFICATIONS: {modifications}
+MODIFICATIONS: {modifications or "None"}
+NOTE: A MODIFICATIONS value of "None" means no feedback has been provided.
+Do not treat "None" as feedback content.
 {background_knowledge or ""}
 
 Use the following rules to decide how to respond:
-- If MODIFICATIONS is empty: Generate a fresh set of 2-5 PIRs based
+- If MODIFICATIONS is "None": Generate a fresh set of 2-5 PIRs based
   on the investigation context above.
 - If MODIFICATIONS has content and EXISTING PIRs is not None:
-  - First, judge whether the feedback targets specific PIRs (e.g. "change PIR 2",
-    "PIR 3 is too vague") or is general (e.g. "poor quality", "too broad",
-    "not relevant enough").
-  - Specific feedback: keep all other PIRs unchanged and only modify the ones
-    explicitly mentioned.
-  - General feedback: regenerate all PIRs from scratch, using the feedback
-    as quality guidance.
+  - First, classify the feedback into one of three types:
+    1. Additive (e.g. "add a PIR about X", "include a PIR on Y", "add one about Z"):
+       Keep ALL existing PIRs completely unchanged and append only the new PIR(s)
+       to the list. Do not modify, merge, reword, or remove any existing PIRs.
+    2. Specific (e.g. "change PIR 2", "PIR 3 is too vague", "rewrite PIR 1"):
+       Keep all other PIRs unchanged and only modify the ones explicitly mentioned.
+    3. General (e.g. "poor quality", "too broad", "not relevant enough"):
+       Regenerate all PIRs from scratch, using the feedback as quality guidance.
 - If MODIFICATIONS has content but EXISTING PIRs is None: Regenerate
   PIRs from scratch, but take the requested changes into account as
   additional constraints.
@@ -303,8 +308,10 @@ THREAT ACTORS: {threat_actors}
 PRIORITY FOCUS: {priority_focus}
 ANALYTICAL PERSPECTIVES: {perspectives}
 
-MODIFICATIONS: {modifications}
-- If MODIFICATIONS is empty: summarise the context as-is.
+MODIFICATIONS: {modifications or "None"}
+NOTE: A MODIFICATIONS value of "None" means no feedback has been provided.
+Do not treat "None" as feedback content.
+- If MODIFICATIONS is "None": summarise the context as-is.
 - If MODIFICATIONS has content: incorporate the requested changes into the summary.
 """
     )

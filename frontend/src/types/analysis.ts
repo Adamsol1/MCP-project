@@ -25,6 +25,7 @@ export interface AssertionConfidence {
 
 export interface PerspectiveAssertion {
   assertion: string;
+  analysis?: string;
   supporting_finding_ids: string[];
   source_types: string[];
   confidence: AssertionConfidence | null;

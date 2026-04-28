@@ -1,12 +1,20 @@
 """Processing phase prompt builders and MCP adapter functions."""
 
+from datetime import UTC, datetime
+
+from ._shared import _language_instruction
+
 
 def build_processing_prompt(
     pir: str,
     collected_data: str,
     feedback: str | None = None,
     previous_result: str | None = None,
+    language: str = "en",
 ) -> str:
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
+    lang_note = _language_instruction(language, "all output fields")
+
     feedback_section = (
         f"\n## Analyst Feedback from Previous Attempt\n{feedback}\nAddress this feedback in your processing."
         if feedback else ""
@@ -20,7 +28,10 @@ def build_processing_prompt(
         if previous_result else ""
     )
 
-    return f"""You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
+    return f"""{lang_note}You are a professional threat intelligence analyst. Your task is to process raw collected intelligence data into structured PMESII entities ready for analysis.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning, including PIR timeframes and recency assessments.
 
 ## Priority Intelligence Requirements
 {pir}
@@ -73,9 +84,9 @@ otx, knowledge_base, web_search, csv_upload, pdf_upload, txt_upload, json_upload
 
 ## Confidence Scoring
 - 40-55: Single source, unverified
-- 60-70: Single reliable source (OTX or KB) with reasonable support
-- 70-80: Confirmed by OTX with multiple pulses, or two independent sources
-- 80-90: Confirmed by multiple independent sources
+- 60-69: Single reliable source (OTX or KB) with reasonable support
+- 70-79: Confirmed by OTX with multiple pulses, or two independent sources
+- 80-89: Confirmed by multiple independent sources
 - 90+: Three or more sources with consistent attribution
 
 ## PIR Numbering
@@ -91,6 +102,13 @@ PIR-2 (short description): Gap
 PIR-3 (short description): Partially answered
   → EntityC (low confidence). Key gap: X unknown.
 
+## Source Attribution
+For every finding, record the specific collected items that directly support it:
+- Web articles (fetch_page / google_search / google_news_search): add full URLs to `supporting_data.source_urls`
+- Knowledge base entries: add the resource_id values to `supporting_data.kb_refs`
+- Uploaded files (pdf_upload / csv_upload / txt_upload / json_upload): add the resource_id (filename) to `supporting_data.source_refs`
+- OTX / IoC lookups: add the indicator values to `supporting_data.iocs`
+Always populate whichever fields are relevant. Multiple source types may be present in the same finding.
 
 ## Output Format
 Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
@@ -110,6 +128,8 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
         "attack_ids": ["T1078", "T1110.003"],
         "entities": ["Organization", "System"],
         "domains": ["example.com"],
+        "source_urls": ["https://example.com/article-slug"],
+        "source_refs": ["uploaded_report.pdf"],
         "timestamps": ["2026-01-15T00:00:00Z"],
         "locations": ["Oslo, Norway"],
         "kb_refs": ["knowledge_base_reference"]
@@ -125,8 +145,11 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
 def build_processing_modify_prompt(
     existing_result: str,
     modifications: str,
+    language: str = "en",
 ) -> str:
-    return f"""You are a professional threat intelligence analyst. Apply the requested modification to an existing processing result.
+    lang_note = _language_instruction(language, "the modified output")
+
+    return f"""{lang_note}You are a professional threat intelligence analyst. Apply the requested modification to an existing processing result.
 
 ## Modification Request
 {modifications}
@@ -152,6 +175,7 @@ def processing_process(
     collected_data: str,
     feedback: str = "",
     previous_result: str = "",
+    language: str = "en",
 ) -> str:
     """Prompt for processing raw collected data into structured PMESII entities.
 
@@ -167,12 +191,14 @@ def processing_process(
         collected_data=collected_data,
         feedback=feedback or None,
         previous_result=previous_result or None,
+        language=language,
     )
 
 
 def processing_modify(
     existing_result: str,
     modifications: str,
+    language: str = "en",
 ) -> str:
     """Prompt for applying analyst modifications to an existing processing result.
 
@@ -183,4 +209,5 @@ def processing_modify(
     return build_processing_modify_prompt(
         existing_result=existing_result,
         modifications=modifications,
+        language=language,
     )

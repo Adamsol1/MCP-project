@@ -111,7 +111,8 @@ const demoResponse: AnalysisResponse = {
     per_perspective_implications: {
       us: [
         {
-          assertion: "US analysts should monitor shared vendor-access pathways.",
+          assertion:
+            "US analysts should monitor shared vendor-access pathways.",
           supporting_finding_ids: ["F-001"],
           source_types: ["network_telemetry"],
           confidence: null,
@@ -212,7 +213,9 @@ describe("AnalysisWorkspace", () => {
 
     render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
-    expect(screen.getByText(/No analysis available for this session/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/No analysis available for this session/i),
+    ).toBeInTheDocument();
   });
 
   it("renders findings and analysis sections", async () => {
@@ -252,7 +255,10 @@ describe("AnalysisWorkspace", () => {
               sender: "system",
               text: "Analysis complete",
               type: "analysis",
-              data: { ...demoResponse, analysis_draft: { ...demoResponse.analysis_draft, title: "" } },
+              data: {
+                ...demoResponse,
+                analysis_draft: { ...demoResponse.analysis_draft, title: "" },
+              },
             },
           ],
           perspectives: ["US", "NEUTRAL"],
@@ -368,7 +374,7 @@ describe("AnalysisWorkspace", () => {
 
     render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
-    await screen.findByText(/Run council on a point/i);
+    await screen.findByText(/Run council/i);
     await user.click(screen.getByRole("button", { name: /Run council/i }));
 
     expect(

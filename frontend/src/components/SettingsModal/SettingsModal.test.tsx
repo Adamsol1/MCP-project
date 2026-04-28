@@ -106,7 +106,7 @@ describe("SettingsModal", () => {
 
       await user.click(screen.getByRole("button", { name: /parameters/i }));
 
-      expect(screen.getByText(/timeframe/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/timeframe/i)).toBeInTheDocument();
     });
 
     it("shows General content when switching back from Parameters", async () => {

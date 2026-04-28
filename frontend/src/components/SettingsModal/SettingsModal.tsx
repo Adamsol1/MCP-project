@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import { useT } from "../../i18n/useT";
-import type { CouncilSettings, Language, Theme } from "../../types/settings";
+import type { CouncilSettings, Language, SourceTimeframes, Theme } from "../../types/settings";
 
 /** Props for the SettingsModal component. */
 interface SettingsModalProps {
@@ -36,6 +36,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     updateAiLanguage,
     updateTheme,
     updateInputParameters,
+    updateSourceTimeframe,
     updateCouncilSettings,
   } = useSettings();
   const t = useT();
@@ -110,6 +111,8 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 onAiLanguageChange={updateAiLanguage}
                 timeframe={settings.inputParameters.timeframe}
                 onTimeframeChange={(v) => updateInputParameters({ timeframe: v })}
+                sourceTimeframes={settings.inputParameters.sourceTimeframes}
+                onSourceTimeframeChange={updateSourceTimeframe}
               />
             )}
             {activeSection === "council" && (
@@ -238,17 +241,21 @@ function GeneralSection({
   );
 }
 
-/** Parameters section — AI output language and prompt context fields. */
+/** Parameters section — AI output language, prompt context fields, and per-tier timeframes. */
 function ParametersSection({
   aiLanguage,
   onAiLanguageChange,
   timeframe,
   onTimeframeChange,
+  sourceTimeframes,
+  onSourceTimeframeChange,
 }: {
   aiLanguage: Language;
   onAiLanguageChange: (l: Language) => void;
   timeframe: string;
   onTimeframeChange: (v: string) => void;
+  sourceTimeframes: SourceTimeframes;
+  onSourceTimeframeChange: (key: keyof SourceTimeframes, value: string) => void;
 }) {
   const t = useT();
   return (
@@ -282,7 +289,61 @@ function ParametersSection({
           />
         }
       />
+      <SettingRow
+        label={t.sourceTimeframesLabel}
+        description={t.sourceTimeframesDesc}
+        control={
+          <SourceTimeframesControl
+            value={sourceTimeframes}
+            onChange={onSourceTimeframeChange}
+          />
+        }
+      />
     </>
+  );
+}
+
+// ─── Source Timeframes Control ────────────────────────────────────────────────
+
+const SOURCE_TIMEFRAME_KEYS: (keyof SourceTimeframes)[] = [
+  "web_gov",
+  "web_think_tank",
+  "web_news",
+  "web_other",
+  "otx",
+];
+
+const TIMEFRAME_OPTION_KEYS = ["", "d1", "w1", "m1", "m3", "m6", "y1", "y2", "y3"] as const;
+
+function SourceTimeframesControl({
+  value,
+  onChange,
+}: {
+  value: SourceTimeframes;
+  onChange: (key: keyof SourceTimeframes, v: string) => void;
+}) {
+  const t = useT();
+  return (
+    <div className="flex flex-col gap-2">
+      {SOURCE_TIMEFRAME_KEYS.map((key) => (
+        <div key={key} className="flex items-center gap-3">
+          <span className="w-36 shrink-0 text-xs text-text-secondary">
+            {t.sourceTimeframeLabels[key]}
+          </span>
+          <select
+            value={value[key]}
+            onChange={(e) => onChange(key, e.target.value)}
+            className={selectClass}
+          >
+            {TIMEFRAME_OPTION_KEYS.map((code) => (
+              <option key={code} value={code}>
+                {t.timeframeOptions[code]}
+              </option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -293,12 +354,13 @@ function CouncilSection({
   settings: CouncilSettings;
   onChange: (params: Partial<CouncilSettings>) => void;
 }) {
+  const t = useT();
   return (
     <div>
       <SettingRow
-        label="Mode"
+        label={t.councilModeLabel}
         htmlFor="council-mode"
-        description="Conference runs the full debate. Quick runs a single round."
+        description={t.councilModeDesc}
         control={
           <select
             id="council-mode"
@@ -308,15 +370,15 @@ function CouncilSection({
             }
             className={selectClass}
           >
-            <option value="conference">Conference</option>
-            <option value="quick">Quick</option>
+            <option value="conference">{t.councilModeConference}</option>
+            <option value="quick">{t.councilModeQuick}</option>
           </select>
         }
       />
       <SettingRow
-        label="Rounds"
+        label={t.councilRoundsLabel}
         htmlFor="council-rounds"
-        description="How many deliberation rounds the council should run."
+        description={t.councilRoundsDesc}
         control={
           <select
             id="council-rounds"
@@ -337,9 +399,9 @@ function CouncilSection({
         }
       />
       <SettingRow
-        label="Round Timeout"
+        label={t.councilTimeoutLabel}
         htmlFor="council-timeout"
-        description="Maximum seconds to allow each round before timing out."
+        description={t.councilTimeoutDesc}
         control={
           <select
             id="council-timeout"
@@ -353,20 +415,20 @@ function CouncilSection({
           >
             {[60, 120, 180, 240, 300, 420, 600, 900].map((value) => (
               <option key={value} value={value}>
-                {value} seconds
+                {t.councilSeconds(value)}
               </option>
             ))}
           </select>
         }
       />
       <SettingRow
-        label="Vote Retry"
-        description="Retry once or more if a participant omits the required VOTE line."
+        label={t.councilVoteRetryLabel}
+        description={t.councilVoteRetryDesc}
         control={
           <div className="flex gap-2">
             {[
-              { label: "On", value: true },
-              { label: "Off", value: false },
+              { label: t.councilVoteRetryOn, value: true },
+              { label: t.councilVoteRetryOff, value: false },
             ].map((option) => (
               <button
                 key={option.label}
@@ -386,9 +448,9 @@ function CouncilSection({
         }
       />
       <SettingRow
-        label="Vote Retry Attempts"
+        label={t.councilVoteRetryAttemptsLabel}
         htmlFor="council-vote-retries"
-        description="How many retry prompts to send when vote formatting is missing."
+        description={t.councilVoteRetryAttemptsDesc}
         control={
           <select
             id="council-vote-retries"

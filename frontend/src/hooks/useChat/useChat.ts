@@ -33,6 +33,7 @@ import type {
 } from "../../types/conversation";
 import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
+import { useT, type Translations } from "../../i18n/useT";
 
 let didRequestInitialDevSnapshots = false;
 
@@ -316,10 +317,25 @@ function inferPhaseFromResponse(
   }
 }
 
-function buildSystemMessage(response: DialogueApiResponse): Message {
+function translateBackendError(raw: string, t: Translations): string {
+  const mapping: Record<string, string> = {
+    "Collection failed": t.collectionFailed,
+  };
+  return mapping[raw.trim()] ?? raw;
+}
+
+function buildSystemMessage(
+  response: DialogueApiResponse,
+  t: Translations,
+  isGatherMore = false,
+): Message {
+  const text =
+    response.action === "error"
+      ? translateBackendError(response.question, t)
+      : response.question;
   const message: Message = {
     id: crypto.randomUUID(),
-    text: response.question,
+    text,
     sender: "system",
   };
 
@@ -334,8 +350,8 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
         const sources = parseSuggestedSources(response.question);
         message.text =
           sources.length > 0
-            ? `Collecting from: ${sources.join(", ")}`
-            : "Collecting from selected sources...";
+            ? t.collectingFrom(sources.join(", "))
+            : t.collectingFromSelected;
       }
       break;
 
@@ -361,7 +377,9 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
           "collected_data" in parsed &&
           Array.isArray((parsed as Record<string, unknown>).collected_data)
         ) {
-          message.data = parsed as CollectionDisplayData;
+          const collectionData = parsed as CollectionDisplayData;
+          collectionData.replace = !isGatherMore;
+          message.data = collectionData;
         } else if ("sources_used" in parsed) {
           message.data = parsed as CollectionSummaryData;
         }
@@ -373,14 +391,15 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
           collected_data: [],
           source_summary: [],
           parse_error: "Collection data could not be parsed for display.",
+          replace: !isGatherMore,
         } as CollectionDisplayData;
       }
-      message.text = "Collection complete";
+      message.text = t.collectionComplete;
       break;
     }
 
     case "processing": {
-      message.text = "Processing complete — results are ready for review.";
+      message.text = t.processingComplete;
       const parsed = extractJsonObject(response.question) as ProcessingData | null;
       if (parsed && "findings" in parsed) {
         message.data = parsed;
@@ -393,7 +412,7 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       if (parsed) {
         message.data = parsed;
       }
-      message.text = "Analysis complete";
+      message.text = t.analysisComplete;
       break;
     }
 
@@ -402,7 +421,7 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       if (parsed) {
         message.data = parsed;
       }
-      message.text = "Council deliberation complete";
+      message.text = t.councilDeliberationComplete;
       break;
     }
 
@@ -410,7 +429,7 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
       const sources = parseSuggestedSources(response.question);
       if (sources.length > 0) {
         message.data = sources as SuggestedSourcesData;
-        message.text = `Suggested sources: ${sources.join(", ")}`;
+        message.text = t.suggestedSourcesText(sources.join(", "));
       }
       break;
     }
@@ -419,17 +438,17 @@ function buildSystemMessage(response: DialogueApiResponse): Message {
   return message;
 }
 
-function getFeedbackPrompt(stage: DialogueStage): string {
+function getFeedbackPrompt(stage: DialogueStage, t: Translations): string {
   if (stage === "summary_confirming") {
-    return "What would you like to change in the summary?";
+    return t.feedbackSummary;
   }
   if (stage === "pir_confirming") {
-    return "What would you like to change in the PIRs?";
+    return t.feedbackPir;
   }
   if (stage === "plan_confirming") {
-    return "What should be changed in the collection plan?";
+    return t.feedbackPlan;
   }
-  return "What should be modified in the collected summary?";
+  return t.feedbackCollection;
 }
 
 export function useChat(initialPerspectives?: string[]) {
@@ -441,6 +460,7 @@ export function useChat(initialPerspectives?: string[]) {
     setStage,
   } = useConversation();
   const { settings } = useSettings();
+  const t = useT();
   const { success, info, error } = useToast();
   const { setReviewActivity } = useWorkspace();
   const [loadingIds, setLoadingIds] = useState<Set<string>>(new Set());
@@ -538,9 +558,10 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackStage: DialogueStage,
     fallbackSubState: DialogueSubState,
     fallbackPhase: DialoguePhase,
+    isGatherMore = false,
   ) => {
     if (response.action !== "complete") {
-      addMessage(buildSystemMessage(response), conversationId);
+      addMessage(buildSystemMessage(response, t, isGatherMore), conversationId);
     }
 
     const next = inferStageFromResponse(response, fallbackStage, fallbackSubState);
@@ -567,6 +588,13 @@ export function useChat(initialPerspectives?: string[]) {
     fallbackPhase: DialoguePhase,
     perspectives: string[],
   ) => {
+    // Inject per-tier timeframes from settings if not already set by the caller.
+    const effectiveOptions: DialogueSendOptions = {
+      ...options,
+      sourceTimeframes:
+        options.sourceTimeframes ?? { ...settings.inputParameters.sourceTimeframes },
+    };
+
     const response = await sendMessage(
       message,
       sessionId,
@@ -574,7 +602,7 @@ export function useChat(initialPerspectives?: string[]) {
       approved,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
-      options,
+      effectiveOptions,
     );
 
     if (response.action === "start_collecting") {
@@ -599,8 +627,10 @@ export function useChat(initialPerspectives?: string[]) {
       undefined,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
+      { sourceTimeframes: effectiveOptions.sourceTimeframes },
     );
 
+    const isGatherMore = effectiveOptions.gatherMore ?? false;
     if (collectResponse.action === "error") {
       const errorStage: DialogueStage =
         collectResponse.stage === "collecting"
@@ -612,9 +642,10 @@ export function useChat(initialPerspectives?: string[]) {
         errorStage,
         "awaiting_decision",
         "collection",
+        isGatherMore,
       );
     } else {
-      applyResponse(collectResponse, conversationId, "collecting", null, "collection");
+      applyResponse(collectResponse, conversationId, "collecting", null, "collection", isGatherMore);
     }
   };
 
@@ -653,7 +684,7 @@ export function useChat(initialPerspectives?: string[]) {
         conversation.perspectives,
       );
     } catch (e) {
-      error(`Message failed: ${e instanceof Error ? e.message : String(e)}`);
+      error(t.messageFailed(e instanceof Error ? e.message : String(e)));
       if (activeConversation?.stage === "collecting") {
         setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
@@ -696,11 +727,11 @@ export function useChat(initialPerspectives?: string[]) {
       );
       // Only show toast if the user is still viewing the same conversation
       if (activeConversation?.id === conversationId) {
-        success("Request approved");
+        success(t.requestApproved);
       }
     } catch (e) {
       if (activeConversation?.id === conversationId) {
-        error(`Approval failed: ${e instanceof Error ? e.message : String(e)}`);
+        error(t.approvalFailed(e instanceof Error ? e.message : String(e)));
         if (activeConversation.stage === "collecting") {
           setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
         }
@@ -719,14 +750,14 @@ export function useChat(initialPerspectives?: string[]) {
     addMessage(
       {
         id: crypto.randomUUID(),
-        text: getFeedbackPrompt(stage),
+        text: getFeedbackPrompt(stage, t),
         sender: "system",
       },
       activeConversation.id,
     );
 
     setStage(activeConversation.id, stage, "awaiting_modifications");
-    info("Add your feedback in chat.");
+    info(t.addFeedbackInChat);
   };
 
   const gatherMoreFromProcessing = async () => {
@@ -746,9 +777,7 @@ export function useChat(initialPerspectives?: string[]) {
         activeConversation.perspectives,
       );
     } catch (e) {
-      error(
-        `Gather more failed: ${e instanceof Error ? e.message : String(e)}`,
-      );
+      error(t.gatherMoreFailed(e instanceof Error ? e.message : String(e)));
     } finally {
       setIsLoading(conversationId, false);
     }
@@ -762,13 +791,13 @@ export function useChat(initialPerspectives?: string[]) {
     addMessage(
       {
         id: crypto.randomUUID(),
-        text: "What additional information should I gather?",
+        text: t.gatherMoreQuestion,
         sender: "system",
       },
       activeConversation.id,
     );
     setStage(activeConversation.id, "reviewing", "awaiting_gather_more");
-    info("Describe what to gather more on.");
+    info(t.gatherMoreInfo);
   };
 
   const toggleSourceSelection = (source: string) => {
@@ -780,10 +809,10 @@ export function useChat(initialPerspectives?: string[]) {
     });
   };
 
-  const submitSourceSelection = async () => {
+  const submitSourceSelection = async (sourceTimeframes: Record<string, string> = {}) => {
     if (!activeConversation) return;
     if (selectedSources.length === 0) {
-      error("Select at least one source to continue.");
+      error(t.selectAtLeastOneSource);
       return;
     }
 
@@ -791,8 +820,8 @@ export function useChat(initialPerspectives?: string[]) {
     const message = isGatherMore ? (pendingGatherMoreText ?? "") : "approve";
     const approved = isGatherMore ? undefined : true;
     const options = isGatherMore
-      ? { gatherMore: true, selectedSources }
-      : { selectedSources };
+      ? { gatherMore: true, selectedSources, sourceTimeframes }
+      : { selectedSources, sourceTimeframes };
 
     setLocalSourceContext(null);
     setPendingGatherMoreText(null);
@@ -812,11 +841,7 @@ export function useChat(initialPerspectives?: string[]) {
         activeConversation.perspectives,
       );
     } catch (e) {
-      error(
-        `Failed to start collection: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
-      );
+      error(t.startCollectionFailed(e instanceof Error ? e.message : String(e)));
       if (activeConversation?.stage === "collecting") {
         setStage(conversationId, "plan_confirming", "awaiting_decision", "collection");
       }
@@ -872,9 +897,9 @@ export function useChat(initialPerspectives?: string[]) {
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
       );
-      info(`Moved to stage: ${response.stage}`);
+      info(t.setDevStage(response.stage));
     } catch {
-      error("Failed to set dev stage");
+      error(t.setDevStageFailed);
     }
   };
 
@@ -888,9 +913,9 @@ export function useChat(initialPerspectives?: string[]) {
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
       );
-      info(`Synced stage: ${response.stage}`);
+      info(t.syncDevStage(response.stage));
     } catch {
-      error("Failed to sync dev stage");
+      error(t.syncDevStageFailed);
     }
   };
 
@@ -906,9 +931,9 @@ export function useChat(initialPerspectives?: string[]) {
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
       );
-      info("Reset stage to initial");
+      info(t.resetStageInfo);
     } catch {
-      error("Failed to reset dev stage");
+      error(t.resetStageFailed);
     }
   };
 
@@ -951,7 +976,7 @@ export function useChat(initialPerspectives?: string[]) {
       const snapshots = await listDevDialogueSnapshots();
       setDevSnapshots(snapshots);
       if (snapshots.length === 0) {
-        info("No previous backend runs found.");
+        info(t.noPreviousBackendRuns);
       }
     } catch (e) {
       const status =
@@ -960,8 +985,8 @@ export function useChat(initialPerspectives?: string[]) {
           : undefined;
       error(
         status === 404
-          ? "Previous-run dev endpoint not found. Restart the backend."
-          : "Failed to load previous runs",
+          ? t.previousRunsEndpointMissing
+          : t.previousRunsFailed,
       );
     } finally {
       setIsDevSnapshotsLoading(false);
@@ -1004,12 +1029,10 @@ export function useChat(initialPerspectives?: string[]) {
         response.sub_state ?? defaultSubStateForStage(response.stage),
         response.phase,
       );
-      success(`Loaded previous run: ${sourceSessionId.slice(0, 8)}`);
+      success(t.loadedPreviousRun(sourceSessionId.slice(0, 8)));
     } catch (e) {
       error(
-        `Failed to restore previous run: ${
-          e instanceof Error ? e.message : String(e)
-        }`,
+        t.restorePreviousRunFailed(e instanceof Error ? e.message : String(e)),
       );
     } finally {
       setIsDevSnapshotsLoading(false);

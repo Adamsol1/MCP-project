@@ -1,6 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useT } from "../../i18n/useT";
+import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import ApprovalPrompt from "../ApprovalPrompt/ApprovalPrompt";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import CitationText from "../CitationText/CitationText";
 import SourceList from "../SourceList/SourceList";
 import AnalysisWorkspace from "../AnalysisWorkspace/AnalysisWorkspace";
@@ -22,6 +24,7 @@ import type {
 } from "../../types/dialogue";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { CollectionStatus } from "../../services/dialogue/dialogue";
+import type { SourceTimeframes } from "../../types/settings";
 
 function Chevron() {
   return (
@@ -40,6 +43,89 @@ function Chevron() {
       <path d="M6 9l6 6 6-6" />
     </svg>
   );
+}
+
+/** Renders reasoning markdown into structured sections and bullet lists. */
+function ReasoningMarkdown({ text }: { text: string }) {
+  // Normalise: replace inline " * " separators (model sometimes omits newlines)
+  // with a real newline so each bullet lands on its own line.
+  const normalised = text
+    .replace(/\r\n/g, "\n")
+    .replace(/ \* /g, "\n* ");
+
+  const rawLines = normalised.split("\n");
+
+  type Block =
+    | { kind: "heading"; text: string }
+    | { kind: "bullet"; text: string }
+    | { kind: "prose"; text: string };
+
+  const blocks: Block[] = [];
+  for (const raw of rawLines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith("* ") || line.startsWith("- ")) {
+      blocks.push({ kind: "bullet", text: line.slice(2).trim() });
+    } else if (/^[A-Z][^*\n]{0,80}:\s*$/.test(line)) {
+      // Line is only a section label like "Perspective Integration:"
+      blocks.push({ kind: "heading", text: line.replace(/:$/, "") });
+    } else {
+      blocks.push({ kind: "prose", text: line });
+    }
+  }
+
+  // Group consecutive bullets into <ul> runs
+  const rendered: React.ReactNode[] = [];
+  let i = 0;
+  while (i < blocks.length) {
+    const block = blocks[i];
+    if (block.kind === "heading") {
+      rendered.push(
+        <p key={i} className="text-xs font-semibold uppercase tracking-wide text-text-muted mt-3 mb-1">
+          {block.text}
+        </p>
+      );
+      i++;
+    } else if (block.kind === "bullet") {
+      const bullets: React.ReactNode[] = [];
+      while (i < blocks.length && blocks[i].kind === "bullet") {
+        const b = blocks[i] as { kind: "bullet"; text: string };
+        bullets.push(
+          <li key={i} className="flex gap-2 items-start">
+            <span className="mt-1.5 shrink-0 w-1.5 h-1.5 rounded-full bg-text-muted/60" />
+            <span className="flex-1">{renderInline(b.text)}</span>
+          </li>
+        );
+        i++;
+      }
+      rendered.push(
+        <ul key={`ul-${i}`} className="space-y-1.5 ml-1">
+          {bullets}
+        </ul>
+      );
+    } else {
+      rendered.push(
+        <p key={i} className="leading-relaxed">
+          {renderInline(block.text)}
+        </p>
+      );
+      i++;
+    }
+  }
+
+  return <div className="space-y-1 text-sm text-text-secondary">{rendered}</div>;
+}
+
+/** Renders inline markdown: **bold** and plain text segments. */
+function renderInline(text: string): React.ReactNode {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((part, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) {
+      return <strong key={i} className="font-semibold text-text-primary">{part.slice(2, -2)}</strong>;
+    }
+    // Strip any residual stray asterisks at boundaries
+    return <span key={i}>{part.replace(/^\*+|\*+$/g, "")}</span>;
+  });
 }
 
 function PirMessage({ pirData }: { pirData: PirData }) {
@@ -71,10 +157,7 @@ function PirMessage({ pirData }: { pirData: PirData }) {
     setHighlightedRefs(Array.isArray(value) ? value : value ? [value] : []);
   };
 
-  const reasoningPoints = (pirData.reasoning ?? "")
-    .split(/(?=\d+\.\s)/)
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const reasoningText = (pirData.reasoning ?? "").trim();
 
   return (
     <div className="space-y-3">
@@ -145,32 +228,15 @@ function PirMessage({ pirData }: { pirData: PirData }) {
           )}
         </div>
       </details>
-      {reasoningPoints.length > 0 && (
+      {reasoningText && (
         <details className="group mt-3 border-t border-border/50 pt-2">
           <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
             {t.showReasoning}
             <Chevron />
           </summary>
-          <ol className="mt-2 space-y-3 bg-surface-muted rounded-md p-3 list-none">
-            {reasoningPoints.map((point, i) => (
-              <li
-                key={i}
-                className="text-sm text-text-secondary leading-relaxed flex gap-2"
-              >
-                <span className="shrink-0 w-5 h-5 rounded-full bg-border/60 flex items-center justify-center text-[10px] font-bold text-text-muted mt-0.5">
-                  {i + 1}
-                </span>
-                <div className="flex-1">
-                  <CitationText
-                    text={point.replace(/^\d+\.\s*/, "")}
-                    claims={pirData.claims}
-                    highlightedRefs={highlightedRefs}
-                    onRefHover={handleHoveredRefs}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
         </details>
       )}
     </div>
@@ -327,6 +393,31 @@ function formatRelevantTo(values: string[]): string {
   return values.join(", ");
 }
 
+/** Renders an APA citation string, turning the trailing URL (if any) into a clickable link. */
+function ApaWithLink({ citation, url }: { citation: string; url: string }) {
+  const urlIdx = citation.lastIndexOf("https://");
+  if (urlIdx === -1) {
+    return (
+      <>
+        {citation}{" "}
+        <a href={url} target="_blank" rel="noopener noreferrer"
+           className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+          {url}
+        </a>
+      </>
+    );
+  }
+  return (
+    <>
+      {citation.slice(0, urlIdx)}
+      <a href={citation.slice(urlIdx)} target="_blank" rel="noopener noreferrer"
+         className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+        {citation.slice(urlIdx)}
+      </a>
+    </>
+  );
+}
+
 function FindingDetailModal({
   finding,
   displayId,
@@ -336,6 +427,8 @@ function FindingDetailModal({
   displayId?: string;
   onClose: () => void;
 }) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   useEffect(() => {
     if (!finding) return;
     const handler = (e: KeyboardEvent) => {
@@ -345,6 +438,8 @@ function FindingDetailModal({
     return () => document.removeEventListener("keydown", handler);
   }, [finding, onClose]);
 
+  const { pirData, collectionData } = useWorkspace();
+
   if (!finding) return null;
 
   const tier = confidenceTierFromInt(finding.confidence);
@@ -352,7 +447,62 @@ function FindingDetailModal({
   const sourceLabel = SOURCE_DISPLAY_NAMES[finding.source] ?? finding.source;
   const sd = finding.supporting_data ?? {};
 
+  // Resolve all source references into a unified list for APA display.
+  const allItems = collectionData?.collected_data ?? [];
+
+  type ResolvedSource =
+    | { kind: "web"; url: string; apa: string | null; title: string | null }
+    | { kind: "kb"; ref: string }
+    | { kind: "file"; ref: string; apa: string | null; title: string | null }
+    | { kind: "otx"; indicator: string };
+
+  const resolvedSources: ResolvedSource[] = (() => {
+    const sources: ResolvedSource[] = [];
+
+    // 1. Web: explicit source_urls, then domain fallback
+    const webUrls = sd.source_urls?.length
+      ? sd.source_urls
+      : (sd.domains ?? []).map((d) => `https://${d}`);
+    for (const url of webUrls) {
+      const match = allItems.find(
+        (item) =>
+          item.resource_id === url ||
+          (item.resource_id && item.resource_id.startsWith(url)) ||
+          (item.resource_id && url.startsWith(item.resource_id))
+      );
+      sources.push({ kind: "web", url, apa: match?.apa_citation ?? null, title: match?.title ?? null });
+    }
+
+    // 2. Uploaded files via source_refs
+    for (const ref of sd.source_refs ?? []) {
+      const match = allItems.find((item) => item.resource_id === ref);
+      sources.push({ kind: "file", ref, apa: match?.apa_citation ?? null, title: match?.title ?? ref });
+    }
+
+    // 3. Knowledge base refs
+    for (const ref of sd.kb_refs ?? []) {
+      sources.push({ kind: "kb", ref });
+    }
+
+    // 4. OTX IoCs
+    for (const indicator of sd.iocs ?? []) {
+      sources.push({ kind: "otx", indicator });
+    }
+
+    return sources;
+  })();
+
+  type PirEntry = { label: string; item: PirData["pirs"][number] };
+  const referencedPirs = finding.relevant_to
+    .map((label): PirEntry | null => {
+      const idx = parseInt(label.replace(/^PIR-/i, ""), 10) - 1;
+      const item = pirData?.pirs?.[idx];
+      return item ? { label, item } : null;
+    })
+    .filter((x): x is PirEntry => x !== null);
+
   return (
+    <>
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
       onClick={onClose}
@@ -396,13 +546,16 @@ function FindingDetailModal({
                 </div>
               </div>
             </div>
-            <button
-              aria-label="close"
-              onClick={onClose}
-              className="shrink-0 rounded-lg p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
-            >
-              ✕
-            </button>
+            <div className="flex shrink-0 items-center gap-2">
+              <HelpButton onClick={() => setIsHelpOpen(true)} label="Finding guide" />
+              <button
+                aria-label="close"
+                onClick={onClose}
+                className="rounded-lg p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+              >
+                ✕
+              </button>
+            </div>
           </div>
         </div>
 
@@ -430,32 +583,60 @@ function FindingDetailModal({
             </div>
           )}
 
-          {/* Supporting data */}
-          {((sd.kb_refs?.length ?? 0) > 0 ||
-            (sd.attack_ids?.length ?? 0) > 0 ||
-            (sd.entities?.length ?? 0) > 0 ||
-            (sd.domains?.length ?? 0) > 0) && (
-            <div className="border-t border-border/50 pt-4 space-y-3">
+          {/* Sources (APA 7th) */}
+          {resolvedSources.length > 0 && (
+            <div className="border-t border-border/50 pt-4 space-y-2">
               <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
-                Supporting Data
+                Sources
               </p>
-              {(sd.kb_refs?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">
-                    Knowledge Base Refs
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {sd.kb_refs!.map((r) => (
-                      <span
-                        key={r}
-                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[11px] text-text-primary"
-                      >
-                        {r}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <ol className="space-y-2 list-none">
+                {resolvedSources.map((src, idx) => (
+                  <li key={idx} className="flex gap-2 text-xs text-text-secondary leading-relaxed">
+                    <span className="shrink-0 font-mono text-text-muted">[{idx + 1}]</span>
+                    <span>
+                      {src.kind === "web" && (
+                        src.apa ? (
+                          <ApaWithLink citation={src.apa} url={src.url} />
+                        ) : (
+                          <>
+                            {src.title && <span className="italic">{src.title}. </span>}
+                            <a href={src.url} target="_blank" rel="noopener noreferrer"
+                               className="text-primary underline underline-offset-2 hover:text-primary-dark break-all">
+                              {src.url}
+                            </a>
+                          </>
+                        )
+                      )}
+                      {src.kind === "file" && (
+                        src.apa ? (
+                          <span>{src.apa}</span>
+                        ) : (
+                          <span className="italic">{src.title ?? src.ref}</span>
+                        )
+                      )}
+                      {src.kind === "kb" && (
+                        <span>
+                          <span className="font-medium text-text-primary">Knowledge Base: </span>
+                          <span className="font-mono">{src.ref}</span>
+                        </span>
+                      )}
+                      {src.kind === "otx" && (
+                        <span>
+                          <span className="font-medium text-text-primary">AlienVault OTX — </span>
+                          <span className="font-mono">{src.indicator}</span>
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+
+          {/* Supporting data — technical metadata only (sources moved above) */}
+          {((sd.attack_ids?.length ?? 0) > 0 ||
+            (sd.entities?.length ?? 0) > 0) && (
+            <div className="border-t border-border/50 pt-4 space-y-3">
               {(sd.attack_ids?.length ?? 0) > 0 && (
                 <div>
                   <p className="text-xs font-medium text-text-secondary mb-1">
@@ -483,23 +664,6 @@ function FindingDetailModal({
                   </p>
                 </div>
               )}
-              {(sd.domains?.length ?? 0) > 0 && (
-                <div>
-                  <p className="text-xs font-medium text-text-secondary mb-1">
-                    Domains
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {sd.domains!.map((d) => (
-                      <span
-                        key={d}
-                        className="rounded border border-border/50 bg-surface-muted px-1.5 py-0.5 font-mono text-[10px] text-text-primary"
-                      >
-                        {d}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
 
@@ -516,18 +680,73 @@ function FindingDetailModal({
               </ul>
             </div>
           )}
+
+          {/* Referenced PIRs in full */}
+          {referencedPirs.length > 0 && (
+            <div className="border-t border-border/50 pt-4 space-y-3">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted">
+                Priority Intelligence Requirements
+              </p>
+              {referencedPirs.map(({ label, item }) => (
+                <div key={label} className="rounded-lg bg-surface-muted border border-border/50 px-3 py-2.5 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary shrink-0">
+                      {label}
+                    </span>
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-text-muted">
+                      {item.priority}
+                    </span>
+                  </div>
+                  <p className="text-xs text-text-primary leading-relaxed">{item.question}</p>
+                  {item.rationale && (
+                    <p className="text-[11px] text-text-muted italic leading-relaxed">{item.rationale}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
+    <HelpModal
+      isOpen={isHelpOpen}
+      onClose={() => setIsHelpOpen(false)}
+      title="Understanding Findings"
+      sections={[
+        {
+          heading: "What is a Finding?",
+          body: "A finding is a structured intelligence conclusion extracted from the raw collected data. Each finding has a title, a core statement, a confidence score, and supporting evidence drawn from the sources that were queried.",
+        },
+        {
+          heading: "Confidence tiers",
+          body: "Confidence reflects how well the evidence supports the finding. Low (below 40%) means limited or conflicting evidence. Moderate (40–69%) means partial corroboration. High (70–89%) means strong, consistent corroboration. Assessed (90%+) means the finding is robustly supported across multiple independent sources.",
+        },
+        {
+          heading: "PIRs — Priority Intelligence Requirements",
+          body: "The PIR badges (e.g. PIR-1, PIR-2) show which of your original intelligence requirements this finding is relevant to. These were generated in the Direction phase based on your topic.",
+        },
+        {
+          heading: "ATT&CK techniques",
+          body: "ATT&CK IDs (e.g. T1190) reference the MITRE ATT&CK framework — a globally recognised taxonomy of adversary tactics and techniques. They help map findings to known threat behaviours.",
+        },
+        {
+          heading: "APA citations and source references",
+          body: "Sources are listed in APA 7th edition format where available. Web sources include the URL and publication details. Uploaded files are referenced by their filename. Knowledge Base references point to your organisation's internal intelligence store.",
+        },
+      ]}
+    />
+    </>
   );
 }
 
 function ProcessingMessage({
   data,
   onGapCollect,
+  onCollectMore,
 }: {
   data: ProcessingData;
   onGapCollect?: (gap: string) => void;
+  onCollectMore?: () => void;
 }) {
   const [selectedFinding, setSelectedFinding] = useState<{
     finding: ProcessingData["findings"][number];
@@ -617,7 +836,7 @@ function ProcessingMessage({
                         {displayId}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
+                    <td title={f.title} className="px-4 py-3 text-text-primary font-medium leading-snug group-hover/row:text-primary max-w-[28ch] truncate">
                       {f.title}
                     </td>
                     <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
@@ -652,7 +871,9 @@ function ProcessingMessage({
               <button
                 type="button"
                 onClick={() => setCollectMode(true)}
-                className="rounded-md border border-border/50 px-3 py-1 text-xs font-medium text-text-secondary hover:border-primary hover:text-primary transition-colors"
+                disabled={!!onCollectMore}
+                title={onCollectMore ? "Use the Collect More button below to proceed" : undefined}
+                className="rounded-md border border-border/50 px-3 py-1 text-xs font-medium text-text-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:enabled:border-primary hover:enabled:text-primary"
               >
                 Collect More
               </button>
@@ -743,7 +964,7 @@ interface ChatWindowProps {
   availableSources?: string[];
   selectedSources?: string[];
   onToggleSourceSelection?: (source: string) => void;
-  onSubmitSourceSelection?: () => void;
+  onSubmitSourceSelection?: (sourceTimeframes: Record<string, string>) => void;
   devPrefill?: string | null;
   onDevPrefillConsumed?: () => void;
   inputPrefill?: string | null;
@@ -788,19 +1009,31 @@ function SourceSummaryTable({
   );
 }
 
-function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
-  const { mergeCollectionData } = useWorkspace();
+function CollectionDisplayMessage({
+  data,
+  runNumber,
+}: {
+  data: CollectionDisplayData;
+  runNumber: number;
+}) {
+  const { mergeCollectionData, setCollectionData } = useWorkspace();
   const t = useT();
 
   useEffect(() => {
-    mergeCollectionData(data);
-  }, [data, mergeCollectionData]);
+    if (data.replace) {
+      setCollectionData({ collected_data: data.collected_data, source_summary: data.source_summary });
+    } else {
+      mergeCollectionData(data);
+    }
+  }, [data, mergeCollectionData, setCollectionData]);
+
+  const header = t.collectionRunLabel(runNumber);
 
   if (data.parse_error) {
     return (
       <div className="space-y-2">
         <div>
-          <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+          <h3 className="font-semibold">{header}</h3>
           <p className="mt-0.5 text-xs text-text-secondary">
             {t.collectionResultsSubtitle}
           </p>
@@ -821,7 +1054,7 @@ function CollectionDisplayMessage({ data }: { data: CollectionDisplayData }) {
   return (
     <div className="space-y-3">
       <div>
-        <h3 className="font-semibold">{t.collectionResultsHeader}</h3>
+        <h3 className="font-semibold">{header}</h3>
         <p className="mt-0.5 text-xs text-text-secondary">
           {t.collectionResultsSubtitle}
         </p>
@@ -857,8 +1090,22 @@ export default function ChatWindow({
   onGapCollect,
 }: ChatWindowProps) {
   const t = useT();
+  const { settings } = useSettings();
   const contentWidthClass = "w-full max-w-5xl mx-auto px-6";
   const [inputValue, setInputValue] = useState("");
+  // Local per-tier timeframe overrides for the current source selection.
+  // Initialized from settings when source selection opens; adjustable per session.
+  const [localTimeframes, setLocalTimeframes] = useState<Record<string, string>>(
+    () => ({ ...settings.inputParameters.sourceTimeframes }),
+  );
+
+  // Re-sync with settings whenever source selection opens.
+  useEffect(() => {
+    if (isSourceSelecting) {
+      setLocalTimeframes({ ...settings.inputParameters.sourceTimeframes });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSourceSelecting]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -921,6 +1168,22 @@ export default function ChatWindow({
           ? t.placeholderGatherMore
           : t.placeholderDefault;
 
+  const collectionRunMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let count = 0;
+    for (const msg of messages) {
+      if (
+        msg.type === "collection" &&
+        msg.data &&
+        "collected_data" in (msg.data as object)
+      ) {
+        count++;
+        map.set(msg.id, count);
+      }
+    }
+    return map;
+  }, [messages]);
+
   function renderMessageContent(message: Message) {
     if (
       message.type === "summary" &&
@@ -968,7 +1231,8 @@ export default function ChatWindow({
       return (
         <ProcessingMessage
           data={message.data as ProcessingData}
-          onGapCollect={onGapCollect}
+          onGapCollect={onGapCollect ? (gap) => onSendMessage?.(gap) : undefined}
+          onCollectMore={onGatherMoreFromProcessing}
         />
       );
     }
@@ -981,6 +1245,7 @@ export default function ChatWindow({
       return (
         <CollectionDisplayMessage
           data={message.data as CollectionDisplayData}
+          runNumber={collectionRunMap.get(message.id) ?? 1}
         />
       );
     }
@@ -1159,10 +1424,43 @@ export default function ChatWindow({
                     </div>
                   )}
 
+                  {/* Date windows — per-tier timeframe overrides, pre-filled from settings */}
+                  <div className="mt-4 border-t border-border pt-3">
+                    <p className="text-xs font-semibold text-text-secondary mb-2">
+                      {t.dateWindowsLabel}
+                    </p>
+                    <p className="text-xs text-text-muted mb-3">{t.dateWindowsDesc}</p>
+                    <div className="flex flex-col gap-2">
+                      {(Object.keys(t.sourceTimeframeLabels) as (keyof SourceTimeframes)[]).map((key) => (
+                        <div key={key} className="flex items-center gap-3">
+                          <span className="w-44 shrink-0 text-xs text-text-secondary">
+                            {t.sourceTimeframeLabels[key]}
+                          </span>
+                          <select
+                            value={localTimeframes[key] ?? ""}
+                            onChange={(e) =>
+                              setLocalTimeframes((prev) => ({ ...prev, [key]: e.target.value }))
+                            }
+                            disabled={isLoading}
+                            className="rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                          >
+                            {(Object.entries(t.timeframeOptions) as [string, string][]).map(
+                              ([code, label]) => (
+                                <option key={code} value={code}>
+                                  {label}
+                                </option>
+                              ),
+                            )}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="mt-3 flex justify-end">
                     <button
                       type="button"
-                      onClick={() => onSubmitSourceSelection?.()}
+                      onClick={() => onSubmitSourceSelection?.(localTimeframes)}
                       disabled={
                         isLoading ||
                         availableSources.length === 0 ||

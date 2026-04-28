@@ -1,4 +1,6 @@
+import { useState } from "react";
 import type { PhaseReviewItem } from "../../types/conversation";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
 import type { Analysis } from "../../types/analysis";
 
@@ -187,7 +189,7 @@ function ProcessingTranscript({ data }: { data: ProcessingData }) {
                 <p className="text-xs font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
                 {f.confidence != null && (
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${CONFIDENCE_COLOR(f.confidence)}`}>
-                    {Math.round(f.confidence * 100)}%
+                    {Math.round(f.confidence)}%
                   </span>
                 )}
               </div>
@@ -355,8 +357,13 @@ function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: Ph
     return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
   }
 
-  if (phase === "processing" && parsed && typeof parsed === "object" && "findings" in parsed) {
-    return <ProcessingTranscript data={parsed as ProcessingData} />;
+  if (phase === "processing" && parsed) {
+    if (Array.isArray(parsed) && parsed.length > 0 && "id" in parsed[0]) {
+      return <ProcessingTranscript data={{ findings: parsed as ProcessingFinding[], gaps: [] }} />;
+    }
+    if (typeof parsed === "object" && !Array.isArray(parsed) && "findings" in parsed) {
+      return <ProcessingTranscript data={parsed as ProcessingData} />;
+    }
   }
 
   if (phase === "analysis" && parsed && typeof parsed === "object") {
@@ -395,12 +402,15 @@ export default function ReviewActivityModal({
   activity,
   focusAttempt,
 }: ReviewActivityModalProps) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   if (!isOpen) return null;
 
   const phases = [...new Set(activity.map((a) => a.phase))];
   const phasesSummary = phases.map(phaseLabel).join(", ");
 
   return (
+    <>
     <div
       data-testid="review-activity-modal-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -420,13 +430,16 @@ export default function ReviewActivityModal({
               {activity.length} attempt{activity.length !== 1 ? "s" : ""} — {phasesSummary}
             </p>
           </div>
-          <button
-            aria-label="Close review activity"
-            onClick={onClose}
-            className="rounded p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <HelpButton onClick={() => setIsHelpOpen(true)} label="Review Activity guide" />
+            <button
+              aria-label="Close review activity"
+              onClick={onClose}
+              className="rounded p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -520,5 +533,29 @@ export default function ReviewActivityModal({
         </div>
       </div>
     </div>
+    <HelpModal
+      isOpen={isHelpOpen}
+      onClose={() => setIsHelpOpen(false)}
+      title="Review Activity Guide"
+      sections={[
+        {
+          heading: "What is Review Activity?",
+          body: "Before each phase output is shown to you, an AI reviewer evaluates it against your intelligence requirements. This automatic quality gate catches incomplete or low-quality outputs and asks for regeneration when needed.",
+        },
+        {
+          heading: "Approved vs Rejected",
+          body: "Approved means the output met quality standards and was passed to you. Rejected means the reviewer found issues — the AI then regenerated the output using the reviewer's specific feedback. Multiple attempts may appear if regeneration was needed more than once.",
+        },
+        {
+          heading: "AI Feedback section",
+          body: "The AI Feedback block shows the reviewer's exact reasoning — what was lacking and what needed improvement. For approved outputs with no issues, it will show a simple confirmation message.",
+        },
+        {
+          heading: "Full Transcript section",
+          body: "The Full Transcript shows the raw structured output that was generated for that attempt — parsed into a readable format per phase. For collection phases this includes sources and items; for processing it shows findings; for analysis it shows judgments and summaries.",
+        },
+      ]}
+    />
+    </>
   );
 }

@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2022-032
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: United States–Russia Relations
+AUTHOR: Col. (ret.) David Richards, Strategic Intelligence Analyst
+DATE: 30 April 2022
+ORGANIZATION: Knowledge Base
+---
+
 # United States–Russia Relations
 
 ## Strategic Overview

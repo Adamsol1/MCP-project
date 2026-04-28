@@ -112,6 +112,10 @@ class PerspectiveAssertion(BaseModel):
     """A single per-perspective implication with full evidence trace."""
 
     assertion: str = Field(..., description="The implication/assertion text")
+    analysis: str | None = Field(
+        default=None,
+        description="Deep analytical narrative expanding on the assertion",
+    )
     supporting_finding_ids: list[str] = Field(
         default_factory=list,
         description="Finding IDs that back this assertion",

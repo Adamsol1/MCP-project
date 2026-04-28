@@ -3,8 +3,15 @@ import json
 import pytest
 
 from src.models.dialogue import DialogueAction
-from src.services.collectors.collection_service import CollectionService
+from src.services.collection.collection_service import CollectionService
 from src.services.state_machines.collection_flow import CollectionFlow, CollectionState
+
+
+def async_return(value):
+    async def _inner(*_args, **_kwargs):
+        return value
+
+    return _inner
 
 
 class MockCollectionService:
@@ -13,13 +20,15 @@ class MockCollectionService:
         self.collected = '{"collected_data": [], "source_summary": []}'
         self.modified = '{"collected_data": [], "source_summary": []}'
 
-    async def generate_collection_plan(self, _pir, _feedback=None):  # noqa: ARG002
+    async def generate_collection_plan(
+        self, _pir, _feedback=None, current_plan=None, language="en"
+    ):  # noqa: ARG002
         return self.plan
 
     async def collect(self, sources, pir, plan, **kwargs):  # noqa: ARG002
         return self.collected
 
-    async def modify_summary(self, _raw, _user_message):  # noqa: ARG002
+    async def modify_summary(self, _raw, _user_message, language="en"):  # noqa: ARG002
         return self.modified
 
     @staticmethod
@@ -133,7 +142,7 @@ async def test_handle_collecting_without_orchestrator_uses_service(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -154,7 +163,7 @@ async def test_handle_collecting_with_orchestrator_uses_orchestrator(monkeypatch
     orchestrator = MockOrchestrator()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -168,7 +177,7 @@ async def test_handle_collecting_with_orchestrator_uses_orchestrator(monkeypatch
 
 
 @pytest.mark.asyncio
-async def test_handle_collecting_exception_resets_to_plan_confirming(_monkeypatch):
+async def test_handle_collecting_exception_resets_to_plan_confirming(monkeypatch):
     # Arrange
     flow = CollectionFlow(session_id="s1", pir="Test PIR")
     flow.state = CollectionState.COLLECTING
@@ -199,7 +208,7 @@ async def test_handle_collecting_consumes_gather_more_feedback(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -220,7 +229,7 @@ async def test_handle_reviewing_approve_transitions_to_complete(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: None,
+        async_return(None),
     )
 
     # Act
@@ -285,11 +294,11 @@ async def test_handle_reviewing_modify_returns_show_collection(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: {"attempts": ["raw data"]},
+        async_return({"attempts": ["raw data"]}),
     )
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -322,7 +331,7 @@ async def test_handle_collecting_response_contains_parsed_data(monkeypatch):
     monkeypatch.setattr(CollectionService, "parse_collected_data", lambda raw: parsed)  # noqa: ARG005
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -357,7 +366,7 @@ async def test_handle_reviewing_gather_more_sets_feedback_from_user_message():
 
 
 @pytest.mark.asyncio
-async def test_process_user_message_routes_to_plan_confirming(_monkeypatch):
+async def test_process_user_message_routes_to_plan_confirming(monkeypatch):
     # Arrange
     flow = CollectionFlow(session_id="s1", pir="Test PIR")
     flow.state = CollectionState.PLAN_CONFIRMING
@@ -381,7 +390,7 @@ async def test_process_user_message_routes_to_collecting(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -402,7 +411,7 @@ async def test_process_user_message_routes_to_reviewing(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: None,
+        async_return(None),
     )
 
     # Act
@@ -438,7 +447,9 @@ async def test_process_user_message_returns_complete_for_unknown_state():
 async def test_initialize_returns_error_when_plan_generation_fails():
     # Arrange
     class FailingService(MockCollectionService):
-        async def generate_collection_plan(self, _pir, _feedback=None):
+        async def generate_collection_plan(
+            self, _pir, _feedback=None, current_plan=None, language="en"
+        ):
             raise RuntimeError("LLM unavailable")
 
     flow = CollectionFlow(session_id="s1", pir="Test PIR")
@@ -457,14 +468,14 @@ async def test_handle_reviewing_modify_returns_error_when_modify_summary_fails(
 ):
     # Arrange
     class FailingService(MockCollectionService):
-        async def modify_summary(self, _raw, _user_message):
+        async def modify_summary(self, _raw, _user_message, language="en"):
             raise RuntimeError("LLM unavailable")
 
     flow = CollectionFlow(session_id="s1", pir="Test PIR")
     flow.state = CollectionState.REVIEWING
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: {"attempts": ["raw data"]},
+        async_return({"attempts": ["raw data"]}),
     )
 
     # Act
@@ -530,7 +541,7 @@ async def test_handle_collecting_adds_activity_summary_when_orchestrator_has_rev
     orchestrator = MockOrchestrator()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -539,10 +550,9 @@ async def test_handle_collecting_adds_activity_summary_when_orchestrator_has_rev
     )
 
     # Assert
-    payload = json.loads(response.content)
-    assert "activity_summary" in payload
-    assert payload["activity_summary"][0]["reviewer_approved"] is True
-    assert payload["activity_summary"][0]["collector_sources"] == ["OTX"]
+    assert response.review_activity
+    assert response.review_activity[0].reviewer_approved is True
+    assert response.review_activity[0].sources_used == ["OTX"]
 
 
 # --- gather_more_feedback passed to orchestrator ---
@@ -566,7 +576,7 @@ async def test_handle_collecting_passes_gather_more_feedback_to_orchestrator(
 
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
     service = MockCollectionService()
 
@@ -592,11 +602,11 @@ async def test_handle_reviewing_modify_with_empty_collected_data(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: None,
+        async_return(None),
     )
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
 
     # Act
@@ -621,11 +631,11 @@ async def test_full_flow_planning_to_complete(monkeypatch):
     service = MockCollectionService()
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._write_collected",
-        lambda *_args, **_kwargs: None,
+        async_return(None),
     )
     monkeypatch.setattr(
         "src.services.state_machines.collection_flow._read_collected",
-        lambda _session_id: None,
+        async_return(None),
     )
 
     # Act — initialize

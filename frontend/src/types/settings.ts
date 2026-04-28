@@ -4,6 +4,20 @@ export type Language = "en" | "no";
 /** Supported UI themes. */
 export type Theme = "light" | "dark";
 
+/** Per-web-source-tier timeframe codes (Serper date_restrict format). */
+export interface SourceTimeframes {
+  /** Government & official sources (.gov, .mil, ministry/agency sites). */
+  web_gov: string;
+  /** Think tanks & research institutions (RAND, CSIS, Chatham House, etc.). */
+  web_think_tank: string;
+  /** News & media outlets (Reuters, BBC, AP, FT, etc.). */
+  web_news: string;
+  /** Other / unclassified web sources. */
+  web_other: string;
+  /** AlienVault OTX threat intelligence feed. */
+  otx: string;
+}
+
 /**
  * Context parameters that are auto-injected into every prompt
  * so the AI has background information without needing to ask.
@@ -12,6 +26,8 @@ export type Theme = "light" | "dark";
 export interface InputParameters {
   /** The time period the analysis should cover (e.g. "Last 30 days"). */
   timeframe: string;
+  /** Per-source-tier date window overrides. Empty string means no restriction. */
+  sourceTimeframes: SourceTimeframes;
 }
 
 /** User-configurable runtime controls for analysis-stage council runs. */
@@ -55,6 +71,13 @@ export const DEFAULT_SETTINGS: Settings = {
   theme: "dark",
   inputParameters: {
     timeframe: "",
+    sourceTimeframes: {
+      web_gov: "",
+      web_think_tank: "",
+      web_news: "",
+      web_other: "",
+      otx: "",
+    },
   },
   councilSettings: {
     mode: "conference",

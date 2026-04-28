@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { pdf } from "@react-pdf/renderer";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type {
   AnalysisResponse,
   AssertionConfidence,
@@ -9,6 +10,10 @@ import type {
 } from "../../types/analysis";
 import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverageView";
 import AnalysisReportPDF from "./AnalysisReportPDF";
+import ReviewFeedbackPDF from "./ReviewFeedbackPDF";
+import type { PhaseReviewItem } from "../../types/conversation";
+import type { CouncilNote } from "../../types/analysis";
+import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -32,10 +37,30 @@ const ASSERTION_TIER_STYLES: Record<
   ConfidenceTier,
   { bg: string; text: string; border: string; label: string }
 > = {
-  low: { bg: "bg-error-subtle", text: "text-error-text", border: "border-error/30", label: "Low" },
-  moderate: { bg: "bg-warning-subtle", text: "text-warning-text", border: "border-warning/30", label: "Moderate" },
-  high: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "High" },
-  assessed: { bg: "bg-success-subtle", text: "text-success-text", border: "border-success/30", label: "Assessed" },
+  low: {
+    bg: "bg-error-subtle",
+    text: "text-error-text",
+    border: "border-error/30",
+    label: "Low",
+  },
+  moderate: {
+    bg: "bg-warning-subtle",
+    text: "text-warning-text",
+    border: "border-warning/30",
+    label: "Moderate",
+  },
+  high: {
+    bg: "bg-success-subtle",
+    text: "text-success-text",
+    border: "border-success/30",
+    label: "High",
+  },
+  assessed: {
+    bg: "bg-success-subtle",
+    text: "text-success-text",
+    border: "border-success/30",
+    label: "Assessed",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -99,7 +124,9 @@ function getAnalysisHeading(
 
 function getSupportingDataSummary(data: Record<string, string[]>) {
   return Object.entries(data)
-    .filter(([key, values]) => values.length > 0 && !PRIORITY_DATA_KEYS.includes(key))
+    .filter(
+      ([key, values]) => values.length > 0 && !PRIORITY_DATA_KEYS.includes(key),
+    )
     .map(([key, values]) => `${values.length} ${LABEL_MAP[key] || key}`)
     .join(" · ");
 }
@@ -145,7 +172,11 @@ function getAllSourceTypes(findings: ProcessingFinding[]): string[] {
 // Sub-components — assertion confidence
 // ---------------------------------------------------------------------------
 
-function AssertionTierBadge({ confidence }: { confidence: AssertionConfidence | null }) {
+function AssertionTierBadge({
+  confidence,
+}: {
+  confidence: AssertionConfidence | null;
+}) {
   if (!confidence) {
     return (
       <span className="inline-flex items-center rounded-full border border-border px-2 py-0.5 text-[10px] font-medium text-text-muted">
@@ -182,8 +213,12 @@ function AssertionRow({
             <span className="text-[10px] font-medium text-warning-text">⚠</span>
           )}
         </div>
-        <p className="flex-1 text-sm leading-6 text-text-primary">{assertion.assertion}</p>
+        <p className="flex-1 text-sm font-medium leading-6 text-text-primary">{assertion.assertion}</p>
       </div>
+
+      {assertion.analysis && (
+        <p className="mt-2 text-sm leading-6 text-text-secondary whitespace-pre-line">{assertion.analysis}</p>
+      )}
 
       {conf && (
         <div className="mt-2 ml-18 space-y-2">
@@ -248,6 +283,8 @@ interface AnalysisViewProps {
   conversationTitle: string | undefined;
   onStartCouncil: () => void;
   timeframe?: string;
+  reviewActivity?: PhaseReviewItem[];
+  councilNote?: CouncilNote | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -259,35 +296,84 @@ export default function AnalysisView({
   conversationTitle,
   onStartCouncil,
   timeframe,
+  reviewActivity = [],
 }: AnalysisViewProps) {
-  const { processing_result: processingResult, analysis_draft: analysis } = data;
+  const { processing_result: processingResult, analysis_draft: analysis } =
+    data;
   const findings = processingResult.findings;
 
-  const computedTimelineSpan = useMemo(() => getTimelineSpan(findings), [findings]);
+  const computedTimelineSpan = useMemo(
+    () => getTimelineSpan(findings),
+    [findings],
+  );
   const timelineSpan = timeframe?.trim() || computedTimelineSpan;
   const allSourceTypes = useMemo(() => getAllSourceTypes(findings), [findings]);
   const averageConfidence = getAverageConfidence(findings);
-  const analysisHeading = getAnalysisHeading(analysis.title, analysis.summary, conversationTitle, findings);
+  const analysisHeading = getAnalysisHeading(
+    analysis.title,
+    analysis.summary,
+    conversationTitle,
+    findings,
+  );
 
-  const orderedPerspectiveEntries = Object.keys(analysis.per_perspective_implications)
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  const { collectionData } = useWorkspace();
+  const totalCollectedItems = collectionData
+    ? collectionData.source_summary.reduce((sum, s) => sum + s.count, 0)
+    : findings.length;
+
+  const orderedPerspectiveEntries = Object.keys(
+    analysis.per_perspective_implications,
+  )
     .sort((a, b) => a.localeCompare(b))
     .map((key) => [key, analysis.per_perspective_implications[key]] as const);
 
   async function handleDownloadPDF() {
     const blob = await pdf(
-      <AnalysisReportPDF data={data} title={analysisHeading} />
+      <AnalysisReportPDF data={data} title={analysisHeading} />,
     ).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${analysisHeading.slice(0, 60).replace(/[^a-z0-9 ]/gi, "").trim().replace(/\s+/g, "_")}.pdf`;
+    a.download = `${analysisHeading
+      .slice(0, 60)
+      .replace(/[^a-z0-9 ]/gi, "")
+      .trim()
+      .replace(/\s+/g, "_")}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleDownloadFeedbackPDF() {
+    const blob = await pdf(
+      <ReviewFeedbackPDF
+        reviewActivity={reviewActivity}
+        reportTitle={analysisHeading}
+      />,
+    ).toBlob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `feedback_${analysisHeading
+      .slice(0, 50)
+      .replace(/[^a-z0-9 ]/gi, "")
+      .trim()
+      .replace(/\s+/g, "_")}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
   }
 
   return (
     <>
-      <div className="flex justify-end pb-2">
+      <div className="flex justify-end items-center gap-2 pb-2">
+        <HelpButton onClick={() => setIsHelpOpen(true)} label="Analysis report guide" />
+        <button
+          onClick={handleDownloadFeedbackPDF}
+          className="rounded-md border border-border px-3 py-1.5 text-xs font-semibold text-text-secondary transition-opacity hover:opacity-80"
+        >
+          Download Feedback
+        </button>
         <button
           onClick={handleDownloadPDF}
           className="rounded-md bg-primary px-3 py-1.5 text-xs font-semibold text-text-inverse transition-opacity hover:opacity-80"
@@ -295,183 +381,244 @@ export default function AnalysisView({
           Download PDF
         </button>
       </div>
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        title="Reading the Analysis Report"
+        sections={[
+          {
+            heading: "What is this report?",
+            body: "The Analysis Report is the final intelligence product synthesised from all collected and processed data. It brings together key judgments, recommended actions, and multi-perspective framing into a single structured document.",
+          },
+          {
+            heading: "Key Judgments",
+            body: "Key Judgments are the most important analytical conclusions drawn from the evidence. They represent the AI's highest-confidence assessments about the situation, ordered by significance.",
+          },
+          {
+            heading: "Recommended Actions",
+            body: "Recommended Actions are suggested next steps based on the intelligence picture. These are operationally oriented and directly tied to the key judgments.",
+          },
+          {
+            heading: "Avg Confidence and confidence tiers",
+            body: "Confidence is calculated per-finding based on the quality and corroboration of evidence. Low is below 40%, Moderate is 40–69%, High is 70–89%, and Assessed is 90%+. The average confidence shown in the stat strip reflects all findings in the report.",
+          },
+          {
+            heading: "Evidence Docket",
+            body: "The Evidence Docket lists every finding that went into the analysis. Click any finding to expand it and see the full evidence: core statement, why it matters, key indicators (ATT&CK IDs, entities, locations), and uncertainties.",
+          },
+          {
+            heading: "Perspective Implications",
+            body: "Perspective Implications show how the same intelligence picture is framed differently by each selected national or analytical perspective. Expand a perspective to see its specific assertions and confidence scores.",
+          },
+          {
+            heading: "Information Gaps",
+            body: "Information Gaps highlight areas where the evidence is insufficient to draw firm conclusions. These can be addressed by running additional collection on the highlighted topics.",
+          },
+        ]}
+      />
 
       <div className="mx-auto max-w-4xl space-y-10 pb-12 pt-2">
-
-      {/* ── Hero: document-style header ──────────────────────────────── */}
-      <section className="space-y-4 px-5">
-        <div>
-          <h1 className="font-sans text-[2rem] font-bold leading-tight text-text-primary">
-            {analysisHeading}
-          </h1>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-text-secondary">
-            {analysis.summary}
-          </p>
-        </div>
-
-        {/* Inline stat strip */}
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border/50 py-3 text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-widest text-text-muted">Findings</span>
-            <span className="font-semibold text-text-primary">{findings.length}</span>
+        {/* ── Hero: document-style header ──────────────────────────────── */}
+        <section className="space-y-4 px-5">
+          <div>
+            <h1 className="font-sans text-[2rem] font-bold leading-tight text-text-primary">
+              {analysisHeading}
+            </h1>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-text-secondary">
+              {analysis.summary}
+            </p>
           </div>
-          <span className="text-border/70">·</span>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] uppercase tracking-widest text-text-muted">Avg Confidence</span>
-            <span className={`font-semibold tabular-nums ${getConfidenceTextColor(averageConfidence)}`}>
-              {averageConfidence}%
-            </span>
-            <span className="text-[11px] text-text-muted">
-              {getConfidenceTierLabel(averageConfidence)}
-            </span>
-            <div className="h-1.5 w-10 overflow-hidden rounded-full bg-border/40">
-              <div
-                className={`h-full rounded-full ${getConfidenceColor(averageConfidence)}`}
-                style={{ width: `${averageConfidence}%` }}
-              />
+
+          {/* Inline stat strip */}
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-y border-border/50 py-3 text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-widest text-text-muted">
+                Findings
+              </span>
+              <span className="font-semibold text-text-primary">
+                {findings.length}
+              </span>
+            </div>
+            <span className="text-base font-bold text-text-secondary">·</span>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-widest text-text-muted">
+                Avg Confidence
+              </span>
+              <span
+                className={`font-semibold tabular-nums ${getConfidenceTextColor(averageConfidence)}`}
+              >
+                {averageConfidence}%
+              </span>
+              <span className="text-[11px] text-text-muted">
+                {getConfidenceTierLabel(averageConfidence)}
+              </span>
+              <div className="h-1.5 w-10 overflow-hidden rounded-full bg-border/40">
+                <div
+                  className={`h-full rounded-full ${getConfidenceColor(averageConfidence)}`}
+                  style={{ width: `${averageConfidence}%` }}
+                />
+              </div>
+            </div>
+            {allSourceTypes.length > 0 && (
+              <>
+                <span className="text-base font-bold text-text-secondary">·</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-widest text-text-muted">
+                    Sources
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {totalCollectedItems} items across {allSourceTypes.length}{" "}
+                    {allSourceTypes.length === 1 ? "source" : "sources"}
+                  </span>
+                </div>
+              </>
+            )}
+            {timelineSpan && (
+              <>
+                <span className="text-base font-bold text-text-secondary">·</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] uppercase tracking-widest text-text-muted">
+                    Timeline
+                  </span>
+                  <span className="font-semibold text-text-primary">
+                    {timelineSpan}
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        </section>
+
+        {/* ── Collection Coverage ───────────────────────────────────────── */}
+        {data.collection_coverage && (
+          <CollectionCoverageView coverage={data.collection_coverage} />
+        )}
+
+        {/* ── Key Judgments + Recommended Actions (side-by-side) ───────── */}
+        <section className="px-5">
+          <div className="border-b border-border/50 pb-8 md:grid md:grid-cols-[1fr_1px_1fr]">
+            {/* Key Judgments */}
+            <div className="md:pr-8">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Key Judgments
+              </p>
+              <ol className="mt-4 space-y-4">
+                {analysis.key_judgments.map((judgment, index) => (
+                  <li
+                    key={judgment}
+                    className="flex gap-3 text-sm leading-6 text-text-primary"
+                  >
+                    <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-semibold text-text-secondary">
+                      {index + 1}
+                    </span>
+                    <span>{judgment}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            {/* Vertical divider */}
+            <div className="hidden md:block bg-border/50 my-2" />
+
+            {/* Recommended Actions */}
+            <div className="mt-8 md:mt-0 md:pl-8">
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Recommended Actions
+              </p>
+              <ul className="mt-4 space-y-3">
+                {analysis.recommended_actions.map((action) => (
+                  <li
+                    key={action}
+                    className="flex gap-2.5 text-sm leading-6 text-text-primary"
+                  >
+                    <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                    <span>{action}</span>
+                  </li>
+                ))}
+              </ul>
             </div>
           </div>
-          {allSourceTypes.length > 0 && (
-            <>
-              <span className="text-border/70">·</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-widest text-text-muted">Sources</span>
-                <span className="font-semibold text-text-primary">{findings.length}</span>
-                <span className="text-[11px] text-text-muted">
-                  items across{" "}
-                  <span className="font-semibold text-text-primary">{allSourceTypes.length}</span>{" "}
-                  {allSourceTypes.length === 1 ? "source" : "sources"}
-                </span>
-              </div>
-            </>
-          )}
-          {timelineSpan && (
-            <>
-              <span className="text-border/70">·</span>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] uppercase tracking-widest text-text-muted">Timeline</span>
-                <span className="font-semibold text-text-primary">{timelineSpan}</span>
-              </div>
-            </>
-          )}
-        </div>
-      </section>
+        </section>
 
-      {/* ── Collection Coverage ───────────────────────────────────────── */}
-      {data.collection_coverage && (
-        <CollectionCoverageView coverage={data.collection_coverage} />
-      )}
-
-      {/* ── Key Judgments + Recommended Actions (side-by-side) ───────── */}
-      <section className="px-5">
-        <div className="border-b border-border/50 pb-8 md:grid md:grid-cols-[1fr_1px_1fr]">
-          {/* Key Judgments */}
-          <div className="md:pr-8">
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
-              Key Judgments
-            </p>
-            <ol className="mt-4 space-y-4">
-              {analysis.key_judgments.map((judgment, index) => (
-                <li key={judgment} className="flex gap-3 text-sm leading-6 text-text-primary">
-                  <span className="mt-0.5 inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-border bg-surface-muted text-[10px] font-semibold text-text-secondary">
-                    {index + 1}
-                  </span>
-                  <span>{judgment}</span>
-                </li>
-              ))}
-            </ol>
+        {/* ── Evidence Docket ───────────────────────────────────────────── */}
+        <section className="space-y-4">
+          <div className="flex items-end justify-between gap-4 px-5">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Intelligence Findings
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-text-primary">
+                Evidence Docket
+              </h2>
+            </div>
+            <span className="text-xs text-text-muted">
+              {findings.length} findings
+            </span>
           </div>
 
-          {/* Vertical divider */}
-          <div className="hidden md:block bg-border/50 my-2" />
+          <div className="divide-y divide-border/50 rounded-2xl border border-border overflow-hidden">
+            {findings.map((finding) => (
+              <FindingRow key={finding.id} finding={finding} />
+            ))}
+          </div>
+        </section>
 
-          {/* Recommended Actions */}
-          <div className="mt-8 md:mt-0 md:pl-8">
+        {/* ── Perspective Implications ──────────────────────────────────── */}
+        {orderedPerspectiveEntries.length > 0 && (
+          <section className="space-y-4 px-5">
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Perspective Implications
+              </p>
+              <h2 className="mt-1 text-xl font-semibold text-text-primary">
+                Framing by Perspective
+              </h2>
+            </div>
+
+            <div className="divide-y divide-border/50">
+              {orderedPerspectiveEntries.map(([key, implications]) => (
+                <PerspectiveSection
+                  key={key}
+                  perspectiveKey={key}
+                  implications={implications}
+                  allFindings={findings}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Information Gaps ──────────────────────────────────────────── */}
+        {analysis.information_gaps.length > 0 && (
+          <section className="space-y-4 border-t border-border/50 pt-8 px-5">
             <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
-              Recommended Actions
+              Information Gaps
             </p>
-            <ul className="mt-4 space-y-3">
-              {analysis.recommended_actions.map((action) => (
-                <li key={action} className="flex gap-2.5 text-sm leading-6 text-text-primary">
-                  <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
-                  <span>{action}</span>
+            <ul className="space-y-2">
+              {analysis.information_gaps.map((gap) => (
+                <li
+                  key={gap}
+                  className="flex gap-2.5 text-sm leading-6 text-text-secondary"
+                >
+                  <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
+                  <span>{gap}</span>
                 </li>
               ))}
             </ul>
-          </div>
+          </section>
+        )}
+
+        {/* ── Start Council CTA ─────────────────────────────────────────── */}
+        <div className="flex justify-end pt-2 px-5">
+          <button
+            type="button"
+            onClick={onStartCouncil}
+            className="rounded-lg border border-border bg-surface px-5 py-2 text-sm font-medium text-text-secondary transition-colors hover:border-primary hover:bg-primary-subtle hover:text-primary"
+          >
+            Go to Council
+          </button>
         </div>
-      </section>
-
-      {/* ── Evidence Docket ───────────────────────────────────────────── */}
-      <section className="space-y-4">
-        <div className="flex items-end justify-between gap-4 px-5">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
-              Intelligence Findings
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-text-primary">Evidence Docket</h2>
-          </div>
-          <span className="text-xs text-text-muted">{findings.length} findings</span>
-        </div>
-
-        <div className="divide-y divide-border/50 rounded-2xl border border-border overflow-hidden">
-          {findings.map((finding) => (
-            <FindingRow key={finding.id} finding={finding} />
-          ))}
-        </div>
-      </section>
-
-      {/* ── Perspective Implications ──────────────────────────────────── */}
-      {orderedPerspectiveEntries.length > 0 && (
-        <section className="space-y-4 px-5">
-          <div>
-            <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
-              Perspective Implications
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-text-primary">Framing by Perspective</h2>
-          </div>
-
-          <div className="divide-y divide-border/50">
-            {orderedPerspectiveEntries.map(([key, implications]) => (
-              <PerspectiveSection
-                key={key}
-                perspectiveKey={key}
-                implications={implications}
-                allFindings={findings}
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* ── Information Gaps ──────────────────────────────────────────── */}
-      {analysis.information_gaps.length > 0 && (
-        <section className="space-y-4 border-t border-border/50 pt-8 px-5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.14em] text-text-muted">
-            Information Gaps
-          </p>
-          <ul className="space-y-2">
-            {analysis.information_gaps.map((gap) => (
-              <li key={gap} className="flex gap-2.5 text-sm leading-6 text-text-secondary">
-                <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
-                <span>{gap}</span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
-
-      {/* ── Start Council CTA ─────────────────────────────────────────── */}
-      <div className="flex justify-end pt-2 px-5">
-        <button
-          type="button"
-          onClick={onStartCouncil}
-          className="rounded-[18px] border border-border bg-surface px-5 py-2.5 text-sm font-medium text-text-primary shadow-sm hover:bg-surface-muted transition-colors"
-        >
-          Start Council →
-        </button>
       </div>
-    </div>
     </>
   );
 }
@@ -501,17 +648,25 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
             {finding.id}
           </span>
           {sourceTypes.slice(0, 1).map((src) => (
-            <span key={src} className="rounded-full border border-border px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-text-secondary">
+            <span
+              key={src}
+              className="rounded-full border border-border px-2.5 py-0.5 text-[11px] uppercase tracking-wide text-text-secondary"
+            >
               {formatSourceLabel(src)}
             </span>
           ))}
         </div>
 
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-text-primary">{finding.title}</h3>
+          <h3 className="truncate text-sm font-semibold text-text-primary">
+            {finding.title}
+          </h3>
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {finding.relevant_to.map((pirId) => (
-              <span key={pirId} className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary">
+              <span
+                key={pirId}
+                className="rounded bg-surface-muted px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-text-secondary"
+              >
                 {pirId}
               </span>
             ))}
@@ -526,11 +681,23 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
                 style={{ width: `${finding.confidence}%` }}
               />
             </div>
-            <span className={`text-sm font-semibold tabular-nums ${getConfidenceTextColor(finding.confidence)}`}>
+            <span
+              className={`text-sm font-semibold tabular-nums ${getConfidenceTextColor(finding.confidence)}`}
+            >
               {finding.confidence}%
             </span>
           </div>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={`shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+          >
             <path d="M6 9l6 6 6-6" />
           </svg>
         </div>
@@ -541,35 +708,56 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
         <div className="px-5 py-5 space-y-5">
           {/* Finding */}
           <section>
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">Finding</p>
-            <p className="mt-2 text-sm leading-7 text-text-primary">{finding.finding}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+              Finding
+            </p>
+            <p className="mt-2 text-sm leading-7 text-text-primary">
+              {finding.finding}
+            </p>
           </section>
 
           {/* Why it matters */}
           <section className="border-l-[3px] border-l-primary pl-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-primary">Why it matters</p>
-            <p className="mt-1.5 text-sm leading-7 italic text-text-secondary">{finding.why_it_matters}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-primary">
+              Why it matters
+            </p>
+            <p className="mt-1.5 text-sm leading-7 italic text-text-secondary">
+              {finding.why_it_matters}
+            </p>
           </section>
 
           {/* Evidence summary */}
           <section className="border-t border-border/50 pt-4">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">Evidence Summary</p>
-            <p className="mt-2 text-sm leading-6 text-text-primary">{finding.evidence_summary}</p>
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+              Evidence Summary
+            </p>
+            <p className="mt-2 text-sm leading-6 text-text-primary">
+              {finding.evidence_summary}
+            </p>
           </section>
 
           {/* Key indicators */}
-          {PRIORITY_DATA_KEYS.some((k) => (finding.supporting_data[k]?.length ?? 0) > 0) && (
+          {PRIORITY_DATA_KEYS.some(
+            (k) => (finding.supporting_data[k]?.length ?? 0) > 0,
+          ) && (
             <section className="border-t border-border/50 pt-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">Key Indicators</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+                Key Indicators
+              </p>
               <div className="mt-3 space-y-3">
-                {PRIORITY_DATA_KEYS.filter((key) => (finding.supporting_data[key]?.length ?? 0) > 0).map((key) => (
+                {PRIORITY_DATA_KEYS.filter(
+                  (key) => (finding.supporting_data[key]?.length ?? 0) > 0,
+                ).map((key) => (
                   <div key={key}>
                     <p className="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
                       {LABEL_MAP[key] || key}
                     </p>
                     <div className="mt-1.5 flex flex-wrap gap-1.5">
                       {finding.supporting_data[key].map((value) => (
-                        <span key={`${key}-${value}`} className="rounded border border-border bg-surface-muted px-2 py-0.5 text-xs text-text-secondary">
+                        <span
+                          key={`${key}-${value}`}
+                          className="rounded border border-border bg-surface-muted px-2 py-0.5 text-xs text-text-secondary"
+                        >
                           {value}
                         </span>
                       ))}
@@ -578,7 +766,9 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
                 ))}
               </div>
               {getSupportingDataSummary(finding.supporting_data) && (
-                <p className="mt-3 text-xs text-text-muted">{getSupportingDataSummary(finding.supporting_data)}</p>
+                <p className="mt-3 text-xs text-text-muted">
+                  {getSupportingDataSummary(finding.supporting_data)}
+                </p>
               )}
             </section>
           )}
@@ -586,10 +776,15 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
           {/* Uncertainties */}
           {finding.uncertainties.length > 0 && (
             <section className="border-t border-border/50 pt-4">
-              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">Uncertainties</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-text-muted">
+                Uncertainties
+              </p>
               <ul className="mt-2 space-y-1.5">
                 {finding.uncertainties.map((u) => (
-                  <li key={u} className="flex gap-2.5 text-sm leading-6 text-text-secondary">
+                  <li
+                    key={u}
+                    className="flex gap-2.5 text-sm leading-6 text-text-secondary"
+                  >
                     <span className="mt-[0.55em] h-1.5 w-1.5 shrink-0 rounded-full bg-warning" />
                     <span>{u}</span>
                   </li>
@@ -606,7 +801,11 @@ function FindingRow({ finding }: { finding: ProcessingFinding }) {
   );
 }
 
-function TechnicalDataAccordion({ supporting_data }: { supporting_data: Record<string, string[]> }) {
+function TechnicalDataAccordion({
+  supporting_data,
+}: {
+  supporting_data: Record<string, string[]>;
+}) {
   const [open, setOpen] = useState(false);
   const hasData = Object.values(supporting_data).some((v) => v.length > 0);
   if (!hasData) return null;
@@ -631,7 +830,10 @@ function TechnicalDataAccordion({ supporting_data }: { supporting_data: Record<s
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1">
                   {values.map((value) => (
-                    <span key={`${key}-${value}`} className="rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] text-text-secondary">
+                    <span
+                      key={`${key}-${value}`}
+                      className="rounded border border-border bg-surface px-1.5 py-0.5 text-[11px] text-text-secondary"
+                    >
                       {value}
                     </span>
                   ))}
@@ -661,11 +863,11 @@ function PerspectiveSection({
   const firstAssertion = implications[0] ?? null;
 
   return (
-    <div>
+    <div className="py-2">
       {/* Clickable header row */}
       <button
         type="button"
-        className="flex w-full items-center gap-4 py-4 text-left group"
+        className="flex w-full items-center gap-4 py-3 text-left group"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
@@ -673,16 +875,29 @@ function PerspectiveSection({
           {formatPerspectiveLabel(perspectiveKey)}
         </h3>
         <AssertionTierBadge confidence={firstAssertion?.confidence ?? null} />
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`ml-auto shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={`ml-auto shrink-0 text-text-muted transition-transform duration-150 ${open ? "rotate-180" : ""}`}
+        >
           <path d="M6 9l6 6 6-6" />
         </svg>
       </button>
 
       {/* Collapsed preview */}
       {!open && firstAssertion && (
-        <p className="pb-4 text-sm leading-6 text-text-secondary line-clamp-2">
-          {firstAssertion.assertion}
-        </p>
+        <div className="relative pb-5 overflow-hidden">
+          <p className="text-sm leading-6 text-text-secondary line-clamp-3">
+            {firstAssertion.assertion}
+          </p>
+          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-linear-to-t from-surface to-transparent" />
+        </div>
       )}
 
       {/* Expanded assertions — flat, separated by border-b, labeled */}

@@ -1,3 +1,12 @@
+---
+DOCUMENT ID: KB-2020-063
+CLASSIFICATION: UNCLASSIFIED // TLP:CLEAR
+TITLE: Financial Sector Threat Landscape
+AUTHOR: Nathan Ross, Financial Intelligence Analyst
+DATE: 18 October 2020
+ORGANIZATION: Knowledge Base
+---
+
 # Financial Sector Threat Landscape
 
 ## Strategic Overview

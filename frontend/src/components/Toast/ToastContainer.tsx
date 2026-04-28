@@ -33,13 +33,13 @@ const positionConfig: Record<
   Position,
   { positioning: "fixed" | "absolute"; classes: string }
 > = {
-  "top-right": { positioning: "fixed", classes: "top-16 right-14" },
+  "top-right": { positioning: "fixed", classes: "top-2 right-14" },
   "top-left": { positioning: "fixed", classes: "top-4 left-4" },
   "bottom-right": { positioning: "fixed", classes: "bottom-4 right-4" },
   "bottom-left": { positioning: "fixed", classes: "bottom-4 left-4" },
   "top-center": {
     positioning: "fixed",
-    classes: "top-4 left-1/2 -translate-x-1/2",
+    classes: "top-16 left-1/2 -translate-x-1/2",
   },
   "bottom-center": {
     positioning: "fixed",

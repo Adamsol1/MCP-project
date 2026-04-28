@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from src.api.analysis import router as analysis_router
 from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
-from src.db.engine import get_knowledge_engine, get_sessions_engine
+from src.db.engine import get_knowledge_engine, get_sessions_engine, run_migrations, seed_knowledge
+from src.db.unit_of_work import KnowledgeUnitOfWork, get_knowledge_uow
 from src.db.unit_of_work import UnitOfWork, get_uow
 from src.importers.session_uploads import (
     default_uploads_root,
@@ -42,12 +44,17 @@ logger = logging.getLogger("app")
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     """Application lifecycle: initialize DB engines and start council MCP."""
+    migrations_applied = await asyncio.to_thread(run_migrations)
+    if migrations_applied:
+        await asyncio.to_thread(seed_knowledge)
     # Initialize DB engines so connectivity issues surface at startup
     get_sessions_engine()
     get_knowledge_engine()
     # Keep legacy sessions/ dir creation for dev-tool snapshot endpoints
     ensure_sessions_dir()
     council_mcp_process = await maybe_start_council_mcp(get_council_mcp_url())
+    logger.info("Backend API started successfully: http://127.0.0.1:8000")
+    print("Backend API started successfully: http://127.0.0.1:8000", flush=True)
     logger.info("Application started — database engines initialized")
     try:
         yield
@@ -57,6 +64,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(lifespan=lifespan)
+
 
 # Cors middleware to allow request from frontend
 app.add_middleware(
@@ -73,6 +81,25 @@ app.include_router(dialogue_router)
 
 # Path for saving uploaded files.
 UPLOADS_ROOT = Path(default_uploads_root())
+
+
+@app.get("/api/knowledge/perspective-documents")
+async def list_perspective_documents(
+    kuow: KnowledgeUnitOfWork = Depends(get_knowledge_uow),
+):
+    """Return all active perspective documents grouped by perspective and section."""
+    docs = await kuow.perspective_docs.list_all_active()
+    grouped: dict[str, dict[str, list[dict]]] = {}
+    for doc in docs:
+        grouped.setdefault(doc.perspective, {}).setdefault(doc.section, []).append(
+            {
+                "id": doc.id,
+                "title": doc.title,
+                "source": doc.source,
+                "date_published": doc.date_published.isoformat(),
+            }
+        )
+    return {"perspective_documents": grouped}
 
 
 # Health check endpoint used for checking system status
@@ -195,12 +222,27 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
     - All uploaded files and parsed artifacts (data/imports/{session_id}/)
     - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
     - Legacy: analysis state file and session JSON if they exist
+
+    The DB delete is attempted first and committed independently of the file
+    cleanups.  If file cleanup later fails we still return 204 — the
+    authoritative DB row is already gone and stale files can be pruned later.
     """
+    # --- DB delete (authoritative) ---
     try:
-        await evict_session(session_id, uow)
+        existed = await evict_session(session_id, uow)
+    except Exception as e:
+        logger.error(
+            f"[delete_session] DB delete failed for session {session_id}: {e}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500, detail="Failed to delete session from DB"
+        ) from e
+
+    # --- Filesystem cleanups (best-effort) ---
+    try:
         delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
 
-        # Clean up legacy log files (will be removed once Phase 3 is complete)
         outputs_dir = ResearchLogger(session_id=session_id).log_path.parent
         for log_name in (
             f"research_log_{session_id}.jsonl",
@@ -210,7 +252,6 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
             if log_file.exists():
                 log_file.unlink()
 
-        # Clean up legacy analysis state file
         analysis_state_file = (
             Path(__file__).resolve().parents[2]
             / "sessions"
@@ -219,20 +260,19 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
         if analysis_state_file.exists():
             analysis_state_file.unlink()
 
-        # Clean up legacy session JSON file
         legacy_session_file = (
             Path(__file__).resolve().parents[2] / "sessions" / f"{session_id}.json"
         )
         if legacy_session_file.exists():
             legacy_session_file.unlink()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(
-            f"[delete_session] Failed to delete session {session_id}: {e}",
+        # File cleanup failures do not mask the successful DB delete above.
+        logger.warning(
+            f"[delete_session] File cleanup failed for session {session_id}: {e}",
             exc_info=True,
         )
-        raise HTTPException(status_code=500, detail="Failed to delete session") from e
 
-    logger.info(f"[delete_session] Deleted session {session_id}")
+    logger.info(
+        f"[delete_session] Deleted session {session_id} (db_existed={existed})"
+    )
     return Response(status_code=204)

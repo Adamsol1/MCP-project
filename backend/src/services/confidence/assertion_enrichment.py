@@ -139,6 +139,7 @@ def enrich_assertions(
         enriched.append(
             PerspectiveAssertion(
                 assertion=assertion.assertion,
+                analysis=assertion.analysis,
                 supporting_finding_ids=assertion.supporting_finding_ids,
                 source_types=source_types,
                 confidence=confidence,

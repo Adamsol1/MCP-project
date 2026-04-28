@@ -1,30 +1,26 @@
 """Processing phase review prompt builder and MCP adapter function."""
 
+from datetime import UTC, datetime
+
 
 def build_processing_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for correlations produced in the Processing phase.
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
-    Args:
-        content: The correlation report to review (JSON string).
-        context: The collected data used as input (JSON string).
-
-    Returns:
-        Formatted prompt string ready to send to the AI reviewer.
-    """
     return f"""You are a strict quality reviewer for processing results produced in the Processing
 phase of a threat intelligence cycle.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning and timeframe assessments.
 
 Your role is to verify that the PMESII entities extracted are grounded in the collected
 evidence, correctly categorized, and relevant to the PIRs. You are NOT a grammar checker —
 you evaluate analytical quality, evidence traceability, and PIR alignment.
 
-<<<CONTEXT>>>
+## Intelligence Context
 {context}
-<<<END_CONTEXT>>>
 
-<<<CONTENT>>>
+## Processing Result to Review
 {content}
-<<<END_CONTENT>>>
 
 CONTEXT includes: pir (the intelligence requirements), collected_data (raw collected text).
 CONTENT includes: entities (PMESIIEntity list), gaps, processing_summary, assessment_changed, change_summary.
@@ -65,6 +61,8 @@ CONTENT includes: entities (PMESIIEntity list), gaps, processing_summary, assess
 ## Output
 Return valid JSON only. No markdown. No code fences.
 
+Set overall_approved to true only if ALL individual PIRs are approved.
+
 {{
   "overall_approved": bool,
   "severity": "none" | "minor" | "major",
@@ -72,10 +70,10 @@ Return valid JSON only. No markdown. No code fences.
     {{
       "pir_index": 0,
       "approved": bool,
-      "issue": "string or null"
+      "issue": "string — use JSON null (not the string 'null') if no issue"
     }}
   ],
-  "suggestions": "string or null"
+  "suggestions": "string — use JSON null (not the string 'null') if no suggestions"
 }}"""
 
 
