@@ -71,13 +71,17 @@ Convert findings into PMESIIEntity objects. One entity per meaningful observatio
 Keep descriptions narrow and factual. Use tags broadly for relations and context.
 
 ## PMESII Categories
-Assign one or more categories per entity:
+Assign exactly ONE primary category per finding:
 - political: governance, diplomacy, policy, elections
 - military: armed forces, weapons, operations, doctrine
 - economic: trade, sanctions, energy, finance
 - social: population, culture, ideology, public opinion
 - information: media, cyber, propaganda, signals
 - infrastructure: physical systems, networks, utilities, transport
+
+Choose the single most relevant category. Do not assign multiple categories.
+**If you are genuinely uncertain between exactly two categories**, call `request_pmesii_clarification` with the finding title, the two candidate categories, and one sentence explaining why both could apply.
+Use the analyst's answer as the sole category for that finding.
 
 ## Valid Source Values
 otx, knowledge_base, web_search, csv_upload, pdf_upload, txt_upload, json_upload
@@ -117,11 +121,12 @@ Return ONLY valid JSON. No preamble, no explanation, no markdown fences.
   "findings": [
     {{
       "id": "F-01",
-      "title": "Short finding title",
+      "title": "2-4 word entity name (e.g. 'APT41', 'Iran Power Grid', 'PLA Cyber Command')",
       "finding": "Detailed analytical narrative of the finding",
       "evidence_summary": "Concise summary of the supporting evidence",
       "source": "web_search",
       "confidence": 75,
+      "categories": ["military"],
       "relevant_to": ["PIR-1", "PIR-2"],
       "supporting_data": {{
         "iocs": ["indicator1", "indicator2"],

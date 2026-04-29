@@ -6,6 +6,8 @@ import os
 import re
 from pathlib import Path
 
+from fastmcp import Context
+
 UPLOADS_ROOT = Path(
     os.getenv(
         "UPLOADS_ROOT",
@@ -222,6 +224,7 @@ def _db_search_uploads(session_id: str, terms: list[str], max_results: int) -> l
             "score": score,
             "file_upload_id": row["id"],
             "filename": row["original_filename"],
+            "_content_header": content[:300],
             "page_reference": None,
             "snippet": _make_snippet(content, terms),
             "citation": citation,
@@ -232,10 +235,63 @@ def _db_search_uploads(session_id: str, terms: list[str], max_results: int) -> l
     return results[:max_results]
 
 
-def search_local_data(session_id: str, query: str, max_results: int = 20) -> str:
+# TLP levels that require a provider-switch warning before sending to a cloud LLM.
+# TLP:GREEN and TLP:CLEAR are unrestricted and do not trigger elicitation.
+_RESTRICTED_TLP: frozenset[str] = frozenset({"TLP:RED", "TLP:AMBER", "TLP:AMBER+STRICT"})
+
+# Sessions that have already received the provider-switch warning this server run.
+# Persists in the MCP server process so the warning fires at most once per session.
+_warned_sessions: set[str] = set()
+
+
+def _get_tlp_level(content_header: str) -> str | None:
+    """Return the highest TLP marker found in a content header string, or None."""
+    upper = content_header.upper()
+    for level in ("TLP:RED", "TLP:AMBER+STRICT", "TLP:AMBER", "TLP:GREEN", "TLP:CLEAR"):
+        if level in upper:
+            return level
+    return None
+
+
+_USE_LOCAL = "Bytt til lokal LLM"
+_USE_CLOUD = "Fortsett med Gemini"
+
+
+async def _maybe_elicit_provider_switch(
+    ctx: Context, session_id: str, tlp_level: str
+) -> str:
+    """Fire a one-time provider-switch elicitation when classified content is encountered.
+
+    Returns the user's choice (one of _USE_LOCAL / _USE_CLOUD). If the session
+    has already been warned, returns _USE_CLOUD silently so subsequent tool calls
+    proceed without interruption.
+
+    The caller is responsible for acting on the returned choice — blocking or
+    filtering content when the user chooses _USE_LOCAL.
+    """
+    if session_id in _warned_sessions:
+        return _USE_CLOUD
+
+    result = await ctx.elicit(
+        message=(
+            f"Klassifisert innhold oppdaget ({tlp_level}). "
+            f"Du kjører Gemini (sky-LLM). Klassifiserte dokumenter bør ikke sendes til en sky-LLM. "
+            f"Vil du bytte til lokal LLM?"
+        ),
+        response_type=[_USE_LOCAL, _USE_CLOUD],
+    )
+    _warned_sessions.add(session_id)
+    if hasattr(result, "data") and isinstance(result.data, str):
+        return result.data
+    return _USE_CLOUD
+
+
+async def search_local_data(ctx: Context, session_id: str, query: str, max_results: int = 20) -> str:
     """Search uploaded session files for evidence snippets and citation metadata.
 
     Tries sessions.db (uploaded_files table) first, falls back to manifest.json.
+    If classified content (TLP:RED/AMBER) is found and the session has not yet
+    been warned, fires a one-time provider-switch elicitation.
     """
     if not query.strip():
         raise ValueError("query cannot be empty")
@@ -249,8 +305,20 @@ def search_local_data(session_id: str, query: str, max_results: int = 20) -> str
     # Try DB first
     db_results = _db_search_uploads(session_id, terms, max_results)
     if db_results is not None:
-        for item in db_results:
+        use_local = False
+        restricted_indices: set[int] = set()
+        for i, item in enumerate(db_results):
+            content_header = item.pop("_content_header", "")
             item.pop("score", None)
+            tlp = _get_tlp_level(content_header)
+            if tlp in _RESTRICTED_TLP:
+                restricted_indices.add(i)
+                if not use_local:
+                    choice = await _maybe_elicit_provider_switch(ctx, session_id, tlp)
+                    if choice == _USE_LOCAL:
+                        use_local = True
+        if use_local:
+            db_results = [r for i, r in enumerate(db_results) if i not in restricted_indices]
         return json.dumps({
             "session_id": session_id,
             "query": query,
@@ -287,7 +355,6 @@ def search_local_data(session_id: str, query: str, max_results: int = 20) -> str
             reason = str(entry.get("search_skip_reason") or "not_searchable")
             skipped.append(f"{filename}:{reason}")
             continue
-
         combined_results.extend(_search_record(entry, terms, max_results))
 
     combined_results.sort(key=lambda item: item.get("score", 0), reverse=True)

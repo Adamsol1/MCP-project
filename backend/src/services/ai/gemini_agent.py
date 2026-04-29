@@ -43,11 +43,17 @@ def _json_schema_to_gemini(schema: dict) -> types.Schema:
     properties = {
         k: _json_schema_to_gemini(v) for k, v in schema.get("properties", {}).items()
     }
+    items = (
+        _json_schema_to_gemini(schema["items"])
+        if schema.get("type") == "array" and "items" in schema
+        else None
+    )
     return types.Schema(
         type=schema_type,
         description=schema.get("description"),
         properties=properties or None,
         required=schema.get("required"),
+        items=items,
     )
 
 

@@ -808,6 +808,9 @@ function ProcessingMessage({
                 Source
               </th>
               <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                Categories
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
                 Confidence
               </th>
               <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
@@ -841,6 +844,18 @@ function ProcessingMessage({
                     </td>
                     <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
                       {sourceLabel}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        {(f.categories ?? []).map((cat) => (
+                          <span
+                            key={cat}
+                            className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary-subtle text-primary uppercase"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span

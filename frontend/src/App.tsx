@@ -12,7 +12,10 @@ import {
 } from "./services/upload/upload";
 import {
   getCollectionStatus,
+  getPendingElicitation,
+  respondToElicitation,
   type CollectionStatus,
+  type PendingElicitation,
 } from "./services/dialogue/dialogue";
 import { useChat } from "./hooks/useChat/useChat";
 import { useConversation } from "./hooks/useConversation/useConversation";
@@ -24,7 +27,8 @@ import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel"
 import StageTracker from "./components/StageTracker/StageTracker";
 import { useT } from "./i18n/useT";
 import { ToastContainer } from "./components/Toast";
-import { HelpModal, HelpButton } from "./components/HelpModal/HelpModal";
+import ElicitationModal from "./components/ElicitationModal/ElicitationModal";
+import { HelpButton, HelpModal } from "./components/HelpModal/HelpModal";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
@@ -130,6 +134,8 @@ function AppShell() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] =
     useState<CollectionStatus | null>(null);
+  const [pendingElicitation, setPendingElicitation] =
+    useState<PendingElicitation | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
@@ -184,6 +190,32 @@ function AppShell() {
       clearInterval(interval);
     };
   }, [isCollecting, activeConversation?.sessionId]);
+
+  useEffect(() => {
+    if (!isLoading || !activeConversation?.sessionId) return;
+
+    const sessionId = activeConversation.sessionId;
+    let active = true;
+
+    const poll = async () => {
+      const elicitation = await getPendingElicitation(sessionId);
+      if (active) setPendingElicitation(elicitation);
+    };
+
+    poll();
+
+    const interval = setInterval(poll, 1500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isLoading, activeConversation?.sessionId]);
+
+  const handleElicitationRespond = async (choice: string) => {
+    if (!activeConversation?.sessionId) return;
+    setPendingElicitation(null);
+    await respondToElicitation(activeConversation.sessionId, choice);
+  };
 
   const visibleUploadedFiles = useMemo(
     () => (activeConversation?.sessionId ? uploadedFiles : []),
@@ -398,6 +430,12 @@ function AppShell() {
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
       />
+      {pendingElicitation && (
+        <ElicitationModal
+          elicitation={pendingElicitation}
+          onRespond={handleElicitationRespond}
+        />
+      )}
       <ToastContainer position="top-right" />
 
       <HelpModal
