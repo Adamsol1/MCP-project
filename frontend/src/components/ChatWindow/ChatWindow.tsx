@@ -244,6 +244,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 }
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
+  const t = useT();
+  const reasoningText = (planData.reasoning ?? "").trim();
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
@@ -304,6 +306,17 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
         <p className="whitespace-pre-wrap text-sm text-text-primary">
           {planData.plan}
         </p>
+      )}
+      {reasoningText && (
+        <details className="group mt-3 border-t border-border/50 pt-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+            {t.showReasoning}
+            <Chevron />
+          </summary>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
+        </details>
       )}
     </div>
   );
@@ -748,6 +761,8 @@ function ProcessingMessage({
   onGapCollect?: (gap: string) => void;
   onCollectMore?: () => void;
 }) {
+  const t = useT();
+  const reasoningText = (data.reasoning ?? "").trim();
   const [selectedFinding, setSelectedFinding] = useState<{
     finding: ProcessingData["findings"][number];
     displayId: string;
@@ -934,6 +949,17 @@ function ProcessingMessage({
             </div>
           )}
         </div>
+      )}
+      {reasoningText && (
+        <details className="group mt-3 border-t border-border/50 pt-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+            {t.showReasoning}
+            <Chevron />
+          </summary>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
+        </details>
       )}
       <FindingDetailModal
         finding={selectedFinding?.finding ?? null}

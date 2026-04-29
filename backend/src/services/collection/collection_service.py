@@ -63,6 +63,7 @@ _SOURCE_ALIASES = {
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
+    "knowledge_base": "Knowledge Bank",
     "list_knowledge_base": "Knowledge Bank",
     "read_knowledge_base": "Knowledge Bank",
     "query_otx": "AlienVault OTX",
@@ -319,10 +320,9 @@ class CollectionService:
             if items:
                 deduped: dict[tuple, dict] = {}
                 for item in items:
-                    key = (
-                        str(item.get("source") or ""),
-                        str(item.get("resource_id") or ""),
-                    )
+                    raw_source = str(item.get("source") or "")
+                    canonical = TOOL_TO_DISPLAY_NAME.get(raw_source, raw_source)
+                    key = (canonical, str(item.get("resource_id") or ""))
                     deduped[key] = item
                 items = list(deduped.values())
 
@@ -448,11 +448,14 @@ class CollectionService:
                         f"   Intended sources: {sources_str}"
                     )
                 plan_text = "\n\n".join(plan_lines)
-                return {
+                result: dict[str, Any] = {
                     "steps": steps,
                     "plan": plan_text,
                     "suggested_sources": seen_sources,
                 }
+                if parsed.get("reasoning"):
+                    result["reasoning"] = parsed["reasoning"]
+                return result
 
             # Legacy format: flat plan text + global suggested_sources.
             plan_text = parsed.get("plan")  # type: ignore[assignment]
@@ -466,10 +469,13 @@ class CollectionService:
                 )
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
-            return {
+            legacy_result: dict[str, Any] = {
                 "plan": normalized_plan,
                 "suggested_sources": suggested_sources,
             }
+            if parsed.get("reasoning"):
+                legacy_result["reasoning"] = parsed["reasoning"]
+            return legacy_result
 
         return {
             "plan": raw_plan.strip(),
@@ -509,6 +515,10 @@ class CollectionService:
             )
 
         payload = self._coerce_plan_payload(ai_output)
+
+        # Capture reasoning from Gemini thinking tokens if not already in JSON.
+        if not payload.get("reasoning") and agent.last_thought_text:
+            payload["reasoning"] = agent.last_thought_text
 
         # Fallback: if the AI produced steps with no suggested_sources on any step,
         # fill each empty step from plan text inference, then aggregate global list.

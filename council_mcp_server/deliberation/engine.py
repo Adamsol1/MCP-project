@@ -724,7 +724,7 @@ The following files are available in the working directory:
 
 Based on your analysis above, provide exactly one vote line using this format:
 
-VOTE: {{"option": "Your bottom-line assessment", "confidence": 0.85, "rationale": "Brief explanation"}}
+VOTE: {{"option": "Your bottom-line assessment", "confidence": 0.6, "rationale": "Brief explanation"}}
 
 Where:
 - option: Your own short bottom-line conclusion about the debate question
@@ -935,15 +935,15 @@ Reply with ONLY the VOTE line. Do not repeat your analysis."""
 
 After your analysis, you MUST end your response with exactly one vote line using the following format:
 
-VOTE: {"option": "Your choice", "confidence": 0.85, "rationale": "Brief explanation"}
+VOTE: {"option": "Your choice", "confidence": 0.6, "rationale": "Brief explanation"}
 
 Where:
 - option: Your bottom-line assessment in a short phrase (e.g., "Coordinated access development", "State-linked collection with unclear disruption intent")
-- confidence: Your confidence level from 0.0 (no confidence) to 1.0 (absolute certainty)
+- confidence: Your confidence level from 0.0 (no confidence) to 1.0 (absolute certainty). Be honest — use lower values when evidence is ambiguous or incomplete.
 - rationale: Brief explanation for your vote
 
 Example:
-VOTE: {"option": "Coordinated access development", "confidence": 0.9, "rationale": "Credential access, phishing staging, and infrastructure overlap point to a deliberate campaign."}
+VOTE: {"option": "Coordinated access development", "confidence": 0.7, "rationale": "Credential access, phishing staging, and infrastructure overlap point to a deliberate campaign, though attribution remains uncertain."}
 
 Do not ask for voting options. Create your own bottom-line assessment from the debate question.
 """.strip()

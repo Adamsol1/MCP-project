@@ -33,6 +33,9 @@ _FETCH_TOOLS: set[str] = {"fetch_page"}
 # Tools whose result count is determined by the num_results argument rather than being 1 per call.
 _RESULT_COUNT_TOOLS: set[str] = {"google_search", "google_news_search"}
 
+# Tools that are lookup/search operations and should not increment the result count.
+_NO_COUNT_TOOLS: set[str] = {"list_uploads", "search_local_data"}
+
 _repo = CollectionStatusRepository()
 
 
@@ -48,6 +51,7 @@ class CollectionStatusTracker:
 
     def __init__(self, session_id: str, selected_sources: list[str]) -> None:
         self.session_id = session_id
+        self._read_file_ids: set[str] = set()
         self._data: dict = {
             "session_id": session_id,
             "status": "collecting",
@@ -75,16 +79,28 @@ class CollectionStatusTracker:
         source = _TOOL_TO_SOURCE.get(tool_name)
         if not source or source not in self._data["sources"]:
             return
+        self._data["current_source"] = source
+        self._data["current_activity"] = None
+        now = datetime.now(UTC).isoformat()
+        self._data["sources"][source]["last_called_at"] = now
+        # Lookup/search tools update current_source for live feedback but don't count as results.
+        if tool_name in _NO_COUNT_TOOLS:
+            self._flush()
+            return
         # Search tools (google_search/google_news_search) count by num_results arg
         if tool_name in _RESULT_COUNT_TOOLS:
             count = int((tool_args or {}).get("num_results", 5))
+        elif tool_name == "read_upload":
+            # Count each unique file once, not each call.
+            file_id = (tool_args or {}).get("file_upload_id", "")
+            if file_id in self._read_file_ids:
+                self._flush()
+                return
+            self._read_file_ids.add(file_id)
+            count = 1
         else:
             count = 1
-        now = datetime.now(UTC).isoformat()
         self._data["sources"][source]["call_count"] += count
-        self._data["sources"][source]["last_called_at"] = now
-        self._data["current_source"] = source
-        self._data["current_activity"] = None
         self._flush()
 
     def mark_complete(self) -> None:

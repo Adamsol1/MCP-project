@@ -108,6 +108,7 @@ export interface CollectionPlanData {
   plan: string;
   steps?: CollectionPlanStep[];
   suggested_sources: string[];
+  reasoning?: string;
 }
 
 /**
@@ -245,6 +246,7 @@ export interface ProcessingFinding {
 export interface ProcessingData {
   findings: ProcessingFinding[];
   gaps: string[];
+  reasoning?: string;
 }
 
 /**

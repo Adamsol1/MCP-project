@@ -1,3 +1,4 @@
+import json
 import logging
 
 from src.mcp_client.client import MCPClient
@@ -36,11 +37,22 @@ class ProcessingService:
                 },
             )
             agent = GeminiAgent(self.mcp_client)
-            return await agent.run(
+            raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Process the collected intelligence data into structured PMESII entities.",
                 allowed_tool_names=set(_PROCESSING_TOOLS),
             )
+
+        # Inject reasoning from Gemini thinking tokens if not already in the JSON.
+        if agent.last_thought_text:
+            try:
+                parsed = json.loads(raw)
+                if not parsed.get("reasoning"):
+                    parsed["reasoning"] = agent.last_thought_text
+                return json.dumps(parsed, ensure_ascii=False)
+            except (json.JSONDecodeError, AttributeError):
+                pass
+        return raw
 
     async def modify_processing(
         self,

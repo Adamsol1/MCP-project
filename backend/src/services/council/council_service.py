@@ -30,7 +30,7 @@ class CouncilService:
     """Run a council deliberation with fixed app defaults."""
 
     DEFAULT_ADAPTER = "gemini"
-    DEFAULT_MODEL = "gemini-2.5-flash"
+    DEFAULT_MODEL = "gemini-2.5-pro"
     DEFAULT_MODE = "conference"
     DEFAULT_ROUNDS = 2
     DEFAULT_TIMEOUT_PER_ROUND = 180
