@@ -67,6 +67,8 @@ class CollectionContext(BaseModel):
     pir: str
     plan: str
     direction_context: DialogueContext | None = None
+    gather_more_feedback: str | None = None
+    """Set when this is a supplemental 'gather more' run, not the initial collection."""
 
 
 class ProcessingContext(BaseModel):
@@ -74,6 +76,8 @@ class ProcessingContext(BaseModel):
 
     pir: str
     collected_data: str
+    is_revision: bool = False
+    """True when this is a re-processing run refining an earlier result."""
 
 
 class AnalysisContext(BaseModel):

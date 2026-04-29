@@ -280,17 +280,24 @@ class AIOrchestrator:
                 )
             else:
                 accumulated["raw_data"] = new_data
-            return accumulated["raw_data"]
+            # Summarize before passing to reviewer so it receives {summary, sources_used, gaps}
+            # instead of the raw {"collected_data": [...]} blob.
+            return await collection_service.summarize(pir, accumulated["raw_data"], language)
 
-        return await self._run_with_review(  # type: ignore[no-any-return]
+        await self._run_with_review(
             generate_fn=collect_fn,
             reviewer=reviewer,
             context=CollectionContext(
-                pir=pir, plan=plan, direction_context=direction_context
+                pir=pir,
+                plan=plan,
+                direction_context=direction_context,
+                gather_more_feedback=feedback,
             ),
             phase="collection",
             session_id=session_id,
         )
+        # Always return raw data — the summary was only for the reviewer.
+        return accumulated["raw_data"]
 
     async def analyse_and_review(
         self,
@@ -356,7 +363,11 @@ class AIOrchestrator:
         return await self._run_with_review(  # type: ignore[no-any-return]
             generate_fn=process_fn,
             reviewer=reviewer,
-            context=ProcessingContext(pir=pir, collected_data=collected_data),
+            context=ProcessingContext(
+                pir=pir,
+                collected_data=collected_data,
+                is_revision=previous_result is not None,
+            ),
             phase="processing",
             session_id=session_id,
         )

@@ -1353,7 +1353,9 @@ export default function ChatWindow({
                       : phase === "analysis"
                         ? "Generating analysis…"
                         : phase === "collection"
-                          ? "Collecting intelligence…"
+                          ? stage === "plan_confirming" || stage === "planning"
+                            ? "Updating collection plan…"
+                            : "Collecting intelligence…"
                           : "Working…"}
                   </p>
                 </div>

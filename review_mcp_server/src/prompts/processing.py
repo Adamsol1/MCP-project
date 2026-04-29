@@ -1,10 +1,45 @@
 """Processing phase review prompt builder and MCP adapter function."""
 
+import json as _json
 from datetime import UTC, datetime
 
 
 def build_processing_review_prompt(content: str, context: str) -> str:
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
+
+    try:
+        _ctx = _json.loads(context)
+        _is_revision = bool(_ctx.get("is_revision", False))
+    except Exception:
+        _is_revision = False
+
+    if _is_revision:
+        _mode_header = """
+## RE-PROCESSING MODE
+This is a **refinement** of an earlier processing result — not a fresh extraction.
+The new result reflects updated or accumulated collected data building on prior work.
+
+Apply these adjusted criteria:
+- Gaps acknowledged as unresolvable in the previous result may legitimately persist.
+  Do not penalize for gaps that were already present and correctly documented.
+- Evaluate whether entities from the prior result have been correctly retained,
+  updated, or removed based on the new collected data.
+- Only flag MAJOR if the new result introduces unsupported entities, removes
+  previously well-grounded entities without justification, or degrades PIR coverage
+  compared to the prior result.
+
+"""
+        _gap_rule = (
+            "- Gaps that appeared in the previous result and remain genuinely unresolvable "
+            "are acceptable. Only flag MAJOR for gaps that are newly absent when PIRs are "
+            "clearly still unaddressed by the new collected data."
+        )
+    else:
+        _mode_header = ""
+        _gap_rule = (
+            "- If PIRs remain unanswered after processing, gaps must reflect that.\n"
+            "- Empty gaps when PIRs are clearly unaddressed is MAJOR."
+        )
 
     return f"""You are a strict quality reviewer for processing results produced in the Processing
 phase of a threat intelligence cycle.
@@ -15,7 +50,7 @@ Use this as the reference point for all temporal reasoning and timeframe assessm
 Your role is to verify that the PMESII entities extracted are grounded in the collected
 evidence, correctly categorized, and relevant to the PIRs. You are NOT a grammar checker —
 you evaluate analytical quality, evidence traceability, and PIR alignment.
-
+{_mode_header}
 ## Intelligence Context
 {context}
 
@@ -51,8 +86,7 @@ CONTENT includes: entities (PMESIIEntity list), gaps, processing_summary, assess
   integer: over-inflated values (e.g. 90+ from a single web source) are MAJOR.
 
 ### 5. Gap Completeness
-- If PIRs remain unanswered after processing, gaps must reflect that.
-- Empty gaps when PIRs are clearly unaddressed is MAJOR.
+{_gap_rule}
 
 ## Severity policy
 - MAJOR: unsupported entity, missing high-priority PIR coverage, over-inflated confidence, missing critical gaps

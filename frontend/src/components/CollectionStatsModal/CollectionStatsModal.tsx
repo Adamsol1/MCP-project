@@ -110,7 +110,7 @@ function PieChart({ slices }: { slices: SliceData[] }) {
         <text
           x={cx + r + 45}
           y={cy - 4}
-          fontSize="32"
+          fontSize="14"
           fontWeight="600"
           fill="var(--color-text-secondary)"
         >

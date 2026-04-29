@@ -672,6 +672,20 @@ class CollectionService:
 
         return raw_data
 
+    async def summarize(self, pir: str, raw_data: str, language: str = "en") -> str:
+        """Summarize raw collected data into {summary, sources_used, gaps} JSON for review."""
+        async with self.mcp_client.connect():
+            system_prompt = await self.mcp_client.get_prompt(
+                "collection_summarize",
+                {"pir": pir, "collected_data": raw_data, "language": language},
+            )
+            agent = GeminiAgent(self.mcp_client)
+            return await agent.run(
+                system_prompt=system_prompt,
+                task="Summarize the collected intelligence data.",
+                allowed_tool_names=set(),
+            )
+
     @staticmethod
     def delete_web_results(session_id: str) -> None:
         """Remove the collected data file for a session."""
