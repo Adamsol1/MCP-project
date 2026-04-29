@@ -10,6 +10,7 @@ _PROCESSING_TOOLS = [
     "list_knowledge_base",
     "read_knowledge_base",
     "google_search",
+    "request_pmesii_clarification",
 ]
 
 

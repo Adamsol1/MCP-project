@@ -13,8 +13,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from datetime import UTC, datetime
+
 from src.mcp_client.client import MCPClient
 from src.services.collection.collection_status import CollectionStatusTracker
+from src.services.reasearch_logger import ResearchLogger
 from src.services.ai.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
@@ -624,6 +627,9 @@ class CollectionService:
             if session_id:
                 tracker = CollectionStatusTracker(session_id, selected_sources)
 
+            # TODO(future): disable elicitation_callback when ai_provider == "local".
+            # See feature/localLLM branch for the aiProvider setting + request_llm_provider
+            # pattern. For now elicitation is always active (only Gemini is supported).
             agent = GeminiAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:

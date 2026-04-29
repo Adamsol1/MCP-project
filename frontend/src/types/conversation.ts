@@ -227,6 +227,7 @@ export interface ProcessingFinding {
   evidence_summary: string;
   source: string;
   confidence: number;
+  categories?: string[];
   relevant_to: string[];
   why_it_matters: string;
   uncertainties: string[];
