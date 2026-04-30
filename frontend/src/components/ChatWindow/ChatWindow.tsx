@@ -1149,6 +1149,19 @@ export default function ChatWindow({
   }, [isSourceSelecting]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const bottomPanelRef = useRef<HTMLDivElement>(null);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(160);
+
+  useEffect(() => {
+    const el = bottomPanelRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      setBottomPanelHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    setBottomPanelHeight(el.offsetHeight);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -1273,7 +1286,7 @@ export default function ChatWindow({
         <ProcessingMessage
           data={message.data as ProcessingData}
           onGapCollect={onGapCollect ? (gap) => onSendMessage?.(gap) : undefined}
-          onCollectMore={onGatherMoreFromProcessing}
+          onCollectMore={isConfirming ? onGatherMoreFromProcessing : undefined}
         />
       );
     }
@@ -1314,7 +1327,7 @@ export default function ChatWindow({
   return (
     <div className="flex-1 min-h-0 w-full relative flex flex-col">
       {hasConversationContent && (
-        <div className="absolute inset-0 overflow-y-auto py-4 pb-40">
+        <div className="absolute inset-0 overflow-y-auto py-4" style={{ paddingBottom: bottomPanelHeight + 24 }}>
           <div className={`${contentWidthClass} flex flex-col`}>
             {messages.map((message) => (
               <div
@@ -1375,6 +1388,7 @@ export default function ChatWindow({
 
       {!isAnalysisComplete && (
         <div
+          ref={bottomPanelRef}
           className={`flex flex-col items-center gap-4 pb-6 ${
             hasConversationContent
               ? "absolute bottom-0 left-0 right-0 pt-8 bg-linear-to-t from-surface-elevated via-surface-elevated/90 to-transparent"
@@ -1473,10 +1487,10 @@ export default function ChatWindow({
                       {t.dateWindowsLabel}
                     </p>
                     <p className="text-xs text-text-muted mb-3">{t.dateWindowsDesc}</p>
-                    <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       {(Object.keys(t.sourceTimeframeLabels) as (keyof SourceTimeframes)[]).map((key) => (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className="w-44 shrink-0 text-xs text-text-secondary">
+                        <div key={key} className="flex flex-col gap-1">
+                          <span className="text-xs text-text-secondary">
                             {t.sourceTimeframeLabels[key]}
                           </span>
                           <select
@@ -1485,7 +1499,7 @@ export default function ChatWindow({
                               setLocalTimeframes((prev) => ({ ...prev, [key]: e.target.value }))
                             }
                             disabled={isLoading}
-                            className="rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                            className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                           >
                             {(Object.entries(t.timeframeOptions) as [string, string][]).map(
                               ([code, label]) => (

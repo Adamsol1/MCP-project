@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { PhaseReviewItem } from "../../types/conversation";
 import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
-import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
+import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, CollectionSummaryData, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
 import type { Analysis } from "../../types/analysis";
 
 interface ReviewActivityModalProps {
@@ -163,6 +163,50 @@ function CollectionTranscript({ data, reviewerSuggestions }: { data: CollectionD
           </p>
           <div className="rounded-lg border border-border-muted bg-surface p-3">
             <FormattedReviewText text={reviewerSuggestions} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CollectionSummaryTranscript({ data }: { data: CollectionSummaryData }) {
+  return (
+    <div className="space-y-4">
+      {data.summary && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Summary
+          </p>
+          <div className="rounded-lg border border-border-muted bg-surface-muted p-3">
+            <FormattedReviewText text={data.summary} />
+          </div>
+        </div>
+      )}
+      {data.sources_used && data.sources_used.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Sources Used
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {data.sources_used.map((src) => (
+              <span
+                key={src}
+                className="rounded px-2 py-0.5 text-xs font-medium bg-surface-elevated text-text-secondary border border-border-muted"
+              >
+                {src}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.gaps && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Gaps
+          </p>
+          <div className="rounded-lg border border-warning-subtle bg-warning-subtle/20 p-3">
+            <FormattedReviewText text={data.gaps} />
           </div>
         </div>
       )}
@@ -353,8 +397,11 @@ function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: Ph
     return <PirTranscript data={parsed as PirData} />;
   }
 
-  if (phase === "collection" && parsed && typeof parsed === "object" && "collected_data" in parsed) {
-    return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
+  if (phase === "collection" && parsed && typeof parsed === "object") {
+    if ("collected_data" in parsed)
+      return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
+    if ("summary" in parsed && "sources_used" in parsed)
+      return <CollectionSummaryTranscript data={parsed as CollectionSummaryData} />;
   }
 
   if (phase === "processing" && parsed) {

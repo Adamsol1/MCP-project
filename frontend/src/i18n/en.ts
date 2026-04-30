@@ -166,7 +166,6 @@ export const en = {
     web_think_tank: "Think Tanks / Research",
     web_news:       "News & Media",
     web_other:      "Other Web",
-    otx:            "AlienVault OTX",
   } as Record<string, string>,
   timeframeOptions: {
     "":  "No restriction",

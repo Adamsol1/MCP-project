@@ -310,7 +310,6 @@ const SOURCE_TIMEFRAME_KEYS: (keyof SourceTimeframes)[] = [
   "web_think_tank",
   "web_news",
   "web_other",
-  "otx",
 ];
 
 const TIMEFRAME_OPTION_KEYS = ["", "d1", "w1", "m1", "m3", "m6", "y1", "y2", "y3"] as const;

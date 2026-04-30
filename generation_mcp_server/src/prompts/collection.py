@@ -6,6 +6,18 @@ from datetime import UTC, datetime, timedelta
 from ._shared import SOURCE_TOOL_MAP, _language_instruction
 
 
+_FUTURE_KEYWORDS = (
+    "next ", "coming ", "upcoming ", "future ", "forward",
+    "in the next", "over the next", "within the next",
+)
+
+
+def _is_future_timeframe(tf: str) -> bool:
+    """Return True if the timeframe string describes a future period."""
+    lower = tf.lower()
+    return any(kw in lower for kw in _FUTURE_KEYWORDS)
+
+
 def _code_to_date(code: str) -> str:
     """Convert a timeframe code (e.g. 'y3', 'm3') to a YYYY-MM-DD cutoff date.
     Falls back to 3 years ago for empty or unrecognised codes.
@@ -139,10 +151,25 @@ def build_collection_collect_prompt(
     _now = datetime.now(UTC)
     _stf = source_timeframes or {}
     _otx_lookback = _code_to_date(_stf.get("otx", ""))
+    _pir_is_future = bool(since_date and _is_future_timeframe(since_date))
+    _future_context = (
+        " This is a FUTURE-ORIENTED PIR — you are collecting background intelligence "
+        "(current threat indicators, capability assessments, recent activity, trend data) "
+        "that supports forward-looking analysis. The date restrictions below define the "
+        "historical window to search for this supporting context. Do NOT restrict queries "
+        "to only events that have already concluded; focus on indicators and patterns that "
+        "are relevant to what may occur during the PIR timeframe."
+        if _pir_is_future else ""
+    )
     since_note = (
-        f"\nNote: Today's date is {_now.strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\". "
-        f"For all query_otx calls, use since_date=\"{_otx_lookback}\"."
-        if "query_otx" in approved_tools else ""
+        f"\nNote: Today's date is {_now.strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\"."
+        f"{_future_context}"
+        f" For all query_otx calls, use since_date=\"{_otx_lookback}\"."
+        if "query_otx" in approved_tools else (
+            f"\nNote: Today's date is {_now.strftime('%Y-%m-%d')}. The PIR timeframe is \"{since_date}\"."
+            f"{_future_context}"
+            if since_date and _pir_is_future else ""
+        )
     )
 
     existing_data_section = (
@@ -195,7 +222,15 @@ def build_collection_collect_prompt(
             f"\nWrite narrow, specific queries — not broad topic keywords."
             f"\nBad queries match too many unrelated pages (military hardware wikis, hobby sites, blogs)."
             f"\nGood queries combine: a specific named entity or event + the analytic angle + the source type."
-            f"\n"
+            + (
+                f"\n"
+                f"\nFUTURE-ORIENTED PIR: The PIR covers a future period. Construct queries that surface"
+                f"\ncurrent capabilities, intentions, forecasts, and trend assessments — not news about"
+                f"\nevents that will happen in the future (those do not exist yet). Target indicators,"
+                f"\nbuildup patterns, and analytical projections."
+                if _pir_is_future else ""
+            )
+            + f"\n"
             f"\nQuery construction:"
             f"\n  BAD:  \"China military Taiwan\"                → too broad, matches everything"
             f"\n  BAD:  \"GPS jamming\"                         → matches hobby and history pages"
@@ -208,6 +243,10 @@ def build_collection_collect_prompt(
             f"\n  - Add source-type words: 'analysis', 'assessment', 'report', 'white paper'"
             f"\n  - Add known authoritative domains with OR: 'site:csis.org OR site:rand.org OR site:rusi.org'"
             f"\n  - Use year or date range when timeframe matters: '2025' or '2024 2025'"
+            + (
+                f"\n  - For future PIRs: prefer 'forecast', 'projection', 'outlook', 'assessment', 'trajectory'"
+                if _pir_is_future else ""
+            )
             f"\n"
             f"\nSource authority hierarchy — prefer queries that surface sources in this order:"
             f"\n  1. Government & official sources (.gov, .mil, ministry/agency sites)"
@@ -221,7 +260,14 @@ def build_collection_collect_prompt(
             f"\n{_web_examples}"
             f"\n"
             f"\n## Per-Source-Type Timeframes"
-            f"\nApply these date_restrict codes based on the type of source the query targets:"
+            + (
+                f"\nThis PIR covers a future period. These date windows define how far back to search for"
+                f"\nbackground intelligence (recent activity, trend data, capability indicators) that"
+                f"\nsupports the forward-looking analysis — they are NOT a mirror of the future PIR period."
+                f"\n"
+                if _pir_is_future else ""
+            )
+            + f"\nApply these date_restrict codes based on the type of source the query targets:"
             f"\n  Government & official (.gov, .mil, ministry/agency, state media): date_restrict=\"{_stf.get('web_gov', '') or 'omit'}\""
             f"\n  Think tanks & research (RAND, CSIS, Chatham House, RUSI, CFR):    date_restrict=\"{_stf.get('web_think_tank', '') or 'omit'}\""
             f"\n  News & media (Reuters, BBC, AP, FT, national newspapers):          date_restrict=\"{_stf.get('web_news', '') or 'omit'}\""

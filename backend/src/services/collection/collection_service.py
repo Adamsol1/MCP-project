@@ -642,9 +642,6 @@ class CollectionService:
                 status_tracker=tracker,
             )
 
-        if tracker:
-            tracker.mark_complete()
-
         # Second pass: summarize full page content via Gemini url_context (no scraping).
         # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
         # We pass up to 25 URLs (buffer) because some pages will be inaccessible and get
@@ -667,8 +664,13 @@ class CollectionService:
                     logger.info(
                         f"[CollectionService] url_context: added {len(summaries)} page summaries"
                     )
+                if tracker:
+                    tracker.set_source_count("Web Search", len(summaries) if summaries else 0)
 
             raw_data = _strip_search_snippet_items(raw_data)
+
+        if tracker:
+            tracker.mark_complete()
 
         return raw_data
 

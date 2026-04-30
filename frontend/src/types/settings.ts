@@ -14,8 +14,6 @@ export interface SourceTimeframes {
   web_news: string;
   /** Other / unclassified web sources. */
   web_other: string;
-  /** AlienVault OTX threat intelligence feed. */
-  otx: string;
 }
 
 /**
@@ -76,7 +74,6 @@ export const DEFAULT_SETTINGS: Settings = {
       web_think_tank: "",
       web_news: "",
       web_other: "",
-      otx: "",
     },
   },
   councilSettings: {
