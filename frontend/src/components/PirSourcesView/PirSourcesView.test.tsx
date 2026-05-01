@@ -146,7 +146,7 @@ describe("PirSourcesView — source rendering", () => {
 
 describe("PirSourcesView — hover updates context", () => {
   it("hovering a source card sets highlightedRefs in context", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
 
     renderWithSettings(
       <WorkspaceProvider>
@@ -167,7 +167,7 @@ describe("PirSourcesView — hover updates context", () => {
   });
 
   it("mouse leave on a source card clears highlightedRefs in context", async () => {
-    const user = userEvent.setup();
+    const user = userEvent.setup({ pointerEventsCheck: 0 });
 
     renderWithSettings(
       <WorkspaceProvider>

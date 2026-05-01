@@ -3,7 +3,7 @@
 import pytest
 
 from src.models.dialogue import DialogueContext, ReviewResult
-from src.services.AI.review_service import ReviewService
+from src.services.ai.review_service import ReviewService
 
 
 class MockReviewMCPClient:

@@ -19,7 +19,7 @@ class MockDialogueService:
         self.raise_on_pir = raise_on_pir
         self.raise_on_summary = raise_on_summary
 
-    async def generate_clarifying_question(self, user_message, _context, language="en"):
+    async def generate_clarifying_question(self, user_message, context, language="en"):
         if self.raise_on_clarifying:
             raise RuntimeError("Service unavailable")
         self.clarifying_calls.append(

@@ -145,9 +145,13 @@ def test_dev_state_can_force_stage():
 def test_gather_more_resets_processing_to_collection():
     """gather_more=True during processing phase should reset back to collection."""
     # Arrange
+    from src.api.dialogue import IntelligenceSession
+    from src.services.reasearch_logger import ResearchLogger
+
     client = TestClient(app)
     session_id = "test-gather-more-resets"
-    session = dialogue_api._get_or_create_session(session_id)
+    session = IntelligenceSession(session_id, ResearchLogger(session_id))
+    dialogue_api._sessions[session_id] = session
     session.collection_flow = CollectionFlow(session_id=session_id)
     session.processing_flow = ProcessingFlow(session_id=session_id)
 
@@ -167,9 +171,13 @@ def test_gather_more_resets_processing_to_collection():
 def test_gather_more_without_collection_flow_returns_400():
     """gather_more=True with no collection flow should return 400."""
     # Arrange
+    from src.api.dialogue import IntelligenceSession
+    from src.services.reasearch_logger import ResearchLogger
+
     client = TestClient(app)
     session_id = "test-gather-more-no-collection"
-    session = dialogue_api._get_or_create_session(session_id)
+    session = IntelligenceSession(session_id, ResearchLogger(session_id))
+    dialogue_api._sessions[session_id] = session
     session.processing_flow = ProcessingFlow(session_id=session_id)
     session.collection_flow = None
 
