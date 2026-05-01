@@ -6,7 +6,8 @@ services:
     ports:
       - "${APP_PORT:-8080}:80"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     restart: unless-stopped
 
   backend:
@@ -31,9 +32,18 @@ services:
     expose:
       - "8000"
     depends_on:
-      - generation-mcp
-      - review-mcp
-      - council-mcp
+      generation-mcp:
+        condition: service_healthy
+      review-mcp:
+        condition: service_healthy
+      council-mcp:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   generation-mcp:
@@ -53,6 +63,12 @@ services:
       - backend_data:/app/backend/data
     expose:
       - "8001"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   review-mcp:
@@ -64,6 +80,12 @@ services:
       REVIEW_MCP_PORT: "8002"
     expose:
       - "8002"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
   council-mcp:
@@ -84,6 +106,12 @@ services:
       - council_decision_graph:/app/council_mcp_server/decision_graph_data
     expose:
       - "8003"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=2).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
     restart: unless-stopped
 
 volumes:
