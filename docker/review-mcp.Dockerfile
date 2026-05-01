@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV POETRY_VERSION=2.2.1 \
+ENV POETRY_VERSION=2.3.1 \
     POETRY_VIRTUALENVS_CREATE=false \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -21,4 +21,4 @@ COPY review_mcp_server/ ./
 
 EXPOSE 8002
 
-CMD ["poetry", "run", "python", "src/server.py"]
+CMD ["python", "src/server.py"]

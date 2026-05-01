@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV POETRY_VERSION=2.2.1 \
+ENV POETRY_VERSION=2.3.1 \
     POETRY_VIRTUALENVS_CREATE=false \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -24,4 +24,4 @@ RUN mkdir -p /app/council_mcp_server/transcripts /app/council_mcp_server/decisio
 
 EXPOSE 8003
 
-CMD ["poetry", "run", "python", "server_http.py"]
+CMD ["python", "server_http.py"]

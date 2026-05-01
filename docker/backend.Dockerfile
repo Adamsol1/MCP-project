@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-ENV POETRY_VERSION=2.2.1 \
+ENV POETRY_VERSION=2.3.1 \
     POETRY_VIRTUALENVS_CREATE=false \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
@@ -20,4 +20,4 @@ RUN mkdir -p /app/backend/data
 
 EXPOSE 8000
 
-CMD ["poetry", "run", "uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "src.api.main:app", "--host", "0.0.0.0", "--port", "8000"]
