@@ -15,7 +15,10 @@ RUN apt-get update \
     && pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 COPY review_mcp_server/pyproject.toml review_mcp_server/poetry.lock ./
-RUN poetry install --only main --no-root --no-interaction --no-ansi
+RUN poetry install --only main \
+    --no-root \
+    --no-interaction \
+    --no-ansi
 
 COPY review_mcp_server/ ./
 

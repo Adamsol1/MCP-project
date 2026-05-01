@@ -15,7 +15,10 @@ RUN apt-get update \
     && pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 COPY generation_mcp_server/pyproject.toml generation_mcp_server/poetry.lock ./
-RUN poetry install --only main --no-root --no-interaction --no-ansi
+RUN poetry install --only main \
+    --no-root \
+    --no-interaction \
+    --no-ansi
 
 COPY generation_mcp_server/ ./
 RUN mkdir -p /app/backend/data

@@ -17,7 +17,10 @@ RUN apt-get update \
     && pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 COPY council_mcp_server/pyproject.toml council_mcp_server/poetry.lock ./
-RUN poetry install --only main --no-root --no-interaction --no-ansi
+RUN poetry install --only main \
+    --no-root \
+    --no-interaction \
+    --no-ansi
 
 COPY council_mcp_server/ ./
 RUN mkdir -p /app/council_mcp_server/transcripts /app/council_mcp_server/decision_graph_data

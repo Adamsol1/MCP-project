@@ -13,7 +13,10 @@ RUN apt-get update \
     && pip install --no-cache-dir "poetry==${POETRY_VERSION}"
 
 COPY backend/pyproject.toml backend/poetry.lock ./
-RUN poetry install --only main --no-root --no-interaction --no-ansi
+RUN poetry install --only main \
+    --no-root \
+    --no-interaction \
+    --no-ansi
 
 COPY backend/ ./
 RUN mkdir -p /app/backend/data
