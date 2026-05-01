@@ -36,6 +36,10 @@ wheels/
 
 # Poetry
 poetry.lock
+!backend/poetry.lock
+!generation_mcp_server/poetry.lock
+!review_mcp_server/poetry.lock
+!council_mcp_server/poetry.lock
 
 # PyInstaller
 *.manifest
