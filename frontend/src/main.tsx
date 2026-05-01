@@ -19,6 +19,7 @@
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import "./services/crypto/randomUuidFallback";
 import "./index.css";
 import App from "./App";
 import { ToastProvider } from "./contexts/Toast/ToastContext";
