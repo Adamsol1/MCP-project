@@ -1,0 +1,92 @@
+services:
+  frontend:
+    build:
+      context: https://github.com/Adamsol1/MCP-project.git#dev
+      dockerfile: docker/frontend.Dockerfile
+    ports:
+      - "${APP_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: https://github.com/Adamsol1/MCP-project.git#dev
+      dockerfile: docker/backend.Dockerfile
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
+      OTX_API_KEY: ${OTX_API_KEY:?Set OTX_API_KEY in Portainer}
+      SERPER_API_KEY: ${SERPER_API_KEY:?Set SERPER_API_KEY in Portainer}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      MCP_SERVER_URL: http://generation-mcp:8001/sse
+      REVIEW_MCP_URL: http://review-mcp:8002/sse
+      COUNCIL_MCP_URL: http://council-mcp:8003/sse
+      COUNCIL_MCP_AUTOSTART: "0"
+      SESSIONS_DB_PATH: /app/backend/data/sessions.db
+      KNOWLEDGE_DB_PATH: /app/backend/data/knowledge.db
+    volumes:
+      - backend_data:/app/backend/data
+    expose:
+      - "8000"
+    depends_on:
+      - generation-mcp
+      - review-mcp
+      - council-mcp
+    restart: unless-stopped
+
+  generation-mcp:
+    build:
+      context: https://github.com/Adamsol1/MCP-project.git#dev
+      dockerfile: docker/generation-mcp.Dockerfile
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
+      OTX_API_KEY: ${OTX_API_KEY:?Set OTX_API_KEY in Portainer}
+      SERPER_API_KEY: ${SERPER_API_KEY:?Set SERPER_API_KEY in Portainer}
+      MCP_SERVER_HOST: 0.0.0.0
+      MCP_SERVER_PORT: "8001"
+      SESSIONS_DB_PATH: /app/backend/data/sessions.db
+      KNOWLEDGE_DB_PATH: /app/backend/data/knowledge.db
+      MCP_UPLOADS_DIR: /app/backend/data/mcp_uploads
+    volumes:
+      - backend_data:/app/backend/data
+    expose:
+      - "8001"
+    restart: unless-stopped
+
+  review-mcp:
+    build:
+      context: https://github.com/Adamsol1/MCP-project.git#dev
+      dockerfile: docker/review-mcp.Dockerfile
+    environment:
+      REVIEW_MCP_HOST: 0.0.0.0
+      REVIEW_MCP_PORT: "8002"
+    expose:
+      - "8002"
+    restart: unless-stopped
+
+  council-mcp:
+    build:
+      context: https://github.com/Adamsol1/MCP-project.git#dev
+      dockerfile: docker/council-mcp.Dockerfile
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      COUNCIL_MCP_HOST: 0.0.0.0
+      COUNCIL_MCP_PORT: "8003"
+      COUNCIL_TRANSCRIPTS_DIR: transcripts
+      COUNCIL_DECISION_GRAPH_DB_PATH: /app/council_mcp_server/decision_graph_data/decision_graph.db
+    volumes:
+      - council_transcripts:/app/council_mcp_server/transcripts
+      - council_decision_graph:/app/council_mcp_server/decision_graph_data
+    expose:
+      - "8003"
+    restart: unless-stopped
+
+volumes:
+  backend_data:
+  council_transcripts:
+  council_decision_graph:

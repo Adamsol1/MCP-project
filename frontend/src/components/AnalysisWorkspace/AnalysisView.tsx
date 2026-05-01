@@ -260,6 +260,7 @@ export default function AnalysisView({
   onStartCouncil,
   timeframe,
   reviewActivity = [],
+  councilNote = null,
 }: AnalysisViewProps) {
   const { processing_result: processingResult, analysis_draft: analysis } =
     data;
@@ -313,6 +314,8 @@ export default function AnalysisView({
       <ReviewFeedbackPDF
         reviewActivity={reviewActivity}
         reportTitle={analysisHeading}
+        analysisData={data}
+        councilNote={councilNote}
       />,
     ).toBlob();
     const url = URL.createObjectURL(blob);

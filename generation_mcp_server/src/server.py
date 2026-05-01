@@ -23,6 +23,7 @@ def _port_in_use(port: int) -> bool:
 
 
 BOOT_PORT = int(os.getenv("MCP_SERVER_PORT", "8001"))
+BOOT_HOST = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
 BOOT_URL = f"http://127.0.0.1:{BOOT_PORT}/sse"
 
 if __name__ == "__main__":
@@ -101,7 +102,7 @@ if __name__ == "__main__":
     print(f"Starting Generation MCP on {BOOT_URL}", flush=True)
     mcp.run(
         transport="sse",
-        host="127.0.0.1",
+        host=BOOT_HOST,
         port=BOOT_PORT,
         show_banner=False,
         log_level="WARNING",

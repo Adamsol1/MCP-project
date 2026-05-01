@@ -35,6 +35,7 @@ def _port_in_use(port: int) -> bool:
 
 PROJECT_DIR = Path(__file__).parent.absolute()
 BOOT_PORT = int(os.getenv("COUNCIL_MCP_PORT", "8003"))
+BOOT_HOST = os.getenv("COUNCIL_MCP_HOST", "127.0.0.1")
 BOOT_URL = f"http://127.0.0.1:{BOOT_PORT}/sse"
 
 if __name__ == "__main__":
@@ -97,6 +98,9 @@ logger = logging.getLogger(__name__)
 config_path = PROJECT_DIR / "config.yaml"
 logger.info("Loading config from: %s", config_path)
 config = load_config(str(config_path))
+decision_graph_db_path = os.getenv("COUNCIL_DECISION_GRAPH_DB_PATH")
+if decision_graph_db_path and config.decision_graph:
+    config.decision_graph.db_path = decision_graph_db_path
 
 adapters: dict = {}
 adapter_sources: list[tuple[str, dict]] = []
@@ -118,6 +122,10 @@ for source_name, adapter_configs in adapter_sources:
 
 engine = DeliberationEngine(
     adapters=adapters,
+    transcript_manager=TranscriptManager(
+        output_dir=os.getenv("COUNCIL_TRANSCRIPTS_DIR", "transcripts"),
+        server_dir=PROJECT_DIR,
+    ),
     config=config,
     server_dir=PROJECT_DIR,
 )
@@ -301,7 +309,7 @@ if __name__ == "__main__":
     print(f"Starting Council MCP on {BOOT_URL}", flush=True)
     mcp.run(
         transport="sse",
-        host="127.0.0.1",
+        host=BOOT_HOST,
         port=BOOT_PORT,
         show_banner=False,
         log_level="WARNING",
