@@ -247,7 +247,7 @@ def build_collection_collect_prompt(
                 f"\n  - For future PIRs: prefer 'forecast', 'projection', 'outlook', 'assessment', 'trajectory'"
                 if _pir_is_future else ""
             )
-            f"\n"
+            + f"\n"
             f"\nSource authority hierarchy — prefer queries that surface sources in this order:"
             f"\n  1. Government & official sources (.gov, .mil, ministry/agency sites)"
             f"\n  2. Established research institutions & think tanks (CSIS, RAND, Chatham House, RUSI, CFR, Brookings, ISW)"
