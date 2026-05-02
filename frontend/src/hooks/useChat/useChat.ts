@@ -208,6 +208,7 @@ function parsePlanData(raw: string): CollectionPlanData {
     plan,
     steps,
     suggested_sources,
+    reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : undefined,
   };
 }
 

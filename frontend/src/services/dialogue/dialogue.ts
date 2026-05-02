@@ -130,6 +130,11 @@ export interface CollectionSourceStatus {
   last_called_at: string | null;
 }
 
+export interface PendingElicitation {
+  message: string;
+  options: string[];
+}
+
 export interface CollectionStatus {
   session_id: string;
   status: "collecting" | "complete";
@@ -148,6 +153,26 @@ export async function getCollectionStatus(sessionId: string): Promise<Collection
   } catch {
     return null;
   }
+}
+
+export async function getPendingElicitation(sessionId: string): Promise<PendingElicitation | null> {
+  try {
+    const res = await axios.get<{ pending_elicitation: PendingElicitation | null }>(
+      `${API_BACKEND_URL}/api/dialogue/elicitation/pending/${sessionId}`,
+      { timeout: COLLECTION_STATUS_TIMEOUT_MS },
+    );
+    return res.data.pending_elicitation;
+  } catch {
+    return null;
+  }
+}
+
+export async function respondToElicitation(sessionId: string, choice: string): Promise<void> {
+  await axios.post(
+    `${API_BACKEND_URL}/api/dialogue/elicitation/${sessionId}/respond`,
+    { choice },
+    { timeout: COLLECTION_STATUS_TIMEOUT_MS },
+  );
 }
 
 export async function getDevDialogueState(sessionId: string) {

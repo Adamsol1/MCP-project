@@ -63,7 +63,7 @@ def _write_processed_json(tmp_path, session_id: str, attempts: list[str]) -> Non
 class TestProcessingResultStore:
     """Test ProcessingResultStore."""
 
-    def test_successful_load_returns_processing_result(self, monkeypatch, tmp_path):
+    async def test_successful_load_returns_processing_result(self, monkeypatch, tmp_path):
         """Service should load the session processing result successfully."""
         monkeypatch.setattr(
             processing_service_module,
@@ -76,13 +76,13 @@ class TestProcessingResultStore:
             [json.dumps(VALID_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingResultStore().get_processing_result("session-123")
+        result = await ProcessingResultStore().get_processing_result("session-123")
 
         assert isinstance(result, ProcessingResult)
         assert len(result.findings) == 1
         assert len(result.gaps) == 1
 
-    def test_returned_type_is_processing_result(self, monkeypatch, tmp_path):
+    async def test_returned_type_is_processing_result(self, monkeypatch, tmp_path):
         """Service should return a validated ProcessingResult instance."""
         monkeypatch.setattr(
             processing_service_module,
@@ -95,11 +95,11 @@ class TestProcessingResultStore:
             [json.dumps(VALID_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingResultStore().get_processing_result("session-456")
+        result = await ProcessingResultStore().get_processing_result("session-456")
 
         assert type(result) is ProcessingResult
 
-    def test_prefers_last_valid_attempt(self, monkeypatch, tmp_path):
+    async def test_prefers_last_valid_attempt(self, monkeypatch, tmp_path):
         """Service should use the most recent valid attempt in processed.json."""
         monkeypatch.setattr(
             processing_service_module,
@@ -123,11 +123,11 @@ class TestProcessingResultStore:
             ],
         )
 
-        result = ProcessingResultStore().get_processing_result("session-789")
+        result = await ProcessingResultStore().get_processing_result("session-789")
 
         assert result.findings[0].id == "F-NEW"
 
-    def test_converts_legacy_entities_schema(self, monkeypatch, tmp_path):
+    async def test_converts_legacy_entities_schema(self, monkeypatch, tmp_path):
         """Service should convert older PMESII processing output into analysis findings."""
         monkeypatch.setattr(
             processing_service_module,
@@ -140,7 +140,7 @@ class TestProcessingResultStore:
             [json.dumps(LEGACY_PROCESSING_PAYLOAD)],
         )
 
-        result = ProcessingResultStore().get_processing_result("legacy-session")
+        result = await ProcessingResultStore().get_processing_result("legacy-session")
 
         assert len(result.findings) == 1
         assert result.findings[0].id == "E-001"
@@ -148,7 +148,7 @@ class TestProcessingResultStore:
         assert result.findings[0].source == "manual"
         assert result.gaps == ["Victimology remains incomplete."]
 
-    def test_missing_file_raises_clear_error(self, monkeypatch, tmp_path):
+    async def test_missing_file_raises_clear_error(self, monkeypatch, tmp_path):
         """Missing processed.json should raise the processing-required error."""
         monkeypatch.setattr(
             processing_service_module,
@@ -157,9 +157,9 @@ class TestProcessingResultStore:
         )
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingResultStore().get_processing_result("nonexistent-session")
+            await ProcessingResultStore().get_processing_result("nonexistent-session")
 
-    def test_invalid_file_raises_clear_error(self, monkeypatch, tmp_path):
+    async def test_invalid_file_raises_clear_error(self, monkeypatch, tmp_path):
         """Invalid JSON should raise the processing-required error."""
         monkeypatch.setattr(
             processing_service_module,
@@ -171,9 +171,9 @@ class TestProcessingResultStore:
         (session_dir / "processed.json").write_text("{not-valid-json", encoding="utf-8")
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingResultStore().get_processing_result("invalid-session")
+            await ProcessingResultStore().get_processing_result("invalid-session")
 
-    def test_invalid_payload_raises_clear_error(self, monkeypatch, tmp_path):
+    async def test_invalid_payload_raises_clear_error(self, monkeypatch, tmp_path):
         """Schema-invalid payload should raise the processing-required error."""
         monkeypatch.setattr(
             processing_service_module,
@@ -187,4 +187,4 @@ class TestProcessingResultStore:
         )
 
         with pytest.raises(ValueError, match=PROCESSING_RESULT_UNAVAILABLE_MESSAGE):
-            ProcessingResultStore().get_processing_result("invalid-payload-session")
+            await ProcessingResultStore().get_processing_result("invalid-payload-session")

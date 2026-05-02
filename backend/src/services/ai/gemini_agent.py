@@ -43,11 +43,17 @@ def _json_schema_to_gemini(schema: dict) -> types.Schema:
     properties = {
         k: _json_schema_to_gemini(v) for k, v in schema.get("properties", {}).items()
     }
+    items = (
+        _json_schema_to_gemini(schema["items"])
+        if schema.get("type") == "array" and "items" in schema
+        else None
+    )
     return types.Schema(
         type=schema_type,
         description=schema.get("description"),
         properties=properties or None,
         required=schema.get("required"),
+        items=items,
     )
 
 
@@ -78,6 +84,7 @@ class GeminiAgent:
         self.model = model
         self.mcp_client = mcp_client
         self.max_tool_rounds = max_tool_rounds
+        self.last_thought_text: str = ""
 
     async def run(
         self,
@@ -110,9 +117,11 @@ class GeminiAgent:
             )
         ]
 
+        self.last_thought_text = ""
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
             tools=available_tools,
+            thinking_config=types.ThinkingConfig(include_thoughts=True),
         )
 
         for round_num in range(self.max_tool_rounds):
@@ -147,10 +156,17 @@ class GeminiAgent:
 
             if not tool_calls:
                 finish_reason = getattr(candidate, "finish_reason", "N/A")
+                thought_text = "".join(
+                    part.text
+                    for part in candidate.content.parts
+                    if getattr(part, "thought", False) and part.text
+                )
+                if thought_text:
+                    self.last_thought_text = thought_text
                 text = "".join(
                     part.text
                     for part in candidate.content.parts
-                    if part.text is not None
+                    if not getattr(part, "thought", False) and part.text is not None
                 )
                 if not text:
                     logger.warning(

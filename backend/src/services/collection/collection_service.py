@@ -13,8 +13,11 @@ import re
 from pathlib import Path
 from typing import Any
 
+from datetime import UTC, datetime
+
 from src.mcp_client.client import MCPClient
 from src.services.collection.collection_status import CollectionStatusTracker
+from src.services.reasearch_logger import ResearchLogger
 from src.services.ai.gemini_agent import GeminiAgent
 
 logger = logging.getLogger("app")
@@ -63,6 +66,7 @@ _SOURCE_ALIASES = {
 }
 
 TOOL_TO_DISPLAY_NAME: dict[str, str] = {
+    "knowledge_base": "Knowledge Bank",
     "list_knowledge_base": "Knowledge Bank",
     "read_knowledge_base": "Knowledge Bank",
     "query_otx": "AlienVault OTX",
@@ -319,10 +323,9 @@ class CollectionService:
             if items:
                 deduped: dict[tuple, dict] = {}
                 for item in items:
-                    key = (
-                        str(item.get("source") or ""),
-                        str(item.get("resource_id") or ""),
-                    )
+                    raw_source = str(item.get("source") or "")
+                    canonical = TOOL_TO_DISPLAY_NAME.get(raw_source, raw_source)
+                    key = (canonical, str(item.get("resource_id") or ""))
                     deduped[key] = item
                 items = list(deduped.values())
 
@@ -448,11 +451,14 @@ class CollectionService:
                         f"   Intended sources: {sources_str}"
                     )
                 plan_text = "\n\n".join(plan_lines)
-                return {
+                result: dict[str, Any] = {
                     "steps": steps,
                     "plan": plan_text,
                     "suggested_sources": seen_sources,
                 }
+                if parsed.get("reasoning"):
+                    result["reasoning"] = parsed["reasoning"]
+                return result
 
             # Legacy format: flat plan text + global suggested_sources.
             plan_text = parsed.get("plan")  # type: ignore[assignment]
@@ -466,10 +472,13 @@ class CollectionService:
                 )
 
             suggested_sources = cls._normalize_sources(parsed.get("suggested_sources"))
-            return {
+            legacy_result: dict[str, Any] = {
                 "plan": normalized_plan,
                 "suggested_sources": suggested_sources,
             }
+            if parsed.get("reasoning"):
+                legacy_result["reasoning"] = parsed["reasoning"]
+            return legacy_result
 
         return {
             "plan": raw_plan.strip(),
@@ -509,6 +518,10 @@ class CollectionService:
             )
 
         payload = self._coerce_plan_payload(ai_output)
+
+        # Capture reasoning from Gemini thinking tokens if not already in JSON.
+        if not payload.get("reasoning") and agent.last_thought_text:
+            payload["reasoning"] = agent.last_thought_text
 
         # Fallback: if the AI produced steps with no suggested_sources on any step,
         # fill each empty step from plan text inference, then aggregate global list.
@@ -614,6 +627,9 @@ class CollectionService:
             if session_id:
                 tracker = CollectionStatusTracker(session_id, selected_sources)
 
+            # TODO(future): disable elicitation_callback when ai_provider == "local".
+            # See feature/localLLM branch for the aiProvider setting + request_llm_provider
+            # pattern. For now elicitation is always active (only Gemini is supported).
             agent = GeminiAgent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
@@ -625,9 +641,6 @@ class CollectionService:
                 allowed_tool_names=allowed_tool_names,
                 status_tracker=tracker,
             )
-
-        if tracker:
-            tracker.mark_complete()
 
         # Second pass: summarize full page content via Gemini url_context (no scraping).
         # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
@@ -651,10 +664,29 @@ class CollectionService:
                     logger.info(
                         f"[CollectionService] url_context: added {len(summaries)} page summaries"
                     )
+                if tracker:
+                    tracker.set_source_count("Web Search", len(summaries) if summaries else 0)
 
             raw_data = _strip_search_snippet_items(raw_data)
 
+        if tracker:
+            tracker.mark_complete()
+
         return raw_data
+
+    async def summarize(self, pir: str, raw_data: str, language: str = "en") -> str:
+        """Summarize raw collected data into {summary, sources_used, gaps} JSON for review."""
+        async with self.mcp_client.connect():
+            system_prompt = await self.mcp_client.get_prompt(
+                "collection_summarize",
+                {"pir": pir, "collected_data": raw_data, "language": language},
+            )
+            agent = GeminiAgent(self.mcp_client)
+            return await agent.run(
+                system_prompt=system_prompt,
+                task="Summarize the collected intelligence data.",
+                allowed_tool_names=set(),
+            )
 
     @staticmethod
     def delete_web_results(session_id: str) -> None:

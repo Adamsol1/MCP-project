@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from src.services.collectors.collection_service import CollectionService
+from src.services.collection.collection_service import CollectionService
 
 
 @pytest.mark.asyncio
@@ -13,7 +13,7 @@ async def test_suggest_sources_does_not_crash_on_plain_text_plan():
         "Plan:\n1) Use local docs first.\n2) Expand if needed."
     )
 
-    assert sources == ["Internal Knowledge Bank"]
+    assert sources == ["Knowledge Bank"]
 
 
 @pytest.mark.asyncio
@@ -28,7 +28,7 @@ async def test_suggest_sources_parses_markdown_wrapped_json():
 
     sources = await service.suggest_sources(raw)
 
-    assert sources == ["Internal Knowledge Bank", "AlienVault OTX"]
+    assert sources == ["Knowledge Bank", "AlienVault OTX"]
 
 
 def test_coerce_plan_payload_keeps_plan_even_when_not_json():
@@ -89,8 +89,8 @@ def test_parse_collected_data_happy_path():
     assert len(result["collected_data"]) == 3
 
     by_name = {s["display_name"]: s for s in result["source_summary"]}
-    assert by_name["Internal Knowledge Bank"]["count"] == 2
-    assert by_name["Internal Knowledge Bank"]["has_content"] is True
+    assert by_name["Knowledge Bank"]["count"] == 2
+    assert by_name["Knowledge Bank"]["has_content"] is True
     assert by_name["AlienVault OTX"]["count"] == 1
     assert by_name["AlienVault OTX"]["has_content"] is True
 
@@ -141,9 +141,9 @@ def test_parse_collected_data_deduplicates_resource_ids():
     kb = next(
         s
         for s in result["source_summary"]
-        if s["display_name"] == "Internal Knowledge Bank"
+        if s["display_name"] == "Knowledge Bank"
     )
-    assert kb["count"] == 2
+    assert kb["count"] == 1
     assert kb["resource_ids"] == ["geopolitical/eu_usa"]
 
 
@@ -161,11 +161,11 @@ def test_parse_collected_data_returns_error_payload_on_bad_json():
 async def test_suggest_sources_falls_back_on_internal_parser_error(monkeypatch):
     service = CollectionService(mcp_client=None)  # type: ignore[arg-type]
 
-    def boom(_raw):
+    def boom(cls_or_self, _raw):
         raise RuntimeError("unexpected parse failure")
 
     monkeypatch.setattr(CollectionService, "_coerce_plan_payload", boom)
 
     sources = await service.suggest_sources("anything")
 
-    assert sources == ["Internal Knowledge Bank"]
+    assert sources == ["Knowledge Bank"]

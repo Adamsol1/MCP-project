@@ -6,7 +6,9 @@ Reads from knowledge.db when available, falls back to file-based .md resources.
 import json
 import logging
 
+from fastmcp import Context
 from resources import KNOWLEDGE_REGISTRY, RESOURCES_DIR
+from tools.local_search import _get_tlp_level, _RESTRICTED_TLP, _USE_LOCAL, _maybe_elicit_provider_switch
 
 logger = logging.getLogger("mcp_server")
 
@@ -72,25 +74,35 @@ def list_knowledge_base() -> str:
     return json.dumps(list(KNOWLEDGE_REGISTRY.keys()))
 
 
-def read_knowledge_base(resource_id: str) -> str:
-    """Read a knowledge bank resource by its ID."""
-    # Try DB first
+async def read_knowledge_base(ctx: Context, resource_id: str, session_id: str) -> str:
+    """Read a knowledge bank resource by its ID.
+
+    session_id is required so classified content (TLP:RED/AMBER) can trigger
+    a one-time provider-switch elicitation for the correct session.
+    If the content carries a restricted TLP level and the session has not yet
+    been warned, fires the elicitation before returning the content.
+    """
     db_content = _db_read(resource_id)
     if db_content is not None:
-        return db_content
+        content = db_content
+    else:
+        if resource_id not in KNOWLEDGE_REGISTRY:
+            available = list(KNOWLEDGE_REGISTRY.keys())
+            raise ValueError(
+                f"Unknown resource_id: '{resource_id}'. Available: {available}"
+            )
+        path = RESOURCES_DIR / f"{resource_id}.md"
+        if not path.exists():
+            raise ValueError(f"Resource file not found: {resource_id}")
+        content = path.read_text(encoding="utf-8")
 
-    # Fallback to file
-    if resource_id not in KNOWLEDGE_REGISTRY:
-        available = list(KNOWLEDGE_REGISTRY.keys())
-        raise ValueError(
-            f"Unknown resource_id: '{resource_id}'. Available: {available}"
-        )
+    tlp_level = _get_tlp_level(content[:300])
+    if tlp_level in _RESTRICTED_TLP:
+        choice = await _maybe_elicit_provider_switch(ctx, session_id, tlp_level)
+        if choice == _USE_LOCAL:
+            return f"Innhold ikke returnert — bruker valgte lokal LLM for {tlp_level}-ressurs."
 
-    path = RESOURCES_DIR / f"{resource_id}.md"
-    if not path.exists():
-        raise ValueError(f"Resource file not found: {resource_id}")
-
-    return path.read_text(encoding="utf-8")
+    return content
 
 
 def register_knowledge_tools(mcp) -> None:

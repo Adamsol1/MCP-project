@@ -145,6 +145,7 @@ export default function IntelligencePanel({
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         collectionData={collectionData}
+        uploadedFiles={uploadedFiles}
       />
       <ReviewActivityModal
         isOpen={reviewModalOpen}
@@ -453,14 +454,14 @@ function FileUploadSection({
               >
                 <span
                   className="flex-1 truncate text-text-primary"
-                  title={file.filename}
+                  title={file.original_filename}
                 >
-                  {file.filename}
+                  {file.original_filename}
                 </span>
                 <button
                   onClick={() => onFileRemove?.(file)}
                   className="shrink-0 text-text-muted hover:text-error transition-colors"
-                  aria-label={t.removeFile(file.filename)}
+                  aria-label={t.removeFile(file.original_filename)}
                 >
                   ✕
                 </button>

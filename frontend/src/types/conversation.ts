@@ -108,6 +108,7 @@ export interface CollectionPlanData {
   plan: string;
   steps?: CollectionPlanStep[];
   suggested_sources: string[];
+  reasoning?: string;
 }
 
 /**
@@ -226,6 +227,7 @@ export interface ProcessingFinding {
   evidence_summary: string;
   source: string;
   confidence: number;
+  categories?: string[];
   relevant_to: string[];
   why_it_matters: string;
   uncertainties: string[];
@@ -245,6 +247,7 @@ export interface ProcessingFinding {
 export interface ProcessingData {
   findings: ProcessingFinding[];
   gaps: string[];
+  reasoning?: string;
 }
 
 /**

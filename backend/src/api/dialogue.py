@@ -32,6 +32,7 @@ from src.services.analysis.analysis_service import AnalysisService
 from src.services.analysis.analysis_session_store import AnalysisSessionStore
 from src.services.collection.collection_service import CollectionService
 from src.services.collection.collection_status import CollectionStatusTracker
+from src.services.elicitation.elicitation_store import get_elicitation_store
 from src.services.council.council_service import CouncilService
 from src.services.ai.llm_service import LLMService
 from src.services.direction.dialogue_service import DialogueService
@@ -1116,8 +1117,14 @@ async def _build_dev_hydrated_messages(
     return messages
 
 
-def _get_mcp_client() -> MCPClient:
-    return MCPClient()
+def _get_mcp_client(session_id: str | None = None) -> MCPClient:
+    if not session_id:
+        return MCPClient()
+    store = get_elicitation_store()
+    async def _elicitation_callback(message: str, options: list[str]) -> str:
+        elicitation = store.create(session_id, message, options)
+        return await elicitation.wait()
+    return MCPClient(elicitation_callback=_elicitation_callback)
 
 
 def _get_review_service() -> ReviewService:
@@ -1468,7 +1475,6 @@ async def _dispatch_message(
 @router.post("/message")
 async def send_message(
     request: DialogueMessageRequest,
-    mcp_client: MCPClient = Depends(_get_mcp_client),
     review_service: ReviewService = Depends(_get_review_service),
     uow: UnitOfWork = Depends(get_uow),
 ) -> DialogueMessageResponse:
@@ -1491,6 +1497,7 @@ async def send_message(
     Raises:
         Any exception given by DirectionFlow or MCPClient
     """
+    mcp_client = _get_mcp_client(request.session_id)
     timeout_seconds = _dialogue_request_timeout_seconds(request)
     try:
         return await asyncio.wait_for(
@@ -1527,11 +1534,40 @@ async def get_collection_status(session_id: str):
     The frontend polls this every ~1.5 s while isCollecting is true to drive
     the per-source progress indicator in the IntelligencePanel.
     Returns 404 if no status file exists yet for the session.
+    Includes a pending_elicitation field when the agent is waiting for user input.
     """
     status = CollectionStatusTracker.read(session_id)
     if status is None:
         raise HTTPException(status_code=404, detail="No collection status found")
     return status
+
+
+@router.get("/elicitation/pending/{session_id}")
+async def get_pending_elicitation(session_id: str):
+    """Return any pending elicitation request for a session, or null if none.
+
+    Polled by the frontend during any active agent phase (isLoading).
+    Phase-agnostic — works for collection, processing, and future phases.
+    """
+    elicitation = get_elicitation_store().get(session_id)
+    return {"pending_elicitation": elicitation.to_dict() if elicitation else None}
+
+
+class ElicitationResponse(BaseModel):
+    choice: str
+
+
+@router.post("/elicitation/{session_id}/respond")
+async def respond_to_elicitation(session_id: str, body: ElicitationResponse):
+    """Submit the user's answer to a pending elicitation request.
+
+    Called by the frontend when the user clicks an option in the elicitation modal.
+    Unblocks the MCP agent which is waiting on asyncio.Event.
+    """
+    responded = get_elicitation_store().respond(session_id, body.choice)
+    if not responded:
+        raise HTTPException(status_code=404, detail="No pending elicitation for this session")
+    return {"status": "ok"}
 
 
 @router.get("/dev/state")

@@ -1,10 +1,47 @@
 """Collection phase review prompt builder and MCP adapter function."""
 
+import json as _json
 from datetime import UTC, datetime
 
 
 def build_collection_review_prompt(content: str, context: str) -> str:
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
+
+    try:
+        _ctx = _json.loads(context)
+        _gather_more_feedback = (_ctx.get("gather_more_feedback") or "").strip()
+    except Exception:
+        _gather_more_feedback = ""
+
+    if _gather_more_feedback:
+        _mode_header = f"""
+## SUPPLEMENTAL COLLECTION MODE
+This is an **incremental** "gather more" run — NOT the initial full collection.
+The user requested additional data to address a specific gap:
+> {_gather_more_feedback}
+
+Evaluate ONLY whether the new collected data meaningfully addresses this gap request.
+Do NOT require full coverage of all PIRs — prior collection runs already addressed
+the base requirements. Apply the following adjusted criteria:
+- PIR Coverage: approve a PIR if the new data adds relevant evidence toward the gap.
+  Only flag MAJOR if the new data is entirely irrelevant to the stated gap.
+- Source Quality, Traceability, and Timeframe rules still apply normally.
+- Do not penalize for limited breadth — supplemental runs are expected to be narrower.
+
+"""
+        _pir_coverage_rule = (
+            "- This is a supplemental run. Evaluate each PIR only in relation to the "
+            "stated gap above. Approve if the new data adds at least partial value. "
+            "Only flag MAJOR if the new data completely fails to address the gap."
+        )
+    else:
+        _mode_header = ""
+        _pir_coverage_rule = (
+            "- Review ALL PIRs in context.pirs.\n"
+            "- For each PIR, decide if collected evidence meaningfully addresses the requirement.\n"
+            "- Require at least one source-traceable basis for each PIR decision.\n"
+            "- If a PIR has priority \"high\" and is not covered, this is MAJOR."
+        )
 
     return f"""You are a strict quality reviewer for collected intelligence in the Collection
 phase of a threat intelligence cycle.
@@ -15,7 +52,7 @@ Use this as the reference point for all temporal reasoning, including timeframe 
 Your role is to verify that collected output is decision-relevant, source-grounded,
 and sufficient to answer approved intelligence requirements. You are NOT a
 style editor. You evaluate analytical usefulness, source quality, and traceability.
-
+{_mode_header}
 ## Intelligence Context
 {context}
 
@@ -33,10 +70,7 @@ Expected structure:
 ## Evaluate using these criteria:
 
 ### 1. PIR Coverage
-- Review ALL PIRs in context.pirs.
-- For each PIR, decide if collected evidence meaningfully addresses the requirement.
-- Require at least one source-traceable basis for each PIR decision.
-- If a PIR has priority "high" and is not covered, this is MAJOR.
+{_pir_coverage_rule}
 
 ### 2. Source Quality
 - Check relevance: sources must match the PIR and target context.
@@ -62,9 +96,10 @@ When in doubt, be strict because weak collection quality propagates errors downs
 
 - MAJOR examples:
   - unsupported material claims
-  - uncovered high-priority PIR
+  - uncovered high-priority PIR (full collection mode only)
   - significant out-of-timeframe findings
   - critical source-quality failures
+  - supplemental run that adds zero relevant data for the stated gap
 - MINOR examples:
   - partial PIR coverage with recoverable gaps
   - generally valid findings lacking precision or prioritization

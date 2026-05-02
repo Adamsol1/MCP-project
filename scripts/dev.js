@@ -7,26 +7,38 @@ const services = [
     key: "mcp",
     name: "Generation MCP",
     args: ["--silent", "run", "dev:mcp"],
-    success: [/Starting Generation MCP on (.+)/, /Generation MCP already running on (.+)/],
+    success: [
+      /Starting Generation MCP on (.+)/,
+      /Generation MCP already running on (.+)/,
+    ],
   },
   {
     key: "review",
     name: "Review MCP",
     args: ["--silent", "run", "dev:review"],
-    success: [/Starting Review MCP on (.+)/, /Review MCP already running on (.+)/],
+    success: [
+      /Starting Review MCP on (.+)/,
+      /Review MCP already running on (.+)/,
+    ],
   },
   {
     key: "council",
     name: "Council MCP",
     args: ["--silent", "run", "dev:council"],
-    success: [/Starting Council MCP on (.+)/, /Council MCP already running on (.+)/],
+    success: [
+      /Starting Council MCP on (.+)/,
+      /Council MCP already running on (.+)/,
+    ],
   },
   {
     key: "backend",
     name: "Backend API",
     args: ["--silent", "run", "dev:backend"],
     env: { COUNCIL_MCP_AUTOSTART: "0" },
-    success: [/Backend API started successfully: (.+)/, /Backend API already running on (.+)/],
+    success: [
+      /Backend API started successfully: (.+)/,
+      /Backend API already running on (.+)/,
+    ],
   },
   {
     key: "frontend",
@@ -41,7 +53,7 @@ const startedServices = new Set();
 let shuttingDown = false;
 
 const BARBOSA_BANNER = [
-  " ____            _                     ",
+  " ____            ._                     ",
   "| __ )  __ _ _ __| |__   ___  ___  __ _",
   "|  _ \\ / __ | ___| __ \\ / _ \\/ __|/ __ |",
   "| |_) | (_| | |  | |_) | (_) \\__ \\ (_| |",
@@ -81,8 +93,12 @@ function portMessage(service, line) {
 
 function isKnownStartupNoise(line) {
   return (
-    /AuthlibDeprecationWarning: authlib\.jose module is deprecated/i.test(line) ||
-    /Warning: You are sending unauthenticated requests to the HF Hub/i.test(line)
+    /AuthlibDeprecationWarning: authlib\.jose module is deprecated/i.test(
+      line,
+    ) ||
+    /Warning: You are sending unauthenticated requests to the HF Hub/i.test(
+      line,
+    )
   );
 }
 
@@ -96,7 +112,11 @@ function shouldForwardRuntimeLine(state, line) {
     return true;
   }
 
-  if (/Traceback|Exception|Error:|ERROR|WARN|WARNING|CRITICAL|failed|Cannot|Invalid/i.test(line)) {
+  if (
+    /Traceback|Exception|Error:|ERROR|WARN|WARNING|CRITICAL|failed|Cannot|Invalid/i.test(
+      line,
+    )
+  ) {
     if (/Traceback/i.test(line)) {
       state.forwardLines = 12;
     }
@@ -114,14 +134,16 @@ function handleLine(service, state, rawLine) {
     const match = line.match(pattern);
     if (match && !state.reported) {
       state.reported = true;
-      const target = service.key === "frontend" ? terminalLink(match[1]) : match[1];
+      const target =
+        service.key === "frontend" ? terminalLink(match[1]) : match[1];
       console.log(`${service.name} started successfully: ${target}`);
       maybePrintBanner(service);
       return;
     }
   }
 
-  const failure = dependencyMessage(service, line) || portMessage(service, line);
+  const failure =
+    dependencyMessage(service, line) || portMessage(service, line);
   if (failure && !state.reportedFailure) {
     state.reportedFailure = true;
     console.error(failure);
@@ -168,7 +190,9 @@ function startService(service) {
     children.delete(service.key);
     if (shuttingDown || signal) return;
     if (code !== 0 && !state.reportedFailure) {
-      const action = state.reported ? "stopped unexpectedly" : "failed to start";
+      const action = state.reported
+        ? "stopped unexpectedly"
+        : "failed to start";
       console.error(`${service.name} ${action} (exit code ${code}).`);
     }
   });

@@ -207,11 +207,24 @@ function AssertionRow({
   return (
     <div>
       <div className="flex items-start gap-3">
-        <div className="mt-0.5 flex shrink-0 items-center gap-1.5">
+        <div className="mt-0.5 flex shrink-0 items-center gap-1.5 flex-wrap">
           <AssertionTierBadge confidence={conf} />
           {conf?.circular_flag && (
             <span className="text-[10px] font-medium text-warning-text">⚠</span>
           )}
+          {assertion.supporting_finding_ids.length > 0 &&
+            assertion.supporting_finding_ids.map((fid) => {
+              const finding = allFindings.find((f) => f.id === fid);
+              return (
+                <span
+                  key={fid}
+                  title={finding?.title}
+                  className="rounded border border-primary/30 bg-primary-subtle/20 px-1.5 py-0.5 text-[9px] font-mono text-primary/70"
+                >
+                  {fid}
+                </span>
+              );
+            })}
         </div>
         <p className="flex-1 text-sm font-medium leading-6 text-text-primary">{assertion.assertion}</p>
       </div>
@@ -220,56 +233,6 @@ function AssertionRow({
         <p className="mt-2 text-sm leading-6 text-text-secondary whitespace-pre-line">{assertion.analysis}</p>
       )}
 
-      {conf && (
-        <div className="mt-2 ml-18 space-y-2">
-          <div className="grid grid-cols-3 gap-3">
-            {(
-              [
-                ["Authority", conf.authority],
-                ["Corroboration", conf.corroboration],
-                ["Independence", conf.independence],
-              ] as [string, number][]
-            ).map(([label, value]) => (
-              <div key={label}>
-                <p className="text-[9px] font-medium uppercase tracking-widest text-text-muted">{label}</p>
-                <div className="mt-0.5 flex items-center gap-1">
-                  <div className="h-1 flex-1 overflow-hidden rounded-full bg-border/40">
-                    <div className="h-full rounded-full bg-primary/60" style={{ width: `${Math.round(value * 100)}%` }} />
-                  </div>
-                  <span className="text-[9px] tabular-nums text-text-muted">{value.toFixed(2)}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {assertion.source_types.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {assertion.source_types.map((st) => (
-                <span key={st} className="rounded-full border border-border bg-surface px-1.5 py-0.5 text-[9px] text-text-muted">
-                  {st.replace(/_/g, " ")}
-                </span>
-              ))}
-            </div>
-          )}
-
-          {assertion.supporting_finding_ids.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {assertion.supporting_finding_ids.map((fid) => {
-                const finding = allFindings.find((f) => f.id === fid);
-                return (
-                  <span
-                    key={fid}
-                    title={finding?.title}
-                    className="rounded border border-primary/30 bg-primary-subtle/20 px-1.5 py-0.5 text-[9px] font-mono text-primary/70"
-                  >
-                    {fid}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

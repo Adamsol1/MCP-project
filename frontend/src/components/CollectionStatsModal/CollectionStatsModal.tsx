@@ -3,6 +3,7 @@ import type {
   CollectionDisplayData,
   CollectedItem,
 } from "../../types/conversation";
+import type { UploadedFileRecord } from "../../services/upload/upload";
 import { useT } from "../../i18n/useT";
 
 // ── Colors & abbreviations ────────────────────────────────────────────────────
@@ -109,7 +110,7 @@ function PieChart({ slices }: { slices: SliceData[] }) {
         <text
           x={cx + r + 45}
           y={cy - 4}
-          fontSize="32"
+          fontSize="14"
           fontWeight="600"
           fill="var(--color-text-secondary)"
         >
@@ -480,6 +481,7 @@ function cleanTitle(title: string): string {
 }
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  knowledge_base: "Knowledge Bank",
   list_knowledge_base: "Knowledge Bank",
   read_knowledge_base: "Knowledge Bank",
   query_otx: "AlienVault OTX",
@@ -518,6 +520,14 @@ function isWebSource(source: string) {
     source === "fetch_page" ||
     source === "google_news_search" ||
     source === "google_search"
+  );
+}
+
+function isUploadSource(source: string) {
+  return (
+    source === "read_upload" ||
+    source === "search_local_data" ||
+    source === "list_uploads"
   );
 }
 
@@ -911,17 +921,23 @@ function Chevron({ className }: { className?: string }) {
 
 // ── Item card (collapsible) ───────────────────────────────────────────────────
 
-function ItemCard({ item }: { item: CollectedItem }) {
+function ItemCard({ item, uploadedFiles }: { item: CollectedItem; uploadedFiles?: UploadedFileRecord[] }) {
   const isOtx = isOtxSource(item.source);
   const isKb = isKbSource(item.source);
   const isWeb = isWebSource(item.source);
+  const isUpload = isUploadSource(item.source);
   const isFetch = item.source === "fetch_page";
 
-  const displayTitle: string = isFetch
-    ? item.title
-      ? cleanTitle(item.title)
-      : (item.resource_id ?? "(untitled)")
-    : (item.resource_id ?? "(no resource)");
+  const displayTitle: string = (() => {
+    if (isFetch) {
+      return item.title ? cleanTitle(item.title) : (item.resource_id ?? "(untitled)");
+    }
+    if (isUpload && item.resource_id && uploadedFiles) {
+      const match = uploadedFiles.find((f) => f.file_upload_id === item.resource_id);
+      if (match) return match.original_filename;
+    }
+    return item.title ?? item.resource_id ?? "(no resource)";
+  })();
 
   // Translate non-Latin titles for web articles
   const { translated, loading } = useTranslation(isWeb ? displayTitle : "");
@@ -963,7 +979,7 @@ function ItemCard({ item }: { item: CollectedItem }) {
         )}
         {isOtx ? (
           <OtxContent content={item.content} />
-        ) : isKb || isWeb ? (
+        ) : isKb || isWeb || isUpload ? (
           <KbContent content={item.content} />
         ) : (
           <pre className="max-h-48 overflow-auto whitespace-pre-wrap break-all rounded border border-border-muted bg-surface-muted p-3 text-xs text-text-secondary">
@@ -981,12 +997,14 @@ interface CollectionStatsModalProps {
   isOpen: boolean;
   onClose: () => void;
   collectionData: CollectionDisplayData | null;
+  uploadedFiles?: UploadedFileRecord[];
 }
 
 export default function CollectionStatsModal({
   isOpen,
   onClose,
   collectionData,
+  uploadedFiles,
 }: CollectionStatsModalProps) {
   const t = useT();
 
@@ -1176,14 +1194,14 @@ export default function CollectionStatsModal({
                               </summary>
                               <div className="px-3 py-3 space-y-2 bg-surface-muted">
                                 {typeItems.map((item, i) => (
-                                  <ItemCard key={i} item={item} />
+                                  <ItemCard key={i} item={item} uploadedFiles={uploadedFiles} />
                                 ))}
                               </div>
                             </details>
                           ))
                         : // ── Non-web: flat list of collapsible items ───────────
                           items.map((item, i) => (
-                            <ItemCard key={i} item={item} />
+                            <ItemCard key={i} item={item} uploadedFiles={uploadedFiles} />
                           ))}
                     </div>
                   </details>

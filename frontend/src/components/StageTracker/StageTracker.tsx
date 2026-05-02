@@ -85,11 +85,11 @@ export default function StageTracker({
                   <CheckIcon />
                 </span>
               ) : isActive ? (
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-white text-xs font-bold">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-text-inverse text-xs font-bold">
                   {i + 1}
                 </span>
               ) : (
-                <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-border text-text-muted text-xs font-bold">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full border-2 border-border text-text-secondary text-xs font-bold">
                   {i + 1}
                 </span>
               )}

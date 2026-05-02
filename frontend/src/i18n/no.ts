@@ -169,7 +169,6 @@ export const no = {
     web_think_tank: "Tenketanker / forskning",
     web_news: "Nyheter / media",
     web_other: "Andre webkilder",
-    otx: "AlienVault OTX",
   } as Record<string, string>,
   timeframeOptions: {
     "": "Ingen begrensning",

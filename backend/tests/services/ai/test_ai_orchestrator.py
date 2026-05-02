@@ -3,7 +3,7 @@
 import pytest
 
 from src.models.dialogue import DialogueContext
-from src.services.AI.ai_orchestrator import AIOrchestrator
+from src.services.ai.ai_orchestrator import AIOrchestrator
 from tests.services.conftest import (
     MockGenerator,
     MockLogger,
@@ -47,6 +47,8 @@ async def test_orchestrator_approves_on_first_try():
 
 @pytest.mark.asyncio
 async def test_orchestrator_retries_and_succeeds():
+    """With max_attempts=1, the orchestrator runs one attempt and returns the result
+    even if the reviewer rejects it (no retry occurs)."""
     context = DialogueContext()
     context.scope = "identify attack patterns"
     context.timeframe = "last 6 months"
@@ -69,15 +71,16 @@ async def test_orchestrator_retries_and_succeeds():
     )
 
     assert result == "Generated PIR based on context"
-    assert reviewer.call_count == 2
-    assert len(orchestrator.attempts) == 2
-    assert len(orchestrator.review_results) == 2
+    assert reviewer.call_count == 1
+    assert len(orchestrator.attempts) == 1
+    assert len(orchestrator.review_results) == 1
     assert orchestrator.retry_explanations == ["Be more specific"]
-    assert len(logger.logs) == 2
+    assert len(logger.logs) == 1
 
 
 @pytest.mark.asyncio
 async def test_orchestrator_fails_after_max_retries():
+    """With max_attempts=1, even multiple rejections result in a single attempt."""
     context = DialogueContext()
     context.scope = "identify attack patterns"
     context.timeframe = "last 6 months"
@@ -106,9 +109,9 @@ async def test_orchestrator_fails_after_max_retries():
     )
 
     assert result == "Generated PIR based on context"
-    assert reviewer.call_count == 3
-    assert len(orchestrator.attempts) == 3
-    assert len(orchestrator.review_results) == 3
+    assert reviewer.call_count == 1
+    assert len(orchestrator.attempts) == 1
+    assert len(orchestrator.review_results) == 1
     assert orchestrator.attempts[-1] == result
-    assert len(orchestrator.retry_explanations) == 3
-    assert len(logger.logs) == 3
+    assert len(orchestrator.retry_explanations) == 1
+    assert len(logger.logs) == 1

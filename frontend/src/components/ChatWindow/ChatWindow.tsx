@@ -244,6 +244,8 @@ function PirMessage({ pirData }: { pirData: PirData }) {
 }
 
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
+  const t = useT();
+  const reasoningText = (planData.reasoning ?? "").trim();
   return (
     <div className="space-y-3">
       <h3 className="font-semibold">Collection Plan</h3>
@@ -304,6 +306,17 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
         <p className="whitespace-pre-wrap text-sm text-text-primary">
           {planData.plan}
         </p>
+      )}
+      {reasoningText && (
+        <details className="group mt-3 border-t border-border/50 pt-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+            {t.showReasoning}
+            <Chevron />
+          </summary>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
+        </details>
       )}
     </div>
   );
@@ -748,6 +761,8 @@ function ProcessingMessage({
   onGapCollect?: (gap: string) => void;
   onCollectMore?: () => void;
 }) {
+  const t = useT();
+  const reasoningText = (data.reasoning ?? "").trim();
   const [selectedFinding, setSelectedFinding] = useState<{
     finding: ProcessingData["findings"][number];
     displayId: string;
@@ -808,6 +823,9 @@ function ProcessingMessage({
                 Source
               </th>
               <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
+                Categories
+              </th>
+              <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
                 Confidence
               </th>
               <th className="px-4 py-2.5 text-left font-semibold uppercase tracking-wide text-xs border-b border-border/50 whitespace-nowrap">
@@ -841,6 +859,18 @@ function ProcessingMessage({
                     </td>
                     <td className="px-4 py-3 text-text-secondary whitespace-nowrap">
                       {sourceLabel}
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex flex-wrap gap-1">
+                        {(f.categories ?? []).map((cat) => (
+                          <span
+                            key={cat}
+                            className="rounded px-1.5 py-0.5 text-xs font-medium bg-primary-subtle text-primary uppercase"
+                          >
+                            {cat}
+                          </span>
+                        ))}
+                      </div>
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span
@@ -934,6 +964,17 @@ function ProcessingMessage({
             </div>
           )}
         </div>
+      )}
+      {reasoningText && (
+        <details className="group mt-3 border-t border-border/50 pt-2">
+          <summary className="cursor-pointer list-none text-sm font-medium text-text-secondary hover:text-text-primary select-none flex items-center gap-1">
+            {t.showReasoning}
+            <Chevron />
+          </summary>
+          <div className="mt-2 bg-surface-muted rounded-md p-3">
+            <ReasoningMarkdown text={reasoningText} />
+          </div>
+        </details>
       )}
       <FindingDetailModal
         finding={selectedFinding?.finding ?? null}
@@ -1108,6 +1149,19 @@ export default function ChatWindow({
   }, [isSourceSelecting]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const bottomPanelRef = useRef<HTMLDivElement>(null);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(160);
+
+  useEffect(() => {
+    const el = bottomPanelRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(() => {
+      setBottomPanelHeight(el.offsetHeight);
+    });
+    observer.observe(el);
+    setBottomPanelHeight(el.offsetHeight);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const el = textareaRef.current;
@@ -1232,7 +1286,7 @@ export default function ChatWindow({
         <ProcessingMessage
           data={message.data as ProcessingData}
           onGapCollect={onGapCollect ? (gap) => onSendMessage?.(gap) : undefined}
-          onCollectMore={onGatherMoreFromProcessing}
+          onCollectMore={isConfirming ? onGatherMoreFromProcessing : undefined}
         />
       );
     }
@@ -1273,7 +1327,7 @@ export default function ChatWindow({
   return (
     <div className="flex-1 min-h-0 w-full relative flex flex-col">
       {hasConversationContent && (
-        <div className="absolute inset-0 overflow-y-auto py-4 pb-40">
+        <div className="absolute inset-0 overflow-y-auto py-4" style={{ paddingBottom: bottomPanelHeight + 24 }}>
           <div className={`${contentWidthClass} flex flex-col`}>
             {messages.map((message) => (
               <div
@@ -1312,7 +1366,9 @@ export default function ChatWindow({
                       : phase === "analysis"
                         ? "Generating analysis…"
                         : phase === "collection"
-                          ? "Collecting intelligence…"
+                          ? stage === "plan_confirming" || stage === "planning"
+                            ? "Updating collection plan…"
+                            : "Collecting intelligence…"
                           : "Working…"}
                   </p>
                 </div>
@@ -1332,6 +1388,7 @@ export default function ChatWindow({
 
       {!isAnalysisComplete && (
         <div
+          ref={bottomPanelRef}
           className={`flex flex-col items-center gap-4 pb-6 ${
             hasConversationContent
               ? "absolute bottom-0 left-0 right-0 pt-8 bg-linear-to-t from-surface-elevated via-surface-elevated/90 to-transparent"
@@ -1430,10 +1487,10 @@ export default function ChatWindow({
                       {t.dateWindowsLabel}
                     </p>
                     <p className="text-xs text-text-muted mb-3">{t.dateWindowsDesc}</p>
-                    <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                       {(Object.keys(t.sourceTimeframeLabels) as (keyof SourceTimeframes)[]).map((key) => (
-                        <div key={key} className="flex items-center gap-3">
-                          <span className="w-44 shrink-0 text-xs text-text-secondary">
+                        <div key={key} className="flex flex-col gap-1">
+                          <span className="text-xs text-text-secondary">
                             {t.sourceTimeframeLabels[key]}
                           </span>
                           <select
@@ -1442,7 +1499,7 @@ export default function ChatWindow({
                               setLocalTimeframes((prev) => ({ ...prev, [key]: e.target.value }))
                             }
                             disabled={isLoading}
-                            className="rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
+                            className="w-full rounded border border-border bg-surface px-2 py-1 text-xs text-text-primary focus:outline-none focus:ring-1 focus:ring-primary disabled:opacity-50"
                           >
                             {(Object.entries(t.timeframeOptions) as [string, string][]).map(
                               ([code, label]) => (

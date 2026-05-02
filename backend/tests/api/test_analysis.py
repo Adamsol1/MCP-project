@@ -173,7 +173,7 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
         assert session_id is None or isinstance(session_id, str)
         return logger
 
-    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda: store)
+    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda uow=None: store)
     monkeypatch.setattr(
         analysis_api,
         "AnalysisService",
@@ -188,7 +188,7 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
         raising=False,
     )
     monkeypatch.setattr(
-        "src.services.processing_result_store._SESSIONS_DATA_DIR",
+        "src.services.processing.processing_result_store._SESSIONS_DATA_DIR",
         tmp_path,
     )
 
@@ -250,6 +250,7 @@ def test_analysis_draft_response_shape_is_valid(monkeypatch, tmp_path):
     assert len(processing_result["gaps"]) == 2
 
     assert set(analysis_draft.keys()) == {
+        "title",
         "summary",
         "key_judgments",
         "per_perspective_implications",
