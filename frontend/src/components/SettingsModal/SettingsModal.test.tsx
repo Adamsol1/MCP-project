@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
 import { SettingsModal } from "./SettingsModal";
+import { axe } from "vitest-axe";
 
 // ─── Test helper ─────────────────────────────────────────────────────────────
 // SettingsModal reads from SettingsContext, so it must live inside a Provider.
@@ -256,5 +257,28 @@ describe("SettingsModal", () => {
         "true",
       );
     });
+  });
+});
+
+describe("SettingsModal — accessibility (WCAG 2.1 AA)", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("has no violations when open on the Appearance tab", async () => {
+    const { container } = renderModal({ isOpen: true });
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations on the Parameters tab", async () => {
+    const user = userEvent.setup();
+    const { container } = renderModal({ isOpen: true });
+    await user.click(screen.getByRole("button", { name: /parameters/i }));
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations on the Council tab", async () => {
+    const user = userEvent.setup();
+    const { container } = renderModal({ isOpen: true });
+    await user.click(screen.getByRole("button", { name: /council/i }));
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

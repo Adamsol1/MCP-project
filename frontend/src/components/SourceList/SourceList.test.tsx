@@ -15,6 +15,7 @@ import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import SourceList from "./SourceList";
 import type { Source } from "../../types/conversation";
+import { axe } from "vitest-axe";
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -214,5 +215,25 @@ describe("SourceList — highlight state", () => {
     const cards = screen.getAllByRole("listitem");
     expect(cards[0]).toHaveClass("text-primary");
     expect(cards[1]).not.toHaveClass("text-primary");
+  });
+});
+
+describe("SourceList — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations with sources", async () => {
+    const { container } = render(
+      <SourceList
+        sources={[sourceNorway, sourceEnergy]}
+        highlightedRefs={[]}
+        onSourceHover={vi.fn()}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with empty source list", async () => {
+    const { container } = render(
+      <SourceList sources={[]} highlightedRefs={[]} onSourceHover={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

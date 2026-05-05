@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import ApprovalPrompt from "./ApprovalPrompt";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 describe("ApprovalPrompt", () => {
   it("renders primary actions for approval prompt", () => {
@@ -21,7 +22,7 @@ describe("ApprovalPrompt", () => {
     renderWithSettings(<ApprovalPrompt stage="summary_confirming" />);
 
     expect(
-      screen.getByRole("heading", { name: /summary approval prompt/i }),
+      screen.getByRole("heading", { name: /does this capture your intent/i }),
     ).toBeInTheDocument();
   });
 
@@ -29,7 +30,7 @@ describe("ApprovalPrompt", () => {
     renderWithSettings(<ApprovalPrompt stage="pir_confirming" />);
 
     expect(
-      screen.getByRole("heading", { name: /pir approval prompt/i }),
+      screen.getByRole("heading", { name: /do these pirs look correct/i }),
     ).toBeInTheDocument();
   });
 
@@ -90,5 +91,12 @@ describe("ApprovalPrompt", () => {
     );
 
     expect(onRejectWithFeedback).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("ApprovalPrompt — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in default state", async () => {
+    const { container } = renderWithSettings(<ApprovalPrompt />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

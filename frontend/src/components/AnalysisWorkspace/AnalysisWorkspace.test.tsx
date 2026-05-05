@@ -5,8 +5,10 @@ import type { ReactNode } from "react";
 import AnalysisWorkspace from "./AnalysisWorkspace";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { ConversationStore } from "../../types/conversation";
 import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
+import { axe } from "vitest-axe";
 
 vi.mock("../../services/analysis/analysis", () => ({
   runAnalysisCouncil: vi.fn(),
@@ -144,7 +146,9 @@ function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <SettingsProvider>
-        <ConversationProvider>{children}</ConversationProvider>
+        <ConversationProvider>
+          <WorkspaceProvider>{children}</WorkspaceProvider>
+        </ConversationProvider>
       </SettingsProvider>
     );
   };
@@ -469,5 +473,18 @@ describe("AnalysisWorkspace", () => {
         screen.queryByText(/Attribution remains unresolved/i),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("AnalysisWorkspace — accessibility (WCAG 2.1 AA)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    seedConversationStore();
+  });
+
+  it("has no violations in initial render", async () => {
+    const { container } = render(<AnalysisWorkspace />, { wrapper: createWrapper() });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

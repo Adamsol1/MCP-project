@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import CollectionStatsModal from "./CollectionStatsModal";
 import { renderWithSettings } from "../../test/renderWithProviders";
 import type { CollectionDisplayData } from "../../types/conversation";
+import { axe } from "vitest-axe";
 
 // ---------------------------------------------------------------------------
 // Fixture data (same shape as real CollectionDisplayData)
@@ -159,5 +160,18 @@ describe("CollectionStatsModal", () => {
     );
 
     expect(screen.getByText(/no data available/i)).toBeInTheDocument();
+  });
+});
+
+describe("CollectionStatsModal — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations when open with data", async () => {
+    const { container } = renderWithSettings(
+      <CollectionStatsModal
+        isOpen={true}
+        onClose={vi.fn()}
+        collectionData={COLLECTION_DATA}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

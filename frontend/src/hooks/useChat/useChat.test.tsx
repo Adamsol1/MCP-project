@@ -145,7 +145,6 @@ describe("useChat", () => {
           web_think_tank: "",
           web_news: "",
           web_other: "",
-          otx: "",
         },
       },
     );
