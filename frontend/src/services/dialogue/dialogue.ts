@@ -30,13 +30,15 @@ export interface CouncilRunSettings {
 }
 
 export interface DialogueSendOptions {
-  aiProvider?: "local" | "gemini";
+  aiProvider?: "gemini" | "local";
   selectedSources?: string[];
   gatherMore?: boolean;
   councilDebatePoint?: string;
   councilFindingIds?: string[];
   councilPerspectives?: string[];
   councilSettings?: CouncilRunSettings;
+  /** Per-source-tier timeframe codes for this submission (overrides settings defaults). */
+  sourceTimeframes?: Record<string, string>;
 }
 
 export interface DialogueDevStateResponse {
@@ -109,8 +111,9 @@ export async function sendMessage(
       perspectives,
       approved,
       language,
+      ai_provider: options.aiProvider ?? "gemini",
       settings_timeframe: settingsTimeframe,
-      ai_provider: options.aiProvider ?? "local",
+      settings_source_timeframes: options.sourceTimeframes ?? {},
       selected_sources: options.selectedSources ?? [],
       gather_more: options.gatherMore ?? false,
       council_debate_point: options.councilDebatePoint ?? "",
@@ -127,6 +130,11 @@ export async function sendMessage(
 export interface CollectionSourceStatus {
   call_count: number;
   last_called_at: string | null;
+}
+
+export interface PendingElicitation {
+  message: string;
+  options: string[];
 }
 
 export interface CollectionStatus {
@@ -147,6 +155,26 @@ export async function getCollectionStatus(sessionId: string): Promise<Collection
   } catch {
     return null;
   }
+}
+
+export async function getPendingElicitation(sessionId: string): Promise<PendingElicitation | null> {
+  try {
+    const res = await axios.get<{ pending_elicitation: PendingElicitation | null }>(
+      `${API_BACKEND_URL}/api/dialogue/elicitation/pending/${sessionId}`,
+      { timeout: COLLECTION_STATUS_TIMEOUT_MS },
+    );
+    return res.data.pending_elicitation;
+  } catch {
+    return null;
+  }
+}
+
+export async function respondToElicitation(sessionId: string, choice: string): Promise<void> {
+  await axios.post(
+    `${API_BACKEND_URL}/api/dialogue/elicitation/${sessionId}/respond`,
+    { choice },
+    { timeout: COLLECTION_STATUS_TIMEOUT_MS },
+  );
 }
 
 export async function getDevDialogueState(sessionId: string) {

@@ -16,6 +16,7 @@ import {
   type AiProvider,
   type InputParameters,
   type CouncilSettings,
+  type SourceTimeframes,
 } from "../../types/settings";
 
 /** localStorage key under which the settings object is stored as JSON. */
@@ -46,6 +47,8 @@ export interface SettingsContextValue {
    * when more fields are added in the future.
    */
   updateInputParameters: (params: Partial<InputParameters>) => void;
+  /** Update a single source-tier timeframe code (e.g. web_news → "m3"). */
+  updateSourceTimeframe: (key: keyof SourceTimeframes, value: string) => void;
   /** Merge partial council runtime settings into the current values. */
   updateCouncilSettings: (params: Partial<CouncilSettings>) => void;
 }
@@ -75,6 +78,10 @@ function loadSettings(): Settings {
       inputParameters: {
         ...DEFAULT_SETTINGS.inputParameters,
         ...parsed.inputParameters,
+        sourceTimeframes: {
+          ...DEFAULT_SETTINGS.inputParameters.sourceTimeframes,
+          ...(parsed.inputParameters?.sourceTimeframes ?? {}),
+        },
       },
       councilSettings: {
         ...DEFAULT_SETTINGS.councilSettings,
@@ -122,6 +129,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     );
   }, [settings.theme]);
 
+  useLayoutEffect(() => {
+    document.documentElement.lang = settings.language;
+  }, [settings.language]);
+
   const updateLanguage = useCallback((language: Language) => {
     setSettings((prev) => ({ ...prev, language }));
   }, []);
@@ -153,6 +164,19 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateSourceTimeframe = useCallback(
+    (key: keyof SourceTimeframes, value: string) => {
+      setSettings((prev) => ({
+        ...prev,
+        inputParameters: {
+          ...prev.inputParameters,
+          sourceTimeframes: { ...prev.inputParameters.sourceTimeframes, [key]: value },
+        },
+      }));
+    },
+    [],
+  );
+
   const updateCouncilSettings = useCallback(
     (params: Partial<CouncilSettings>) => {
       setSettings((prev) => ({
@@ -170,6 +194,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     updateAiProvider,
     updateTheme,
     updateInputParameters,
+    updateSourceTimeframe,
     updateCouncilSettings,
   };
 

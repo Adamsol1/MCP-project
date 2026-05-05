@@ -5,8 +5,10 @@ import type { ReactNode } from "react";
 import AnalysisWorkspace from "./AnalysisWorkspace";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import type { ConversationStore } from "../../types/conversation";
 import type { AnalysisResponse, CouncilNote } from "../../types/analysis";
+import { axe } from "vitest-axe";
 
 vi.mock("../../services/analysis/analysis", () => ({
   runAnalysisCouncil: vi.fn(),
@@ -111,7 +113,8 @@ const demoResponse: AnalysisResponse = {
     per_perspective_implications: {
       us: [
         {
-          assertion: "US analysts should monitor shared vendor-access pathways.",
+          assertion:
+            "US analysts should monitor shared vendor-access pathways.",
           supporting_finding_ids: ["F-001"],
           source_types: ["network_telemetry"],
           confidence: null,
@@ -136,6 +139,7 @@ const demoResponse: AnalysisResponse = {
     ],
   },
   latest_council_note: null,
+  collection_coverage: null,
   data_source: "session",
 };
 
@@ -143,7 +147,9 @@ function createWrapper() {
   return function Wrapper({ children }: { children: ReactNode }) {
     return (
       <SettingsProvider>
-        <ConversationProvider>{children}</ConversationProvider>
+        <ConversationProvider>
+          <WorkspaceProvider>{children}</WorkspaceProvider>
+        </ConversationProvider>
       </SettingsProvider>
     );
   };
@@ -212,7 +218,9 @@ describe("AnalysisWorkspace", () => {
 
     render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
-    expect(screen.getByText(/No analysis available for this session/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/No analysis available for this session/i),
+    ).toBeInTheDocument();
   });
 
   it("renders findings and analysis sections", async () => {
@@ -252,7 +260,10 @@ describe("AnalysisWorkspace", () => {
               sender: "system",
               text: "Analysis complete",
               type: "analysis",
-              data: { ...demoResponse, analysis_draft: { ...demoResponse.analysis_draft, title: "" } },
+              data: {
+                ...demoResponse,
+                analysis_draft: { ...demoResponse.analysis_draft, title: "" },
+              },
             },
           ],
           perspectives: ["US", "NEUTRAL"],
@@ -368,7 +379,7 @@ describe("AnalysisWorkspace", () => {
 
     render(<AnalysisWorkspace />, { wrapper: createWrapper() });
 
-    await screen.findByText(/Run council on a point/i);
+    await screen.findByText(/Run council/i);
     await user.click(screen.getByRole("button", { name: /Run council/i }));
 
     expect(
@@ -463,5 +474,18 @@ describe("AnalysisWorkspace", () => {
         screen.queryByText(/Attribution remains unresolved/i),
       ).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("AnalysisWorkspace — accessibility (WCAG 2.1 AA)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    seedConversationStore();
+  });
+
+  it("has no violations in initial render", async () => {
+    const { container } = render(<AnalysisWorkspace />, { wrapper: createWrapper() });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

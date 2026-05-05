@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import CollectionStatsView from "./CollectionStatsView";
 import type { CollectionDisplayData } from "../../types/conversation";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 // ---------------------------------------------------------------------------
 // Minimal fixture data
@@ -120,5 +121,21 @@ describe("CollectionStatsView", () => {
     await user.click(screen.getByRole("button", { name: /view raw data/i }));
 
     expect(onOpenModal).toHaveBeenCalledOnce();
+  });
+});
+
+describe("CollectionStatsView — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations with collection data", async () => {
+    const { container } = renderWithSettings(
+      <CollectionStatsView collectionData={COLLECTION_DATA} onOpenModal={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations in empty state", async () => {
+    const { container } = renderWithSettings(
+      <CollectionStatsView collectionData={null} onOpenModal={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

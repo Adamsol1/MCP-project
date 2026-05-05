@@ -2,6 +2,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import FileUpload from "./FileUpload";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 
 describe("FileUpload", () => {
   it("renders a file input", () => {
@@ -219,5 +220,12 @@ describe("FileUpload", () => {
 
     // Should now be enabled
     expect(submitButton).toBeEnabled();
+  });
+});
+
+describe("FileUpload — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in default state", async () => {
+    const { container } = render(<FileUpload />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

@@ -55,6 +55,7 @@ class CouncilFlow(BasePhaseFlow):
         council_service,
         analysis_flow: AnalysisFlow | None = None,
         council_settings: CouncilRunSettings | None = None,
+        language: str = "en",
     ) -> DialogueResponse:
         from src.models.analysis import AnalysisDraft, ProcessingResult
 
@@ -90,6 +91,7 @@ class CouncilFlow(BasePhaseFlow):
                 analysis_draft=analysis_draft,
                 finding_ids=finding_ids or None,
                 council_settings=council_settings,
+                language=language,
             )
         except Exception as exc:
             logger.error(

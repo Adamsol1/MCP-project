@@ -1,33 +1,63 @@
 """Collection phase review prompt builder and MCP adapter function."""
 
+import json as _json
+from datetime import UTC, datetime
+
 
 def build_collection_review_prompt(content: str, context: str) -> str:
-    """Build review prompt for collected intelligence in the Collection phase.
+    _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
-    Args:
-        content: The collected data package to review (JSON string).
-        context: The direction context and PIR plan used for collection (JSON string).
+    try:
+        _ctx = _json.loads(context)
+        _gather_more_feedback = (_ctx.get("gather_more_feedback") or "").strip()
+    except Exception:
+        _gather_more_feedback = ""
 
-    Returns:
-        Formatted prompt string ready to send to the AI reviewer.
-    """
-    return f"""
-You are a strict quality reviewer for collected intelligence in the Collection
+    if _gather_more_feedback:
+        _mode_header = f"""
+## SUPPLEMENTAL COLLECTION MODE
+This is an **incremental** "gather more" run — NOT the initial full collection.
+The user requested additional data to address a specific gap:
+> {_gather_more_feedback}
+
+Evaluate ONLY whether the new collected data meaningfully addresses this gap request.
+Do NOT require full coverage of all PIRs — prior collection runs already addressed
+the base requirements. Apply the following adjusted criteria:
+- PIR Coverage: approve a PIR if the new data adds relevant evidence toward the gap.
+  Only flag MAJOR if the new data is entirely irrelevant to the stated gap.
+- Source Quality, Traceability, and Timeframe rules still apply normally.
+- Do not penalize for limited breadth — supplemental runs are expected to be narrower.
+
+"""
+        _pir_coverage_rule = (
+            "- This is a supplemental run. Evaluate each PIR only in relation to the "
+            "stated gap above. Approve if the new data adds at least partial value. "
+            "Only flag MAJOR if the new data completely fails to address the gap."
+        )
+    else:
+        _mode_header = ""
+        _pir_coverage_rule = (
+            "- Review ALL PIRs in context.pirs.\n"
+            "- For each PIR, decide if collected evidence meaningfully addresses the requirement.\n"
+            "- Require at least one source-traceable basis for each PIR decision.\n"
+            "- If a PIR has priority \"high\" and is not covered, this is MAJOR."
+        )
+
+    return f"""You are a strict quality reviewer for collected intelligence in the Collection
 phase of a threat intelligence cycle.
+
+TODAY'S DATE: {_today}
+Use this as the reference point for all temporal reasoning, including timeframe compliance assessments.
 
 Your role is to verify that collected output is decision-relevant, source-grounded,
 and sufficient to answer approved intelligence requirements. You are NOT a
 style editor. You evaluate analytical usefulness, source quality, and traceability.
-
-You will receive two JSON payloads:
-
-<<<CONTEXT>>>
+{_mode_header}
+## Intelligence Context
 {context}
-<<<END_CONTEXT>>>
 
-<<<CONTENT>>>
+## Collected Output to Review
 {content}
-<<<END_CONTENT>>>
 
 Expected structure:
 - CONTEXT includes scope, timeframe, target_entities, threat_actors,
@@ -40,10 +70,7 @@ Expected structure:
 ## Evaluate using these criteria:
 
 ### 1. PIR Coverage
-- Review ALL PIRs in context.pirs.
-- For each PIR, decide if collected evidence meaningfully addresses the requirement.
-- Require at least one source-traceable basis for each PIR decision.
-- If a PIR has priority "high" and is not covered, this is MAJOR.
+{_pir_coverage_rule}
 
 ### 2. Source Quality
 - Check relevance: sources must match the PIR and target context.
@@ -69,16 +96,18 @@ When in doubt, be strict because weak collection quality propagates errors downs
 
 - MAJOR examples:
   - unsupported material claims
-  - uncovered high-priority PIR
+  - uncovered high-priority PIR (full collection mode only)
   - significant out-of-timeframe findings
   - critical source-quality failures
+  - supplemental run that adds zero relevant data for the stated gap
 - MINOR examples:
   - partial PIR coverage with recoverable gaps
   - generally valid findings lacking precision or prioritization
 
-## Output requirements
+## Output
 Return valid JSON only. No markdown. No code fences.
-The output schema must exactly match:
+
+Set overall_approved to true only if ALL individual PIRs are approved.
 
 {{
   "overall_approved": bool,
@@ -87,18 +116,11 @@ The output schema must exactly match:
     {{
       "pir_index": int,
       "approved": bool,
-      "issue": "string or null"
+      "issue": "string — use JSON null (not the string 'null') if no issue"
     }}
   ],
-  "suggestions": "string or null"
-}}
-
-Rules for fields:
-- pir_reviews must include one entry per PIR index in context.pirs.
-- If approved is false, issue must be concrete and collection-specific.
-- suggestions should provide actionable next collection steps
-  (sources, queries, and evidence needed), not generic advice.
-"""
+  "suggestions": "string — when overall_approved is true, write a brief justification explaining which criteria were met and why the collection is considered sufficient. Use JSON null (not the string 'null') only when overall_approved is false and no actionable guidance applies."
+}}"""
 
 
 # ── MCP adapter function ──────────────────────────────────────────────────────

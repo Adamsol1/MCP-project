@@ -73,7 +73,7 @@ class TestSessionScopedUploads:
         assert saved_path.read_bytes() == b"hello"
         assert str(mock_upload_path / "session-a" / "files") in str(saved_path)
 
-    def test_upload_empty_file(self, _mock_upload_path):
+    def test_upload_empty_file(self, mock_upload_path):  # noqa: ARG002
         response = client.post(
             "/api/import/upload",
             data={"session_id": "session-a"},
@@ -124,7 +124,7 @@ class TestSessionScopedUploads:
         assert len(response2.json()["files"]) == 1
         assert response2.json()["files"][0]["filename"] == "two.txt"
 
-    def test_delete_uploaded_file(self, _mock_upload_path):
+    def test_delete_uploaded_file(self, mock_upload_path):  # noqa: ARG002
         upload_response = client.post(
             "/api/import/upload",
             data={"session_id": "session-delete"},

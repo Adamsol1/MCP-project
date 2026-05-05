@@ -6,6 +6,7 @@ import ChatWindow from "./ChatWindow";
 import { ToastProvider } from "../../contexts/Toast/ToastContext";
 import { WorkspaceProvider } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import { SettingsProvider } from "../../contexts/SettingsContext/SettingsContext";
+import { axe } from "vitest-axe";
 
 vi.mock("../AnalysisWorkspace/AnalysisWorkspace", () => ({
   default: () => <div>Inline analysis view</div>,
@@ -788,5 +789,26 @@ describe("PirMessage — rationale citation rendering", () => {
 
     expect(screen.getByText("Because it matters.")).toBeInTheDocument();
     expect(document.querySelectorAll("sup")).toHaveLength(0);
+  });
+});
+
+describe("ChatWindow — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in empty state", async () => {
+    const { container } = renderWithToast(<ChatWindow />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with system and user messages", async () => {
+    const messages = [
+      { id: "1", text: "How can I help?", sender: "system" as const },
+      { id: "2", text: "Investigate APT29", sender: "user" as const },
+    ];
+    const { container } = renderWithToast(<ChatWindow messages={messages} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations during confirmation state", async () => {
+    const { container } = renderWithToast(<ChatWindow isConfirming={true} />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

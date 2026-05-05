@@ -4,6 +4,7 @@ import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, Pha
 import React from "react";
 
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
+  knowledge_base: "Knowledge Bank",
   list_knowledge_base: "Knowledge Bank",
   read_knowledge_base: "Knowledge Bank",
   query_otx: "AlienVault OTX",
@@ -18,10 +19,11 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
 const WEB_SOURCES = new Set(["fetch_page", "google_news_search", "google_search"]);
 
 function deduplicateItems(items: CollectedItem[]): CollectedItem[] {
-  // Pass 1: deduplicate by (source, resource_id) — keep richer content
+  // Pass 1: deduplicate by (canonical-source, resource_id) — keep richer content
   const byUrl = new Map<string, CollectedItem>();
   for (const item of items) {
-    const key = `${item.source}|${item.resource_id ?? ""}`;
+    const canonical = TOOL_DISPLAY_NAMES[item.source] ?? item.source;
+    const key = `${canonical}|${item.resource_id ?? ""}`;
     const existing = byUrl.get(key);
     if (!existing || (item.content?.length ?? 0) > (existing.content?.length ?? 0)) {
       byUrl.set(key, item);

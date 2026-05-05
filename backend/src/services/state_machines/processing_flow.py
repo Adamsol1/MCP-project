@@ -22,6 +22,7 @@ from src.models.dialogue import (
     PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
+from src.services.processing.processing_result_store import normalize_raw_result
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
@@ -176,6 +177,7 @@ class ProcessingFlow(BasePhaseFlow):
         orchestrator=None,
         reviewer=None,
         uow=None,
+        language: str = "en",
     ) -> DialogueResponse:
         """Start processing: read collected data, run agent, write to DB, go to REVIEWING."""
         if not self.session_id:
@@ -206,6 +208,7 @@ class ProcessingFlow(BasePhaseFlow):
                     reviewer=reviewer,
                     session_id=self.session_id,
                     previous_result=previous_result,
+                    language=language,
                 )
                 retry_count = len(orchestrator.attempts) - 1
                 self.pending_reasoning_log = ReasoningLog(
@@ -225,6 +228,7 @@ class ProcessingFlow(BasePhaseFlow):
                 raw_result = await processing_service.process(
                     collected_data=raw_collected,
                     pir=self.pir,
+                    language=language,
                 )
         except Exception:
             logger.error(
@@ -235,6 +239,7 @@ class ProcessingFlow(BasePhaseFlow):
                 action=DialogueAction.ERROR, content="Processing failed"
             )
 
+        raw_result = normalize_raw_result(raw_result)
         self.state = ProcessingState.REVIEWING
         logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         await _write_processed(self.session_id, self.pir, raw_result, uow=uow)
@@ -268,11 +273,16 @@ class ProcessingFlow(BasePhaseFlow):
         processing_service,
         approved=None,
         uow=None,
+        language: str = "en",
     ) -> DialogueResponse:
         """Route the incoming message to the correct state handler."""
         if self.state == ProcessingState.REVIEWING:
             return await self.handle_reviewing(
-                user_message, processing_service, approved, uow=uow
+                user_message,
+                processing_service,
+                approved,
+                uow=uow,
+                language=language,
             )
         else:
             return DialogueResponse(
@@ -285,6 +295,7 @@ class ProcessingFlow(BasePhaseFlow):
         processing_service,
         approved,
         uow=None,
+        language: str = "en",
     ) -> DialogueResponse:
         """
         State handler for reviewing phase.
@@ -326,7 +337,7 @@ class ProcessingFlow(BasePhaseFlow):
             )
             try:
                 modified = await processing_service.modify_processing(
-                    last_result, user_message
+                    last_result, user_message, language=language
                 )
             except Exception:
                 logger.error(

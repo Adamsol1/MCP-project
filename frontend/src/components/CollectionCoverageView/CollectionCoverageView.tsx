@@ -107,22 +107,6 @@ function FindingRefList({ findings }: { findings: CoverageFindingRef[] }) {
   );
 }
 
-function PriorityBadge({ priority }: { priority: string }) {
-  const styles =
-    priority === "high"
-      ? "bg-error-subtle text-error-text border-error/20"
-      : priority === "medium"
-        ? "bg-warning-subtle text-warning-text border-warning/20"
-        : "bg-surface text-text-muted border-border";
-  return (
-    <span
-      className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-medium uppercase tracking-widest ${styles}`}
-    >
-      {priority}
-    </span>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Aggregate bar
 // ---------------------------------------------------------------------------
@@ -181,7 +165,6 @@ function PirRow({
         {/* Meta badges */}
         <div className="ml-2 flex shrink-0 flex-col items-end gap-1.5">
           <TierBadge tier={pir.tier} score={pir.score} />
-          <PriorityBadge priority={pir.priority} />
         </div>
 
         {/* Expand chevron */}

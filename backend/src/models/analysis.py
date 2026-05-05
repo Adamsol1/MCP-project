@@ -18,6 +18,9 @@ class FindingModel(BaseModel):
     confidence: int = Field(
         ..., ge=0, le=100, description="AI-generated confidence (legacy, 0–100)"
     )
+    categories: list[str] = Field(
+        default_factory=list, description="PMESII categories assigned to this finding"
+    )
     relevant_to: list[str] = Field(
         default_factory=list, description="Related PIR identifiers"
     )

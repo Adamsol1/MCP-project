@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { FileUploadModal } from "./FileUploadModal";
+import { axe } from "vitest-axe";
 
 describe("FileUploadModal", () => {
   // ---------- Visibility ----------
@@ -118,5 +119,19 @@ describe("FileUploadModal", () => {
 
     // FileUpload renders a dropzone
     expect(screen.getByTestId("file-dropzone")).toBeInTheDocument();
+  });
+});
+
+describe("FileUploadModal — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations when open", async () => {
+    const { container } = render(
+      <FileUploadModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onFileSelect={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

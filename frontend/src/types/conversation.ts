@@ -108,6 +108,7 @@ export interface CollectionPlanData {
   plan: string;
   steps?: CollectionPlanStep[];
   suggested_sources: string[];
+  reasoning?: string;
 }
 
 /**
@@ -219,6 +220,12 @@ export interface PhaseReviewItem {
   generated_content: string | null;
 }
 
+/**
+ * The data structure for displaying the results of AI processing, including the extracted findings,
+ * identified gaps, and the AI's reasoning. Findings may optionally include supporting
+ * data such as entities, timestamps, locations, knowledge base references, attack IDs,
+ * domains, source URLs, and indicators of compromise (IOCs).
+ */
 export interface ProcessingFinding {
   id: string;
   title: string;
@@ -226,6 +233,7 @@ export interface ProcessingFinding {
   evidence_summary: string;
   source: string;
   confidence: number;
+  categories?: string[];
   relevant_to: string[];
   why_it_matters: string;
   uncertainties: string[];
@@ -236,19 +244,30 @@ export interface ProcessingFinding {
     kb_refs?: string[];
     attack_ids?: string[];
     domains?: string[];
+    source_urls?: string[];
+    source_refs?: string[];
+    iocs?: string[];
   };
 }
 
+/**
+ * The data structure for displaying the results of AI processing, including the extracted findings,
+ */
 export interface ProcessingData {
   findings: ProcessingFinding[];
   gaps: string[];
+  reasoning?: string;
 }
 
 /**
- * The data structure for displaying the collected information from various sources during the collection review stage, including the collected data, a summary of the sources used, and any parsing errors encountered.
+ * The data structure for displaying the collected information from various sources during the collection review stage,
+ *  including the collected data, a summary of the sources used, and any parsing errors encountered.
  */
 export interface CollectionDisplayData {
   collected_data: CollectedItem[];
   source_summary: CollectionSourceSummary[];
   parse_error?: string;
+  /** When true, replaces existing sidebar stats instead of merging. Set for initial collection and revisions;
+   * false only for gather-more additions. */
+  replace?: boolean;
 }

@@ -40,8 +40,13 @@ class SessionRepository(GenericRepository[SessionTable]):
         await self._session.flush()
         return existing
 
-    async def delete_cascade(self, session_id: str) -> None:
-        """Delete a session and all related rows across child tables."""
+    async def delete_cascade(self, session_id: str) -> bool:
+        """Delete a session and all related rows across child tables.
+
+        Returns:
+            True if a session row existed and was deleted, False otherwise.
+            Child rows are always cleaned up regardless of the return value.
+        """
         # Delete children first (SQLite FK support varies)
         for model in (
             CollectionAttemptTable,
@@ -57,6 +62,8 @@ class SessionRepository(GenericRepository[SessionTable]):
                 await self._session.delete(row)
 
         session_row = await self.get(session_id)
+        existed = session_row is not None
         if session_row:
             await self._session.delete(session_row)
         await self._session.flush()
+        return existed

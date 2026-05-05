@@ -65,8 +65,9 @@ describe("sendMessage", () => {
         perspectives: ["US", "EU"],
         approved: undefined,
         language: "en",
+        ai_provider: "gemini",
         settings_timeframe: "",
-        ai_provider: "local",
+        settings_source_timeframes: {},
         selected_sources: [],
         gather_more: false,
         council_debate_point: "",
@@ -147,6 +148,17 @@ describe("sendMessage", () => {
 
     const [, body] = vi.mocked(axios.post).mock.calls[0];
     expect((body as Record<string, unknown>).gather_more).toBe(true);
+  });
+
+  it("forwards aiProvider from options", async () => {
+    vi.mocked(axios.post).mockResolvedValue(mockResponse);
+
+    await sendMessage("Hello", "session-1", ["NEUTRAL"], undefined, "en", "", {
+      aiProvider: "local",
+    });
+
+    const [, body] = vi.mocked(axios.post).mock.calls[0];
+    expect((body as Record<string, unknown>).ai_provider).toBe("local");
   });
 
   it("throws when the API call fails", async () => {

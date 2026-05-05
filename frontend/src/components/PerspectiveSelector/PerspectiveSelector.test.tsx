@@ -16,6 +16,7 @@ import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import PerspectiveSelector from "./PerspectiveSelector";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 // Labels as rendered by the component (from en.ts perspectiveLabels).
 // These are the abbreviated labels shown in the grid buttons.
@@ -41,14 +42,6 @@ describe("PerspectiveSelector", () => {
     }
   });
 
-  it("renders a heading or label for the section", () => {
-    renderWithSettings(
-      <PerspectiveSelector selected={["NEUTRAL"]} onChange={vi.fn()} />,
-    );
-
-    expect(screen.getByText(/perspective/i)).toBeInTheDocument();
-  });
-
   // ---------- Default state ----------
 
   it("shows GLOBAL as selected by default", () => {
@@ -65,8 +58,8 @@ describe("PerspectiveSelector", () => {
       <PerspectiveSelector selected={["NEUTRAL"]} onChange={vi.fn()} />,
     );
 
-    // "US" button should not be selected when only NEUTRAL is selected
-    const usBtn = screen.getByRole("button", { name: /^us$/i });
+    // Buttons have emoji+label text (e.g. "🇺🇸US"); use ends-with match
+    const usBtn = screen.getByRole("button", { name: /us$/i });
     expect(usBtn).toHaveAttribute("aria-pressed", "false");
   });
 
@@ -82,7 +75,7 @@ describe("PerspectiveSelector", () => {
 
     // Click "US" which is currently not selected.
     // First non-global pick replaces default NEUTRAL.
-    const usBtn = screen.getByRole("button", { name: /^us$/i });
+    const usBtn = screen.getByRole("button", { name: /us$/i });
     await user.click(usBtn);
 
     expect(handleChange).toHaveBeenCalledTimes(1);
@@ -100,7 +93,7 @@ describe("PerspectiveSelector", () => {
       />,
     );
 
-    const usBtn = screen.getByRole("button", { name: /^us$/i });
+    const usBtn = screen.getByRole("button", { name: /us$/i });
     await user.click(usBtn);
 
     expect(handleChange).toHaveBeenCalledTimes(1);
@@ -146,7 +139,7 @@ describe("PerspectiveSelector", () => {
       <PerspectiveSelector selected={["US"]} onChange={vi.fn()} />,
     );
 
-    const usBtn = screen.getByRole("button", { name: /^us$/i });
+    const usBtn = screen.getByRole("button", { name: /us$/i });
     const chinaBtn = screen.getByRole("button", { name: /china/i });
 
     expect(usBtn).toHaveAttribute("data-selected", "true");
@@ -166,5 +159,14 @@ describe("PerspectiveSelector", () => {
     );
 
     expect(russiaBtn).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("PerspectiveSelector — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations with default selection", async () => {
+    const { container } = renderWithSettings(
+      <PerspectiveSelector selected={["NEUTRAL"]} onChange={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

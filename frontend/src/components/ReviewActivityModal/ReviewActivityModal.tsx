@@ -1,5 +1,7 @@
+import { useState } from "react";
 import type { PhaseReviewItem } from "../../types/conversation";
-import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
+import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
+import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, CollectionSummaryData, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
 import type { Analysis } from "../../types/analysis";
 
 interface ReviewActivityModalProps {
@@ -168,6 +170,50 @@ function CollectionTranscript({ data, reviewerSuggestions }: { data: CollectionD
   );
 }
 
+function CollectionSummaryTranscript({ data }: { data: CollectionSummaryData }) {
+  return (
+    <div className="space-y-4">
+      {data.summary && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Summary
+          </p>
+          <div className="rounded-lg border border-border-muted bg-surface-muted p-3">
+            <FormattedReviewText text={data.summary} />
+          </div>
+        </div>
+      )}
+      {data.sources_used && data.sources_used.length > 0 && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Sources Used
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {data.sources_used.map((src) => (
+              <span
+                key={src}
+                className="rounded px-2 py-0.5 text-xs font-medium bg-surface-elevated text-text-secondary border border-border-muted"
+              >
+                {src}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+      {data.gaps && (
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-text-muted mb-1.5">
+            Gaps
+          </p>
+          <div className="rounded-lg border border-warning-subtle bg-warning-subtle/20 p-3">
+            <FormattedReviewText text={data.gaps} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const CONFIDENCE_COLOR = (score: number) =>
   score >= 0.7 ? "bg-success-subtle text-success-text" :
   score >= 0.4 ? "bg-warning-subtle text-warning-text" :
@@ -187,7 +233,7 @@ function ProcessingTranscript({ data }: { data: ProcessingData }) {
                 <p className="text-xs font-semibold text-text-primary leading-snug flex-1">{f.title}</p>
                 {f.confidence != null && (
                   <span className={`shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${CONFIDENCE_COLOR(f.confidence)}`}>
-                    {Math.round(f.confidence * 100)}%
+                    {Math.round(f.confidence)}%
                   </span>
                 )}
               </div>
@@ -232,8 +278,9 @@ function normalizePythonRepr(s: string): string {
   while (i < s.length) {
     if (s[i] === "'") {
       let j = i + 1;
-      while (j < s.length && s[j] !== "'") {
-        if (s[j] === "\\") j++;
+      while (j < s.length) {
+        if (s[j] === "\\") { j += 2; continue; } // skip escaped char
+        if (s[j] === "'") break;
         j++;
       }
       const inner = s.slice(i + 1, j).replace(/"/g, '\\"');
@@ -241,8 +288,9 @@ function normalizePythonRepr(s: string): string {
       i = j + 1;
     } else if (s[i] === '"') {
       let j = i + 1;
-      while (j < s.length && s[j] !== '"') {
-        if (s[j] === "\\") j++;
+      while (j < s.length) {
+        if (s[j] === "\\") { j += 2; continue; }
+        if (s[j] === '"') break;
         j++;
       }
       result += s.slice(i, j + 1);
@@ -258,9 +306,19 @@ function normalizePythonRepr(s: string): string {
     .replace(/\bNone\b/g, "null");
 }
 
+function stripCodeFence(s: string): string {
+  const trimmed = s.trim();
+  if (!trimmed.startsWith("```")) return trimmed;
+  const newline = trimmed.indexOf("\n");
+  if (newline === -1) return trimmed;
+  const body = trimmed.slice(newline + 1);
+  return body.endsWith("```") ? body.slice(0, -3).trim() : body.trim();
+}
+
 function tryParseContent(content: string): unknown {
-  try { return JSON.parse(content); } catch { /* not valid JSON */ }
-  try { return JSON.parse(normalizePythonRepr(content)); } catch { /* not valid Python repr either */ }
+  const stripped = stripCodeFence(content);
+  try { return JSON.parse(stripped); } catch { /* not valid JSON */ }
+  try { return JSON.parse(normalizePythonRepr(stripped)); } catch { /* not valid Python repr either */ }
   return null;
 }
 
@@ -339,12 +397,20 @@ function TranscriptRenderer({ phase, content, reviewerSuggestions }: { phase: Ph
     return <PirTranscript data={parsed as PirData} />;
   }
 
-  if (phase === "collection" && parsed && typeof parsed === "object" && "collected_data" in parsed) {
-    return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
+  if (phase === "collection" && parsed && typeof parsed === "object") {
+    if ("collected_data" in parsed)
+      return <CollectionTranscript data={parsed as CollectionDisplayData} reviewerSuggestions={reviewerSuggestions} />;
+    if ("summary" in parsed && "sources_used" in parsed)
+      return <CollectionSummaryTranscript data={parsed as CollectionSummaryData} />;
   }
 
-  if (phase === "processing" && parsed && typeof parsed === "object" && "findings" in parsed) {
-    return <ProcessingTranscript data={parsed as ProcessingData} />;
+  if (phase === "processing" && parsed) {
+    if (Array.isArray(parsed) && parsed.length > 0 && "id" in parsed[0]) {
+      return <ProcessingTranscript data={{ findings: parsed as ProcessingFinding[], gaps: [] }} />;
+    }
+    if (typeof parsed === "object" && !Array.isArray(parsed) && "findings" in parsed) {
+      return <ProcessingTranscript data={parsed as ProcessingData} />;
+    }
   }
 
   if (phase === "analysis" && parsed && typeof parsed === "object") {
@@ -383,12 +449,15 @@ export default function ReviewActivityModal({
   activity,
   focusAttempt,
 }: ReviewActivityModalProps) {
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
+
   if (!isOpen) return null;
 
   const phases = [...new Set(activity.map((a) => a.phase))];
   const phasesSummary = phases.map(phaseLabel).join(", ");
 
   return (
+    <>
     <div
       data-testid="review-activity-modal-backdrop"
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
@@ -408,13 +477,16 @@ export default function ReviewActivityModal({
               {activity.length} attempt{activity.length !== 1 ? "s" : ""} — {phasesSummary}
             </p>
           </div>
-          <button
-            aria-label="Close review activity"
-            onClick={onClose}
-            className="rounded p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            <HelpButton onClick={() => setIsHelpOpen(true)} label="Review Activity guide" />
+            <button
+              aria-label="Close review activity"
+              onClick={onClose}
+              className="rounded p-1.5 text-text-muted hover:bg-surface-elevated hover:text-text-primary transition-colors"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body */}
@@ -508,5 +580,29 @@ export default function ReviewActivityModal({
         </div>
       </div>
     </div>
+    <HelpModal
+      isOpen={isHelpOpen}
+      onClose={() => setIsHelpOpen(false)}
+      title="Review Activity Guide"
+      sections={[
+        {
+          heading: "What is Review Activity?",
+          body: "Before each phase output is shown to you, an AI reviewer evaluates it against your intelligence requirements. This automatic quality gate catches incomplete or low-quality outputs and asks for regeneration when needed.",
+        },
+        {
+          heading: "Approved vs Rejected",
+          body: "Approved means the output met quality standards and was passed to you. Rejected means the reviewer found issues — the AI then regenerated the output using the reviewer's specific feedback. Multiple attempts may appear if regeneration was needed more than once.",
+        },
+        {
+          heading: "AI Feedback section",
+          body: "The AI Feedback block shows the reviewer's exact reasoning — what was lacking and what needed improvement. For approved outputs with no issues, it will show a simple confirmation message.",
+        },
+        {
+          heading: "Full Transcript section",
+          body: "The Full Transcript shows the raw structured output that was generated for that attempt — parsed into a readable format per phase. For collection phases this includes sources and items; for processing it shows findings; for analysis it shows judgments and summaries.",
+        },
+      ]}
+    />
+    </>
   );
 }

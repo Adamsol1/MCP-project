@@ -194,17 +194,24 @@ describe("deleteSessionArtifacts", () => {
     expect(result).toBeUndefined();
   });
 
-  it("silently succeeds when the backend returns an error (best-effort cleanup)", async () => {
+  it("propagates non-404 errors so callers can surface the failure", async () => {
+    vi.mocked(axios.isAxiosError).mockReturnValue(false);
     vi.mocked(axios.delete).mockRejectedValue(new Error("Backend unreachable"));
 
-    // Should not throw — errors are swallowed so the frontend deletion can proceed.
     await expect(
       deleteSessionArtifacts("session-123"),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow("Backend unreachable");
   });
 
   it("silently succeeds when the session never had any backend artifacts (404)", async () => {
-    vi.mocked(axios.delete).mockRejectedValue({ response: { status: 404 } });
+    const notFound = {
+      isAxiosError: true,
+      response: { status: 404 },
+    };
+    vi.mocked(axios.isAxiosError).mockImplementation(
+      (err): err is import("axios").AxiosError => err === notFound,
+    );
+    vi.mocked(axios.delete).mockRejectedValue(notFound);
 
     await expect(
       deleteSessionArtifacts("session-123"),

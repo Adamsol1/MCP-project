@@ -16,6 +16,7 @@ from src.db.engine import get_knowledge_session_factory, get_sessions_session_fa
 from src.db.repositories.analysis_repo import AnalysisSessionRepository
 from src.db.repositories.collection_repo import CollectionAttemptRepository
 from src.db.repositories.knowledge_repo import KnowledgeRepository
+from src.db.repositories.perspective_doc_repo import PerspectiveDocRepository
 from src.db.repositories.processing_repo import ProcessingAttemptRepository
 from src.db.repositories.research_log_repo import ResearchLogRepository
 from src.db.repositories.session_repo import SessionRepository
@@ -54,6 +55,7 @@ class KnowledgeUnitOfWork:
     def __init__(self, session: AsyncSession):
         self._session = session
         self.knowledge = KnowledgeRepository(session)
+        self.perspective_docs = PerspectiveDocRepository(session)
 
     async def commit(self) -> None:
         await self._session.commit()

@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 // Helper: creates a minimal conversation object for testing
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
@@ -413,5 +414,21 @@ describe("Sidebar", () => {
     expect(
       screen.getByRole("button", { name: /new chat/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Sidebar — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in empty state", async () => {
+    const { container } = renderSidebar();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with conversations listed", async () => {
+    const conversations = [
+      makeConversation({ id: "c1", title: "Investigate APT29" }),
+      makeConversation({ id: "c2", title: "Analyze ransomware" }),
+    ];
+    const { container } = renderSidebar({ conversations, activeConversationId: "c1" });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

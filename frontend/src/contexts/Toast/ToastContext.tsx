@@ -1,4 +1,10 @@
-import { createContext, useReducer, useCallback, type ReactNode } from 'react';
+import {
+  createContext,
+  useReducer,
+  useCallback,
+  useContext,
+  type ReactNode,
+} from 'react';
 
 /**
  * Visual severity of a toast notification.
@@ -32,7 +38,10 @@ export interface ToastContextValue {
    * Low-level method to add a toast with explicit control over type and duration.
    * @returns The UUID of the newly created toast.
    */
-  addToast: (message: string, options?: { type?: ToastType; duration?: number }) => string;
+  addToast: (
+    message: string,
+    options?: ToastType | { type?: ToastType; duration?: number },
+  ) => string;
   /**
    * Remove a specific toast by its id.
    * Called automatically when a toast's timer expires or the user clicks ×.
@@ -94,13 +103,15 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, dispatch] = useReducer(toastReducer, []);
 
   /** Creates a toast with a generated UUID and dispatches ADD. */
-  const addToast = useCallback((message: string, options?: { type?: ToastType; duration?: number }) => {
+  const addToast = useCallback((message: string, options?: ToastType | { type?: ToastType; duration?: number }) => {
+    const normalizedOptions =
+      typeof options === 'string' ? { type: options } : options;
     const id = crypto.randomUUID();
     const toast: Toast = {
       id,
       message,
-      type: options?.type || 'info',
-      duration: options?.duration ?? DEFAULT_DURATION,
+      type: normalizedOptions?.type || 'info',
+      duration: normalizedOptions?.duration ?? DEFAULT_DURATION,
     };
     dispatch({ type: 'ADD', payload: toast });
     return id;
@@ -128,4 +139,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
     </ToastContext.Provider>
   );
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+  if (!context) {
+    throw new Error('useToast must be used within a ToastProvider');
+  }
+  return context;
 }

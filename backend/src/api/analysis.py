@@ -18,11 +18,11 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.confidence import CollectionCoverageResult
-from src.services.analysis_service import AnalysisService
-from src.services.analysis_session_store import AnalysisSessionStore
+from src.services.analysis.analysis_service import AnalysisService
+from src.services.analysis.analysis_session_store import AnalysisSessionStore
 from src.services.confidence.collection_coverage import compute_collection_coverage
-from src.services.council_service import CouncilService
-from src.services.processing_result_store import (
+from src.services.council.council_service import CouncilService
+from src.services.processing.processing_result_store import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
     ProcessingResultStore,
 )

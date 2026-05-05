@@ -310,7 +310,12 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
     (id: string) => {
       const conversation = state.conversations.find((c) => c.id === id);
       if (conversation) {
-        void deleteSessionArtifacts(conversation.sessionId);
+        deleteSessionArtifacts(conversation.sessionId).catch((err) => {
+          console.error(
+            `[deleteConversation] Backend delete failed for session ${conversation.sessionId}:`,
+            err,
+          );
+        });
       }
       dispatch({ type: "DELETE_CONVERSATION", payload: id });
     },
@@ -318,9 +323,14 @@ export function ConversationProvider({ children }: { children: ReactNode }) {
   );
 
   const deleteAllConversations = useCallback(() => {
-    state.conversations.forEach(
-      (c) => void deleteSessionArtifacts(c.sessionId),
-    );
+    state.conversations.forEach((c) => {
+      deleteSessionArtifacts(c.sessionId).catch((err) => {
+        console.error(
+          `[deleteAllConversations] Backend delete failed for session ${c.sessionId}:`,
+          err,
+        );
+      });
+    });
     dispatch({ type: "DELETE_ALL_CONVERSATIONS" });
   }, [state.conversations]);
 

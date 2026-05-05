@@ -2,6 +2,7 @@ import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import userEvent from "@testing-library/user-event";
 import Toast from "./Toast";
+import { axe } from "vitest-axe";
 
 describe("Toast", () => {
   beforeEach(() => {
@@ -192,5 +193,35 @@ describe("Toast", () => {
     vi.advanceTimersByTime(5000);
 
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("Toast — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations for info type", async () => {
+    const { container } = render(
+      <Toast id="1" type="info" message="Info message" duration={5000} onClose={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for success type", async () => {
+    const { container } = render(
+      <Toast id="1" type="success" message="Success message" duration={5000} onClose={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for error type", async () => {
+    const { container } = render(
+      <Toast id="1" type="error" message="Error message" duration={5000} onClose={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for warning type", async () => {
+    const { container } = render(
+      <Toast id="1" type="warning" message="Warning message" duration={5000} onClose={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

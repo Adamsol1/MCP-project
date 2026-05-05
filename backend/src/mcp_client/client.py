@@ -1,7 +1,7 @@
 """MCP Client — connects to the standalone MCP server via SSE/HTTP.
 
 The MCP server runs as a separate process (started independently via
-`python mcp_server/src/server.py`). This client connects to it over HTTP
+`python generation_mcp_server/src/server.py`). This client connects to it over HTTP
 using Server-Sent Events (SSE) transport — no subprocess management needed.
 """
 
@@ -9,18 +9,26 @@ import json
 import logging
 import os
 import time
+from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
 from urllib.parse import urlparse
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
-from mcp.types import TextContent
+from mcp.types import ElicitResult, TextContent
 from pydantic import AnyUrl
 
 logger = logging.getLogger("app")
 
 _DEFAULT_URL = "http://127.0.0.1:8011/sse"
+
+# Receives (message, options) from the MCP server and returns the chosen option.
+ElicitationCallback = Callable[[str, list[str]], Awaitable[str]]
+
+_RESTRICTED_TLP = frozenset({"TLP:RED", "TLP:AMBER", "TLP:AMBER+STRICT"})
+_USE_LOCAL = "Bytt til lokal LLM"
+_USE_CLOUD = "Fortsett med Gemini"
 
 
 def get_mcp_server_url() -> str:
@@ -52,6 +60,14 @@ def get_mcp_server_url() -> str:
     return server_url
 
 
+def _get_tlp_level(content_header: str) -> str | None:
+    upper = content_header.upper()
+    for level in ("TLP:RED", "TLP:AMBER+STRICT", "TLP:AMBER", "TLP:GREEN", "TLP:CLEAR"):
+        if level in upper:
+            return level
+    return None
+
+
 class MCPClient:
     """Client for communicating with the MCP Threat Intelligence server.
 
@@ -59,14 +75,25 @@ class MCPClient:
     started separately before calling connect().
 
     Args:
-        server_url: SSE endpoint URL of the running MCP server.
-                    Defaults to the MCP_SERVER_URL env var, or
-                    http://127.0.0.1:8011/sse if unset.
+        server_url:           SSE endpoint URL of the running MCP server.
+                              Defaults to the MCP_SERVER_URL env var, or
+                              http://127.0.0.1:8011/sse if unset.
+        elicitation_callback: Optional async function invoked when the MCP server
+                              sends an elicitation/create request mid-tool-call.
+                              Receives (message, options) and must return the
+                              chosen option string. When None, elicitation
+                              requests are silently declined by the SDK.
     """
 
-    def __init__(self, server_url: str | None = None) -> None:
+    def __init__(
+        self,
+        server_url: str | None = None,
+        elicitation_callback: ElicitationCallback | None = None,
+    ) -> None:
         self.server_url = server_url or get_mcp_server_url()
         self.session: ClientSession | None = None
+        self._elicitation_callback = elicitation_callback
+        self._resource_tlp_warned: bool = False
 
     @asynccontextmanager
     async def connect(self):
@@ -79,9 +106,14 @@ class MCPClient:
             httpx.ConnectError: If the MCP server is not running at server_url.
         """
         logger.info(f"[MCP] Connecting to {self.server_url}...")
+
+        sdk_callback = None
+        if self._elicitation_callback:
+            sdk_callback = self._make_sdk_callback(self._elicitation_callback)
+
         async with (
             sse_client(self.server_url) as (read, write),
-            ClientSession(read, write) as session,
+            ClientSession(read, write, elicitation_callback=sdk_callback) as session,
         ):
             await session.initialize()
             self.session = session
@@ -89,6 +121,31 @@ class MCPClient:
             yield self
         self.session = None
         logger.info("[MCP] Disconnected")
+
+    @staticmethod
+    def _make_sdk_callback(user_callback: ElicitationCallback):
+        """Wrap our simple (message, options) → str callback in the SDK's expected signature.
+
+        The SDK passes a full ElicitRequest object and expects an ElicitResult back.
+        We extract the message and any enum options from the schema, call the user
+        callback, then wrap the answer in an ElicitResult.
+        """
+        async def _sdk_elicitation_callback(ctx, params, /):
+            message = params.message
+
+            # Extract options from requestedSchema (camelCase, plain dict).
+            # FastMCP encodes list[str] response_type as a string property named
+            # "value" with an enum list.
+            options: list[str] = []
+            schema: dict = getattr(params, "requestedSchema", None) or {}
+            for prop in schema.get("properties", {}).values():
+                if isinstance(prop, dict) and prop.get("enum"):
+                    options = [str(v) for v in prop["enum"]]
+                    break
+            chosen = await user_callback(message, options)
+            return ElicitResult(action="accept", content={"value": chosen})
+
+        return _sdk_elicitation_callback
 
     async def call_tool(
         self, tool_name: str, arguments: dict[str, Any] | None = None
@@ -218,6 +275,31 @@ class MCPClient:
             for resource in result.resources
         ]
 
+    async def _maybe_elicit_classified(self, content: str) -> bool:
+        """Check content header for restricted TLP and elicit provider-switch if needed.
+
+        Host-driven counterpart to _maybe_elicit_provider_switch() in the MCP server.
+        Called from read_resource() when the backend proactively fetches knowledge.
+        Fires at most once per MCPClient instance (one per request/session).
+
+        Returns True if the content should be blocked (user chose local LLM).
+        """
+        if not self._elicitation_callback or self._resource_tlp_warned:
+            return False
+
+        tlp = _get_tlp_level(content[:300])
+        if tlp not in _RESTRICTED_TLP:
+            return False
+
+        choice = await self._elicitation_callback(
+            f"Klassifisert innhold oppdaget ({tlp}). "
+            f"Du kjører Gemini (sky-LLM). Klassifiserte ressurser bør ikke sendes til en sky-LLM. "
+            f"Vil du bytte til lokal LLM?",
+            [_USE_LOCAL, _USE_CLOUD],
+        )
+        self._resource_tlp_warned = True
+        return choice == _USE_LOCAL
+
     async def read_resource(self, uri: str) -> str:
         """Read a resource by URI from the MCP server.
 
@@ -250,7 +332,12 @@ class MCPClient:
 
         for content_item in result.contents:
             if hasattr(content_item, "text"):
-                return content_item.text
+                content = content_item.text
+                blocked = await self._maybe_elicit_classified(content)
+                if blocked:
+                    logger.info(f"[MCP] Resource {uri} blocked — user chose local LLM")
+                    return ""
+                return content
         raise ValueError(f"No text content in resource: {uri}")
 
     @staticmethod

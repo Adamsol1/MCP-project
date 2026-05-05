@@ -5,7 +5,19 @@ export type Language = "en" | "no";
 export type Theme = "light" | "dark";
 
 /** Supported backend AI providers. */
-export type AiProvider = "local" | "gemini";
+export type AiProvider = "gemini" | "local";
+
+/** Per-web-source-tier timeframe codes (Serper date_restrict format). */
+export interface SourceTimeframes {
+  /** Government & official sources (.gov, .mil, ministry/agency sites). */
+  web_gov: string;
+  /** Think tanks & research institutions (RAND, CSIS, Chatham House, etc.). */
+  web_think_tank: string;
+  /** News & media outlets (Reuters, BBC, AP, FT, etc.). */
+  web_news: string;
+  /** Other / unclassified web sources. */
+  web_other: string;
+}
 
 /**
  * Context parameters that are auto-injected into every prompt
@@ -15,6 +27,8 @@ export type AiProvider = "local" | "gemini";
 export interface InputParameters {
   /** The time period the analysis should cover (e.g. "Last 30 days"). */
   timeframe: string;
+  /** Per-source-tier date window overrides. Empty string means no restriction. */
+  sourceTimeframes: SourceTimeframes;
 }
 
 /** User-configurable runtime controls for analysis-stage council runs. */
@@ -57,10 +71,16 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   aiLanguage: "en",
-  aiProvider: "local",
+  aiProvider: "gemini",
   theme: "dark",
   inputParameters: {
     timeframe: "",
+    sourceTimeframes: {
+      web_gov: "",
+      web_think_tank: "",
+      web_news: "",
+      web_other: "",
+    },
   },
   councilSettings: {
     mode: "conference",

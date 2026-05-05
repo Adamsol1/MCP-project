@@ -75,6 +75,8 @@ class TestDataSource:
             "txt_upload",
             "json_upload",
             "manual",
+            "knowledge_base",
+            "web_search",
         }
         actual = {member.value for member in DataSource}
 

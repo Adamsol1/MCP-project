@@ -12,7 +12,10 @@ import {
 } from "./services/upload/upload";
 import {
   getCollectionStatus,
+  getPendingElicitation,
+  respondToElicitation,
   type CollectionStatus,
+  type PendingElicitation,
 } from "./services/dialogue/dialogue";
 import { useChat } from "./hooks/useChat/useChat";
 import { useConversation } from "./hooks/useConversation/useConversation";
@@ -23,13 +26,19 @@ import {
 import IntelligencePanel from "./components/IntelligencePanel/IntelligencePanel";
 import StageTracker from "./components/StageTracker/StageTracker";
 import { useT } from "./i18n/useT";
+import type { DialogueStage } from "./types/dialogue";
+import { ToastContainer } from "./components/Toast";
+import ElicitationModal from "./components/ElicitationModal/ElicitationModal";
+import { HelpButton, HelpModal } from "./components/HelpModal/HelpModal";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
 function WorkspaceResetWatcher({
   conversationId,
+  stage,
 }: {
   conversationId: string | null;
+  stage: DialogueStage;
 }) {
   const { setPirData, setCollectionData, setHighlightedRefs, setReviewActivity } = useWorkspace();
 
@@ -39,6 +48,15 @@ function WorkspaceResetWatcher({
     setHighlightedRefs([]);
     setReviewActivity([]);
   }, [conversationId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When the stage falls back to gathering (e.g. user rejected PIR and is providing
+  // new input), clear the stale PIR sources so the panel doesn't show old data while
+  // a new PIR is being generated.
+  useEffect(() => {
+    if (stage === "gathering") {
+      setPirData(null);
+    }
+  }, [stage, setPirData]);
 
   return null;
 }
@@ -124,9 +142,12 @@ function AppShell() {
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] =
     useState<CollectionStatus | null>(null);
+  const [pendingElicitation, setPendingElicitation] =
+    useState<PendingElicitation | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     current: number;
@@ -182,11 +203,45 @@ function AppShell() {
     };
   }, [isCollecting, activeConversation?.sessionId]);
 
+  useEffect(() => {
+    if (!isLoading || !activeConversation?.sessionId) return;
+
+    const sessionId = activeConversation.sessionId;
+    let active = true;
+
+    const poll = async () => {
+      const elicitation = await getPendingElicitation(sessionId);
+      if (active) setPendingElicitation(elicitation);
+    };
+
+    poll();
+
+    const interval = setInterval(poll, 1500);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isLoading, activeConversation?.sessionId]);
+
+  const handleElicitationRespond = async (choice: string) => {
+    if (!activeConversation?.sessionId) return;
+    setPendingElicitation(null);
+    await respondToElicitation(activeConversation.sessionId, choice);
+  };
+
   const visibleUploadedFiles = useMemo(
     () => (activeConversation?.sessionId ? uploadedFiles : []),
     [activeConversation?.sessionId, uploadedFiles],
   );
   const visibleCollectionStatus = isCollecting ? collectionStatus : null;
+
+  const effectiveAvailableSources = useMemo(() => {
+    const UPLOADED_DOCS = "Uploaded Documents";
+    if (visibleUploadedFiles.length === 0 || availableSources.includes(UPLOADED_DOCS)) {
+      return availableSources;
+    }
+    return [...availableSources, UPLOADED_DOCS];
+  }, [availableSources, visibleUploadedFiles]);
 
   const handleSubmit = async (files: File[]) => {
     const conversation = ensureConversationSession();
@@ -238,7 +293,7 @@ function AppShell() {
 
   return (
     <>
-      <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} />
+      <WorkspaceResetWatcher conversationId={activeConversation?.id ?? null} stage={stage} />
 
       <div className="flex flex-col h-screen">
         {/* Full-width top bar — spans all columns */}
@@ -284,8 +339,9 @@ function AppShell() {
               <StageTracker activePhase={activePhase} />
             </div>
           </div>
-          {/* Right panel toggle — top-right */}
-          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10">
+          {/* Right panel toggle + help button — top-right */}
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 z-10 flex items-center gap-1">
+            <HelpButton onClick={() => setIsHelpOpen(true)} label="App guide" />
             <button
               aria-label="Toggle intelligence panel"
               onClick={() => setIsRightPanelCollapsed((v) => !v)}
@@ -349,7 +405,7 @@ function AppShell() {
             isSourceSelecting={isSourceSelecting}
             isCollecting={isCollecting}
             collectionStatus={visibleCollectionStatus}
-            availableSources={availableSources}
+            availableSources={effectiveAvailableSources}
             selectedSources={selectedSources}
             onToggleSourceSelection={toggleSourceSelection}
             onSubmitSourceSelection={submitSourceSelection}
@@ -361,7 +417,7 @@ function AppShell() {
           />
         </main>
 
-        <div className={`bg-surface border-l border-border-muted flex flex-col overflow-hidden transition-all duration-200 ${isRightPanelCollapsed ? "w-0 border-l-0" : "w-72"}`}>
+        <div className={`bg-surface border-l border-border flex flex-col overflow-hidden transition-all duration-200 ${isRightPanelCollapsed ? "w-0 border-l-0" : "w-72"}`}>
           <IntelligencePanel
             phase={activePhase}
             selectedPerspectives={
@@ -393,6 +449,45 @@ function AppShell() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+      {pendingElicitation && (
+        <ElicitationModal
+          elicitation={pendingElicitation}
+          onRespond={handleElicitationRespond}
+        />
+      )}
+      <ToastContainer position="top-right" />
+
+      <HelpModal
+        isOpen={isHelpOpen}
+        onClose={() => setIsHelpOpen(false)}
+        title="How This App Works"
+        sections={[
+          {
+            heading: "Overview",
+            body: "This app guides you through a structured intelligence analysis workflow in four phases: Direction, Collection, Processing, and Analysis. Each phase builds on the last to produce a rigorous, multi-source intelligence report.",
+          },
+          {
+            heading: "Phase 1 — Direction",
+            body: "Describe your intelligence question or topic. The AI will generate Priority Intelligence Requirements (PIRs) — the specific questions that need to be answered. You can approve these or ask for changes.",
+          },
+          {
+            heading: "Phase 2 — Collection",
+            body: "Select the data sources you want to query (AlienVault OTX, Web Search, Knowledge Bank, Uploaded Documents). The system collects raw intelligence items from each source. You can review, approve, or gather more data.",
+          },
+          {
+            heading: "Phase 3 — Processing",
+            body: "The AI analyses all collected items and extracts structured findings, each with a confidence score, supporting evidence, and references. You review the findings and approve or request additional collection.",
+          },
+          {
+            heading: "Phase 4 — Analysis",
+            body: "A full intelligence report is produced: key judgments, recommended actions, perspective implications, and an evidence docket. You can then launch a Council debate to get multi-perspective assessments from different national analyst viewpoints.",
+          },
+          {
+            heading: "Tips",
+            body: "Use the Intelligence Workspace panel on the right to track review activity, collection statistics, and uploaded files at any time. Click ? buttons throughout the app for section-specific guidance.",
+          },
+        ]}
       />
     </>
   );

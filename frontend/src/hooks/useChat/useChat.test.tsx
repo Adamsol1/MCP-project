@@ -139,7 +139,15 @@ describe("useChat", () => {
       undefined,
       "en",
       "",
-      { aiProvider: "local" },
+      {
+        aiProvider: "gemini",
+        sourceTimeframes: {
+          web_gov: "",
+          web_think_tank: "",
+          web_news: "",
+          web_other: "",
+        },
+      },
     );
   });
 
