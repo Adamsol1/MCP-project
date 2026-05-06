@@ -53,6 +53,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="settings-dialog-heading"
         className="flex h-130 w-185 overflow-hidden rounded-lg border border-border bg-surface text-text-primary shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
@@ -91,7 +92,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
 
           {/* Section heading mirrors the active nav item. */}
-          <h2 className="mb-1 text-base font-semibold capitalize text-text-primary">
+          <h2 id="settings-dialog-heading" className="mb-1 text-base font-semibold capitalize text-text-primary">
             {t.navLabels[activeSection]}
           </h2>
 
@@ -204,8 +205,10 @@ function GeneralSection({
       <SettingRow
         label={t.uiLanguage}
         description={t.uiLanguageDesc}
+        htmlFor="ui-language"
         control={
           <select
+            id="ui-language"
             value={language}
             onChange={(e) => onLanguageChange(e.target.value as Language)}
             className={selectClass}
@@ -263,8 +266,10 @@ function ParametersSection({
       <SettingRow
         label={t.aiOutputLanguage}
         description={t.aiOutputLanguageDesc}
+        htmlFor="ai-output-language"
         control={
           <select
+            id="ai-output-language"
             value={aiLanguage}
             onChange={(e) => onAiLanguageChange(e.target.value as Language)}
             className={selectClass}
@@ -326,10 +331,11 @@ function SourceTimeframesControl({
     <div className="flex flex-col gap-2">
       {SOURCE_TIMEFRAME_KEYS.map((key) => (
         <div key={key} className="flex items-center gap-3">
-          <span className="w-36 shrink-0 text-xs text-text-secondary">
+          <label htmlFor={`timeframe-${key}`} className="w-36 shrink-0 text-xs text-text-secondary">
             {t.sourceTimeframeLabels[key]}
-          </span>
+          </label>
           <select
+            id={`timeframe-${key}`}
             value={value[key]}
             onChange={(e) => onChange(key, e.target.value)}
             className={selectClass}

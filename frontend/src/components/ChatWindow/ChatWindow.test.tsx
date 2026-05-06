@@ -402,12 +402,13 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    expect(screen.getByText("PIR-1")).toBeInTheDocument();
-    expect(screen.getByText("PIR-2")).toBeInTheDocument();
-    expect(screen.getByText("PIR-3")).toBeInTheDocument();
-    expect(screen.getByText("High")).toBeInTheDocument();
-    expect(screen.getByText("Medium")).toBeInTheDocument();
-    expect(screen.getByText("Low")).toBeInTheDocument();
+    // Badges show 1-indexed numbers; priority label includes the "Priority: " prefix
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("3").length).toBeGreaterThan(0);
+    expect(screen.getByText("Priority: High")).toBeInTheDocument();
+    expect(screen.getByText("Priority: Medium")).toBeInTheDocument();
+    expect(screen.getByText("Priority: Low")).toBeInTheDocument();
   });
 
   it("shows a 'Rationale' toggle for each PIR item", () => {
@@ -502,8 +503,9 @@ describe("ChatWindow", () => {
 
     renderWithToast(<ChatWindow messages={messages} />);
 
-    // CitationText renders plain text — **bold** markers are not processed as HTML
-    expect(screen.getByText(/\*\*Scope\*\*/)).toBeInTheDocument();
+    // ReasoningMarkdown processes **bold** markers → <strong> elements via renderInline
+    const scopeEl = screen.getByText("Scope");
+    expect(scopeEl.tagName).toBe("STRONG");
   });
 
   it("renders a 'Show reasoning' toggle for PIR messages", () => {
@@ -660,7 +662,9 @@ describe("ChatWindow", () => {
 
   it("renders the analysis inline and hides the composer when stage is complete", () => {
     const messages = [
-      { id: "1", text: "Analysis complete.", sender: "system" as const },
+      // type:"analysis" + truthy data triggers AnalysisWorkspace (mocked) and hides the composer
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      { id: "1", text: "Analysis complete.", sender: "system" as const, type: "analysis" as const, data: {} as any },
     ];
 
     renderWithToast(<ChatWindow messages={messages} stage="complete" />);
@@ -685,7 +689,7 @@ describe("ChatWindow", () => {
     expect(
       screen.queryByText(/collection review/i),
     ).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /gather more/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /collect more/i })).toBeInTheDocument();
   });
 });
 

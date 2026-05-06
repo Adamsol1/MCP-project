@@ -7,7 +7,7 @@ import ToastContainer from "./ToastContainer";
 function ToastTrigger({ message = "Hello" }: { message?: string }) {
   const { addToast } = useToast();
   return (
-    <button onClick={() => addToast(message, "info")}>Add toast</button>
+    <button onClick={() => addToast(message, { type: "info" })}>Add toast</button>
   );
 }
 

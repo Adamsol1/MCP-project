@@ -96,9 +96,9 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
     useState<CollectionDisplayData | null>(null);
   const [reviewActivity, setReviewActivity] = useState<PhaseReviewItem[]>([]);
   const highlightedRef = highlightedRefs[0] ?? null;
-  const setHighlightedRef = (ref: string | null) => {
+  const setHighlightedRef = useCallback((ref: string | null) => {
     setHighlightedRefs(ref ? [ref] : []);
-  };
+  }, []);
   const mergeCollectionData = useCallback((incoming: CollectionDisplayData) => {
     setCollectionData((prev) => {
       const combined = prev

@@ -66,7 +66,7 @@ describe("CollectionActivityModal", () => {
     );
 
     expect(screen.getByText(/attempt 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/approved/i)).toBeInTheDocument();
+    expect(screen.getByText("Approved")).toBeInTheDocument();
   });
 
   it("renders rejected badge for a rejected attempt", () => {
