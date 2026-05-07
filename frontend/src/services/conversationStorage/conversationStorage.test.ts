@@ -198,4 +198,141 @@ describe("conversationStorage", () => {
       expect(conv1.sessionId).not.toBe(conv2.sessionId);
     });
   });
+
+  // ---------- normalizeConversation / coerceStage (via loadConversationStore) ----------
+
+  describe("loadConversationStore — normalizeConversation coercion", () => {
+    function seedStore(overrides: Record<string, unknown>) {
+      const conv = {
+        id: "c1",
+        title: "Test",
+        messages: [],
+        perspectives: ["NEUTRAL"],
+        sessionId: "s1",
+        isConfirming: false,
+        stage: "initial",
+        phase: "direction",
+        subState: null,
+        createdAt: 1000,
+        updatedAt: 1000,
+        ...overrides,
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        conversations: [conv],
+        activeConversationId: "c1",
+      }));
+    }
+
+    // coerceStage — invalid stage, isConfirming = false → "initial"
+    it("coerces an unrecognised stage to 'initial' when isConfirming is false", () => {
+      seedStore({ stage: "totally_invalid_stage", isConfirming: false });
+      const store = loadConversationStore();
+      expect(store.conversations[0].stage).toBe("initial");
+    });
+
+    // coerceStage — invalid stage, isConfirming = true → "summary_confirming"
+    it("coerces an unrecognised stage to 'summary_confirming' when isConfirming is true", () => {
+      seedStore({ stage: "bogus", isConfirming: true });
+      const store = loadConversationStore();
+      expect(store.conversations[0].stage).toBe("summary_confirming");
+    });
+
+    // inferPhaseFromConversation — reviewing with collection message → "collection"
+    it("infers phase 'collection' for reviewing stage when messages contain collection type", () => {
+      seedStore({
+        stage: "reviewing",
+        phase: undefined, // omit so coercePhase falls back to inferPhaseFromConversation
+        messages: [{ id: "m1", text: "data", sender: "system", type: "collection" }],
+      });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("collection");
+    });
+
+    // inferPhaseFromConversation — reviewing with no collection message → "processing"
+    it("infers phase 'processing' for reviewing stage when no collection message", () => {
+      seedStore({
+        stage: "reviewing",
+        phase: undefined,
+        messages: [],
+      });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("processing");
+    });
+
+    // inferPhaseFromConversation — complete with analysis message → "analysis"
+    it("infers phase 'analysis' for complete stage when messages contain analysis type", () => {
+      seedStore({
+        stage: "complete",
+        phase: undefined,
+        messages: [{ id: "m1", text: "done", sender: "system", type: "analysis" }],
+      });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("analysis");
+    });
+
+    // inferPhaseFromConversation — complete with council message → "analysis"
+    it("infers phase 'analysis' for idle stage when messages contain council type", () => {
+      seedStore({
+        stage: "idle",
+        phase: undefined,
+        messages: [{ id: "m1", text: "council", sender: "system", type: "council" }],
+      });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("analysis");
+    });
+
+    // inferPhaseFromConversation — complete with no analysis/council → "processing"
+    it("infers phase 'processing' for pending stage when no analysis/council messages", () => {
+      seedStore({
+        stage: "pending",
+        phase: undefined,
+        messages: [],
+      });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("processing");
+    });
+
+    // inferPhaseFromConversation — plan_confirming → "collection"
+    it("infers phase 'collection' for plan_confirming stage", () => {
+      seedStore({ stage: "plan_confirming", phase: undefined });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("collection");
+    });
+
+    // inferPhaseFromConversation — processing → "processing"
+    it("infers phase 'processing' for processing stage", () => {
+      seedStore({ stage: "processing", phase: undefined });
+      const store = loadConversationStore();
+      expect(store.conversations[0].phase).toBe("processing");
+    });
+
+    // coercePhase — unknown phase triggers inferPhaseFromConversation
+    it("falls back to inferred phase when stored phase is unrecognised", () => {
+      seedStore({ stage: "gathering", phase: "completely_unknown_phase" });
+      const store = loadConversationStore();
+      // gathering → direction (via inferPhaseFromConversation default)
+      expect(store.conversations[0].phase).toBe("direction");
+    });
+
+    // coerceSubState — unrecognised subState → null
+    it("coerces an unrecognised subState to null", () => {
+      seedStore({ subState: "some_unknown_sub_state" });
+      const store = loadConversationStore();
+      expect(store.conversations[0].subState).toBeNull();
+    });
+
+    // coerceSubState — valid "awaiting_modifications" is preserved
+    it("preserves valid subState 'awaiting_modifications'", () => {
+      seedStore({ stage: "summary_confirming", subState: "awaiting_modifications" });
+      const store = loadConversationStore();
+      expect(store.conversations[0].subState).toBe("awaiting_modifications");
+    });
+
+    // coerceSubState — valid "awaiting_gather_more" is preserved
+    it("preserves valid subState 'awaiting_gather_more'", () => {
+      seedStore({ stage: "reviewing", subState: "awaiting_gather_more" });
+      const store = loadConversationStore();
+      expect(store.conversations[0].subState).toBe("awaiting_gather_more");
+    });
+  });
 });

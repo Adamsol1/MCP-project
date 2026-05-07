@@ -21,11 +21,12 @@ export function HelpModal({ isOpen, onClose, title, sections }: HelpModalProps) 
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="help-modal-title"
         className="flex w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl max-h-[85vh]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 flex shrink-0 items-center justify-between border-b border-border bg-surface px-6 py-4">
-          <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+          <h2 id="help-modal-title" className="text-base font-semibold text-text-primary">{title}</h2>
           <button
             aria-label="Close help"
             onClick={onClose}

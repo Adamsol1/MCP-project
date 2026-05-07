@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 import ElicitationModal from "./ElicitationModal";
 import type { PendingElicitation } from "../../services/dialogue/dialogue";
 
@@ -87,5 +88,21 @@ describe("ElicitationModal", () => {
     await user.click(screen.getByRole("button", { name: /decline/i }));
 
     expect(onRespond).toHaveBeenCalledWith("Decline");
+  });
+});
+
+describe("ElicitationModal — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations with standard elicitation options", async () => {
+    const { container } = render(
+      <ElicitationModal elicitation={elicitation} onRespond={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with plain options", async () => {
+    const { container } = render(
+      <ElicitationModal elicitation={plainElicitation} onRespond={vi.fn()} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

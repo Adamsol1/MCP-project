@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
+import { axe } from "vitest-axe";
 import StageTracker from "./StageTracker";
 import type { DialoguePhase } from "../../types/dialogue";
 
@@ -56,5 +57,27 @@ describe("StageTracker", () => {
     renderTracker("council" as DialoguePhase);
 
     expect(screen.getByText("4")).toBeInTheDocument();
+  });
+});
+
+describe("StageTracker — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations for direction phase", async () => {
+    const { container } = render(<StageTracker activePhase="direction" />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for collection phase", async () => {
+    const { container } = render(<StageTracker activePhase="collection" />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for processing phase", async () => {
+    const { container } = render(<StageTracker activePhase="processing" />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for analysis phase", async () => {
+    const { container } = render(<StageTracker activePhase="analysis" />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

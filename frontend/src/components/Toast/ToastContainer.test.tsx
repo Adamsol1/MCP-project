@@ -1,6 +1,7 @@
 import { render, screen, act } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 import { ToastProvider, useToast } from "../../contexts/Toast/ToastContext";
 import ToastContainer from "./ToastContainer";
 
@@ -86,5 +87,28 @@ describe("ToastContainer", () => {
     await user.click(screen.getByRole("button", { name: /add toast/i }));
 
     expect(screen.getByText("Hello")).toBeInTheDocument();
+  });
+});
+
+describe("ToastContainer — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations when empty", async () => {
+    const { container } = render(
+      <ToastProvider>
+        <ToastContainer />
+      </ToastProvider>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations when a toast is displayed", async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <ToastProvider>
+        <ToastTrigger />
+        <ToastContainer />
+      </ToastProvider>,
+    );
+    await user.click(screen.getByRole("button", { name: /add toast/i }));
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

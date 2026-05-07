@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
+import { axe } from "vitest-axe";
 import CollectionCoverageView from "./CollectionCoverageView";
 import type { CollectionCoverageResult } from "../../types/analysis";
 
@@ -256,5 +257,22 @@ describe("CollectionCoverageView", () => {
     };
     render(<CollectionCoverageView coverage={empty} />);
     expect(screen.queryByText(/Per-PIR Breakdown/i)).not.toBeInTheDocument();
+  });
+});
+
+describe("CollectionCoverageView — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations for high coverage", async () => {
+    const { container } = render(<CollectionCoverageView coverage={highCoverage} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for low coverage", async () => {
+    const { container } = render(<CollectionCoverageView coverage={lowCoverage} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for moderate coverage", async () => {
+    const { container } = render(<CollectionCoverageView coverage={moderateCoverage} />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

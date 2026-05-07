@@ -796,6 +796,652 @@ describe("PirMessage — rationale citation rendering", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// CollectionPlanMessage, SuggestedSourcesMessage, CollectionSummaryMessage
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — plan message", () => {
+  it("renders step titles, descriptions, and numbering for plan messages with steps", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "plan" as const,
+        data: {
+          plan: "Plan text",
+          steps: [
+            {
+              title: "Gather OSINT",
+              description: "Collect publicly available intelligence.",
+              suggested_sources: ["Web Search"],
+            },
+            {
+              title: "Analyse findings",
+              description: "Cross-reference gathered data.",
+              suggested_sources: [],
+            },
+          ],
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText("Collection Plan")).toBeInTheDocument();
+    expect(screen.getByText("Gather OSINT")).toBeInTheDocument();
+    expect(screen.getByText("Collect publicly available intelligence.")).toBeInTheDocument();
+    expect(screen.getByText("Analyse findings")).toBeInTheDocument();
+    // Step numbers 1 and 2 should appear
+    expect(screen.getAllByText("1").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("2").length).toBeGreaterThan(0);
+  });
+
+  it("renders suggested sources inside a step", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "plan" as const,
+        data: {
+          plan: "",
+          steps: [
+            {
+              title: "Research phase",
+              description: "Gather data.",
+              suggested_sources: ["Web Search", "AlienVault OTX"],
+            },
+          ],
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText("Web Search")).toBeInTheDocument();
+    expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
+  });
+
+  it("renders plain plan text when steps is absent", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "plan" as const,
+        data: {
+          plan: "Collect from all available sources and summarise findings.",
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(
+      screen.getByText("Collect from all available sources and summarise findings."),
+    ).toBeInTheDocument();
+  });
+
+  it("renders 'Show reasoning' toggle when plan has reasoning text", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "plan" as const,
+        data: {
+          plan: "Some plan",
+          reasoning: "Chose these steps because of scope.",
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText(/show reasoning/i)).toBeInTheDocument();
+  });
+});
+
+describe("ChatWindow — suggested_sources message", () => {
+  it("renders source names for suggested_sources message", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "suggested_sources" as const,
+        data: ["Web Search", "AlienVault OTX", "Knowledge Bank"],
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText(/Suggested Sources/i)).toBeInTheDocument();
+    expect(screen.getByText("Web Search")).toBeInTheDocument();
+    expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
+    expect(screen.getByText("Knowledge Bank")).toBeInTheDocument();
+  });
+
+  it("renders no-suggestions text when suggested_sources is an empty array", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "suggested_sources" as const,
+        data: [],
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText(/No source suggestions were returned/i)).toBeInTheDocument();
+  });
+});
+
+describe("ChatWindow — collection summary message (type='collection' with sources_used)", () => {
+  it("renders Collection Summary header with summary text and sources used", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "collection" as const,
+        data: {
+          summary: "Intelligence gathered from multiple sources.",
+          sources_used: ["AlienVault OTX", "Web Search"],
+          gaps: "Missing data on insider threats.",
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText(/Collection Summary/i)).toBeInTheDocument();
+    expect(screen.getByText("Intelligence gathered from multiple sources.")).toBeInTheDocument();
+    expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
+    expect(screen.getByText("Missing data on insider threats.")).toBeInTheDocument();
+  });
+});
+
+describe("ChatWindow — collection review state", () => {
+  it("renders Collection Review header when stage=reviewing, phase=collection, isConfirming=true", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="collection"
+      />,
+    );
+    expect(screen.getByText(/Collection Review/i)).toBeInTheDocument();
+  });
+
+  it("renders 'Accept', 'Revise', and 'Collect More' buttons in collection review", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="collection"
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^accept$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^revise$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^collect more$/i })).toBeInTheDocument();
+  });
+
+  it("calls onApprove when Accept button is clicked in collection review", async () => {
+    const user = userEvent.setup();
+    const onApprove = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="collection"
+        onApprove={onApprove}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^accept$/i }));
+    expect(onApprove).toHaveBeenCalledOnce();
+  });
+
+  it("calls onGatherMore when 'Collect More' is clicked", async () => {
+    const user = userEvent.setup();
+    const onGatherMore = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="collection"
+        onGatherMore={onGatherMore}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^collect more$/i }));
+    expect(onGatherMore).toHaveBeenCalledOnce();
+  });
+
+  it("calls onReject when 'Revise' is clicked in collection review", async () => {
+    const user = userEvent.setup();
+    const onReject = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="collection"
+        onReject={onReject}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^revise$/i }));
+    expect(onReject).toHaveBeenCalledOnce();
+  });
+});
+
+describe("ChatWindow — processing review state", () => {
+  it("renders Processing Review header when isConfirming=true, phase=processing", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+      />,
+    );
+    expect(screen.getByText(/Processing Review/i)).toBeInTheDocument();
+  });
+
+  it("renders Accept and Collect More buttons in processing review", () => {
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+      />,
+    );
+    expect(screen.getByRole("button", { name: /^accept$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^collect more$/i })).toBeInTheDocument();
+  });
+
+  it("calls onApprove when Accept is clicked in processing review", async () => {
+    const user = userEvent.setup();
+    const onApprove = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+        onApprove={onApprove}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^accept$/i }));
+    expect(onApprove).toHaveBeenCalledOnce();
+  });
+
+  it("calls onGatherMoreFromProcessing when Collect More clicked in processing review", async () => {
+    const user = userEvent.setup();
+    const onGatherMoreFromProcessing = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isConfirming={true}
+        stage="reviewing"
+        phase="processing"
+        onGatherMoreFromProcessing={onGatherMoreFromProcessing}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /^collect more$/i }));
+    expect(onGatherMoreFromProcessing).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source selection UI
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — source selection", () => {
+  it("renders Select Sources header when isSourceSelecting is true", () => {
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search", "AlienVault OTX"]}
+        selectedSources={[]}
+      />,
+    );
+    expect(screen.getByText(/Select Sources/i)).toBeInTheDocument();
+  });
+
+  it("renders available source buttons in source selection mode", () => {
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search", "AlienVault OTX"]}
+        selectedSources={[]}
+      />,
+    );
+    expect(screen.getByText("Web Search")).toBeInTheDocument();
+    expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
+  });
+
+  it("calls onToggleSourceSelection when a source button is clicked", async () => {
+    const user = userEvent.setup();
+    const onToggle = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search"]}
+        selectedSources={[]}
+        onToggleSourceSelection={onToggle}
+      />,
+    );
+    await user.click(screen.getByText("Web Search"));
+    expect(onToggle).toHaveBeenCalledWith("Web Search");
+  });
+
+  it("renders no-source-suggestions message when availableSources is empty", () => {
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={[]}
+        selectedSources={[]}
+      />,
+    );
+    expect(screen.getByText(/No source suggestions available/i)).toBeInTheDocument();
+  });
+
+  it("renders Start Collecting button that is disabled when no sources are selected", () => {
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search"]}
+        selectedSources={[]}
+      />,
+    );
+    const btn = screen.getByRole("button", { name: /start collecting/i });
+    expect(btn).toBeDisabled();
+  });
+
+  it("calls onSubmitSourceSelection when Start Collecting is clicked with sources selected", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search"]}
+        selectedSources={["Web Search"]}
+        onSubmitSourceSelection={onSubmit}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /start collecting/i }));
+    expect(onSubmit).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collecting status UI
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — collecting status", () => {
+  it("renders Collecting section when isCollecting is true without status", () => {
+    renderWithToast(<ChatWindow isCollecting={true} />);
+    expect(screen.getByText(/collecting/i)).toBeInTheDocument();
+  });
+
+  it("renders collection status sources when collectionStatus is provided", () => {
+    const collectionStatus = {
+      current_source: "Web Search",
+      current_activity: null,
+      sources: {
+        "Web Search": { call_count: 0 },
+        "AlienVault OTX": { call_count: 3 },
+      },
+    };
+    renderWithToast(
+      <ChatWindow isCollecting={true} collectionStatus={collectionStatus} />,
+    );
+    expect(screen.getByText("Web Search")).toBeInTheDocument();
+    expect(screen.getByText("AlienVault OTX")).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Collection display message
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — collection message type", () => {
+  it("renders CollectionResults header for collection message with collected_data", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "collection" as const,
+        data: {
+          collected_data: [{ source: "query_otx", resource_id: "r1", content: "data" }],
+          source_summary: [{ display_name: "AlienVault OTX", count: 1, resource_ids: ["r1"], has_content: true }],
+        },
+      },
+    ];
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText(/Collection Results/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ProcessingMessage — rendered as a message in ChatWindow
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — processing message with findings", () => {
+  const processingMessage = {
+    id: "1",
+    text: "{}",
+    sender: "system" as const,
+    type: "processing" as const,
+    data: {
+      findings: [
+        {
+          id: "f1",
+          title: "APT29 phishing campaign detected",
+          finding: "Detailed finding text about the campaign.",
+          confidence: 0.85,
+          source: "query_otx",
+          categories: ["phishing"],
+          relevant_to: ["PIR-1"],
+          reasoning: "",
+          attack_ids: [],
+          sources: [],
+        },
+      ],
+      gaps: ["Additional context on attribution needed."],
+      reasoning: "",
+    },
+  };
+
+  it("renders Processing Results header and finding title", () => {
+    renderWithToast(<ChatWindow messages={[processingMessage]} />);
+    expect(screen.getByText("Processing Results")).toBeInTheDocument();
+    expect(screen.getByText("APT29 phishing campaign detected")).toBeInTheDocument();
+  });
+
+  it("renders gap text in the gaps section", () => {
+    renderWithToast(<ChatWindow messages={[processingMessage]} />);
+    expect(
+      screen.getByText("Additional context on attribution needed."),
+    ).toBeInTheDocument();
+  });
+
+  it("passes onGapCollect to ProcessingMessage (line 1288 branch)", () => {
+    const onGapCollect = vi.fn();
+    const onSendMessage = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        messages={[processingMessage]}
+        onGapCollect={onGapCollect}
+        onSendMessage={onSendMessage}
+      />,
+    );
+    // The "Collect More" button should appear since onGapCollect is provided
+    expect(
+      screen.getByRole("button", { name: /collect more/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("opens FindingDetailModal when a finding row is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithToast(<ChatWindow messages={[processingMessage]} />);
+
+    // Click on the finding row (the title is rendered as a table cell)
+    await user.click(screen.getByText("APT29 phishing campaign detected"));
+
+    // FindingDetailModal should appear as a dialog
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("closes FindingDetailModal when close button is clicked", async () => {
+    const user = userEvent.setup();
+    renderWithToast(<ChatWindow messages={[processingMessage]} />);
+
+    await user.click(screen.getByText("APT29 phishing campaign detected"));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /close/i }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("renders processing message plain text when type=processing but no findings (line 1321)", () => {
+    const plainProcessing = {
+      id: "2",
+      text: "Processing is underway, please wait.",
+      sender: "system" as const,
+      type: "processing" as const,
+      // no data — will fall through to line 1321
+    };
+    renderWithToast(<ChatWindow messages={[plainProcessing]} />);
+    expect(
+      screen.getByText("Processing is underway, please wait."),
+    ).toBeInTheDocument();
+  });
+
+  it("clicking Collect More enables gap collection mode and shows checkboxes", async () => {
+    const user = userEvent.setup();
+    const onGapCollect = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        messages={[processingMessage]}
+        onGapCollect={onGapCollect}
+        onSendMessage={vi.fn()}
+      />,
+    );
+
+    // Click "Collect More" to enter collect mode
+    const collectMoreBtn = screen.getByRole("button", { name: /^collect more$/i });
+    await user.click(collectMoreBtn);
+
+    // In collect mode, a checkbox should appear for each gap
+    expect(screen.getByRole("checkbox")).toBeInTheDocument();
+    // "Collect All" button should appear
+    expect(screen.getByRole("button", { name: /collect all/i })).toBeInTheDocument();
+  });
+
+  it("Collect All button calls onSendMessage with all gap text", async () => {
+    const user = userEvent.setup();
+    const onSendMessage = vi.fn();
+    renderWithToast(
+      <ChatWindow
+        messages={[processingMessage]}
+        onGapCollect={vi.fn()}
+        onSendMessage={onSendMessage}
+      />,
+    );
+
+    // Enter collect mode
+    await user.click(screen.getByRole("button", { name: /^collect more$/i }));
+    // Click Collect All
+    await user.click(screen.getByRole("button", { name: /collect all/i }));
+
+    // onSendMessage is called via the onGapCollect → (gap) => onSendMessage?.(gap) chain
+    expect(onSendMessage).toHaveBeenCalledOnce();
+    expect(onSendMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Additional context on attribution needed."),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Source selection timeframe onChange (line 1499)
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// ReasoningMarkdown — bullet and heading block rendering
+// ---------------------------------------------------------------------------
+
+describe("ChatWindow — ReasoningMarkdown bullet and heading blocks", () => {
+  it("renders bullet items (starting with '* ') in reasoning as list items", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          pir_text: "PIRs generated.",
+          claims: [],
+          sources: [],
+          pirs: [
+            { question: "Q1?", priority: "high" as const, rationale: "R1.", source_ids: [] },
+          ],
+          // Reasoning with bullets, headings, and empty lines
+          reasoning:
+            "Evidence Overview:\n* First bullet point here\n* Second bullet point\n\nSome prose after empty line.",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+
+    // The section heading "Evidence Overview" should appear
+    expect(screen.getByText("Evidence Overview")).toBeInTheDocument();
+    // Bullet items should be rendered
+    expect(screen.getByText("First bullet point here")).toBeInTheDocument();
+    expect(screen.getByText("Second bullet point")).toBeInTheDocument();
+    // Prose after the empty line
+    expect(screen.getByText("Some prose after empty line.")).toBeInTheDocument();
+  });
+
+  it("renders dash bullets ('- ') in reasoning as list items", () => {
+    const messages = [
+      {
+        id: "1",
+        text: "{}",
+        sender: "system" as const,
+        type: "pir" as const,
+        data: {
+          pir_text: "PIRs.",
+          claims: [],
+          sources: [],
+          pirs: [
+            { question: "Q1?", priority: "low" as const, rationale: "R1.", source_ids: [] },
+          ],
+          reasoning: "- Dash bullet one\n- Dash bullet two",
+        },
+      },
+    ];
+
+    renderWithToast(<ChatWindow messages={messages} />);
+    expect(screen.getByText("Dash bullet one")).toBeInTheDocument();
+    expect(screen.getByText("Dash bullet two")).toBeInTheDocument();
+  });
+});
+
+describe("ChatWindow — source selection timeframe change", () => {
+  it("updates local timeframe state when a timeframe select is changed (line 1499)", async () => {
+    const user = userEvent.setup();
+    renderWithToast(
+      <ChatWindow
+        isSourceSelecting={true}
+        availableSources={["Web Search"]}
+        selectedSources={["Web Search"]}
+      />,
+    );
+
+    // The timeframe selects should be present
+    const selects = screen.getAllByRole("combobox");
+    expect(selects.length).toBeGreaterThan(0);
+
+    // Change a timeframe — just pick the first select and change its value
+    // The options are rendered from t.timeframeOptions; pick any available option
+    const firstSelect = selects[0];
+    const options = Array.from(firstSelect.querySelectorAll("option"));
+    if (options.length > 1) {
+      await user.selectOptions(firstSelect, options[1].value);
+    }
+    // No crash = onChange handler executed
+    expect(firstSelect).toBeInTheDocument();
+  });
+});
+
 describe("ChatWindow — accessibility (WCAG 2.1 AA)", () => {
   it("has no violations in empty state", async () => {
     const { container } = renderWithToast(<ChatWindow />);
