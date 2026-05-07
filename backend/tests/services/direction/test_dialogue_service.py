@@ -69,7 +69,7 @@ class MockToolCallingAgent:
     def __init__(self, mcp_client):  # noqa: ARG002
         pass
 
-    async def run(self, system_prompt: str, task: str):  # noqa: ARG002
+    async def run(self, system_prompt: str, task: str, **kwargs):  # noqa: ARG002
         return system_prompt
 
 
@@ -85,6 +85,45 @@ def _build_service(monkeypatch):
     )
     mcp_client = MockMCPClient()
     return DialogueService(mcp_client, MockAIOrchestrator()), mcp_client
+
+
+@pytest.mark.asyncio
+async def test_parse_or_repair_json_repairs_with_model(monkeypatch):
+    class RepairClient:
+        async def generate_json_text(self, prompt: str):  # noqa: ARG002
+            return '{"question": "What scope?", "type": "scope", "has_sufficient_context": false, "context": {}}'
+
+    monkeypatch.setattr(dialogue_service_module, "OpenAICompatibleClient", RepairClient)
+
+    service = DialogueService(MockMCPClient(), MockAIOrchestrator())
+    result = await service._parse_or_repair_json(
+        raw="What scope?",
+        repair_prompt="repair this",
+        label="clarifying question",
+    )
+
+    assert result["question"] == "What scope?"
+    assert result["type"] == "scope"
+
+
+@pytest.mark.asyncio
+async def test_parse_or_repair_json_raises_when_repair_is_unparseable(monkeypatch):
+    class BrokenRepairClient:
+        async def generate_json_text(self, prompt: str):  # noqa: ARG002
+            return "still not json"
+
+    monkeypatch.setattr(
+        dialogue_service_module, "OpenAICompatibleClient", BrokenRepairClient
+    )
+
+    service = DialogueService(MockMCPClient(), MockAIOrchestrator())
+
+    with pytest.raises(ValueError, match="after repair"):
+        await service._parse_or_repair_json(
+            raw="not json",
+            repair_prompt="repair this",
+            label="PIR",
+        )
 
 
 @pytest.mark.asyncio

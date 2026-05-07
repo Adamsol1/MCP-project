@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from typing import Any
 
 import httpx
@@ -49,6 +50,14 @@ class OpenAICompatibleClient:
             "messages": messages,
             "stream": False,
         }
+        if self.config.temperature is not None:
+            body["temperature"] = self.config.temperature
+        if self.config.max_completion_tokens is not None:
+            body["max_completion_tokens"] = self.config.max_completion_tokens
+        if self.config.enable_thinking is not None:
+            body["chat_template_kwargs"] = {
+                "enable_thinking": self.config.enable_thinking
+            }
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
@@ -67,10 +76,25 @@ class OpenAICompatibleClient:
                 try:
                     response = await self._post_chat(client, url, headers, body)
                     break
+                except httpx.RemoteProtocolError:
+                    if "tools" in body:
+                        OpenAICompatibleClient._tools_supported = False
+                        logger.info(
+                            "[OpenAICompatibleClient] Provider disconnected when "
+                            "tool-calling metadata was sent; disabling tools for "
+                            "subsequent requests."
+                        )
+                        body.pop("tools", None)
+                        body.pop("tool_choice", None)
+                        continue
+                    raise RuntimeError(
+                        "The configured local LLM endpoint disconnected without "
+                        f"sending a response: {url}."
+                    ) from None
                 except httpx.HTTPStatusError as exc:
                     if "tools" in body and self._is_tool_support_error(exc.response):
                         OpenAICompatibleClient._tools_supported = False
-                        logger.warning(
+                        logger.info(
                             "[OpenAICompatibleClient] Provider rejected tool-calling "
                             "metadata; disabling tools for subsequent requests. To "
                             "enable MCP tool-calling with vLLM, start it with "
@@ -90,13 +114,28 @@ class OpenAICompatibleClient:
                         )
                         body.pop("response_format", None)
                         continue
+                    logger.error(
+                        "[OpenAICompatibleClient] HTTP %s: %s",
+                        exc.response.status_code,
+                        exc.response.text[:500],
+                    )
+                    if exc.response.status_code == 502:
+                        raise RuntimeError(
+                            "The configured local LLM endpoint returned 502 Bad "
+                            "Gateway. The Vast/vLLM instance is not ready or is "
+                            f"not serving vLLM at {url}."
+                        ) from exc
                     raise
             payload = response.json()
 
         choices = payload.get("choices") or []
         if not choices:
             raise ValueError(f"Model {self.model} returned no choices")
-        return choices[0].get("message") or {}
+        message = choices[0].get("message") or {}
+        content = message.get("content")
+        if isinstance(content, str):
+            message = {**message, "content": self._clean_content(content)}
+        return message
 
     async def generate_text(self, prompt: str) -> str:
         message = await self.chat([{"role": "user", "content": prompt}])
@@ -132,13 +171,18 @@ class OpenAICompatibleClient:
         headers: dict[str, str],
         body: dict[str, Any],
     ) -> httpx.Response:
-        response = await client.post(url, headers=headers, json=body)
-        if response.status_code >= 400:
-            logger.error(
-                "[OpenAICompatibleClient] HTTP %s: %s",
-                response.status_code,
-                response.text[:500],
-            )
+        try:
+            response = await client.post(url, headers=headers, json=body)
+        except httpx.ConnectError as exc:
+            raise RuntimeError(
+                "Could not connect to the configured local LLM endpoint "
+                f"{url}. Check LLM_BASE_URL and confirm the vLLM server is reachable."
+            ) from exc
+        except httpx.TimeoutException as exc:
+            raise RuntimeError(
+                "Timed out while connecting to the configured local LLM endpoint "
+                f"{url}. Increase LLM_TIMEOUT_SECONDS or check the vLLM server."
+            ) from exc
         response.raise_for_status()
         return response
 
@@ -173,3 +217,11 @@ class OpenAICompatibleClient:
                 "json mode",
             )
         )
+
+    @staticmethod
+    def _clean_content(text: str) -> str:
+        """Normalize common local-model decoding artifacts before parsing."""
+        text = text.replace("\u0120", " ").replace("\u010a", "\n")
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL)
+        text = re.sub(r"^.*?</think>", "", text, flags=re.IGNORECASE | re.DOTALL)
+        return text.strip()

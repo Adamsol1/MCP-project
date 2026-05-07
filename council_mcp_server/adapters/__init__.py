@@ -99,6 +99,8 @@ def create_adapter(
                 responses_api_prefixes=config.responses_api_prefixes,
                 max_output_tokens=config.max_output_tokens,
                 max_completion_tokens=config.max_completion_tokens,
+                temperature=config.temperature,
+                enable_thinking=config.enable_thinking,
             )
 
         return http_adapters[name](

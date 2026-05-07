@@ -89,6 +89,7 @@ class ToolCallingAgent:
         task: str,
         allowed_tool_names: set[str] | None = None,
         status_tracker=None,
+        response_format: dict[str, Any] | None = None,
     ) -> str:
         available_tools = await self._get_tool_declarations(allowed_tool_names)
         self.last_thought_text = ""
@@ -104,7 +105,11 @@ class ToolCallingAgent:
         last_text = ""
 
         for round_num in range(self.max_tool_rounds):
-            message = await self.client.chat(messages, tools=available_tools)
+            message = await self.client.chat(
+                messages,
+                tools=available_tools,
+                response_format=response_format,
+            )
             tool_calls = message.get("tool_calls") or []
 
             if not tool_calls:

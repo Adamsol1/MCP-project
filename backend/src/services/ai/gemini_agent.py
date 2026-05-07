@@ -94,6 +94,7 @@ class GeminiAgent:
         task: str,
         allowed_tool_names: set[str] | None = None,
         status_tracker=None,
+        response_format: dict | None = None,
     ) -> str:
         """Run the agent on a task, autonomously calling MCP tools as needed.
 
@@ -120,11 +121,14 @@ class GeminiAgent:
         ]
 
         self.last_thought_text = ""
-        config = types.GenerateContentConfig(
-            system_instruction=system_prompt,
-            tools=available_tools,
-            thinking_config=types.ThinkingConfig(include_thoughts=True),
-        )
+        config_kwargs = {
+            "system_instruction": system_prompt,
+            "tools": available_tools,
+            "thinking_config": types.ThinkingConfig(include_thoughts=True),
+        }
+        if response_format:
+            config_kwargs["response_mime_type"] = "application/json"
+        config = types.GenerateContentConfig(**config_kwargs)
 
         for round_num in range(self.max_tool_rounds):
             try:

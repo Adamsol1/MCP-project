@@ -302,6 +302,90 @@ class DirectionFlow(BasePhaseFlow):
             except (ValueError, KeyError):
                 pass
 
+    @staticmethod
+    def _context_field_from_question_type(question_type: str | None) -> str | None:
+        if not question_type:
+            return None
+        aliases = {
+            "scope": "scope",
+            "timeframe": "timeframe",
+            "target_entities": "target_entities",
+            "targets": "target_entities",
+            "entities": "target_entities",
+            "actors": "threat_actors",
+            "threat_actors": "threat_actors",
+            "focus": "priority_focus",
+            "priority_focus": "priority_focus",
+        }
+        return aliases.get(str(question_type).strip().lower())
+
+    @staticmethod
+    def _context_field_from_question_text(question: str | None) -> str | None:
+        if not question:
+            return None
+        text = question.lower()
+        if "scope" in text:
+            return "scope"
+        if "time" in text or "period" in text or "timeframe" in text:
+            return "timeframe"
+        if any(
+            word in text
+            for word in (
+                "countries",
+                "organizations",
+                "systems",
+                "sectors",
+                "entities",
+            )
+        ):
+            return "target_entities"
+        if "threat actor" in text or "adversar" in text or "group" in text:
+            return "threat_actors"
+        if "priorit" in text or "focus" in text or "emphas" in text:
+            return "priority_focus"
+        return None
+
+    def _last_answered_field(self) -> str | None:
+        if not self.context.dialogue_turns:
+            return None
+        last_turn = self.context.dialogue_turns[-1]
+        return self._context_field_from_question_type(
+            last_turn.get("question_type")
+        ) or self._context_field_from_question_text(last_turn.get("question"))
+
+    @staticmethod
+    def _coerce_answer_for_context_field(field: str, answer: str):
+        cleaned = answer.strip()
+        if field in {"target_entities", "threat_actors"}:
+            return [cleaned] if cleaned else []
+        return cleaned
+
+    def _backfill_answered_field(
+        self,
+        extracted_context: dict,
+        user_message: str,
+    ) -> dict:
+        """Preserve the user's answer to the previous question if extraction missed it."""
+        field = self._last_answered_field()
+        if not field or extracted_context.get(field):
+            return extracted_context
+        answer_value = self._coerce_answer_for_context_field(field, user_message)
+        if answer_value:
+            extracted_context = {**extracted_context, field: answer_value}
+        return extracted_context
+
+    def _preapply_answered_field(self, user_message: str) -> None:
+        """Apply the answer to the last asked field before asking the model again."""
+        field = self._last_answered_field()
+        if not field:
+            return
+        current = getattr(self.context, field)
+        if current:
+            return
+        answer_value = self._coerce_answer_for_context_field(field, user_message)
+        if answer_value:
+            self._apply_context_update({field: answer_value})
+
     async def handle_initial_input(
         self, user_message, dialogue_service, language: str = "en"
     ) -> DialogueResponse:
@@ -359,6 +443,7 @@ class DirectionFlow(BasePhaseFlow):
         self.context.dialogue_turns.append(
             {
                 "question": result.question.question_text,
+                "question_type": result.question.question_type,
                 "answer": user_message,
             }
         )
@@ -396,6 +481,11 @@ class DirectionFlow(BasePhaseFlow):
             dialogue_response.content = self.context.model_dump_json()
             return dialogue_response
 
+        # Apply the answer to the previous question before generating the next one.
+        # This prevents local models from seeing stale context and repeating the
+        # same missing-field question.
+        self._preapply_answered_field(user_message)
+
         # Generate question and extract context from user message
         try:
             result = await dialogue_service.generate_clarifying_question(
@@ -410,11 +500,18 @@ class DirectionFlow(BasePhaseFlow):
                 action=DialogueAction.ERROR, content="Failed to generate question"
             )
 
-        # Update context
-        self._apply_context_update(result.extracted_context)
+        # Update context. Local models may ask the right question but omit the
+        # user's answer from the JSON context; preserve the answer based on the
+        # question the user was responding to.
+        extracted_context = self._backfill_answered_field(
+            result.extracted_context,
+            user_message,
+        )
+        self._apply_context_update(extracted_context)
         self.context.dialogue_turns.append(
             {
                 "question": result.question.question_text,
+                "question_type": result.question.question_type,
                 "answer": user_message,
             }
         )

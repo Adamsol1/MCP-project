@@ -34,7 +34,8 @@ from src.services.council.council_mcp_process import maybe_start_council_mcp, st
 from src.services.council.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+load_dotenv(PROJECT_ROOT / ".env")
 
 setup_logging()
 

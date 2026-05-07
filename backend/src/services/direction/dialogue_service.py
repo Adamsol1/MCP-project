@@ -14,8 +14,11 @@ from typing import Any
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
 from src.services.ai.agent_factory import create_tool_agent
+from src.services.ai.openai_compatible_client import OpenAICompatibleClient
 
 logger = logging.getLogger("app")
+
+JSON_OBJECT_RESPONSE_FORMAT = {"type": "json_object"}
 
 
 class DialogueService:
@@ -56,9 +59,23 @@ class DialogueService:
                 },
             )
             agent = create_tool_agent(self.mcp_client)
-            raw = await agent.run(system_prompt=system_prompt, task=user_message)
+            raw = await agent.run(
+                system_prompt=system_prompt,
+                task=user_message,
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
+            )
 
-        question_result = self._parse_json(raw)
+        question_result = await self._parse_or_repair_json(
+            raw=raw,
+            repair_prompt=self._clarifying_question_repair_prompt(
+                raw=raw,
+                user_message=user_message,
+                context=context,
+                missing_fields=missing_fields,
+                language=language,
+            ),
+            label="clarifying question",
+        )
 
         # Backend override: if we know fields are missing, force False regardless of AI judgement
         if missing_fields:
@@ -121,11 +138,17 @@ class DialogueService:
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
             )
-            try:
-                result = self._parse_json(raw)
-            except (json.JSONDecodeError, ValueError) as e:
-                raise ValueError(f"Agent returned unparseable response: {e}") from e
+            result = await self._parse_or_repair_json(
+                raw=raw,
+                repair_prompt=self._pir_repair_prompt(
+                    raw=raw,
+                    context=context,
+                    language=effective_language,
+                ),
+                label="PIR",
+            )
 
             # Gemini 2.5 thinking models put internal reasoning into thought parts
             # and may return an empty "reasoning" field in the JSON. Use the captured
@@ -252,6 +275,7 @@ class DialogueService:
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a structured summary of the intelligence collection context.",
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
             )
 
         return self._parse_json(raw)  # type: ignore[no-any-return]
@@ -270,6 +294,108 @@ class DialogueService:
         if not context.priority_focus:
             missing.append("priority_focus")
         return missing
+
+    async def _parse_or_repair_json(
+        self,
+        *,
+        raw: str,
+        repair_prompt: str,
+        label: str,
+    ) -> Any:
+        try:
+            return self._parse_json(raw)
+        except ValueError as parse_error:
+            logger.warning(
+                "[DialogueService] Agent returned unparseable %s JSON; asking model to repair it: %s",
+                label,
+                parse_error,
+            )
+
+        repair_client = OpenAICompatibleClient()
+        repaired = await repair_client.generate_json_text(repair_prompt)
+        try:
+            return self._parse_json(repaired)
+        except ValueError as repair_error:
+            raise ValueError(
+                f"Agent returned unparseable {label} JSON after repair: {repair_error}"
+            ) from repair_error
+
+    @staticmethod
+    def _clarifying_question_repair_prompt(
+        *,
+        raw: str,
+        user_message: str,
+        context: DialogueContext,
+        missing_fields: list[str],
+        language: str,
+    ) -> str:
+        return f"""
+Convert the model output below into exactly one valid JSON object for a clarifying question.
+Do not invent a completed answer. Preserve any useful question from the model output.
+
+Required shape:
+{{
+  "question": "one follow-up question written in language {language}",
+  "type": "one of: scope, target_entities, threat_actors, timeframe, priority_focus, confirmation",
+  "has_sufficient_context": false,
+  "context": {{
+    "scope": "string",
+    "timeframe": "string",
+    "target_entities": ["strings"],
+    "threat_actors": ["strings"],
+    "priority_focus": "string",
+    "perspectives": ["strings"]
+  }}
+}}
+
+Current context JSON:
+{context.model_dump_json()}
+
+Missing fields:
+{json.dumps(missing_fields)}
+
+User message:
+{user_message}
+
+Model output to repair:
+{raw}
+"""
+
+    @staticmethod
+    def _pir_repair_prompt(
+        *,
+        raw: str,
+        context: DialogueContext,
+        language: str,
+    ) -> str:
+        return f"""
+Convert the model output below into exactly one valid JSON object for Priority Intelligence Requirements.
+Do not replace it with a hardcoded fallback. Preserve the model's PIR content and make only the minimum changes needed for valid JSON.
+Write all PIR content in language {language}.
+
+Required shape:
+{{
+  "pir_text": "string",
+  "claims": [
+    {{"id": "claim_1", "text": "string", "source_ref": "[1]", "source_id": "source-id"}}
+  ],
+  "sources": [
+    {{"id": "source-id", "ref": "[1]", "source_type": "kb"}}
+  ],
+  "pirs": [
+    {{"question": "string", "priority": "high | medium | low", "rationale": "string", "source_ids": ["source-id"]}}
+  ],
+  "reasoning": "string"
+}}
+
+Use empty arrays for claims and sources if the output has no citations.
+
+Current context JSON:
+{context.model_dump_json()}
+
+Model output to repair:
+{raw}
+"""
 
     @staticmethod
     def _parse_json(raw: str) -> Any:

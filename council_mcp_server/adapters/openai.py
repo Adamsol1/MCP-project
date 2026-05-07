@@ -64,6 +64,8 @@ class OpenAIAdapter(OpenAIChatCompletionsAdapter):
         responses_api_prefixes: Optional[List[str]] = None,
         max_output_tokens: Optional[int] = None,
         max_completion_tokens: Optional[int] = None,
+        temperature: Optional[float] = None,
+        enable_thinking: Optional[bool] = None,
     ):
         """
         Initialize OpenAI adapter.
@@ -77,6 +79,8 @@ class OpenAIAdapter(OpenAIChatCompletionsAdapter):
             responses_api_prefixes: Model prefixes that use Responses API (default: ["o1", "o3"])
             max_output_tokens: Maximum output tokens for Responses API requests (default: None)
             max_completion_tokens: Maximum tokens for Chat Completions API requests (default: None)
+            temperature: Sampling temperature for Chat Completions API requests (default: None)
+            enable_thinking: Optional vLLM chat template flag for Qwen3-style models
         """
         super().__init__(
             base_url=base_url,
@@ -92,6 +96,8 @@ class OpenAIAdapter(OpenAIChatCompletionsAdapter):
         )
         self.max_output_tokens = max_output_tokens
         self.max_completion_tokens = max_completion_tokens
+        self.temperature = temperature
+        self.enable_thinking = enable_thinking
 
     def _is_responses_api_model(self, model: str) -> bool:
         """
@@ -133,6 +139,14 @@ class OpenAIAdapter(OpenAIChatCompletionsAdapter):
             # Add max_completion_tokens if configured (Chat Completions API parameter)
             if self.max_completion_tokens is not None:
                 body["max_completion_tokens"] = self.max_completion_tokens
+
+            if self.temperature is not None:
+                body["temperature"] = self.temperature
+
+            if self.enable_thinking is not None:
+                body["chat_template_kwargs"] = {
+                    "enable_thinking": self.enable_thinking
+                }
 
             return (endpoint, headers, body)
 

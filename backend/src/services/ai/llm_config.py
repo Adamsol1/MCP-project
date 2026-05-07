@@ -9,9 +9,11 @@ from contextvars import ContextVar
 from dataclasses import dataclass
 
 DEFAULT_LLM_BASE_URL = "http://127.0.0.1:8001/v1"
-DEFAULT_LLM_API_KEY = "my-secret-key"
 DEFAULT_LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 DEFAULT_LLM_TIMEOUT_SECONDS = 180
+DEFAULT_LLM_TEMPERATURE = 0.7
+DEFAULT_LLM_MAX_COMPLETION_TOKENS = 512
+DEFAULT_LLM_ENABLE_THINKING = False
 DEFAULT_LLM_PROVIDER = "gemini"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -29,6 +31,13 @@ def _first_env(*names: str) -> str | None:
     return None
 
 
+def _normalize_openai_base_url(base_url: str) -> str:
+    base_url = base_url.rstrip("/")
+    if base_url.endswith("/v1"):
+        return base_url
+    return f"{base_url}/v1"
+
+
 @dataclass(frozen=True)
 class LLMConfig:
     """OpenAI-compatible chat-completions configuration."""
@@ -37,16 +46,19 @@ class LLMConfig:
     api_key: str | None
     model: str
     timeout_seconds: int
+    temperature: float | None
+    max_completion_tokens: int | None
+    enable_thinking: bool | None
 
 
 def get_llm_config(model: str | None = None) -> LLMConfig:
     """Return the active LLM configuration.
 
-    The defaults point at the user's local vLLM server. LLM_* and VLLM_*
-    environment variables can still override them without changing app code.
+    Local LLM access uses an OpenAI-compatible endpoint configured with LLM_*.
+    No API key is sent unless LLM_API_KEY is explicitly set.
     """
 
-    timeout_raw = _first_env("LLM_TIMEOUT_SECONDS", "VLLM_TIMEOUT_SECONDS")
+    timeout_raw = os.getenv("LLM_TIMEOUT_SECONDS")
     try:
         timeout_seconds = (
             int(timeout_raw) if timeout_raw else DEFAULT_LLM_TIMEOUT_SECONDS
@@ -54,13 +66,45 @@ def get_llm_config(model: str | None = None) -> LLMConfig:
     except ValueError:
         timeout_seconds = DEFAULT_LLM_TIMEOUT_SECONDS
 
+    temperature_raw = os.getenv("LLM_TEMPERATURE")
+    try:
+        temperature = (
+            float(temperature_raw) if temperature_raw else DEFAULT_LLM_TEMPERATURE
+        )
+    except ValueError:
+        temperature = DEFAULT_LLM_TEMPERATURE
+
+    max_tokens_raw = os.getenv("LLM_MAX_COMPLETION_TOKENS")
+    try:
+        max_completion_tokens = (
+            int(max_tokens_raw)
+            if max_tokens_raw
+            else DEFAULT_LLM_MAX_COMPLETION_TOKENS
+        )
+    except ValueError:
+        max_completion_tokens = DEFAULT_LLM_MAX_COMPLETION_TOKENS
+
+    enable_thinking_raw = os.getenv("LLM_ENABLE_THINKING")
+    if enable_thinking_raw is None:
+        enable_thinking = DEFAULT_LLM_ENABLE_THINKING
+    else:
+        enable_thinking = enable_thinking_raw.strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
+
     return LLMConfig(
-        base_url=_first_env("LLM_BASE_URL", "VLLM_BASE_URL") or DEFAULT_LLM_BASE_URL,
-        api_key=_first_env("LLM_API_KEY", "VLLM_API_KEY") or DEFAULT_LLM_API_KEY,
-        model=model
-        or _first_env("LLM_MODEL", "VLLM_MODEL")
-        or DEFAULT_LLM_MODEL,
+        base_url=_normalize_openai_base_url(
+            os.getenv("LLM_BASE_URL") or DEFAULT_LLM_BASE_URL
+        ),
+        api_key=os.getenv("LLM_API_KEY") or None,
+        model=model or os.getenv("LLM_MODEL") or DEFAULT_LLM_MODEL,
         timeout_seconds=timeout_seconds,
+        temperature=temperature,
+        max_completion_tokens=max_completion_tokens,
+        enable_thinking=enable_thinking,
     )
 
 

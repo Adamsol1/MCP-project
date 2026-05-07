@@ -353,6 +353,28 @@ class TestAdapterConfig:
         # Verify the discriminator is correct
         assert openai_config.type == "openai"
 
+    def test_load_config_overrides_openai_adapter_from_llm_env(self, monkeypatch):
+        """Council OpenAI-compatible adapter should use app LLM_* settings."""
+        from models.config import OpenAIAdapterConfig, load_config
+
+        monkeypatch.setenv("LLM_BASE_URL", "http://localhost:8000")
+        monkeypatch.setenv("LLM_API_KEY", "local-test-key")
+        monkeypatch.setenv("LLM_TIMEOUT_SECONDS", "180")
+        monkeypatch.setenv("LLM_MAX_COMPLETION_TOKENS", "512")
+        monkeypatch.setenv("LLM_TEMPERATURE", "0.7")
+        monkeypatch.setenv("LLM_ENABLE_THINKING", "false")
+
+        config = load_config()
+        openai_config = config.adapters.get("openai")
+
+        assert isinstance(openai_config, OpenAIAdapterConfig)
+        assert openai_config.base_url == "http://localhost:8000/v1"
+        assert openai_config.api_key == "local-test-key"
+        assert openai_config.timeout == 180
+        assert openai_config.max_completion_tokens == 512
+        assert openai_config.temperature == 0.7
+        assert openai_config.enable_thinking is False
+
 
 class TestConfigLoader:
     """Tests for config loader with adapter migration."""
