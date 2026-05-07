@@ -173,7 +173,7 @@ class LLMService:
             ValueError: If the model returns an empty response.
             json.JSONDecodeError: If the response is not valid JSON.
         """
-        text = await self.generate_text(prompt)
+        text = await self._generate_json_text(prompt)
         text = self._strip_fences(text)
         try:
             result = json.loads(text)
@@ -196,17 +196,55 @@ class LLMService:
             )
             raise
 
+    async def _generate_json_text(self, prompt: str) -> str:
+        if hasattr(self.client, "generate_json_text"):
+            return await self.client.generate_json_text(prompt)
+        json_prompt = (
+            "Return exactly one valid JSON object. Do not include markdown, "
+            "explanations, or any text outside the JSON object.\n\n"
+            f"{prompt}"
+        )
+        return await self.generate_text(json_prompt)
+
     @staticmethod
     def _strip_fences(text: str) -> str:
-        """Strip markdown code fences and trailing non-JSON content from a response string."""
+        """Strip markdown fences and extract the first JSON object from a response."""
         text = text.strip()
-        if text.startswith("```"):
-            lines = text.splitlines()
-            text = "\n".join(lines[1:-1]).strip()
-        # Extract the outermost JSON object or array, discarding any trailing text.
-        for start_char, end_char in (("{", "}"), ("[", "]")):
-            start = text.find(start_char)
-            end = text.rfind(end_char)
-            if start != -1 and end != -1 and end > start:
-                return text[start : end + 1]
-        return text
+        fence = re.search(r"```(?:json)?\s*(.*?)\s*```", text, flags=re.IGNORECASE | re.DOTALL)
+        if fence:
+            text = fence.group(1).strip()
+
+        json_object = LLMService._extract_first_json_object(text)
+        return json_object or text
+
+    @staticmethod
+    def _extract_first_json_object(text: str) -> str | None:
+        """Return the first balanced JSON object substring, if one exists."""
+        for start, ch in enumerate(text):
+            if ch != "{":
+                continue
+
+            depth = 0
+            in_string = False
+            escaped = False
+            for index in range(start, len(text)):
+                ch = text[index]
+                if in_string:
+                    if escaped:
+                        escaped = False
+                    elif ch == "\\":
+                        escaped = True
+                    elif ch == '"':
+                        in_string = False
+                    continue
+
+                if ch == '"':
+                    in_string = True
+                elif ch == "{":
+                    depth += 1
+                elif ch == "}":
+                    depth -= 1
+                    if depth == 0:
+                        return text[start : index + 1]
+
+        return None

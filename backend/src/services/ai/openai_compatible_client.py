@@ -24,6 +24,7 @@ class OpenAICompatibleClient:
     # calling, skip sending tools on all subsequent requests to avoid a
     # wasted 400 round-trip on every single call.
     _tools_supported: bool = True
+    _json_response_format_supported: bool = True
 
     def __init__(self, config: LLMConfig | None = None, model: str | None = None):
         self.config = config or get_llm_config(model=model)
@@ -35,10 +36,13 @@ class OpenAICompatibleClient:
         messages: list[dict[str, Any]],
         *,
         tools: list[dict[str, Any]] | None = None,
+        response_format: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         # Strip tools if the provider already told us it doesn't support them.
         if not OpenAICompatibleClient._tools_supported:
             tools = None
+        if not OpenAICompatibleClient._json_response_format_supported:
+            response_format = None
 
         body: dict[str, Any] = {
             "model": self.model,
@@ -48,6 +52,8 @@ class OpenAICompatibleClient:
         if tools:
             body["tools"] = tools
             body["tool_choice"] = "auto"
+        if response_format:
+            body["response_format"] = response_format
 
         headers = {"Content-Type": "application/json"}
         if self.config.api_key:
@@ -57,23 +63,34 @@ class OpenAICompatibleClient:
         logger.debug("[OpenAICompatibleClient] POST %s model=%s", url, self.model)
 
         async with httpx.AsyncClient(timeout=self.config.timeout_seconds) as client:
-            try:
-                response = await self._post_chat(client, url, headers, body)
-            except httpx.HTTPStatusError as exc:
-                if not tools or not self._is_tool_support_error(exc.response):
+            while True:
+                try:
+                    response = await self._post_chat(client, url, headers, body)
+                    break
+                except httpx.HTTPStatusError as exc:
+                    if "tools" in body and self._is_tool_support_error(exc.response):
+                        OpenAICompatibleClient._tools_supported = False
+                        logger.warning(
+                            "[OpenAICompatibleClient] Provider rejected tool-calling "
+                            "metadata; disabling tools for subsequent requests. To "
+                            "enable MCP tool-calling with vLLM, start it with "
+                            "--enable-auto-tool-choice and the matching "
+                            "--tool-call-parser for the model."
+                        )
+                        body.pop("tools", None)
+                        body.pop("tool_choice", None)
+                        continue
+                    if "response_format" in body and self._is_json_mode_error(
+                        exc.response
+                    ):
+                        OpenAICompatibleClient._json_response_format_supported = False
+                        logger.warning(
+                            "[OpenAICompatibleClient] Provider rejected JSON response "
+                            "format metadata; retrying without response_format."
+                        )
+                        body.pop("response_format", None)
+                        continue
                     raise
-
-                OpenAICompatibleClient._tools_supported = False
-                logger.warning(
-                    "[OpenAICompatibleClient] Provider rejected tool-calling metadata; "
-                    "disabling tools for subsequent requests. To enable MCP tool-calling "
-                    "with vLLM, start it with --enable-auto-tool-choice and the matching "
-                    "--tool-call-parser for the model."
-                )
-                fallback_body = dict(body)
-                fallback_body.pop("tools", None)
-                fallback_body.pop("tool_choice", None)
-                response = await self._post_chat(client, url, headers, fallback_body)
             payload = response.json()
 
         choices = payload.get("choices") or []
@@ -83,6 +100,26 @@ class OpenAICompatibleClient:
 
     async def generate_text(self, prompt: str) -> str:
         message = await self.chat([{"role": "user", "content": prompt}])
+        text = message.get("content")
+        if not text:
+            raise ValueError(f"Model {self.model} returned empty response")
+        return str(text)
+
+    async def generate_json_text(self, prompt: str) -> str:
+        """Generate text while requesting a single JSON object when supported."""
+        message = await self.chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a JSON API. Return exactly one valid JSON object. "
+                        "Do not include markdown, explanations, or text outside JSON."
+                    ),
+                },
+                {"role": "user", "content": prompt},
+            ],
+            response_format={"type": "json_object"},
+        )
         text = message.get("content")
         if not text:
             raise ValueError(f"Model {self.model} returned empty response")
@@ -119,5 +156,20 @@ class OpenAICompatibleClient:
                 "tools is not supported",
                 "tool_calls is not supported",
                 "does not support tools",
+            )
+        )
+
+    @staticmethod
+    def _is_json_mode_error(response: httpx.Response) -> bool:
+        if response.status_code not in {400, 422}:
+            return False
+        text = response.text.lower()
+        return any(
+            phrase in text
+            for phrase in (
+                "response_format",
+                "json_object",
+                "guided json",
+                "json mode",
             )
         )
