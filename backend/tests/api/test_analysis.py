@@ -7,6 +7,7 @@ from fastapi.testclient import TestClient
 from src.api import analysis as analysis_api
 from src.api.main import app
 from src.models.analysis import AnalysisDraft, CouncilNote
+from src.services.ai.llm_config import get_llm_provider
 from src.services.analysis.analysis_session_store import AnalysisSessionStore
 from src.services.processing.processing_result_store import (
     PROCESSING_RESULT_UNAVAILABLE_MESSAGE,
@@ -173,7 +174,10 @@ def _configure_analysis_dependencies(monkeypatch, tmp_path):
         assert session_id is None or isinstance(session_id, str)
         return logger
 
-    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda uow=None: store)
+    def store_factory(*_args, **_kwargs):
+        return store
+
+    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", store_factory)
     monkeypatch.setattr(
         analysis_api,
         "AnalysisService",
@@ -337,6 +341,45 @@ def test_analysis_council_happy_path(monkeypatch, tmp_path):
         "Neutral Evidence Analyst",
     ]
     assert data["summary"].strip() != ""
+
+
+def test_analysis_council_honors_request_ai_provider(monkeypatch, tmp_path):
+    """Direct analysis council requests should use the selected provider."""
+    _configure_analysis_dependencies(monkeypatch, tmp_path)
+    _write_processed_json(tmp_path, "analysis-session-provider")
+    observed: dict[str, str] = {}
+
+    class _ProviderAwareCouncilService(_FakeCouncilService):
+        def __init__(self):
+            observed["provider_at_init"] = get_llm_provider()
+
+        async def run_council(self, *args, **kwargs):
+            observed["provider_at_run"] = get_llm_provider()
+            return await super().run_council(*args, **kwargs)
+
+    monkeypatch.setattr(
+        analysis_api,
+        "CouncilService",
+        lambda: _ProviderAwareCouncilService(),
+    )
+    client = TestClient(app)
+
+    response = client.post(
+        "/api/analysis/council",
+        json={
+            "session_id": "analysis-session-provider",
+            "debate_point": "Assess whether the activity is coordinated.",
+            "finding_ids": ["F-001"],
+            "selected_perspectives": ["us", "neutral"],
+            "ai_provider": "local",
+        },
+    )
+
+    assert response.status_code == 200
+    assert observed == {
+        "provider_at_init": "local",
+        "provider_at_run": "local",
+    }
 
 
 def test_analysis_council_requires_two_perspectives(monkeypatch, tmp_path):

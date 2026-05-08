@@ -88,51 +88,10 @@ class DeliberationEngine:
         else:
             logger.debug("No config provided, convergence detection disabled")
 
-        # Initialize summarizer fallback chain.
-        # Store all available adapters in preference order. App integrations can
-        # provide config.defaults.summary_adapter/model to use the same provider
-        # that produced the participant debate.
-        self.summarizer_chain: List[tuple] = []
-
-        summarizer_preferences = []
-        defaults_cfg = getattr(config, "defaults", None)
-        summary_adapter = getattr(defaults_cfg, "summary_adapter", None)
-        summary_model = getattr(defaults_cfg, "summary_model", None)
-        if summary_adapter and summary_model:
-            summary_display_name = getattr(
-                defaults_cfg,
-                "summary_display_name",
-                f"{summary_adapter} summary model",
-            )
-            summarizer_preferences.append(
-                (summary_adapter, summary_model, summary_display_name)
-            )
-
-        summarizer_preferences.extend([
-            ("claude", "sonnet", "Claude Sonnet"),
-            ("droid", "claude-sonnet-4-5-20250929", "Droid with Claude Sonnet"),
-            ("codex", "gpt-5-codex", "GPT-5 Codex"),
-            ("gemini", "gemini-2.5-pro", "Gemini 2.5 Pro"),
-        ])
-
-        seen_summarizers = set()
-        for cli_name, model_name, display_name in summarizer_preferences:
-            key = (cli_name, model_name)
-            if key in seen_summarizers:
-                continue
-            seen_summarizers.add(key)
-            if cli_name in adapters:
-                self.summarizer_chain.append((adapters[cli_name], model_name, display_name))
-
-        if self.summarizer_chain:
-            names = [name for _, _, name in self.summarizer_chain]
-            logger.info(f"AI-powered summary generation enabled (fallback chain: {' -> '.join(names)} -> None)")
-        else:
-            logger.warning(
-                "No suitable adapter available for summary generation. "
-                "Configure defaults.summary_adapter/model or install at least one "
-                "CLI (claude, droid, codex, or gemini) for AI-powered summaries."
-            )
+        logger.info(
+            "AI-powered summary generation will use only the adapters/models "
+            "provided in each deliberation request."
+        )
 
         # Initialize decision graph if enabled
         self.graph_integration: Optional["DecisionGraphIntegration"] = None
@@ -211,6 +170,48 @@ class DeliberationEngine:
         model = participant.model or "default"
         return f"{model}@{participant.cli}"
 
+    def _build_request_summarizer_chain(
+        self, request: "DeliberateRequest"
+    ) -> list[tuple[BaseCLIAdapter | BaseHTTPAdapter, str, str, str | None]]:
+        """Use only adapters/models explicitly selected for this request."""
+        summarizers: list[
+            tuple[BaseCLIAdapter | BaseHTTPAdapter, str, str, str | None]
+        ] = []
+        seen: set[tuple[str, str]] = set()
+
+        for participant in request.participants:
+            if not participant.model:
+                logger.debug(
+                    "Skipping summary candidate for %s because no model was specified",
+                    self._participant_identifier(participant),
+                )
+                continue
+
+            key = (participant.cli, participant.model)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            adapter = self.adapters.get(participant.cli)
+            if adapter is None:
+                logger.warning(
+                    "Skipping summary candidate %s@%s because the adapter is not available",
+                    participant.model,
+                    participant.cli,
+                )
+                continue
+
+            summarizers.append(
+                (
+                    adapter,
+                    participant.model,
+                    f"{participant.model}@{participant.cli}",
+                    participant.reasoning_effort,
+                )
+            )
+
+        return summarizers
+
     def _build_participant_prompt(
         self, participant: Participant, shared_prompt: str
     ) -> str:
@@ -255,6 +256,7 @@ class DeliberationEngine:
         previous_responses: List[RoundResponse],
         graph_context: str = "",
         working_directory: str | None = None,
+        round_timeout: float | None = None,
     ) -> List[RoundResponse]:
         """
         Execute a single deliberation round.
@@ -266,6 +268,7 @@ class DeliberationEngine:
             previous_responses: Responses from previous rounds for context
             graph_context: Optional decision graph context from past deliberations
             working_directory: Optional working directory for tool execution
+            round_timeout: Optional timeout in seconds for all participant calls
 
         Returns:
             List of RoundResponse objects from this round
@@ -416,6 +419,23 @@ The following files are available in the working directory:
                             break
 
                 return (participant, response_text)
+            except asyncio.TimeoutError:
+                if round_timeout is not None:
+                    logger.error(
+                        "Adapter %s timed out for participant %s during a timed round",
+                        participant.cli,
+                        participant_label,
+                        exc_info=True,
+                    )
+                    return (
+                        participant,
+                        f"[ERROR: Round timed out after {round_timeout}s]",
+                    )
+                logger.error(
+                    f"Adapter {participant.cli} timed out for participant {participant_label}",
+                    exc_info=True,
+                )
+                return (participant, "[ERROR: TimeoutError: ]")
             except Exception as e:
                 logger.error(
                     f"Adapter {participant.cli} failed for participant {participant_label}: {e}",
@@ -425,10 +445,33 @@ The following files are available in the working directory:
 
         # Run all participants in PARALLEL using asyncio.gather
         logger.info(f"Round {round_num}: Invoking {len(participants)} participants in PARALLEL")
-        parallel_results = await asyncio.gather(
+        participant_calls = asyncio.gather(
             *[invoke_participant(p) for p in participants],
-            return_exceptions=True
+            return_exceptions=True,
         )
+        try:
+            if round_timeout is None:
+                parallel_results = await participant_calls
+            else:
+                parallel_results = await asyncio.wait_for(
+                    participant_calls,
+                    timeout=round_timeout,
+                )
+        except asyncio.TimeoutError:
+            logger.error(
+                "Round %s timed out after %.1fs while invoking participants",
+                round_num,
+                round_timeout,
+            )
+            return [
+                RoundResponse(
+                    round=round_num,
+                    participant=self._participant_identifier(participant),
+                    response=f"[ERROR: Round timed out after {round_timeout}s]",
+                    timestamp=datetime.now().isoformat(),
+                )
+                for participant in participants
+            ]
 
         # Process results and handle any exceptions from gather
         participant_responses: list[tuple[Participant, str]] = []
@@ -1212,7 +1255,6 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
             # Log round completion with model results
             round_elapsed = (datetime.now() - round_start).total_seconds()
             successful = [r for r in round_responses if not r.response.startswith("[ERROR")]
-            failed = [r for r in round_responses if r.response.startswith("[ERROR")]
 
             progress_logger.info(
                 f"ROUND {round_num} COMPLETE | Time: {round_elapsed:.1f}s | "
@@ -1285,12 +1327,13 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
         )
         actual_rounds_completed = round_num if is_early_stop else rounds_to_execute
 
-        # Generate AI-powered summary with fallback chain
+        # Generate AI-powered summary with the request-selected adapter/model only.
         summary = None
-        if self.summarizer_chain:
+        summarizer_chain = self._build_request_summarizer_chain(request)
+        if summarizer_chain:
             from deliberation.summarizer import DeliberationSummarizer
 
-            for adapter, model_name, display_name in self.summarizer_chain:
+            for adapter, model_name, display_name, reasoning_effort in summarizer_chain:
                 try:
                     logger.info(f"Attempting summary generation with {display_name}...")
                     summarizer = DeliberationSummarizer(adapter, model_name)
@@ -1298,6 +1341,8 @@ TOOL_REQUEST: {"name": "search_code", "arguments": {"pattern": "class.*Adapter",
                         question=request.question,
                         responses=all_responses,
                         language=getattr(request, "language", "en"),
+                        working_directory=request.working_directory,
+                        reasoning_effort=reasoning_effort,
                     )
                     logger.info(f"Summary generation completed successfully with {display_name}")
                     break

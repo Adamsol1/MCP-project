@@ -8,9 +8,6 @@ from deliberation.engine import DeliberationEngine
 from deliberation.tools import (
     ToolExecutor,
     ReadFileTool,
-    SearchCodeTool,
-    ListFilesTool,
-    RunCommandTool,
 )
 from models.schema import Participant, RoundResponse, Vote
 
@@ -417,6 +414,56 @@ class TestDeliberationEngineMultiRound:
         second_call = mock_adapters["claude"].invoke_mock.call_args_list[1]
         # Check that context is passed in second deliberation round call
         assert second_call[0][2] is not None  # context should be present
+
+    @pytest.mark.asyncio
+    async def test_summary_uses_request_selected_adapter_only(self, mock_adapters):
+        """Summary generation should not fall back to unrelated installed adapters."""
+        from models.schema import DeliberateRequest
+
+        mock_adapter_class = type(mock_adapters["claude"])
+        openai_adapter = mock_adapter_class("openai")
+        claude_adapter = mock_adapter_class("claude")
+        adapters = {"openai": openai_adapter, "claude": claude_adapter}
+        engine = DeliberationEngine(adapters)
+
+        request = DeliberateRequest(
+            question="Should the council use only the request-selected model?",
+            participants=[
+                Participant(
+                    cli="openai",
+                    model="Qwen/Qwen3-8B",
+                    display_name="Local Analyst A",
+                ),
+                Participant(
+                    cli="openai",
+                    model="Qwen/Qwen3-8B",
+                    display_name="Local Analyst B",
+                ),
+            ],
+            rounds=1,
+            mode="quick",
+            working_directory="/tmp",
+        )
+
+        openai_adapter.invoke_mock.side_effect = [
+            'Local response A.\n\nVOTE: {"option":"Use selected model","confidence":0.8,"rationale":"The request selected it."}',
+            'Local response B.\n\nVOTE: {"option":"Use selected model","confidence":0.7,"rationale":"No unrelated adapter was requested."}',
+            (
+                "CONSENSUS:\nThe selected model should be used.\n\n"
+                "KEY AGREEMENTS:\n- No unrelated adapter was requested.\n\n"
+                "KEY DISAGREEMENTS:\n- None\n\n"
+                "FINAL RECOMMENDATION:\nUse the request-selected model for summaries."
+            ),
+        ]
+
+        result = await engine.execute(request)
+
+        assert result.summary.consensus == "The selected model should be used."
+        assert openai_adapter.invoke_mock.call_count == 3
+        claude_adapter.invoke_mock.assert_not_called()
+        summary_call = openai_adapter.invoke_mock.call_args_list[-1]
+        assert summary_call[0][1] == "Qwen/Qwen3-8B"
+        assert "Analyze the following AI deliberation" in summary_call[0][0]
 
     @pytest.mark.asyncio
     async def test_execute_includes_request_context_in_round_prompt(
@@ -1108,7 +1155,7 @@ class TestEngineWithTools:
 
         # Execute round with hanging tool
         start = time.time()
-        responses = await engine.execute_round(1, "Test", participants, [])
+        await engine.execute_round(1, "Test", participants, [])
         duration = time.time() - start
 
         # Should timeout in ~30s, NOT 60s
@@ -1162,7 +1209,7 @@ class TestEngineWithTools:
             rounds=1,
             mode="quick",
             working_directory="/tmp",)
-        result1 = await engine.execute(request1)
+        await engine.execute(request1)
 
         # Verify tool was executed
         assert len(engine.tool_execution_history) > 0, "First deliberation should have tool execution"
@@ -1186,7 +1233,7 @@ class TestEngineWithTools:
             rounds=1,
             mode="quick",
             working_directory="/tmp",)
-        result2 = await engine.execute(request2)
+        await engine.execute(request2)
 
         # CRITICAL: History should NOT contain both deliberations
         # It should only contain the second deliberation's tools

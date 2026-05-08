@@ -18,6 +18,7 @@ from src.models.analysis import (
     ProcessingResult,
 )
 from src.models.confidence import CollectionCoverageResult
+from src.services.ai.llm_config import request_llm_provider
 from src.services.analysis.analysis_service import AnalysisService
 from src.services.analysis.analysis_session_store import AnalysisSessionStore
 from src.services.confidence.collection_coverage import compute_collection_coverage
@@ -102,6 +103,7 @@ class AnalysisCouncilRequest(BaseModel):
     finding_ids: list[str] = Field(default_factory=list)
     selected_perspectives: list[str] = Field(..., min_length=2)
     council_settings: CouncilRunSettings | None = None
+    ai_provider: str | None = None
 
     @field_validator("debate_point")
     @classmethod
@@ -253,48 +255,55 @@ async def create_analysis_council(
 ) -> CouncilNote:
     """Run a council deliberation against the current analysis-stage state."""
     store = AnalysisSessionStore(uow=uow)
-    council_service = CouncilService()
     research_logger = ResearchLogger(session_id=request.session_id)
 
     try:
-        draft_response = await _build_draft(
-            request.session_id,
-            store,
-            uow=uow,
-            mcp_client=mcp_client,
-        )
-    except ValueError as exc:
-        status_code = 409 if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE else 500
-        raise HTTPException(status_code=status_code, detail=str(exc)) from exc
+        with request_llm_provider(request.ai_provider):
+            council_service = CouncilService()
 
-    available_finding_ids = {
-        finding.id for finding in draft_response.processing_result.findings
-    }
-    invalid_finding_ids = [
-        finding_id
-        for finding_id in request.finding_ids
-        if finding_id not in available_finding_ids
-    ]
-    if invalid_finding_ids:
-        raise HTTPException(
-            status_code=400,
-            detail=("Unknown finding_ids: " + ", ".join(invalid_finding_ids)),
-        )
+            try:
+                draft_response = await _build_draft(
+                    request.session_id,
+                    store,
+                    uow=uow,
+                    mcp_client=mcp_client,
+                )
+            except ValueError as exc:
+                status_code = (
+                    409 if str(exc) == PROCESSING_RESULT_UNAVAILABLE_MESSAGE else 500
+                )
+                raise HTTPException(status_code=status_code, detail=str(exc)) from exc
 
-    try:
-        council_note = await council_service.run_council(
-            session_id=request.session_id,
-            debate_point=request.debate_point,
-            selected_perspectives=request.selected_perspectives,
-            processing_result=draft_response.processing_result,
-            analysis_draft=draft_response.analysis_draft,
-            finding_ids=request.finding_ids or None,
-            council_settings=request.council_settings,
-        )
+            available_finding_ids = {
+                finding.id for finding in draft_response.processing_result.findings
+            }
+            invalid_finding_ids = [
+                finding_id
+                for finding_id in request.finding_ids
+                if finding_id not in available_finding_ids
+            ]
+            if invalid_finding_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=("Unknown finding_ids: " + ", ".join(invalid_finding_ids)),
+                )
+
+            try:
+                council_note = await council_service.run_council(
+                    session_id=request.session_id,
+                    debate_point=request.debate_point,
+                    selected_perspectives=request.selected_perspectives,
+                    processing_result=draft_response.processing_result,
+                    analysis_draft=draft_response.analysis_draft,
+                    finding_ids=request.finding_ids or None,
+                    council_settings=request.council_settings,
+                )
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
+            except RuntimeError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
     try:
         await store.save_council_note(request.session_id, council_note)

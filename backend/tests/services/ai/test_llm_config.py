@@ -29,7 +29,7 @@ def test_local_llm_defaults_use_expected_configuration(monkeypatch):
     assert config.model == "Qwen/Qwen2.5-7B-Instruct"
     assert config.timeout_seconds == 180
     assert config.temperature == 0.7
-    assert config.max_completion_tokens == 512
+    assert config.max_completion_tokens is None
     assert config.enable_thinking is None
     assert get_llm_provider() == "gemini"
 
@@ -95,4 +95,4 @@ def test_invalid_llm_numeric_settings_fall_back_to_defaults(monkeypatch):
 
     assert config.timeout_seconds == 180
     assert config.temperature == 0.7
-    assert config.max_completion_tokens == 512
+    assert config.max_completion_tokens is None

@@ -12,7 +12,7 @@ DEFAULT_LLM_BASE_URL = "http://127.0.0.1:8001/v1"
 DEFAULT_LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 DEFAULT_LLM_TIMEOUT_SECONDS = 180
 DEFAULT_LLM_TEMPERATURE = 0.7
-DEFAULT_LLM_MAX_COMPLETION_TOKENS = 512
+DEFAULT_LLM_MAX_COMPLETION_TOKENS: int | None = None
 # Default is None (= don't send `chat_template_kwargs.enable_thinking`).
 # Only Qwen / Llama-thinking style endpoints understand this knob; sending it
 # to DeepSeek / OpenAI / Anthropic-compatible endpoints either errors or is
@@ -79,13 +79,19 @@ def get_llm_config(model: str | None = None) -> LLMConfig:
         temperature = DEFAULT_LLM_TEMPERATURE
 
     max_tokens_raw = os.getenv("LLM_MAX_COMPLETION_TOKENS")
-    try:
-        max_completion_tokens = (
-            int(max_tokens_raw)
-            if max_tokens_raw
-            else DEFAULT_LLM_MAX_COMPLETION_TOKENS
-        )
-    except ValueError:
+    if max_tokens_raw and max_tokens_raw.strip().lower() not in {
+        "none",
+        "null",
+        "unlimited",
+    }:
+        try:
+            configured_max_tokens = int(max_tokens_raw)
+            max_completion_tokens = (
+                configured_max_tokens if configured_max_tokens > 0 else None
+            )
+        except ValueError:
+            max_completion_tokens = DEFAULT_LLM_MAX_COMPLETION_TOKENS
+    else:
         max_completion_tokens = DEFAULT_LLM_MAX_COMPLETION_TOKENS
 
     enable_thinking_raw = os.getenv("LLM_ENABLE_THINKING")
@@ -149,7 +155,9 @@ def get_llm_provider() -> str:
     }
     if provider not in aliases:
         allowed = ", ".join(sorted(set(aliases.values())))
-        raise ValueError(f"Unsupported LLM_PROVIDER '{provider}'. Use one of: {allowed}")
+        raise ValueError(
+            f"Unsupported LLM_PROVIDER '{provider}'. Use one of: {allowed}"
+        )
     return aliases[provider]
 
 

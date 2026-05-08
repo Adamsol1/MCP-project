@@ -184,4 +184,5 @@ export interface RunAnalysisCouncilRequest {
   finding_ids: string[];
   selected_perspectives: string[];
   council_settings?: CouncilRunSettings | null;
+  ai_provider?: "gemini" | "local";
 }
