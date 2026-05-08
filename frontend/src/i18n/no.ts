@@ -69,6 +69,10 @@ export const no = {
     "Uploaded Documents": "Opplastede dokumenter",
     "Web Search": "Nettsøk",
   } as Record<string, string>,
+  beta: "Beta",
+  webSearchBetaTitle:
+    "Nettsøk med lokal LLM er i beta — siden hentes via httpx på backend, " +
+    "så JavaScript-baserte sider og sider med bot-beskyttelse hoppes over.",
   sourceDescriptions: {
     "AlienVault OTX": "Åpne trusselinnmatinger",
     "Knowledge Bank": "Organisasjonens kuraterte intel",

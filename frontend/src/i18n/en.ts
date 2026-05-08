@@ -66,6 +66,10 @@ export const en = {
     "Uploaded Documents": "Uploaded Documents",
     "Web Search": "Web Search",
   } as Record<string, string>,
+  beta: "Beta",
+  webSearchBetaTitle:
+    "Web search on local LLM is in beta — page fetches happen on the backend " +
+    "via httpx, so JavaScript-rendered pages and bot-protected sites are skipped.",
   sourceDescriptions: {
     "AlienVault OTX": "Open threat exchange feeds",
     "Knowledge Bank": "Your org's curated intel",
