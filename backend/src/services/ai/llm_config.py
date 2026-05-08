@@ -13,7 +13,11 @@ DEFAULT_LLM_MODEL = "Qwen/Qwen2.5-7B-Instruct"
 DEFAULT_LLM_TIMEOUT_SECONDS = 180
 DEFAULT_LLM_TEMPERATURE = 0.7
 DEFAULT_LLM_MAX_COMPLETION_TOKENS = 512
-DEFAULT_LLM_ENABLE_THINKING = False
+# Default is None (= don't send `chat_template_kwargs.enable_thinking`).
+# Only Qwen / Llama-thinking style endpoints understand this knob; sending it
+# to DeepSeek / OpenAI / Anthropic-compatible endpoints either errors or is
+# silently dropped. Users who actually need it set LLM_ENABLE_THINKING=true|false.
+DEFAULT_LLM_ENABLE_THINKING: bool | None = None
 DEFAULT_LLM_PROVIDER = "gemini"
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
 

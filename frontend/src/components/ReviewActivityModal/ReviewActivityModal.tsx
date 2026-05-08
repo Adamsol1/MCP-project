@@ -14,8 +14,26 @@ interface ReviewActivityModalProps {
 
 // ── Inline text formatter ──────────────────────────────────────────────────────
 
-function InlineFormatted({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+// LLM responses occasionally hand us non-string reasoning/summary fields
+// (e.g. Gemini emitting an object with step_1/step_2 keys, or an array of
+// bullet strings). Coerce defensively so a model quirk can't blank the UI.
+function toFormattableString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  if (Array.isArray(value)) return value.map(toFormattableString).join("\n");
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function InlineFormatted({ text }: { text: unknown }) {
+  const safe = toFormattableString(text);
+  const parts = safe.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -29,8 +47,9 @@ function InlineFormatted({ text }: { text: string }) {
   );
 }
 
-function FormattedReviewText({ text }: { text: string }) {
-  const lines = text.split("\n");
+function FormattedReviewText({ text }: { text: unknown }) {
+  const safe = toFormattableString(text);
+  const lines = safe.split("\n");
   const elements: React.ReactNode[] = [];
   lines.forEach((line, i) => {
     const trimmed = line.trim();

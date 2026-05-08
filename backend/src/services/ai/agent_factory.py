@@ -1,7 +1,10 @@
-"""Factory for provider-specific MCP tool-loop agents."""
+"""Thin facade over `providers.get_provider().tool_agent(...)`.
 
-from src.services.ai.llm_config import get_default_gemini_model, get_llm_provider
-from src.services.ai.tool_calling_agent import ToolCallingAgent
+Kept as a separate module because every phase service imports
+`create_tool_agent`. The provider switch lives in `providers/`.
+"""
+
+from src.services.ai.providers import get_provider
 
 
 def create_tool_agent(
@@ -9,23 +12,8 @@ def create_tool_agent(
     model: str | None = None,
     max_tool_rounds: int = 50,
 ):
-    """Create the active provider's tool-calling agent.
-
-    Gemini uses the Google Gemini function-calling API. Local uses the
-    OpenAI-compatible endpoint configured by LLM_BASE_URL/LLM_MODEL.
-    """
-
-    if get_llm_provider() == "gemini":
-        from src.services.ai.gemini_agent import GeminiAgent
-
-        return GeminiAgent(
-            mcp_client,
-            model=model or get_default_gemini_model(),
-            max_tool_rounds=max_tool_rounds,
-        )
-
-    return ToolCallingAgent(
+    """Return the active provider's MCP tool-loop agent."""
+    return get_provider(model=model).tool_agent(
         mcp_client,
-        model=model,
         max_tool_rounds=max_tool_rounds,
     )

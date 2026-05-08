@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChatWindow from "./components/ChatWindow/ChatWindow";
 import { Sidebar } from "./components/Sidebar/Sidebar";
+import { DevLlmChatModal } from "./components/DevLlmChatModal/DevLlmChatModal";
 import { FileUploadModal } from "./components/FileUploadModal/FileUploadModal";
 import { SettingsModal } from "./components/SettingsModal/SettingsModal";
 import { useToast } from "./hooks/useToast/useToast";
@@ -30,6 +31,7 @@ import type { DialogueStage } from "./types/dialogue";
 import { ToastContainer } from "./components/Toast";
 import ElicitationModal from "./components/ElicitationModal/ElicitationModal";
 import { HelpButton, HelpModal } from "./components/HelpModal/HelpModal";
+import { useSettings } from "./contexts/SettingsContext/SettingsContext";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
@@ -63,6 +65,7 @@ function WorkspaceResetWatcher({
 
 function AppShell() {
   const t = useT();
+  const { settings } = useSettings();
   const { success, error } = useToast();
   const {
     conversations,
@@ -142,6 +145,7 @@ function AppShell() {
 
   const [isFileUploadOpen, setIsFileUploadOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDevLlmChatOpen, setIsDevLlmChatOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFileRecord[]>([]);
   const [collectionStatus, setCollectionStatus] =
@@ -381,6 +385,7 @@ function AppShell() {
               )
             }
             onDevShowCollectionApproval={debugConfirm}
+            onOpenDevLlmChat={() => setIsDevLlmChatOpen(true)}
             devSnapshots={devSnapshots}
             isDevSnapshotsLoading={isDevSnapshotsLoading}
             onDevRefreshSnapshots={refreshDevSnapshots}
@@ -449,6 +454,11 @@ function AppShell() {
       <SettingsModal
         isOpen={isSettingsOpen}
         onClose={() => setIsSettingsOpen(false)}
+      />
+      <DevLlmChatModal
+        isOpen={isDevLlmChatOpen}
+        onClose={() => setIsDevLlmChatOpen(false)}
+        aiProvider={settings.aiProvider}
       />
       {pendingElicitation && (
         <ElicitationModal

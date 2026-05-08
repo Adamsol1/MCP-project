@@ -17,6 +17,7 @@ export const no = {
   minimizeDevTools: "Minimer utviklerverkt\u00f8y",
   sendTestMessage: "Send testmelding",
   showCollectionApproval: "Vis innsamlingsgodkjenning",
+  openLlmChat: "\u00c5pne LLM-chat",
   previousRun: "Tidligere kjøring",
   refresh: "Oppdater",
   loading: "Laster...",

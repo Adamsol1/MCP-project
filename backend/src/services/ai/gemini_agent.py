@@ -11,13 +11,13 @@ which tools to call and when are made by the agent itself.
 
 import json
 import logging
-import os
 import re
 from pathlib import Path
+from typing import Any
 
-from google import genai
 from google.genai import types
 
+from src.services.ai.gemini_client import create_gemini_client
 from src.services.ai.llm_config import get_default_gemini_model
 
 logger = logging.getLogger("app")
@@ -81,8 +81,7 @@ class GeminiAgent:
         model: str | None = None,
         max_tool_rounds: int = 50,
     ):
-        api_key = os.getenv("GEMINI_API_KEY")
-        self.client = genai.Client(api_key=api_key)
+        self.client = create_gemini_client()
         self.model = model or get_default_gemini_model()
         self.mcp_client = mcp_client
         self.max_tool_rounds = max_tool_rounds
@@ -121,12 +120,16 @@ class GeminiAgent:
         ]
 
         self.last_thought_text = ""
-        config_kwargs = {
+        config_kwargs: dict[str, Any] = {
             "system_instruction": system_prompt,
             "tools": available_tools,
             "thinking_config": types.ThinkingConfig(include_thoughts=True),
         }
-        if response_format:
+        # Gemini rejects (400 INVALID_ARGUMENT) requests that combine tools
+        # with response_mime_type="application/json". When tools are present
+        # the system prompt already asks the model for JSON and the parse
+        # layer (DialogueService._parse_or_repair_json) handles any deviation.
+        if response_format and not available_tools:
             config_kwargs["response_mime_type"] = "application/json"
         config = types.GenerateContentConfig(**config_kwargs)
 

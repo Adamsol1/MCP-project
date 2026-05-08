@@ -20,6 +20,7 @@ class MockDialogueService:
         self.raise_on_summary = raise_on_summary
 
     async def generate_clarifying_question(self, user_message, context, language="en"):
+        _ = context
         if self.raise_on_clarifying:
             raise RuntimeError("Service unavailable")
         self.clarifying_calls.append(
@@ -127,6 +128,45 @@ async def test_gathering_preapplies_answer_to_previous_question_before_next_prom
         "Cyber risk assessment for Storebrand"
     )
     assert second.content == "What time period should the investigation cover?"
+
+
+@pytest.mark.asyncio
+async def test_initial_prompt_with_explicit_context_goes_to_summary():
+    dialogue_flow = DirectionFlow()
+    mock_service = MockDialogueService()
+
+    message = (
+        "Investigate Storebrand (Norwegian bank/financial institution) scope "
+        "being exposure to state-sponsored cyber espionage targeting financial data. "
+        "Focus on the last 6 months and predictions for the next 6 months. "
+        "Include broad threat actors with emphasis on state-sponsored groups. "
+        "Priority focus is risk management and how cyber espionage affects their "
+        "financial risk posture."
+    )
+
+    result = await dialogue_flow.process_user_message(
+        message,
+        mock_service,
+        settings_timeframe="Last 30 days",
+    )
+
+    assert result.action == "show_summary"
+    assert dialogue_flow.state == DirectionState.SUMMARY_CONFIRMING
+    assert dialogue_flow.context.target_entities == [
+        "Storebrand (Norwegian bank/financial institution)"
+    ]
+    assert dialogue_flow.context.scope == (
+        "exposure to state-sponsored cyber espionage targeting financial data"
+    )
+    assert dialogue_flow.context.timeframe == (
+        "last 6 months and predictions for the next 6 months"
+    )
+    assert dialogue_flow.context.threat_actors == [
+        "broad threat actors with emphasis on state-sponsored groups"
+    ]
+    assert dialogue_flow.context.priority_focus == (
+        "risk management and how cyber espionage affects their financial risk posture"
+    )
 
 
 @pytest.mark.asyncio

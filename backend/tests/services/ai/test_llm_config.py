@@ -15,6 +15,10 @@ def test_local_llm_defaults_use_expected_configuration(monkeypatch):
         "LLM_PROVIDER",
         "AI_PROVIDER",
         "MODEL_PROVIDER",
+        "LLM_ENABLE_THINKING",
+        "LLM_TIMEOUT_SECONDS",
+        "LLM_TEMPERATURE",
+        "LLM_MAX_COMPLETION_TOKENS",
     ):
         monkeypatch.delenv(name, raising=False)
 
@@ -26,7 +30,7 @@ def test_local_llm_defaults_use_expected_configuration(monkeypatch):
     assert config.timeout_seconds == 180
     assert config.temperature == 0.7
     assert config.max_completion_tokens == 512
-    assert config.enable_thinking is False
+    assert config.enable_thinking is None
     assert get_llm_provider() == "gemini"
 
 

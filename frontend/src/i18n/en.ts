@@ -15,6 +15,7 @@ export const en = {
   minimizeDevTools: "Minimize dev tools",
   sendTestMessage: "Send test message",
   showCollectionApproval: "Show collection approval",
+  openLlmChat: "Open LLM chat",
   previousRun: "Previous run",
   refresh: "Refresh",
   loading: "Loading...",

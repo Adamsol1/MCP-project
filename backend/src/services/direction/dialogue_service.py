@@ -9,12 +9,13 @@ Each turn:
 
 import json
 import logging
+import re
 from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
 from src.services.ai.agent_factory import create_tool_agent
-from src.services.ai.openai_compatible_client import OpenAICompatibleClient
+from src.services.ai.providers import get_provider
 
 logger = logging.getLogger("app")
 
@@ -140,37 +141,39 @@ class DialogueService:
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
                 response_format=JSON_OBJECT_RESPONSE_FORMAT,
             )
-            result = await self._parse_or_repair_json(
+
+        result = await self._parse_or_repair_json(
+            raw=raw,
+            repair_prompt=self._pir_repair_prompt(
                 raw=raw,
-                repair_prompt=self._pir_repair_prompt(
-                    raw=raw,
-                    context=context,
-                    language=effective_language,
-                ),
-                label="PIR",
-            )
+                context=context,
+                language=effective_language,
+            ),
+            label="PIR",
+        )
 
-            # Gemini 2.5 thinking models put internal reasoning into thought parts
-            # and may return an empty "reasoning" field in the JSON. Use the captured
-            # thought text as a fallback so the UI can always show reasoning.
-            if not result.get("reasoning") and agent.last_thought_text:
-                result["reasoning"] = agent.last_thought_text
+        # Gemini 2.5 thinking models put internal reasoning into thought parts
+        # and may return an empty "reasoning" field in the JSON. Use the captured
+        # thought text as a fallback so the UI can always show reasoning.
+        if not result.get("reasoning") and agent.last_thought_text:
+            result["reasoning"] = agent.last_thought_text
 
-            # Enrich sources with citation metadata from the knowledge index.
-            try:
+        # Enrich sources with citation metadata from the knowledge index.
+        try:
+            async with self.mcp_client.connect():
                 index_json = await self.mcp_client.read_resource("knowledge://index")
-                index: list[dict] = json.loads(index_json)
-                citation_by_id = {
-                    entry["id"]: entry["citation"]
-                    for entry in index
-                    if entry.get("citation")
-                }
-                for source in result.get("sources", []):
-                    cit = citation_by_id.get(source.get("id", ""))
-                    if cit:
-                        source["citation"] = cit
-            except Exception as e:
-                logger.warning(f"[MCP] Source citation enrichment failed: {e}")
+            index: list[dict] = json.loads(index_json)
+            citation_by_id = {
+                entry["id"]: entry["citation"]
+                for entry in index
+                if entry.get("citation")
+            }
+            for source in result.get("sources", []):
+                cit = citation_by_id.get(source.get("id", ""))
+                if cit:
+                    source["citation"] = cit
+        except Exception as e:
+            logger.warning(f"[MCP] Source citation enrichment failed: {e}")
 
         return result
 
@@ -303,7 +306,9 @@ class DialogueService:
         label: str,
     ) -> Any:
         try:
-            return self._parse_json(raw)
+            parsed = self._parse_json(raw)
+            self._validate_response_shape(parsed, label)
+            return parsed
         except ValueError as parse_error:
             logger.warning(
                 "[DialogueService] Agent returned unparseable %s JSON; asking model to repair it: %s",
@@ -311,14 +316,49 @@ class DialogueService:
                 parse_error,
             )
 
-        repair_client = OpenAICompatibleClient()
+        # Bug B fix: route repair through whichever provider is currently
+        # active so a Gemini-mode failure doesn't silently cross-fire to the
+        # local endpoint (and vice versa).
+        repair_client = get_provider()
         repaired = await repair_client.generate_json_text(repair_prompt)
         try:
-            return self._parse_json(repaired)
+            parsed = self._parse_json(repaired)
+            self._validate_response_shape(parsed, label)
+            return parsed
         except ValueError as repair_error:
             raise ValueError(
                 f"Agent returned unparseable {label} JSON after repair: {repair_error}"
             ) from repair_error
+
+    @staticmethod
+    def _validate_response_shape(parsed: Any, label: str) -> None:
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{label} response must be a JSON object")
+
+        normalized = label.strip().lower()
+        if normalized == "pir":
+            # `reasoning` is intentionally not required — Gemini 2.5 thinking
+            # models emit it as a thought part and `generate_pir` post-fills
+            # it from `agent.last_thought_text`. Forcing it here would push
+            # every Gemini response onto the repair path.
+            required = {"pir_text", "claims", "sources", "pirs"}
+            missing = sorted(required - set(parsed.keys()))
+            if missing:
+                raise ValueError(
+                    f"PIR response missing top-level field(s): {', '.join(missing)}"
+                )
+            if not isinstance(parsed.get("pirs"), list):
+                raise ValueError("PIR response field 'pirs' must be a list")
+            return
+
+        if normalized == "clarifying question":
+            required = {"question", "type", "has_sufficient_context", "context"}
+            missing = sorted(required - set(parsed.keys()))
+            if missing:
+                raise ValueError(
+                    "clarifying question response missing top-level field(s): "
+                    + ", ".join(missing)
+                )
 
     @staticmethod
     def _clarifying_question_repair_prompt(
@@ -404,7 +444,6 @@ Model output to repair:
         Handles: bare JSON, markdown code fences, and responses where the model
         prepends prose (e.g. thinking-model preamble) before the JSON block.
         """
-        import re as _re
         text = raw.strip()
         if not text:
             raise ValueError("Agent returned empty response")
@@ -416,19 +455,99 @@ Model output to repair:
             pass
 
         # 2. Strip a leading code fence (```json … ```) and retry
-        fence_match = _re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, _re.IGNORECASE)
+        fence_match = re.search(
+            r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE
+        )
         if fence_match:
             try:
                 return json.loads(fence_match.group(1))
             except json.JSONDecodeError:
                 pass
 
-        # 3. Extract the first {...} block — handles preamble text before JSON
-        brace_match = _re.search(r"\{[\s\S]*\}", text)
-        if brace_match:
+        parsed_candidates: list[Any] = []
+
+        # 3. Extract object starts while allowing trailing text. Some local
+        # models emit prose before/after JSON.
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"\{", text):
             try:
-                return json.loads(brace_match.group(0))
+                parsed, _end = decoder.raw_decode(text[match.start() :])
+                parsed_candidates.append(parsed)
             except json.JSONDecodeError:
-                pass
+                continue
+
+        for candidate in DialogueService._json_object_candidates(text):
+            for repaired in (
+                candidate,
+                DialogueService._repair_json_candidate(candidate),
+            ):
+                try:
+                    parsed_candidates.append(json.loads(repaired))
+                except json.JSONDecodeError:
+                    continue
+
+        selected = DialogueService._select_json_candidate(parsed_candidates)
+        if selected is not None:
+            return selected
 
         raise ValueError(f"Could not parse JSON from agent response (length={len(text)})")
+
+    @staticmethod
+    def _select_json_candidate(candidates: list[Any]) -> Any | None:
+        if not candidates:
+            return None
+
+        def score(candidate: Any) -> tuple[int, int]:
+            if not isinstance(candidate, dict):
+                return (0, 0)
+            keys = set(candidate.keys())
+            if {"pir_text", "claims", "sources", "pirs"} <= keys:
+                return (100, len(keys))
+            if {"question", "type", "has_sufficient_context", "context"} <= keys:
+                return (90, len(keys))
+            if "summary" in keys:
+                return (80, len(keys))
+            return (10, len(keys))
+
+        return max(candidates, key=score)
+
+    @staticmethod
+    def _json_object_candidates(text: str) -> list[str]:
+        candidates: list[str] = []
+        start: int | None = None
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for index, char in enumerate(text):
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                if depth == 0:
+                    start = index
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    candidates.append(text[start : index + 1])
+                    start = None
+
+        return candidates
+
+    @staticmethod
+    def _repair_json_candidate(text: str) -> str:
+        text = re.sub(r"\bNone\b", "null", text)
+        text = re.sub(r"\bTrue\b", "true", text)
+        text = re.sub(r"\bFalse\b", "false", text)
+        text = text.replace("\u201c", '"').replace("\u201d", '"')
+        text = text.replace("\u2018", "'").replace("\u2019", "'")
+        return re.sub(r",\s*([}\]])", r"\1", text)

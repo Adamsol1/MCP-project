@@ -136,6 +136,17 @@ describe("Sidebar", () => {
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
   });
 
+  it("calls onOpenDevLlmChat when the LLM chat dev button is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenDevLlmChat = vi.fn();
+
+    renderSidebar({ onOpenDevLlmChat });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(screen.getByRole("button", { name: /open llm chat/i }));
+
+    expect(onOpenDevLlmChat).toHaveBeenCalledOnce();
+  });
+
   it("does not render legacy direction stage jump controls", async () => {
     const user = userEvent.setup();
     renderSidebar();

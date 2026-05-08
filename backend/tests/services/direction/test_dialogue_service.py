@@ -87,13 +87,88 @@ def _build_service(monkeypatch):
     return DialogueService(mcp_client, MockAIOrchestrator()), mcp_client
 
 
+def test_parse_json_handles_trailing_text_after_json():
+    parsed = DialogueService._parse_json('Here is the PIR JSON:\n{"pirs": []}\nDone.')
+
+    assert parsed == {"pirs": []}
+
+
+def test_parse_json_repairs_trailing_commas_in_balanced_object():
+    parsed = DialogueService._parse_json(
+        'Result:\n{"pir_text": "x", "pirs": [], "claims": [], "sources": [],}'
+    )
+
+    assert parsed["pir_text"] == "x"
+    assert parsed["pirs"] == []
+
+
+def test_parse_json_prefers_full_pir_over_nested_claim_object():
+    parsed = DialogueService._parse_json(
+        """
+        {"id": "claim_1", "text": "nested claim", "source_ref": "[1]", "source_id": "s1"}
+        {
+          "pir_text": "full response",
+          "claims": [],
+          "sources": [],
+          "pirs": [{"question": "q", "priority": "high", "rationale": "r", "source_ids": []}],
+          "reasoning": "because"
+        }
+        """
+    )
+
+    assert parsed["pir_text"] == "full response"
+    assert parsed["pirs"][0]["question"] == "q"
+
+
+def _patch_repair_provider(monkeypatch, repair_text: str) -> None:
+    class FakeProvider:
+        async def generate_json_text(self, prompt: str):  # noqa: ARG002
+            return repair_text
+
+    monkeypatch.setattr(
+        dialogue_service_module, "get_provider", lambda: FakeProvider()
+    )
+
+
+@pytest.mark.asyncio
+async def test_parse_or_repair_json_rejects_claim_object_for_pir(monkeypatch):
+    _patch_repair_provider(
+        monkeypatch,
+        json.dumps(
+            {
+                "pir_text": "repaired",
+                "claims": [],
+                "sources": [],
+                "pirs": [
+                    {
+                        "question": "What is the espionage risk?",
+                        "priority": "high",
+                        "rationale": "Decision support",
+                        "source_ids": [],
+                    }
+                ],
+                "reasoning": "The original output was only a nested claim.",
+            }
+        ),
+    )
+    service = DialogueService(MockMCPClient(), MockAIOrchestrator())
+
+    result = await service._parse_or_repair_json(
+        raw='{"id": "claim_1", "text": "not a full PIR"}',
+        repair_prompt="repair this",
+        label="PIR",
+    )
+
+    assert result["pir_text"] == "repaired"
+    assert result["pirs"][0]["priority"] == "high"
+
+
 @pytest.mark.asyncio
 async def test_parse_or_repair_json_repairs_with_model(monkeypatch):
-    class RepairClient:
-        async def generate_json_text(self, prompt: str):  # noqa: ARG002
-            return '{"question": "What scope?", "type": "scope", "has_sufficient_context": false, "context": {}}'
-
-    monkeypatch.setattr(dialogue_service_module, "OpenAICompatibleClient", RepairClient)
+    _patch_repair_provider(
+        monkeypatch,
+        '{"question": "What scope?", "type": "scope", "has_sufficient_context": false, "context": {}}',
+    )
 
     service = DialogueService(MockMCPClient(), MockAIOrchestrator())
     result = await service._parse_or_repair_json(
@@ -108,13 +183,7 @@ async def test_parse_or_repair_json_repairs_with_model(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_parse_or_repair_json_raises_when_repair_is_unparseable(monkeypatch):
-    class BrokenRepairClient:
-        async def generate_json_text(self, prompt: str):  # noqa: ARG002
-            return "still not json"
-
-    monkeypatch.setattr(
-        dialogue_service_module, "OpenAICompatibleClient", BrokenRepairClient
-    )
+    _patch_repair_provider(monkeypatch, "still not json")
 
     service = DialogueService(MockMCPClient(), MockAIOrchestrator())
 

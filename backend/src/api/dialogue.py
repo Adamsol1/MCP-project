@@ -1509,6 +1509,12 @@ async def send_message(
                 timeout=timeout_seconds,
             )
     except ValueError as exc:
+        logger.warning(
+            "[Session %s] Dialogue request rejected as 400: %s",
+            request.session_id,
+            exc,
+            exc_info=True,
+        )
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except TimeoutError:
         session = _sessions.get(request.session_id)

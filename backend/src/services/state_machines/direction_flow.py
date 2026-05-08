@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+from contextlib import suppress
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -245,6 +247,13 @@ class DirectionFlow(BasePhaseFlow):
                 f"[Session {self.session_id}] Source timeframes pre-populated from settings: {self.context.source_timeframes}"
             )
 
+        explicit_context = self._extract_explicit_context(user_message)
+        if explicit_context:
+            self._apply_context_update(explicit_context)
+            logger.info(
+                f"[Session {self.session_id}] Context extracted from explicit user text: {list(explicit_context.keys())}"
+            )
+
         # INITIAL PHASE
         if self.state == DirectionState.INITIAL:
             self.sub_state = None
@@ -297,10 +306,82 @@ class DirectionFlow(BasePhaseFlow):
             pf = extracted_context["priority_focus"]
             self.context.priority_focus = ", ".join(pf) if isinstance(pf, list) else pf
         if extracted_context.get("perspectives"):
-            try:
+            with suppress(ValueError, KeyError):
                 self.update_perspectives(extracted_context["perspectives"])
-            except (ValueError, KeyError):
-                pass
+
+    @staticmethod
+    def _clean_extracted_text(value: str) -> str:
+        return value.strip(" \t\r\n.:-")
+
+    @classmethod
+    def _extract_explicit_context(cls, text: str) -> dict[str, Any]:
+        """Extract obvious direction fields from explicit marker phrases."""
+        extracted: dict[str, Any] = {}
+        normalized = " ".join(text.strip().split())
+        if not normalized:
+            return extracted
+
+        scope_match = re.search(
+            r"\bscope\s+(?:being|is|:)\s+(.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if scope_match:
+            extracted["scope"] = cls._clean_extracted_text(scope_match.group(1))
+        else:
+            exposure_match = re.search(
+                r"\b(exposure to .+?)(?:\.|$)", normalized, flags=re.IGNORECASE
+            )
+            if exposure_match:
+                extracted["scope"] = cls._clean_extracted_text(
+                    exposure_match.group(1)
+                )
+
+        target_match = re.search(
+            r"\binvestigate\s+(.+?)(?:\s+scope\s+(?:being|is|:)|\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if target_match:
+            target = cls._clean_extracted_text(target_match.group(1))
+            if target:
+                extracted["target_entities"] = [target]
+
+        timeframe_match = re.search(
+            r"\b((?:last|past)\s+\d+\s+(?:days?|weeks?|months?|years?)"
+            r"(?:\s+and\s+(?:predictions?\s+for\s+)?(?:the\s+)?next\s+\d+\s+"
+            r"(?:days?|weeks?|months?|years?))?)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if timeframe_match:
+            extracted["timeframe"] = cls._clean_extracted_text(
+                timeframe_match.group(1)
+            )
+
+        actors_match = re.search(
+            r"\binclude\s+(.+?threat actors?.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if actors_match:
+            extracted["threat_actors"] = [
+                cls._clean_extracted_text(actors_match.group(1))
+            ]
+        elif re.search(r"\bstate-sponsored\b", normalized, flags=re.IGNORECASE):
+            extracted["threat_actors"] = ["state-sponsored groups"]
+
+        focus_match = re.search(
+            r"\bpriority focus\s+(?:is|:)\s+(.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if focus_match:
+            extracted["priority_focus"] = cls._clean_extracted_text(
+                focus_match.group(1)
+            )
+
+        return extracted
 
     @staticmethod
     def _context_field_from_question_type(question_type: str | None) -> str | None:

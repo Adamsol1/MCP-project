@@ -5,7 +5,7 @@ import type { RunAnalysisCouncilRequest, CouncilNote } from "../../types/analysi
 
 vi.mock("axios");
 
-const BASE = "http://127.0.0.1:8004";
+const BASE = "http://127.0.0.1:8000";
 
 beforeEach(() => {
   vi.clearAllMocks();
