@@ -218,6 +218,57 @@ describe("SourceList — highlight state", () => {
   });
 });
 
+// ── Group 5: highlightedRef (legacy singular prop) ────────────────────────────
+
+describe("SourceList — highlightedRef legacy prop", () => {
+  it("uses highlightedRef when highlightedRefs is not provided", () => {
+    render(
+      <SourceList
+        sources={[sourceNorway]}
+        highlightedRef="[1]"
+        onSourceHover={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByRole("listitem");
+    expect(card).toHaveClass("text-primary");
+  });
+
+  it("falls back to empty highlight when highlightedRef is null and no highlightedRefs", () => {
+    render(
+      <SourceList
+        sources={[sourceNorway]}
+        highlightedRef={null}
+        onSourceHover={vi.fn()}
+      />,
+    );
+
+    const card = screen.getByRole("listitem");
+    expect(card).not.toHaveClass("text-primary");
+  });
+});
+
+// ── Group 6: source without citation ────────────────────────────────────────
+
+describe("SourceList — source without citation", () => {
+  it("renders source.id as fallback when citation is absent", () => {
+    const sourceWithoutCitation: Source = {
+      id: "raw/source-id",
+      ref: "[3]",
+      source_type: "web",
+    };
+    render(
+      <SourceList
+        sources={[sourceWithoutCitation]}
+        highlightedRefs={[]}
+        onSourceHover={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("raw/source-id")).toBeInTheDocument();
+  });
+});
+
 describe("SourceList — accessibility (WCAG 2.1 AA)", () => {
   it("has no violations with sources", async () => {
     const { container } = render(

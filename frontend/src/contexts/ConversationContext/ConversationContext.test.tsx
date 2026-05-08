@@ -5,6 +5,11 @@ import { useConversation } from "../../hooks/useConversation/useConversation";
 import { ConversationProvider } from "./ConversationContext";
 import type { ConversationStore } from "../../types/conversation";
 
+// Prevent deleteConversation from making real HTTP requests during tests.
+vi.mock("../../services/upload/upload", () => ({
+  deleteSessionArtifacts: vi.fn().mockResolvedValue(undefined),
+}));
+
 const STORAGE_KEY = "mcp-conversations";
 
 // Helper: wraps the hook in a ConversationProvider so it has access to context
@@ -510,6 +515,70 @@ describe("ConversationContext", () => {
 
       const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
       expect(stored.conversations).toHaveLength(0);
+    });
+  });
+
+  // ---------- deleteAllConversations ----------
+
+  describe("deleteAllConversations", () => {
+    it("removes all conversations and sets active to null", () => {
+      const { result } = renderHook(() => useConversation(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.createNewConversation();
+        result.current.createNewConversation();
+      });
+
+      expect(result.current.conversations).toHaveLength(2);
+
+      act(() => {
+        result.current.deleteAllConversations();
+      });
+
+      expect(result.current.conversations).toHaveLength(0);
+      expect(result.current.activeConversation).toBeNull();
+    });
+
+    it("persists the empty state to localStorage", () => {
+      const { result } = renderHook(() => useConversation(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.createNewConversation();
+      });
+
+      act(() => {
+        result.current.deleteAllConversations();
+      });
+
+      const stored = JSON.parse(localStorage.getItem(STORAGE_KEY)!);
+      expect(stored.conversations).toHaveLength(0);
+    });
+  });
+
+  // ---------- renameConversation ----------
+
+  describe("renameConversation", () => {
+    it("updates the title of the specified conversation", () => {
+      const { result } = renderHook(() => useConversation(), {
+        wrapper: createWrapper(),
+      });
+
+      act(() => {
+        result.current.createNewConversation();
+      });
+
+      const convId = result.current.conversations[0].id;
+
+      act(() => {
+        result.current.renameConversation(convId, "My renamed conversation");
+      });
+
+      const renamed = result.current.conversations.find((c) => c.id === convId);
+      expect(renamed?.title).toBe("My renamed conversation");
     });
   });
 

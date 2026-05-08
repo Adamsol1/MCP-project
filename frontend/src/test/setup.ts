@@ -18,6 +18,10 @@ class ResizeObserverStub {
 }
 window.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
 
+// jsdom does not implement HTMLCanvasElement.getContext — stub it so components
+// that render canvas elements don't emit warnings during tests.
+HTMLCanvasElement.prototype.getContext = () => null;
+
 afterEach(() => {
   cleanup();
 });

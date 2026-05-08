@@ -111,6 +111,11 @@ class AIOrchestrator:
                         error_type=error_type,
                     )
                 )
+                # Re-raise the unwrapped root cause so callers can pattern-match
+                # on the underlying error type (ValueError, TimeoutError, etc.)
+                # instead of having to dig through ExceptionGroup wrappers.
+                if e is not original:
+                    raise e from original
                 raise
             self.attempts.append(generated)
             generation_duration = time.time() - generation_start

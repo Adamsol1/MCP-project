@@ -216,8 +216,8 @@ function GeneralSection({
     <>
       <SettingRow
         label={t.uiLanguage}
-        htmlFor="ui-language"
         description={t.uiLanguageDesc}
+        htmlFor="ui-language"
         control={
           <select
             id="ui-language"
@@ -281,8 +281,8 @@ function ParametersSection({
     <>
       <SettingRow
         label={t.aiOutputLanguage}
-        htmlFor="ai-output-language"
         description={t.aiOutputLanguageDesc}
+        htmlFor="ai-output-language"
         control={
           <select
             id="ai-output-language"
@@ -363,10 +363,11 @@ function SourceTimeframesControl({
     <div className="flex flex-col gap-2">
       {SOURCE_TIMEFRAME_KEYS.map((key) => (
         <div key={key} className="flex items-center gap-3">
-          <span className="w-36 shrink-0 text-xs text-text-secondary">
+          <label htmlFor={`timeframe-${key}`} className="w-36 shrink-0 text-xs text-text-secondary">
             {t.sourceTimeframeLabels[key]}
-          </span>
+          </label>
           <select
+            id={`timeframe-${key}`}
             aria-label={t.sourceTimeframeLabels[key]}
             value={value[key]}
             onChange={(e) => onChange(key, e.target.value)}
