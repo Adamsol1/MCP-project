@@ -1,3 +1,5 @@
+import { useEffect } from "react";
+
 interface HelpSection {
   heading?: string;
   body: string;
@@ -11,6 +13,13 @@ interface HelpModalProps {
 }
 
 export function HelpModal({ isOpen, onClose, title, sections }: HelpModalProps) {
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (

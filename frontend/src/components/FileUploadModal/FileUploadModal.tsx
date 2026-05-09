@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import FileUpload from "../FileUpload/FileUpload";
 
 /** Props for the FileUploadModal component. */
@@ -35,6 +36,13 @@ export function FileUploadModal({
   isUploading = false,
   uploadProgress = { current: 0, total: 0 },
 }: FileUploadModalProps) {
+  useEffect(() => {
+    if (!isOpen || isUploading) return;
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isUploading, onClose]);
+
   if (!isOpen) return null;
 
   const progressPercent =

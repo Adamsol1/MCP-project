@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
 import { useT } from "../../i18n/useT";
 import type { CouncilSettings, Language, SourceTimeframes, Theme } from "../../types/settings";
@@ -43,6 +43,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   // Tracks which settings category is displayed in the right panel.
   const [activeSection, setActiveSection] = useState<NavSection>("appearance");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Return nothing when closed — keeps the DOM clean and avoids focus issues.
   if (!isOpen) return null;

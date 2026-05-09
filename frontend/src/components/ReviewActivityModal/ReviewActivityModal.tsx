@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { PhaseReviewItem } from "../../types/conversation";
 import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, CollectionSummaryData, PirData, PirItem, ProcessingData, ProcessingFinding } from "../../types/conversation";
@@ -450,6 +450,18 @@ export default function ReviewActivityModal({
   focusAttempt,
 }: ReviewActivityModalProps) {
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (isHelpOpen) setIsHelpOpen(false);
+        else onClose();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, isHelpOpen, onClose]);
 
   if (!isOpen) return null;
 
