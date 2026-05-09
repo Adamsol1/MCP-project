@@ -122,6 +122,76 @@ describe("FileUploadModal", () => {
   });
 });
 
+describe("FileUploadModal — uploading state", () => {
+  it("shows upload progress text when isUploading is true", () => {
+    render(
+      <FileUploadModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onFileSelect={vi.fn()}
+        onSubmit={vi.fn()}
+        isUploading={true}
+        uploadProgress={{ current: 1, total: 3 }}
+      />,
+    );
+
+    expect(screen.getByText(/uploading 1 of 3 files/i)).toBeInTheDocument();
+  });
+
+  it("shows 'file' (singular) when total is 1", () => {
+    render(
+      <FileUploadModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onFileSelect={vi.fn()}
+        onSubmit={vi.fn()}
+        isUploading={true}
+        uploadProgress={{ current: 1, total: 1 }}
+      />,
+    );
+
+    expect(screen.getByText(/uploading 1 of 1 file…/i)).toBeInTheDocument();
+  });
+
+  it("does not call onClose when backdrop is clicked while uploading", async () => {
+    const onClose = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <FileUploadModal
+        isOpen={true}
+        onClose={onClose}
+        onFileSelect={vi.fn()}
+        onSubmit={vi.fn()}
+        isUploading={true}
+        uploadProgress={{ current: 2, total: 5 }}
+      />,
+    );
+
+    // Backdrop click is disabled during upload (onClick set to undefined)
+    await user.click(screen.getByTestId("modal-backdrop"));
+
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("shows progress percentage when total > 0", () => {
+    render(
+      <FileUploadModal
+        isOpen={true}
+        onClose={vi.fn()}
+        onFileSelect={vi.fn()}
+        onSubmit={vi.fn()}
+        isUploading={true}
+        uploadProgress={{ current: 2, total: 4 }}
+      />,
+    );
+
+    // progressPercent = 50%, applied as inline style — check the bar exists
+    const progressBar = document.querySelector("[style]");
+    expect(progressBar).toBeInTheDocument();
+  });
+});
+
 describe("FileUploadModal — accessibility (WCAG 2.1 AA)", () => {
   it("has no violations when open", async () => {
     const { container } = render(

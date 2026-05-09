@@ -97,13 +97,14 @@ export default function CollectionActivityModal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="collection-activity-modal-title"
         className="flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Review Activity</h2>
+            <h2 id="collection-activity-modal-title" className="text-base font-semibold text-text-primary">Review Activity</h2>
             <p className="mt-0.5 text-xs text-text-muted">
               {activity.length} attempt{activity.length !== 1 ? "s" : ""}
             </p>

@@ -1058,13 +1058,14 @@ export default function CollectionStatsModal({
         data-testid="collection-stats-modal"
         role="dialog"
         aria-modal="true"
+        aria-labelledby="collection-stats-title"
         className="flex h-[95vh] w-[95vw] max-w-7xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-8 py-4">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">
+            <h2 id="collection-stats-title" className="text-base font-semibold text-text-primary">
               {t.collectionResultsHeader}
             </h2>
             <p className="mt-0.5 text-xs text-text-muted">

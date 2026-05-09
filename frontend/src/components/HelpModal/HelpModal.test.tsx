@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 import { HelpModal, HelpButton } from "./HelpModal";
 
 const sections = [
@@ -106,5 +107,24 @@ describe("HelpButton", () => {
     await user.click(screen.getByRole("button", { name: /help/i }));
 
     expect(onClick).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("HelpModal — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations when open with sections", async () => {
+    const { container } = render(
+      <HelpModal isOpen onClose={vi.fn()} title="Help Guide" sections={sections} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for HelpButton", async () => {
+    const { container } = render(<HelpButton onClick={vi.fn()} />);
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations for HelpButton with custom label", async () => {
+    const { container } = render(<HelpButton onClick={vi.fn()} label="Open guide" />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

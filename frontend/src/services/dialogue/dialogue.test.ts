@@ -20,11 +20,16 @@ import {
   getDevDialogueState,
   setDevDialogueState,
   resetDevDialogueState,
+  getPendingElicitation,
+  respondToElicitation,
+  listDevDialogueSnapshots,
+  restoreDevDialogueSnapshot,
 } from "./dialogue";
 import type {
   DialogueApiResponse,
   CollectionStatus,
   DialogueDevStateResponse,
+  DialogueDevSnapshot,
 } from "./dialogue";
 
 vi.mock("axios");
@@ -314,6 +319,147 @@ describe("setDevDialogueState", () => {
     await expect(
       setDevDialogueState("session-1", "summary_confirming"),
     ).rejects.toThrow("Server error");
+  });
+});
+
+// ── getPendingElicitation ─────────────────────────────────────────────────────
+
+describe("getPendingElicitation", () => {
+  it("returns the pending elicitation when one is present", async () => {
+    const pending = {
+      message: "Which time range should we use?",
+      options: ["7 days", "30 days", "90 days"],
+    };
+    vi.mocked(axios.get).mockResolvedValue({
+      data: { pending_elicitation: pending },
+    });
+
+    const result = await getPendingElicitation("session-1");
+
+    expect(axios.get).toHaveBeenCalledWith(
+      `${BASE}/api/dialogue/elicitation/pending/session-1`,
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
+    expect(result).toEqual(pending);
+  });
+
+  it("returns null when there is no pending elicitation", async () => {
+    vi.mocked(axios.get).mockResolvedValue({
+      data: { pending_elicitation: null },
+    });
+
+    const result = await getPendingElicitation("session-1");
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the API call fails (best-effort)", async () => {
+    vi.mocked(axios.get).mockRejectedValue(new Error("Network error"));
+
+    const result = await getPendingElicitation("session-1");
+
+    expect(result).toBeNull();
+  });
+});
+
+// ── respondToElicitation ──────────────────────────────────────────────────────
+
+describe("respondToElicitation", () => {
+  it("POSTs the user choice to the elicitation respond endpoint", async () => {
+    vi.mocked(axios.post).mockResolvedValue({ data: {} });
+
+    await respondToElicitation("session-1", "30 days");
+
+    expect(axios.post).toHaveBeenCalledWith(
+      `${BASE}/api/dialogue/elicitation/session-1/respond`,
+      { choice: "30 days" },
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
+  });
+
+  it("propagates errors from the API", async () => {
+    vi.mocked(axios.post).mockRejectedValue(new Error("Server error"));
+
+    await expect(respondToElicitation("session-1", "7 days")).rejects.toThrow(
+      "Server error",
+    );
+  });
+});
+
+// ── listDevDialogueSnapshots ──────────────────────────────────────────────────
+
+describe("listDevDialogueSnapshots", () => {
+  const mockSnapshots: DialogueDevSnapshot[] = [
+    {
+      session_id: "snap-1",
+      title: "APT29 investigation",
+      artifacts: { session: true, collection: true, processing: false, analysis: false },
+    },
+  ];
+
+  it("returns the list of snapshots from the API", async () => {
+    vi.mocked(axios.get).mockResolvedValue({ data: mockSnapshots });
+
+    const result = await listDevDialogueSnapshots();
+
+    expect(axios.get).toHaveBeenCalledWith(
+      `${BASE}/api/dialogue/dev/snapshots`,
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
+    expect(result).toEqual(mockSnapshots);
+  });
+
+  it("throws when the API call fails", async () => {
+    vi.mocked(axios.get).mockRejectedValue(new Error("Unauthorized"));
+
+    await expect(listDevDialogueSnapshots()).rejects.toThrow("Unauthorized");
+  });
+});
+
+// ── restoreDevDialogueSnapshot ────────────────────────────────────────────────
+
+describe("restoreDevDialogueSnapshot", () => {
+  const mockRestoreResponse = {
+    stage: "pir_confirming",
+    sub_state: "awaiting_decision",
+    phase: "direction",
+    messages: [{ text: "Restored message", sender: "system", type: "question" }],
+  };
+
+  it("POSTs to the restore endpoint with the correct body", async () => {
+    vi.mocked(axios.post).mockResolvedValue({ data: mockRestoreResponse });
+
+    const result = await restoreDevDialogueSnapshot(
+      "source-session",
+      "target-session",
+      "pir_confirming",
+      "direction",
+    );
+
+    expect(axios.post).toHaveBeenCalledWith(
+      `${BASE}/api/dialogue/dev/restore`,
+      {
+        source_session_id: "source-session",
+        target_session_id: "target-session",
+        target_stage: "pir_confirming",
+        target_phase: "direction",
+      },
+      expect.objectContaining({ timeout: expect.any(Number) }),
+    );
+    expect(result).toEqual(mockRestoreResponse);
+  });
+
+  it("throws when the API call fails", async () => {
+    vi.mocked(axios.post).mockRejectedValue(new Error("Restore failed"));
+
+    await expect(
+      restoreDevDialogueSnapshot(
+        "source-session",
+        "target-session",
+        "pir_confirming",
+        "direction",
+      ),
+    ).rejects.toThrow("Restore failed");
   });
 });
 

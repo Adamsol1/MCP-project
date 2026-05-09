@@ -144,3 +144,17 @@ async def test_review_pir_raises_when_fail_open_disabled(monkeypatch):
 
     with pytest.raises(ConnectionError, match="review mcp unavailable"):
         await review_service.review_pir("fake pir", context, "direction")
+
+
+@pytest.mark.asyncio
+async def test_review_pir_raises_value_error_on_unknown_phase():
+    # arrange
+    context = DialogueContext()
+    context.scope = "test"
+    llm = MockLLMService(return_value={})
+    review_mcp = MockReviewMCPClient()
+    service = ReviewService(llm, review_mcp)
+
+    # act / assert
+    with pytest.raises(ValueError, match="Unknown phase"):
+        await service.review_pir("content", context, "invalid_phase")

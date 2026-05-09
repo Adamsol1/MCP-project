@@ -1,6 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
+import { axe } from "vitest-axe";
 import CollectionActivityModal from "./CollectionActivityModal";
 import type { PhaseReviewItem } from "../../types/conversation";
 
@@ -66,7 +67,7 @@ describe("CollectionActivityModal", () => {
     );
 
     expect(screen.getByText(/attempt 1/i)).toBeInTheDocument();
-    expect(screen.getByText(/approved/i)).toBeInTheDocument();
+    expect(screen.getByText("Approved")).toBeInTheDocument();
   });
 
   it("renders rejected badge for a rejected attempt", () => {
@@ -124,5 +125,32 @@ describe("CollectionActivityModal", () => {
     await user.click(screen.getByTestId("activity-modal-backdrop"));
 
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("CollectionActivityModal — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations when open with activity", async () => {
+    const { container } = render(
+      <CollectionActivityModal isOpen onClose={vi.fn()} activity={[approvedItem]} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations when open with empty activity", async () => {
+    const { container } = render(
+      <CollectionActivityModal isOpen onClose={vi.fn()} activity={[]} />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with multiple attempts", async () => {
+    const { container } = render(
+      <CollectionActivityModal
+        isOpen
+        onClose={vi.fn()}
+        activity={[approvedItem, rejectedItem]}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

@@ -92,6 +92,24 @@ describe("ApprovalPrompt", () => {
 
     expect(onRejectWithFeedback).toHaveBeenCalledTimes(1);
   });
+
+  it("uses default copy when stage is provided but has no specific copy (e.g. 'gathering')", () => {
+    renderWithSettings(<ApprovalPrompt stage="gathering" />);
+
+    // "gathering" has no entry in PROMPT_COPY_BY_STAGE → falls back to DEFAULT_PROMPT_COPY
+    // The default title is returned by t.approvalDefault — just check the buttons exist
+    expect(
+      screen.getByRole("button", { name: /approve & continue/i })
+    ).toBeInTheDocument();
+  });
+
+  it("renders plan-specific copy when stage is plan_confirming", () => {
+    renderWithSettings(<ApprovalPrompt stage="plan_confirming" />);
+
+    expect(
+      screen.getByRole("heading", { name: /ready to start collection/i }),
+    ).toBeInTheDocument();
+  });
 });
 
 describe("ApprovalPrompt — accessibility (WCAG 2.1 AA)", () => {

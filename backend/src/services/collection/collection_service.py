@@ -201,7 +201,9 @@ class CollectionService:
             if isinstance(parsed, dict):
                 return parsed
         except Exception:
-            pass
+            repaired = _try_parse_json_lenient(stripped)
+            if repaired is not None:
+                return repaired
 
         # 2) fenced blocks (```json ... ``` or ``` ... ```)
         for candidate in re.findall(
@@ -212,6 +214,9 @@ class CollectionService:
                 if isinstance(parsed, dict):
                     return parsed
             except Exception:
+                repaired = _try_parse_json_lenient(candidate)
+                if repaired is not None:
+                    return repaired
                 continue
 
         # 3) largest object-like substring
@@ -224,7 +229,7 @@ class CollectionService:
                 if isinstance(parsed, dict):
                     return parsed
             except Exception:
-                return None
+                return _try_parse_json_lenient(snippet)
 
         return None
 

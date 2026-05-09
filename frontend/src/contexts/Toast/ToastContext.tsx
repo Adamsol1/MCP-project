@@ -1,4 +1,4 @@
-import { createContext, useReducer, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useReducer, useCallback, type ReactNode } from 'react';
 
 /**
  * Visual severity of a toast notification.
@@ -58,6 +58,13 @@ const DEFAULT_DURATION = 5000;
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export const ToastContext = createContext<ToastContextValue | null>(null);
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function useToast(): ToastContextValue {
+  const ctx = useContext(ToastContext);
+  if (!ctx) throw new Error('useToast must be used inside ToastProvider');
+  return ctx;
+}
 
 /** Union of all actions that can be dispatched to toastReducer. */
 type Action =

@@ -7,9 +7,8 @@
  * Run with: cd frontend && npx vitest PirSourcesView.test
  */
 
-import { screen, act } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import PirSourcesView from "./PirSourcesView";
 import { WorkspaceProvider, useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
@@ -146,10 +145,10 @@ describe("PirSourcesView — source rendering", () => {
 
 // ── Group 3: Hover updates context ────────────────────────────────────────────
 
+// userEvent.hover/unhover deadlock in jsdom. React 18 synthesizes onMouseEnter
+// from native mouseover (bubbling) and onMouseLeave from mouseout — use those directly.
 describe("PirSourcesView — hover updates context", () => {
   it("hovering a source card sets highlightedRefs in context", async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-
     renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
@@ -163,14 +162,13 @@ describe("PirSourcesView — hover updates context", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    await user.hover(sourceCard);
+    fireEvent.mouseOver(sourceCard);
+    await act(async () => {});
 
     expect(screen.getByTestId("refs")).toHaveTextContent("[1]");
   });
 
   it("mouse leave on a source card clears highlightedRefs in context", async () => {
-    const user = userEvent.setup({ pointerEventsCheck: 0 });
-
     renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
@@ -184,8 +182,10 @@ describe("PirSourcesView — hover updates context", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    await user.hover(sourceCard);
-    await user.unhover(sourceCard);
+    fireEvent.mouseOver(sourceCard);
+    await act(async () => {});
+    fireEvent.mouseOut(sourceCard);
+    await act(async () => {});
 
     expect(screen.getByTestId("refs")).toHaveTextContent("empty");
   });
