@@ -6,7 +6,7 @@ from adapters.base_http import BaseHTTPAdapter
 from adapters.claude import ClaudeAdapter
 from adapters.codex import CodexAdapter
 from adapters.droid import DroidAdapter
-from adapters.gemini import GeminiAdapter
+from adapters.gemini import GeminiAPIAdapter, GeminiAdapter
 from adapters.llamacpp import LlamaCppAdapter
 from adapters.lmstudio import LMStudioAdapter
 from adapters.ollama import OllamaAdapter
@@ -48,6 +48,7 @@ def create_adapter(
         "openrouter": OpenRouterAdapter,
         "nebius": NebiusAdapter,
         "openai": OpenAIAdapter,
+        "gemini": GeminiAPIAdapter,
     }
 
     # Handle legacy CLIToolConfig (backward compatibility)
@@ -124,6 +125,7 @@ __all__ = [
     "ClaudeAdapter",
     "CodexAdapter",
     "DroidAdapter",
+    "GeminiAPIAdapter",
     "GeminiAdapter",
     "LlamaCppAdapter",
     "LMStudioAdapter",

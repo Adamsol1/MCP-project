@@ -144,6 +144,15 @@ cli_tools:
 
 # HTTP Adapters Section (new format)
 adapters:
+  gemini:
+    type: http
+    base_url: "https://generativelanguage.googleapis.com/v1beta"
+    api_key: "${GEMINI_API_KEY}"
+    timeout: 300
+    max_retries: 3
+    # Gemini Developer API. In Docker this replaces the CLI-based gemini
+    # entry in cli_tools, which requires a host CLI binary.
+
   ollama:
     type: http
     base_url: "http://localhost:11434"

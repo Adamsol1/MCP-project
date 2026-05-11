@@ -1,7 +1,7 @@
-"""Gemini CLI adapter."""
-import sys
+"""Gemini adapters."""
 
 from adapters.base import BaseCLIAdapter
+from adapters.base_http import BaseHTTPAdapter
 
 
 class GeminiAdapter(BaseCLIAdapter):
@@ -84,3 +84,52 @@ class GeminiAdapter(BaseCLIAdapter):
             Parsed model response
         """
         return raw_output.strip()
+
+
+class GeminiAPIAdapter(BaseHTTPAdapter):
+    """HTTP adapter for the Gemini Developer API.
+
+    The Docker council server should not depend on the host-level `gemini` CLI
+    being installed. This adapter uses the same GEMINI_API_KEY-backed HTTP API
+    as the rest of the app while preserving the council participant adapter name
+    (`gemini`).
+    """
+
+    provider_name = "Gemini API"
+
+    def build_request(self, model: str, prompt: str):
+        endpoint = f"/models/{model}:generateContent"
+        headers = {"Content-Type": "application/json"}
+        if self.api_key:
+            headers["x-goog-api-key"] = self.api_key
+
+        body = {
+            "contents": [
+                {
+                    "role": "user",
+                    "parts": [{"text": prompt}],
+                }
+            ]
+        }
+        return endpoint, headers, body
+
+    def parse_response(self, response_json: dict) -> str:
+        candidates = response_json.get("candidates") or []
+        if not candidates:
+            prompt_feedback = response_json.get("promptFeedback")
+            raise ValueError(
+                f"{self.provider_name} response has no candidates"
+                + (f": {prompt_feedback}" if prompt_feedback else "")
+            )
+
+        content = candidates[0].get("content") or {}
+        parts = content.get("parts") or []
+        text_parts = [part.get("text", "") for part in parts if isinstance(part, dict)]
+        text = "\n".join(part for part in text_parts if part).strip()
+        if not text:
+            finish_reason = candidates[0].get("finishReason", "unknown")
+            raise ValueError(
+                f"{self.provider_name} returned empty content "
+                f"(finishReason={finish_reason})"
+            )
+        return text
