@@ -6,8 +6,7 @@ services:
     ports:
       - "${APP_PORT:-8080}:80"
     depends_on:
-      backend:
-        condition: service_healthy
+      - backend
     restart: unless-stopped
 
   backend:
@@ -21,13 +20,6 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8001/v1}
-      LLM_MODEL: ${LLM_MODEL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-}
-      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
-      LLM_MAX_COMPLETION_TOKENS: ${LLM_MAX_COMPLETION_TOKENS:-}
-      LLM_ENABLE_THINKING: ${LLM_ENABLE_THINKING:-}
       MCP_SERVER_URL: http://generation-mcp:8001/sse
       REVIEW_MCP_URL: http://review-mcp:8002/sse
       COUNCIL_MCP_URL: http://council-mcp:8003/sse
@@ -36,23 +28,12 @@ services:
       KNOWLEDGE_DB_PATH: /app/backend/data/knowledge.db
     volumes:
       - backend_data:/app/backend/data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     expose:
       - "8000"
     depends_on:
-      generation-mcp:
-        condition: service_healthy
-      review-mcp:
-        condition: service_healthy
-      council-mcp:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=2).read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
+      - generation-mcp
+      - review-mcp
+      - council-mcp
     restart: unless-stopped
 
   generation-mcp:
@@ -72,12 +53,6 @@ services:
       - backend_data:/app/backend/data
     expose:
       - "8001"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=2).read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
     restart: unless-stopped
 
   review-mcp:
@@ -89,12 +64,6 @@ services:
       REVIEW_MCP_PORT: "8002"
     expose:
       - "8002"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8002/health', timeout=2).read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
     restart: unless-stopped
 
   council-mcp:
@@ -106,13 +75,6 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
-      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8001/v1}
-      LLM_MODEL: ${LLM_MODEL:-}
-      LLM_API_KEY: ${LLM_API_KEY:-}
-      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-}
-      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
-      LLM_MAX_COMPLETION_TOKENS: ${LLM_MAX_COMPLETION_TOKENS:-}
-      LLM_ENABLE_THINKING: ${LLM_ENABLE_THINKING:-}
       COUNCIL_MCP_HOST: 0.0.0.0
       COUNCIL_MCP_PORT: "8003"
       COUNCIL_TRANSCRIPTS_DIR: transcripts
@@ -120,16 +82,8 @@ services:
     volumes:
       - council_transcripts:/app/council_mcp_server/transcripts
       - council_decision_graph:/app/council_mcp_server/decision_graph_data
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     expose:
       - "8003"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8003/health', timeout=2).read()"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 30s
     restart: unless-stopped
 
 volumes:
