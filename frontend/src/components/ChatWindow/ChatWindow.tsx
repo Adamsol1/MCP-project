@@ -1391,7 +1391,7 @@ export default function ChatWindow({
           ref={bottomPanelRef}
           className={`flex flex-col items-center gap-4 pb-6 ${
             hasConversationContent
-              ? "absolute bottom-0 left-0 right-0 pt-8 bg-linear-to-t from-surface-elevated via-surface-elevated/90 to-transparent"
+              ? "absolute bottom-0 left-0 right-0 pt-8 bg-surface-elevated"
               : "flex-1 justify-center"
           }`}
         >

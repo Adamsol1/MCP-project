@@ -858,7 +858,6 @@ function PerspectiveSection({
           <p className="text-sm leading-6 text-text-secondary line-clamp-3">
             {firstAssertion.assertion}
           </p>
-          <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-10 bg-linear-to-t from-surface to-transparent" />
         </div>
       )}
 

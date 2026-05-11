@@ -110,7 +110,7 @@ export default function IntelligencePanel({
         </h2>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-3 py-4 scrollbar-chatgpt">
+      <div className="flex-1 overflow-y-auto px-3 py-4">
         <div className="flex flex-col">
           {renderPhaseContent()}
           {reviewActivity.length > 0 && (
