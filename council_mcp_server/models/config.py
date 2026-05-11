@@ -4,6 +4,7 @@ import re
 import warnings
 from pathlib import Path
 from typing import Annotated, List, Literal, Optional, Union
+from urllib.parse import urlparse, urlunparse
 
 import yaml
 from dotenv import load_dotenv
@@ -109,6 +110,17 @@ class OpenAIAdapterConfig(HTTPAdapterConfig):
             "Maximum completion tokens for Chat Completions API requests. "
             "If None, uses OpenAI's model-specific defaults. "
             "Only applies to GPT models using the Chat Completions API."
+        ),
+    )
+    temperature: Optional[float] = Field(
+        default=None,
+        description="Sampling temperature for Chat Completions API requests.",
+    )
+    enable_thinking: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Optional vLLM chat_template_kwargs.enable_thinking value for "
+            "models such as Qwen3."
         ),
     )
 
@@ -491,6 +503,71 @@ class Config(BaseModel):
             )
 
 
+def _normalize_openai_compatible_base_url(base_url: str) -> str:
+    """Normalize root OpenAI-compatible URLs to their /v1 API base."""
+    value = base_url.strip().rstrip("/")
+    parsed = urlparse(value)
+    if parsed.scheme and parsed.netloc and parsed.path in {"", "/"}:
+        return urlunparse(parsed._replace(path="/v1"))
+    return value
+
+
+def _env_bool(name: str) -> Optional[bool]:
+    value = os.getenv(name)
+    if value is None:
+        return None
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str) -> Optional[int]:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return None
+    return int(value)
+
+
+def _env_float(name: str) -> Optional[float]:
+    value = os.getenv(name)
+    if value is None or value.strip() == "":
+        return None
+    return float(value)
+
+
+def _apply_llm_openai_adapter_overrides(data: dict) -> None:
+    """Route the council OpenAI-compatible adapter through app LLM_* settings."""
+    adapters = data.get("adapters")
+    if not isinstance(adapters, dict):
+        return
+
+    openai_adapter = adapters.get("openai")
+    if not isinstance(openai_adapter, dict):
+        return
+
+    base_url = os.getenv("LLM_BASE_URL")
+    if base_url:
+        openai_adapter["base_url"] = _normalize_openai_compatible_base_url(base_url)
+
+    api_key = os.getenv("LLM_API_KEY")
+    if api_key is not None:
+        openai_adapter["api_key"] = api_key or None
+
+    timeout = _env_int("LLM_TIMEOUT_SECONDS")
+    if timeout is not None:
+        openai_adapter["timeout"] = timeout
+
+    max_completion_tokens = _env_int("LLM_MAX_COMPLETION_TOKENS")
+    if max_completion_tokens is not None:
+        openai_adapter["max_completion_tokens"] = max_completion_tokens
+
+    temperature = _env_float("LLM_TEMPERATURE")
+    if temperature is not None:
+        openai_adapter["temperature"] = temperature
+
+    enable_thinking = _env_bool("LLM_ENABLE_THINKING")
+    if enable_thinking is not None:
+        openai_adapter["enable_thinking"] = enable_thinking
+
+
 def load_config(path: str = "config.yaml") -> Config:
     """
     Load configuration from YAML file.
@@ -507,8 +584,13 @@ def load_config(path: str = "config.yaml") -> Config:
     """
     config_path = Path(path)
 
-    # Load environment variables from .env file in same directory as config
-    # This ensures the .env file is found regardless of the current working directory
+    # Load environment variables from the app root first, then council-local files.
+    repo_root_env = Path(__file__).resolve().parents[2] / ".env"
+    if repo_root_env.exists():
+        load_dotenv(repo_root_env)
+
+    # Load environment variables from .env file in same directory as config.
+    # This ensures the .env file is found regardless of the current working directory.
     config_dir = config_path.parent if config_path.parent.exists() else Path(__file__).parent.parent
     env_path = config_dir / ".env"
     if env_path.exists():
@@ -526,5 +608,7 @@ def load_config(path: str = "config.yaml") -> Config:
 
     with open(config_path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f)
+
+    _apply_llm_openai_adapter_overrides(data)
 
     return Config(**data)

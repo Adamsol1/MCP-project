@@ -24,6 +24,8 @@ interface SidebarProps {
   onDevSendMessage: () => void;
   /** DEV: Forces chat into confirmation mode to preview approval UI. */
   onDevShowCollectionApproval?: () => void;
+  /** DEV: Opens the direct LLM chat test tool. */
+  onOpenDevLlmChat?: () => void;
   /** DEV: Saved backend runs that can be restored into the active session. */
   devSnapshots?: DialogueDevSnapshot[];
   /** DEV: Whether saved runs are being loaded/restored. */
@@ -75,6 +77,7 @@ export function Sidebar({
   onDeleteAllConversations,
   onDevSendMessage,
   onDevShowCollectionApproval,
+  onOpenDevLlmChat,
   devSnapshots = [],
   isDevSnapshotsLoading = false,
   onDevRefreshSnapshots,
@@ -304,6 +307,14 @@ export function Sidebar({
                   className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
                 >
                   {t.showCollectionApproval}
+                </button>
+              )}
+              {onOpenDevLlmChat && (
+                <button
+                  onClick={onOpenDevLlmChat}
+                  className="w-full text-left px-2 py-1.5 rounded text-sm text-text-secondary hover:bg-surface-elevated"
+                >
+                  {t.openLlmChat}
                 </button>
               )}
               {onDevRestoreSnapshot && (

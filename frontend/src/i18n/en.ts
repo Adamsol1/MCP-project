@@ -15,6 +15,7 @@ export const en = {
   minimizeDevTools: "Minimize dev tools",
   sendTestMessage: "Send test message",
   showCollectionApproval: "Show collection approval",
+  openLlmChat: "Open LLM chat",
   previousRun: "Previous run",
   refresh: "Refresh",
   loading: "Loading...",
@@ -65,6 +66,10 @@ export const en = {
     "Uploaded Documents": "Uploaded Documents",
     "Web Search": "Web Search",
   } as Record<string, string>,
+  beta: "Beta",
+  webSearchBetaTitle:
+    "Web search on local LLM is in beta — page fetches happen on the backend " +
+    "via httpx, so JavaScript-rendered pages and bot-protected sites are skipped.",
   sourceDescriptions: {
     "AlienVault OTX": "Open threat exchange feeds",
     "Knowledge Bank": "Your org's curated intel",
@@ -146,6 +151,12 @@ export const en = {
   uiLanguageDesc: "The language used throughout the interface.",
   aiOutputLanguage: "AI Output Language",
   aiOutputLanguageDesc: "The language the AI will use in its responses.",
+  aiProviderLabel: "AI Provider",
+  aiProviderDesc: "Choose whether requests use Gemini API or the local LLM.",
+  aiProviderLabels: {
+    local: "Local LLM",
+    gemini: "Gemini API",
+  } as Record<string, string>,
   langEnglish: "English",
   langNorwegian: "Norwegian",
   themeLabel: "Theme",

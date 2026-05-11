@@ -1,9 +1,10 @@
 """Tests for MCP server initialization."""
 
 import json
+
 import pytest
 
-from src.server import greet, mcp, dialogue_question, generate_pir
+from src.server import dialogue_question, generate_pir, greet, mcp
 
 VALID_QUESTION_TYPES = ["scope", "timeframe", "target_entities", "actors", "focus", "confirmation"]
 
@@ -148,7 +149,7 @@ class TestServerInitialization:
 
         dialogue_question.fn("Investigate APT29", ["scope"], [], {})
 
-        # Verify "neutral" was injected into the prompt sent to Gemini
+        # Verify "neutral" was injected into the prompt sent to the model
         call_args = mock_client.models.generate_content.call_args
         assert "neutral" in call_args.kwargs["contents"]
 
@@ -200,8 +201,6 @@ class TestServerInitialization:
     def test_generate_pir_tool_raises_value_error_with_insufficient_scope(self, scope, timeframe, target_entities, perspective) -> None:
         with pytest.raises(ValueError):
             generate_pir.fn(scope, timeframe, target_entities, perspective, threat_actors=["APT29"], priority_focus="attack vectors")
-
-
 
 
 

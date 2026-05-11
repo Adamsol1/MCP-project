@@ -592,6 +592,7 @@ export function useChat(initialPerspectives?: string[]) {
     // Inject per-tier timeframes from settings if not already set by the caller.
     const effectiveOptions: DialogueSendOptions = {
       ...options,
+      aiProvider: options.aiProvider ?? settings.aiProvider,
       sourceTimeframes:
         options.sourceTimeframes ?? { ...settings.inputParameters.sourceTimeframes },
     };
@@ -628,7 +629,10 @@ export function useChat(initialPerspectives?: string[]) {
       undefined,
       settings.aiLanguage,
       settings.inputParameters.timeframe,
-      { sourceTimeframes: effectiveOptions.sourceTimeframes },
+      {
+        aiProvider: settings.aiProvider,
+        sourceTimeframes: effectiveOptions.sourceTimeframes,
+      },
     );
 
     const isGatherMore = effectiveOptions.gatherMore ?? false;
@@ -956,6 +960,7 @@ export function useChat(initialPerspectives?: string[]) {
         settings.aiLanguage,
         "",
         {
+          aiProvider: settings.aiProvider,
           councilDebatePoint: params.debatePoint,
           councilFindingIds: params.findingIds,
           councilPerspectives: params.perspectives,

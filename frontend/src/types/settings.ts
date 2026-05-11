@@ -4,6 +4,9 @@ export type Language = "en" | "no";
 /** Supported UI themes. */
 export type Theme = "light" | "dark";
 
+/** Supported backend AI providers. */
+export type AiProvider = "gemini" | "local";
+
 /** Per-web-source-tier timeframe codes (Serper date_restrict format). */
 export interface SourceTimeframes {
   /** Government & official sources (.gov, .mil, ministry/agency sites). */
@@ -51,6 +54,8 @@ export interface Settings {
   language: Language;
   /** Language the AI will use in its responses (sent to backend). */
   aiLanguage: Language;
+  /** Backend model provider used for AI generation. */
+  aiProvider: AiProvider;
   /** Visual theme applied to the UI. */
   theme: Theme;
   /** Prompt context parameters auto-filled on every message send. */
@@ -66,6 +71,7 @@ export interface Settings {
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   aiLanguage: "en",
+  aiProvider: "gemini",
   theme: "dark",
   inputParameters: {
     timeframe: "",

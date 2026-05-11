@@ -34,6 +34,7 @@ from src.services.collection.collection_service import CollectionService
 from src.services.collection.collection_status import CollectionStatusTracker
 from src.services.elicitation.elicitation_store import get_elicitation_store
 from src.services.council.council_service import CouncilService
+from src.services.ai.llm_config import get_default_model_name, request_llm_provider
 from src.services.ai.llm_service import LLMService
 from src.services.direction.dialogue_service import DialogueService
 from src.services.processing.processing_result_store import ProcessingResultStore
@@ -50,7 +51,6 @@ from src.services.state_machines.processing_flow import ProcessingFlow, Processi
 _REVIEW_MCP_URL = os.getenv("REVIEW_MCP_URL", "http://127.0.0.1:8002/sse")
 DEV_TOOLS_ENABLED = os.getenv("DEV_TOOLS_ENABLED", "true").lower() == "true"
 
-_GEMINI_MODEL = "gemini-2.5-flash"
 _GATHER_MORE_CONTENT = (
     "What gaps would you like to fill? Describe what additional information to gather."
 )
@@ -177,6 +177,8 @@ class DialogueMessageRequest(BaseModel):
     language: str = "en"
     """BCP-47 language code from the user's settings (e.g. 'en', 'no').
     Forwarded to MCP tools so the ai generates responses in the correct language."""
+    ai_provider: str | None = None
+    """Model provider selected in Settings. Supported values: 'gemini' or 'local'."""
     settings_timeframe: str = ""
     """Timeframe pre-set by the user in Settings → Parameters (e.g. 'Last 30 days').
     When non-empty and the session context has no timeframe yet, the backend pre-fills
@@ -1128,7 +1130,7 @@ def _get_mcp_client(session_id: str | None = None) -> MCPClient:
 
 
 def _get_review_service() -> ReviewService:
-    llm = LLMService(model=_GEMINI_MODEL)
+    llm = LLMService()
     review_mcp_client = MCPClient(server_url=_REVIEW_MCP_URL)
     return ReviewService(llm, review_mcp_client)
 
@@ -1143,10 +1145,11 @@ def _build_orchestrator(session: IntelligenceSession) -> AIOrchestrator:
     Returns:
         An instance of AI orchestrator
     """
+    model_name = get_default_model_name()
     return AIOrchestrator(
         research_logger=session.research_logger,
-        generator_model=_GEMINI_MODEL,
-        reviewer_model=_GEMINI_MODEL,
+        generator_model=model_name,
+        reviewer_model=model_name,
     )
 
 
@@ -1475,7 +1478,6 @@ async def _dispatch_message(
 @router.post("/message")
 async def send_message(
     request: DialogueMessageRequest,
-    review_service: ReviewService = Depends(_get_review_service),
     uow: UnitOfWork = Depends(get_uow),
 ) -> DialogueMessageResponse:
     """
@@ -1500,10 +1502,20 @@ async def send_message(
     mcp_client = _get_mcp_client(request.session_id)
     timeout_seconds = _dialogue_request_timeout_seconds(request)
     try:
-        return await asyncio.wait_for(
-            _dispatch_message(request, mcp_client, review_service, uow),
-            timeout=timeout_seconds,
+        with request_llm_provider(request.ai_provider):
+            review_service = _get_review_service()
+            return await asyncio.wait_for(
+                _dispatch_message(request, mcp_client, review_service, uow),
+                timeout=timeout_seconds,
+            )
+    except ValueError as exc:
+        logger.warning(
+            "[Session %s] Dialogue request rejected as 400: %s",
+            request.session_id,
+            exc,
+            exc_info=True,
         )
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except TimeoutError:
         session = _sessions.get(request.session_id)
         if session is not None:

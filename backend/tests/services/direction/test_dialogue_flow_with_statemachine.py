@@ -19,7 +19,8 @@ class MockDialogueService:
         self.raise_on_pir = raise_on_pir
         self.raise_on_summary = raise_on_summary
 
-    async def generate_clarifying_question(self, user_message, _context, language="en"):
+    async def generate_clarifying_question(self, user_message, context, language="en"):
+        _ = context
         if self.raise_on_clarifying:
             raise RuntimeError("Service unavailable")
         self.clarifying_calls.append(
@@ -69,6 +70,28 @@ class MockDialogueService:
         return {"summary": "Mock summary"}
 
 
+class ContextAwareDialogueService(MockDialogueService):
+    async def generate_clarifying_question(self, user_message, context, language="en"):
+        self.clarifying_calls.append(
+            {
+                "user_message": user_message,
+                "language": language,
+                "scope": context.scope,
+            }
+        )
+        if not context.scope:
+            question = ClarifyingQuestion(
+                question_text="What is your scope?",
+                question_type="scope",
+            )
+        else:
+            question = ClarifyingQuestion(
+                question_text="What time period should the investigation cover?",
+                question_type="timeframe",
+            )
+        return QuestionResult(question=question, extracted_context={})
+
+
 def test_correct_starting_state_for_dialogue_flow():
     dialogue_flow = DirectionFlow()
     assert dialogue_flow.state == DirectionState.INITIAL
@@ -85,6 +108,65 @@ async def test_state_transition_from_initial_to_gathering():
     assert dialogue_flow.context.initial_query == "Investigate x"
     assert result.action == "ask_question"
     assert mock_service.clarifying_calls[0]["language"] == "en"
+
+
+@pytest.mark.asyncio
+async def test_gathering_preapplies_answer_to_previous_question_before_next_prompt():
+    dialogue_flow = DirectionFlow()
+    mock_service = ContextAwareDialogueService()
+
+    first = await dialogue_flow.process_user_message("Investigate Storebrand", mock_service)
+    second = await dialogue_flow.process_user_message(
+        "Cyber risk assessment for Storebrand",
+        mock_service,
+    )
+
+    assert first.action == "ask_question"
+    assert second.action == "ask_question"
+    assert dialogue_flow.context.scope == "Cyber risk assessment for Storebrand"
+    assert mock_service.clarifying_calls[1]["scope"] == (
+        "Cyber risk assessment for Storebrand"
+    )
+    assert second.content == "What time period should the investigation cover?"
+
+
+@pytest.mark.asyncio
+async def test_initial_prompt_with_explicit_context_goes_to_summary():
+    dialogue_flow = DirectionFlow()
+    mock_service = MockDialogueService()
+
+    message = (
+        "Investigate Storebrand (Norwegian bank/financial institution) scope "
+        "being exposure to state-sponsored cyber espionage targeting financial data. "
+        "Focus on the last 6 months and predictions for the next 6 months. "
+        "Include broad threat actors with emphasis on state-sponsored groups. "
+        "Priority focus is risk management and how cyber espionage affects their "
+        "financial risk posture."
+    )
+
+    result = await dialogue_flow.process_user_message(
+        message,
+        mock_service,
+        settings_timeframe="Last 30 days",
+    )
+
+    assert result.action == "show_summary"
+    assert dialogue_flow.state == DirectionState.SUMMARY_CONFIRMING
+    assert dialogue_flow.context.target_entities == [
+        "Storebrand (Norwegian bank/financial institution)"
+    ]
+    assert dialogue_flow.context.scope == (
+        "exposure to state-sponsored cyber espionage targeting financial data"
+    )
+    assert dialogue_flow.context.timeframe == (
+        "last 6 months and predictions for the next 6 months"
+    )
+    assert dialogue_flow.context.threat_actors == [
+        "broad threat actors with emphasis on state-sponsored groups"
+    ]
+    assert dialogue_flow.context.priority_focus == (
+        "risk management and how cyber espionage affects their financial risk posture"
+    )
 
 
 @pytest.mark.asyncio

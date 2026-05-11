@@ -3,7 +3,7 @@
 import pytest
 from mcp.types import TextContent
 
-from src.mcp_client.client import MCPClient
+from src.mcp_client.client import MCPClient, get_mcp_server_url
 from src.models.dialogue import DialogueContext
 
 
@@ -19,6 +19,25 @@ class TestMCPClientInit:
         """Client session should be None before connecting."""
         client = MCPClient("/path/to/server.py")
         assert client.session is None
+
+    def test_default_server_url_ignores_llm_api_environment(self, monkeypatch) -> None:
+        monkeypatch.setenv("MCP_SERVER_URL", "http://127.0.0.1:8000/v1")
+
+        assert get_mcp_server_url() == "http://127.0.0.1:8011/sse"
+
+    def test_default_server_url_ignores_local_llm_sse_environment(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("MCP_SERVER_URL", "http://127.0.0.1:8000/sse")
+
+        assert MCPClient().server_url == "http://127.0.0.1:8011/sse"
+
+    def test_default_server_url_ignores_old_mcp_port_when_it_is_llm_tunnel(
+        self, monkeypatch
+    ) -> None:
+        monkeypatch.setenv("MCP_SERVER_URL", "http://127.0.0.1:8001/sse")
+
+        assert MCPClient().server_url == "http://127.0.0.1:8011/sse"
 
 
 class TestMCPClientNotConnected:
@@ -109,7 +128,7 @@ class TestMCPClientTools:
 
 class TestMCPClientStripFences:
     """Tests for the _strip_fences helper that removes markdown code fences
-    Gemini occasionally wraps its JSON output in.
+    LLMs occasionally wrap their JSON output in.
 
     _strip_fences should:
       - Remove ```json ... ``` wrappers
@@ -151,7 +170,7 @@ class TestMCPClientStripFences:
 
 class TestMCPClientCallToolParsing:
     """Tests that call_tool correctly parses the text returned by the MCP server,
-    including responses where Gemini has wrapped the JSON in markdown fences.
+    including responses where the model has wrapped the JSON in markdown fences.
     """
 
     def _make_client_with_response(self, response_text: str) -> MCPClient:

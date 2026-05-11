@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { Sidebar } from "./Sidebar";
 import type { Conversation } from "../../types/conversation";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 // Helper: creates a minimal conversation object for testing
 function makeConversation(overrides: Partial<Conversation> = {}): Conversation {
@@ -133,6 +134,17 @@ describe("Sidebar", () => {
     );
 
     expect(onDevShowCollectionApproval).toHaveBeenCalledOnce();
+  });
+
+  it("calls onOpenDevLlmChat when the LLM chat dev button is clicked", async () => {
+    const user = userEvent.setup();
+    const onOpenDevLlmChat = vi.fn();
+
+    renderSidebar({ onOpenDevLlmChat });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    await user.click(screen.getByRole("button", { name: /open llm chat/i }));
+
+    expect(onOpenDevLlmChat).toHaveBeenCalledOnce();
   });
 
   it("does not render legacy direction stage jump controls", async () => {
@@ -413,5 +425,107 @@ describe("Sidebar", () => {
     expect(
       screen.getByRole("button", { name: /new chat/i }),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Sidebar — dev snapshot panel", () => {
+  const devSnapshot = {
+    session_id: "snap-session-xyz",
+    title: "APT29 investigation run",
+    artifacts: { session: true, collection: true, processing: true, analysis: true },
+  };
+
+  async function renderWithSnapshots(extraProps: Partial<React.ComponentProps<typeof Sidebar>> = {}) {
+    const user = userEvent.setup();
+    renderSidebar({
+      showExpandedContent: true,
+      devSnapshots: [devSnapshot],
+      onDevRestoreSnapshot: vi.fn(),
+      onDevRefreshSnapshots: vi.fn(),
+      ...extraProps,
+    });
+    // Dev tools start minimized — expand them
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    return { user };
+  }
+
+  it("renders a select dropdown with the snapshot title as option label", async () => {
+    await renderWithSnapshots();
+    const select = screen.getByRole("combobox");
+    expect(select).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "APT29 investigation run" })).toBeInTheDocument();
+  });
+
+  it("uses session_id as the option value", async () => {
+    await renderWithSnapshots();
+    const option = screen.getByRole("option", { name: "APT29 investigation run" });
+    expect(option).toHaveValue("snap-session-xyz");
+  });
+
+  it("shows the session_id in the monospace paragraph", async () => {
+    await renderWithSnapshots();
+    expect(screen.getByText("snap-session-xyz")).toBeInTheDocument();
+  });
+
+  it("calls onDevRefreshSnapshots when refresh button is clicked", async () => {
+    const onDevRefreshSnapshots = vi.fn();
+    const { user } = await renderWithSnapshots({ onDevRefreshSnapshots });
+    await user.click(screen.getByRole("button", { name: /refresh/i }));
+    expect(onDevRefreshSnapshots).toHaveBeenCalledOnce();
+  });
+
+  it("calls onDevRestoreSnapshot with (sessionId, 'pir_confirming', 'direction') when Load PIR clicked", async () => {
+    const onDevRestoreSnapshot = vi.fn();
+    const { user } = await renderWithSnapshots({ onDevRestoreSnapshot });
+    await user.click(screen.getByRole("button", { name: /^pir$/i }));
+    expect(onDevRestoreSnapshot).toHaveBeenCalledWith("snap-session-xyz", "pir_confirming", "direction");
+  });
+
+  it("calls onDevRestoreSnapshot with (sessionId, 'reviewing', 'collection') when Load Collection clicked", async () => {
+    const onDevRestoreSnapshot = vi.fn();
+    const { user } = await renderWithSnapshots({ onDevRestoreSnapshot });
+    await user.click(screen.getByRole("button", { name: /collection/i }));
+    expect(onDevRestoreSnapshot).toHaveBeenCalledWith("snap-session-xyz", "reviewing", "collection");
+  });
+
+  it("calls onDevRestoreSnapshot with (sessionId, 'reviewing', 'processing') when Load Processing clicked", async () => {
+    const onDevRestoreSnapshot = vi.fn();
+    const { user } = await renderWithSnapshots({ onDevRestoreSnapshot });
+    await user.click(screen.getByRole("button", { name: /processing/i }));
+    expect(onDevRestoreSnapshot).toHaveBeenCalledWith("snap-session-xyz", "reviewing", "processing");
+  });
+
+  it("calls onDevRestoreSnapshot with (sessionId, 'complete', 'analysis') when Load Analysis clicked", async () => {
+    const onDevRestoreSnapshot = vi.fn();
+    const { user } = await renderWithSnapshots({ onDevRestoreSnapshot });
+    await user.click(screen.getByRole("button", { name: /analysis/i }));
+    expect(onDevRestoreSnapshot).toHaveBeenCalledWith("snap-session-xyz", "complete", "analysis");
+  });
+
+  it("shows no-previous-runs text when devSnapshots is empty", async () => {
+    const user = userEvent.setup();
+    renderSidebar({
+      showExpandedContent: true,
+      devSnapshots: [],
+      onDevRestoreSnapshot: vi.fn(),
+    });
+    await user.click(screen.getByRole("button", { name: /expand dev tools/i }));
+    expect(screen.getByText(/no previous runs/i)).toBeInTheDocument();
+  });
+});
+
+describe("Sidebar — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in empty state", async () => {
+    const { container } = renderSidebar();
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with conversations listed", async () => {
+    const conversations = [
+      makeConversation({ id: "c1", title: "Investigate APT29" }),
+      makeConversation({ id: "c2", title: "Analyze ransomware" }),
+    ];
+    const { container } = renderSidebar({ conversations, activeConversationId: "c1" });
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

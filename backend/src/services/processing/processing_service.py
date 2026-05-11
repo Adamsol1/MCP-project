@@ -2,7 +2,7 @@ import json
 import logging
 
 from src.mcp_client.client import MCPClient
-from src.services.ai.gemini_agent import GeminiAgent
+from src.services.ai.agent_factory import create_tool_agent
 
 logger = logging.getLogger("app")
 
@@ -37,7 +37,7 @@ class ProcessingService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Process the collected intelligence data into structured PMESII entities.",
@@ -70,7 +70,7 @@ class ProcessingService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing processing result.",

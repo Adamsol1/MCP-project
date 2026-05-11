@@ -9,13 +9,17 @@ Each turn:
 
 import json
 import logging
+import re
 from typing import Any
 
 from src.mcp_client.client import MCPClient
 from src.models.dialogue import ClarifyingQuestion, DialogueContext, QuestionResult
-from src.services.ai.gemini_agent import GeminiAgent
+from src.services.ai.agent_factory import create_tool_agent
+from src.services.ai.providers import get_provider
 
 logger = logging.getLogger("app")
+
+JSON_OBJECT_RESPONSE_FORMAT = {"type": "json_object"}
 
 
 class DialogueService:
@@ -55,10 +59,24 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
-            raw = await agent.run(system_prompt=system_prompt, task=user_message)
+            agent = create_tool_agent(self.mcp_client)
+            raw = await agent.run(
+                system_prompt=system_prompt,
+                task=user_message,
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
+            )
 
-        question_result = self._parse_json(raw)
+        question_result = await self._parse_or_repair_json(
+            raw=raw,
+            repair_prompt=self._clarifying_question_repair_prompt(
+                raw=raw,
+                user_message=user_message,
+                context=context,
+                missing_fields=missing_fields,
+                language=language,
+            ),
+            label="clarifying question",
+        )
 
         # Backend override: if we know fields are missing, force False regardless of AI judgement
         if missing_fields:
@@ -117,37 +135,45 @@ class DialogueService:
             )
             # MCP Tools primitive: AI may still call read_knowledge_base()
             # autonomously during the tool-loop to explore additional knowledge.
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate Priority Intelligence Requirements (PIRs) based on the provided context.",
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
             )
-            try:
-                result = self._parse_json(raw)
-            except (json.JSONDecodeError, ValueError) as e:
-                raise ValueError(f"Agent returned unparseable response: {e}") from e
 
-            # Gemini 2.5 thinking models put internal reasoning into thought parts
-            # and may return an empty "reasoning" field in the JSON. Use the captured
-            # thought text as a fallback so the UI can always show reasoning.
-            if not result.get("reasoning") and agent.last_thought_text:
-                result["reasoning"] = agent.last_thought_text
+        result = await self._parse_or_repair_json(
+            raw=raw,
+            repair_prompt=self._pir_repair_prompt(
+                raw=raw,
+                context=context,
+                language=effective_language,
+            ),
+            label="PIR",
+        )
 
-            # Enrich sources with citation metadata from the knowledge index.
-            try:
+        # Gemini 2.5 thinking models put internal reasoning into thought parts
+        # and may return an empty "reasoning" field in the JSON. Use the captured
+        # thought text as a fallback so the UI can always show reasoning.
+        if not result.get("reasoning") and agent.last_thought_text:
+            result["reasoning"] = agent.last_thought_text
+
+        # Enrich sources with citation metadata from the knowledge index.
+        try:
+            async with self.mcp_client.connect():
                 index_json = await self.mcp_client.read_resource("knowledge://index")
-                index: list[dict] = json.loads(index_json)
-                citation_by_id = {
-                    entry["id"]: entry["citation"]
-                    for entry in index
-                    if entry.get("citation")
-                }
-                for source in result.get("sources", []):
-                    cit = citation_by_id.get(source.get("id", ""))
-                    if cit:
-                        source["citation"] = cit
-            except Exception as e:
-                logger.warning(f"[MCP] Source citation enrichment failed: {e}")
+            index: list[dict] = json.loads(index_json)
+            citation_by_id = {
+                entry["id"]: entry["citation"]
+                for entry in index
+                if entry.get("citation")
+            }
+            for source in result.get("sources", []):
+                cit = citation_by_id.get(source.get("id", ""))
+                if cit:
+                    source["citation"] = cit
+        except Exception as e:
+            logger.warning(f"[MCP] Source citation enrichment failed: {e}")
 
         return result
 
@@ -248,10 +274,11 @@ class DialogueService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             raw = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a structured summary of the intelligence collection context.",
+                response_format=JSON_OBJECT_RESPONSE_FORMAT,
             )
 
         return self._parse_json(raw)  # type: ignore[no-any-return]
@@ -271,6 +298,305 @@ class DialogueService:
             missing.append("priority_focus")
         return missing
 
+    async def _parse_or_repair_json(
+        self,
+        *,
+        raw: str,
+        repair_prompt: str,
+        label: str,
+    ) -> Any:
+        try:
+            parsed = self._normalize_response_shape(self._parse_json(raw), label)
+            self._validate_response_shape(parsed, label)
+            return parsed
+        except ValueError as parse_error:
+            logger.warning(
+                "[DialogueService] Agent returned unparseable %s JSON; "
+                "asking model to repair it. Reason: %s. Top-level keys seen: %s",
+                label,
+                parse_error,
+                self._top_level_key_summary(raw),
+            )
+
+        # Bug B fix: route repair through whichever provider is currently
+        # active so a Gemini-mode failure doesn't silently cross-fire to the
+        # local endpoint (and vice versa).
+        repair_client = get_provider()
+        repaired = await repair_client.generate_json_text(repair_prompt)
+        try:
+            parsed = self._normalize_response_shape(self._parse_json(repaired), label)
+            self._validate_response_shape(parsed, label)
+            return parsed
+        except ValueError as repair_error:
+            logger.error(
+                "[DialogueService] Repair pass failed for %s. Repaired top-level "
+                "keys: %s. Original raw (first 400 chars): %s",
+                label,
+                self._top_level_key_summary(repaired),
+                raw[:400].replace("\n", " "),
+            )
+            raise ValueError(
+                f"Agent returned unparseable {label} JSON after repair: {repair_error}"
+            ) from repair_error
+
+    @staticmethod
+    def _top_level_key_summary(raw: str) -> str:
+        """Best-effort summary of the keys in a model response for log forensics."""
+        try:
+            parsed = DialogueService._parse_json(raw)
+        except ValueError:
+            return f"<unparseable, length={len(raw)}, head={raw[:120]!r}>"
+        if isinstance(parsed, dict):
+            return ", ".join(sorted(parsed.keys())) or "<empty object>"
+        if isinstance(parsed, list):
+            return f"<array, len={len(parsed)}>"
+        return f"<{type(parsed).__name__}>"
+
+    @staticmethod
+    def _validate_response_shape(parsed: Any, label: str) -> None:
+        """Strict-but-minimal validation: only the load-bearing fields are required.
+
+        Anything else missing is filled in by `_normalize_response_shape`. This
+        keeps a Qwen / DeepSeek response that omits e.g. `claims` from triggering
+        a full repair pass when the only thing the UI actually needs is `pirs`.
+        """
+        if not isinstance(parsed, dict):
+            raise ValueError(f"{label} response must be a JSON object")
+
+        normalized = label.strip().lower()
+        if normalized == "pir":
+            # `pirs` is the only field the downstream flow can't synthesize.
+            # Everything else (`pir_text`, `claims`, `sources`, `reasoning`) is
+            # rendered "best effort" by the frontend, so default-to-empty rather
+            # than block the whole turn.
+            pirs = parsed.get("pirs")
+            if pirs is None:
+                raise ValueError("PIR response missing 'pirs' field")
+            if not isinstance(pirs, list):
+                raise ValueError("PIR response field 'pirs' must be a list")
+            return
+
+        if normalized == "clarifying question":
+            required = {"question", "type", "has_sufficient_context", "context"}
+            missing = sorted(required - set(parsed.keys()))
+            if missing:
+                raise ValueError(
+                    "clarifying question response missing top-level field(s): "
+                    + ", ".join(missing)
+                )
+
+    @staticmethod
+    def _normalize_response_shape(parsed: Any, label: str) -> Any:
+        """Fill in any optional fields the model omitted with sane defaults."""
+        if label.strip().lower() == "pir" and isinstance(parsed, list):
+            return {
+                "pir_text": "",
+                "claims": [],
+                "sources": [],
+                "pirs": DialogueService._normalize_pir_items(parsed),
+                "reasoning": "",
+            }
+
+        if not isinstance(parsed, dict):
+            return parsed
+
+        if label.strip().lower() == "pir":
+            parsed = dict(parsed)
+            if "pirs" not in parsed:
+                for alias in (
+                    "priority_intelligence_requirements",
+                    "priorityIntelligenceRequirements",
+                    "pir_items",
+                    "pirItems",
+                    "pir_questions",
+                    "pirQuestions",
+                    "requirements",
+                    "items",
+                ):
+                    if isinstance(parsed.get(alias), list):
+                        parsed["pirs"] = parsed[alias]
+                        break
+
+            if "pirs" not in parsed and DialogueService._looks_like_pir_item(parsed):
+                parsed = {
+                    "pir_text": "",
+                    "claims": [],
+                    "sources": [],
+                    "pirs": [parsed],
+                    "reasoning": "",
+                }
+
+            if isinstance(parsed.get("pirs"), dict):
+                parsed["pirs"] = [parsed["pirs"]]
+            elif isinstance(parsed.get("pirs"), list):
+                parsed["pirs"] = DialogueService._normalize_pir_items(parsed["pirs"])
+
+            pir_text = parsed.get("pir_text")
+            if not isinstance(pir_text, str) or not pir_text.strip():
+                parsed["pir_text"] = DialogueService._first_string_field(
+                    parsed, ("result", "summary", "description", "text")
+                )
+            if not isinstance(parsed.get("claims"), list):
+                parsed["claims"] = []
+            if not isinstance(parsed.get("sources"), list):
+                parsed["sources"] = []
+            reasoning = parsed.get("reasoning")
+            if not isinstance(reasoning, str) or not reasoning.strip():
+                parsed["reasoning"] = DialogueService._first_string_field(
+                    parsed, ("explanation", "analysis", "rationale")
+                )
+        return parsed
+
+    @staticmethod
+    def _first_string_field(parsed: dict[str, Any], keys: tuple[str, ...]) -> str:
+        for key in keys:
+            value = parsed.get(key)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+        return ""
+
+    @staticmethod
+    def _looks_like_pir_item(value: Any) -> bool:
+        if not isinstance(value, dict):
+            return False
+        if isinstance(value.get("question"), str) and value["question"].strip():
+            return True
+        has_question_alias = any(
+            isinstance(value.get(key), str) and value[key].strip()
+            for key in ("pir", "requirement", "query")
+        )
+        has_pir_metadata = any(
+            key in value for key in ("priority", "rationale", "source_ids")
+        )
+        return has_question_alias and has_pir_metadata
+
+    @staticmethod
+    def _normalize_pir_items(items: list[Any]) -> list[dict[str, Any]]:
+        normalized: list[dict[str, Any]] = []
+        for item in items:
+            if isinstance(item, str):
+                question = item.strip()
+                if question:
+                    normalized.append(
+                        {
+                            "question": question,
+                            "priority": "medium",
+                            "rationale": "",
+                            "source_ids": [],
+                        }
+                    )
+                continue
+
+            if not isinstance(item, dict):
+                continue
+
+            pir_item = dict(item)
+            if not isinstance(pir_item.get("question"), str):
+                for alias in ("pir", "requirement", "query", "text", "title"):
+                    value = pir_item.get(alias)
+                    if isinstance(value, str) and value.strip():
+                        pir_item["question"] = value
+                        break
+
+            question = pir_item.get("question")
+            if not isinstance(question, str) or not question.strip():
+                continue
+            pir_item["question"] = question.strip()
+
+            priority = str(pir_item.get("priority") or "medium").strip().lower()
+            if priority not in {"high", "medium", "low"}:
+                priority = "medium"
+            pir_item["priority"] = priority
+
+            rationale = pir_item.get("rationale")
+            if not isinstance(rationale, str):
+                pir_item["rationale"] = DialogueService._first_string_field(
+                    pir_item, ("reason", "why", "explanation")
+                )
+
+            if not isinstance(pir_item.get("source_ids"), list):
+                pir_item["source_ids"] = []
+
+            normalized.append(pir_item)
+        return normalized
+
+    @staticmethod
+    def _clarifying_question_repair_prompt(
+        *,
+        raw: str,
+        user_message: str,
+        context: DialogueContext,
+        missing_fields: list[str],
+        language: str,
+    ) -> str:
+        return f"""
+Convert the model output below into exactly one valid JSON object for a clarifying question.
+Do not invent a completed answer. Preserve any useful question from the model output.
+
+Required shape:
+{{
+  "question": "one follow-up question written in language {language}",
+  "type": "one of: scope, target_entities, threat_actors, timeframe, priority_focus, confirmation",
+  "has_sufficient_context": false,
+  "context": {{
+    "scope": "string",
+    "timeframe": "string",
+    "target_entities": ["strings"],
+    "threat_actors": ["strings"],
+    "priority_focus": "string",
+    "perspectives": ["strings"]
+  }}
+}}
+
+Current context JSON:
+{context.model_dump_json()}
+
+Missing fields:
+{json.dumps(missing_fields)}
+
+User message:
+{user_message}
+
+Model output to repair:
+{raw}
+"""
+
+    @staticmethod
+    def _pir_repair_prompt(
+        *,
+        raw: str,
+        context: DialogueContext,
+        language: str,
+    ) -> str:
+        return f"""
+Convert the model output below into exactly one valid JSON object for Priority Intelligence Requirements.
+Do not replace it with a hardcoded fallback. Preserve the model's PIR content and make only the minimum changes needed for valid JSON.
+Write all PIR content in language {language}.
+
+Required shape:
+{{
+  "pir_text": "string",
+  "claims": [
+    {{"id": "claim_1", "text": "string", "source_ref": "[1]", "source_id": "source-id"}}
+  ],
+  "sources": [
+    {{"id": "source-id", "ref": "[1]", "source_type": "kb"}}
+  ],
+  "pirs": [
+    {{"question": "string", "priority": "high | medium | low", "rationale": "string", "source_ids": ["source-id"]}}
+  ],
+  "reasoning": "string"
+}}
+
+Use empty arrays for claims and sources if the output has no citations.
+
+Current context JSON:
+{context.model_dump_json()}
+
+Model output to repair:
+{raw}
+"""
+
     @staticmethod
     def _parse_json(raw: str) -> Any:
         """Parse JSON from raw LLM output, with multiple fallback strategies.
@@ -278,7 +604,6 @@ class DialogueService:
         Handles: bare JSON, markdown code fences, and responses where the model
         prepends prose (e.g. thinking-model preamble) before the JSON block.
         """
-        import re as _re
         text = raw.strip()
         if not text:
             raise ValueError("Agent returned empty response")
@@ -290,19 +615,120 @@ class DialogueService:
             pass
 
         # 2. Strip a leading code fence (```json … ```) and retry
-        fence_match = _re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, _re.IGNORECASE)
+        fence_match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text, re.IGNORECASE)
         if fence_match:
             try:
                 return json.loads(fence_match.group(1))
             except json.JSONDecodeError:
                 pass
 
-        # 3. Extract the first {...} block — handles preamble text before JSON
-        brace_match = _re.search(r"\{[\s\S]*\}", text)
-        if brace_match:
-            try:
-                return json.loads(brace_match.group(0))
-            except json.JSONDecodeError:
-                pass
+        parsed_candidates: list[Any] = []
 
-        raise ValueError(f"Could not parse JSON from agent response (length={len(text)})")
+        # 3. Extract object starts while allowing trailing text. Some local
+        # models emit prose before/after JSON.
+        decoder = json.JSONDecoder()
+        for match in re.finditer(r"[\{\[]", text):
+            try:
+                parsed, _end = decoder.raw_decode(text[match.start() :])
+                parsed_candidates.append(parsed)
+            except json.JSONDecodeError:
+                continue
+
+        for candidate in DialogueService._json_object_candidates(text):
+            for repaired in (
+                candidate,
+                DialogueService._repair_json_candidate(candidate),
+            ):
+                try:
+                    parsed_candidates.append(json.loads(repaired))
+                except json.JSONDecodeError:
+                    continue
+
+        selected = DialogueService._select_json_candidate(parsed_candidates)
+        if selected is not None:
+            return selected
+
+        raise ValueError(
+            f"Could not parse JSON from agent response (length={len(text)})"
+        )
+
+    @staticmethod
+    def _select_json_candidate(candidates: list[Any]) -> Any | None:
+        if not candidates:
+            return None
+
+        def score(candidate: Any) -> tuple[int, int]:
+            if not isinstance(candidate, dict):
+                if isinstance(candidate, list):
+                    if any(
+                        DialogueService._looks_like_pir_item(item) for item in candidate
+                    ):
+                        return (85, len(candidate))
+                    return (60, len(candidate))
+                return (0, 0)
+            keys = set(candidate.keys())
+            if {"pir_text", "claims", "sources", "pirs"} <= keys:
+                return (100, len(keys))
+            if "pirs" in keys:
+                return (95, len(keys))
+            if keys & {
+                "priority_intelligence_requirements",
+                "priorityIntelligenceRequirements",
+                "pir_items",
+                "pirItems",
+                "pir_questions",
+                "pirQuestions",
+                "requirements",
+                "items",
+            }:
+                return (88, len(keys))
+            if {"question", "type", "has_sufficient_context", "context"} <= keys:
+                return (90, len(keys))
+            if "summary" in keys:
+                return (80, len(keys))
+            if DialogueService._looks_like_pir_item(candidate):
+                return (70, len(keys))
+            return (10, len(keys))
+
+        return max(candidates, key=score)
+
+    @staticmethod
+    def _json_object_candidates(text: str) -> list[str]:
+        candidates: list[str] = []
+        start: int | None = None
+        depth = 0
+        in_string = False
+        escaped = False
+
+        for index, char in enumerate(text):
+            if in_string:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == '"':
+                    in_string = False
+                continue
+
+            if char == '"':
+                in_string = True
+            elif char == "{":
+                if depth == 0:
+                    start = index
+                depth += 1
+            elif char == "}" and depth:
+                depth -= 1
+                if depth == 0 and start is not None:
+                    candidates.append(text[start : index + 1])
+                    start = None
+
+        return candidates
+
+    @staticmethod
+    def _repair_json_candidate(text: str) -> str:
+        text = re.sub(r"\bNone\b", "null", text)
+        text = re.sub(r"\bTrue\b", "true", text)
+        text = re.sub(r"\bFalse\b", "false", text)
+        text = text.replace("\u201c", '"').replace("\u201d", '"')
+        text = text.replace("\u2018", "'").replace("\u2019", "'")
+        return re.sub(r",\s*([}\]])", r"\1", text)

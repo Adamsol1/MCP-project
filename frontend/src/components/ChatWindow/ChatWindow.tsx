@@ -1463,9 +1463,18 @@ export default function ChatWindow({
                               </span>
                               <span className="min-w-0">
                                 <span
-                                  className={`block text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}
+                                  className={`flex items-center gap-1.5 text-sm font-semibold leading-tight ${isActive ? "text-primary" : "text-text-primary"}`}
                                 >
-                                  {displayName}
+                                  <span className="block">{displayName}</span>
+                                  {source === "Web Search" &&
+                                    settings.aiProvider === "local" && (
+                                      <span
+                                        className="inline-block rounded px-1 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-warning-subtle text-warning-text"
+                                        title={t.webSearchBetaTitle}
+                                      >
+                                        {t.beta}
+                                      </span>
+                                    )}
                                 </span>
                                 {description && (
                                   <span

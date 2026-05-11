@@ -13,6 +13,7 @@ import {
   type Settings,
   type Language,
   type Theme,
+  type AiProvider,
   type InputParameters,
   type CouncilSettings,
   type SourceTimeframes,
@@ -35,6 +36,8 @@ export interface SettingsContextValue {
   updateLanguage: (language: Language) => void;
   /** Replace the AI output language sent to the backend. */
   updateAiLanguage: (language: Language) => void;
+  /** Replace the backend AI provider sent to the backend. */
+  updateAiProvider: (provider: AiProvider) => void;
   /** Switch the UI theme between light and dark. */
   updateTheme: (theme: Theme) => void;
   /**
@@ -138,6 +141,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     setSettings((prev) => ({ ...prev, aiLanguage }));
   }, []);
 
+  const updateAiProvider = useCallback((aiProvider: AiProvider) => {
+    setSettings((prev) => ({ ...prev, aiProvider }));
+  }, []);
+
   const updateTheme = useCallback((theme: Theme) => {
     setSettings((prev) => ({ ...prev, theme }));
   }, []);
@@ -184,6 +191,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     settings,
     updateLanguage,
     updateAiLanguage,
+    updateAiProvider,
     updateTheme,
     updateInputParameters,
     updateSourceTimeframe,

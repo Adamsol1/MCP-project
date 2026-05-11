@@ -10,10 +10,15 @@
  */
 
 import { renderHook, act } from "@testing-library/react";
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ReactNode } from "react";
 import { useConversation } from "./useConversation";
 import { ConversationProvider } from "../../contexts/ConversationContext/ConversationContext";
+
+// Prevent deleteConversation from making real HTTP requests during tests.
+vi.mock("../../services/upload/upload", () => ({
+  deleteSessionArtifacts: vi.fn().mockResolvedValue(undefined),
+}));
 
 function wrapper({ children }: { children: ReactNode }) {
   return <ConversationProvider>{children}</ConversationProvider>;

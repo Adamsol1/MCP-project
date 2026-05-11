@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from src.mcp_client.client import MCPClient
 from src.services.collection.collection_status import CollectionStatusTracker
 from src.services.reasearch_logger import ResearchLogger
-from src.services.ai.gemini_agent import GeminiAgent
+from src.services.ai.agent_factory import create_tool_agent
 
 logger = logging.getLogger("app")
 
@@ -201,7 +201,9 @@ class CollectionService:
             if isinstance(parsed, dict):
                 return parsed
         except Exception:
-            pass
+            repaired = _try_parse_json_lenient(stripped)
+            if repaired is not None:
+                return repaired
 
         # 2) fenced blocks (```json ... ``` or ``` ... ```)
         for candidate in re.findall(
@@ -212,6 +214,9 @@ class CollectionService:
                 if isinstance(parsed, dict):
                     return parsed
             except Exception:
+                repaired = _try_parse_json_lenient(candidate)
+                if repaired is not None:
+                    return repaired
                 continue
 
         # 3) largest object-like substring
@@ -224,7 +229,7 @@ class CollectionService:
                 if isinstance(parsed, dict):
                     return parsed
             except Exception:
-                return None
+                return _try_parse_json_lenient(snippet)
 
         return None
 
@@ -511,7 +516,7 @@ class CollectionService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Generate a collection plan and suggest relevant sources for the given PIRs.",
@@ -627,10 +632,7 @@ class CollectionService:
             if session_id:
                 tracker = CollectionStatusTracker(session_id, selected_sources)
 
-            # TODO(future): disable elicitation_callback when ai_provider == "local".
-            # See feature/localLLM branch for the aiProvider setting + request_llm_provider
-            # pattern. For now elicitation is always active (only Gemini is supported).
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             task = "Collect raw intelligence data from the approved sources based on the PIRs."
             if feedback:
                 task += f" REVIEWER FEEDBACK FROM PREVIOUS ATTEMPT: {feedback}"
@@ -649,7 +651,7 @@ class CollectionService:
         if "Web Search" in selected_sources:
             urls = _extract_search_urls(raw_data)
             if urls:
-                url_agent = GeminiAgent(self.mcp_client)
+                url_agent = create_tool_agent(self.mcp_client)
                 _url_buffer = min(len(urls), 25)
                 logger.info(
                     f"[CollectionService] url_context: fetching {_url_buffer} of {len(urls)} URLs (buffer for inaccessible pages)"
@@ -681,7 +683,7 @@ class CollectionService:
                 "collection_summarize",
                 {"pir": pir, "collected_data": raw_data, "language": language},
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             return await agent.run(
                 system_prompt=system_prompt,
                 task="Summarize the collected intelligence data.",
@@ -707,7 +709,7 @@ class CollectionService:
                     "language": language,
                 },
             )
-            agent = GeminiAgent(self.mcp_client)
+            agent = create_tool_agent(self.mcp_client)
             ai_output = await agent.run(
                 system_prompt=system_prompt,
                 task="Apply the requested modifications to the existing intelligence summary.",

@@ -17,11 +17,21 @@ from fastapi import (
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.analysis import router as analysis_router
+from src.api.dev_chat import router as dev_chat_router
 from src.api.dialogue import ensure_sessions_dir, evict_session
 from src.api.dialogue import router as dialogue_router
-from src.db.engine import get_knowledge_engine, get_sessions_engine, run_migrations, seed_knowledge
-from src.db.unit_of_work import KnowledgeUnitOfWork, get_knowledge_uow
-from src.db.unit_of_work import UnitOfWork, get_uow
+from src.db.engine import (
+    get_knowledge_engine,
+    get_sessions_engine,
+    run_migrations,
+    seed_knowledge,
+)
+from src.db.unit_of_work import (
+    KnowledgeUnitOfWork,
+    UnitOfWork,
+    get_knowledge_uow,
+    get_uow,
+)
 from src.importers.session_uploads import (
     default_uploads_root,
     delete_session_upload,
@@ -30,13 +40,22 @@ from src.importers.session_uploads import (
     save_session_upload,
 )
 from src.logging_config import setup_logging
-from src.services.council.council_mcp_process import maybe_start_council_mcp, stop_council_mcp
+from src.services.ai.gemini_client import patch_gemini_cleanup
+from src.services.council.council_mcp_process import (
+    maybe_start_council_mcp,
+    stop_council_mcp,
+)
 from src.services.council.council_service import get_council_mcp_url
 from src.services.reasearch_logger import ResearchLogger
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+# encoding="utf-8-sig" strips a UTF-8 BOM if one is present. PowerShell on
+# Windows still writes BOM by default; without this the first env var name
+# silently becomes "﻿NAME" and lookups for "NAME" return None.
+load_dotenv(PROJECT_ROOT / ".env", encoding="utf-8-sig")
 
 setup_logging()
+patch_gemini_cleanup()
 
 logger = logging.getLogger("app")
 
@@ -77,6 +96,7 @@ app.add_middleware(
 
 # Includes
 app.include_router(analysis_router)
+app.include_router(dev_chat_router)
 app.include_router(dialogue_router)
 
 # Path for saving uploaded files.

@@ -1,4 +1,4 @@
-"""MCP Threat Intelligence Server - Generation Server (port 8001)."""
+"""MCP Threat Intelligence Server - Generation Server (port 8011)."""
 
 import os
 import socket
@@ -22,7 +22,7 @@ def _port_in_use(port: int) -> bool:
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
-BOOT_PORT = int(os.getenv("MCP_SERVER_PORT", "8001"))
+BOOT_PORT = int(os.getenv("MCP_SERVER_PORT", "8011"))
 BOOT_HOST = os.getenv("MCP_SERVER_HOST", "127.0.0.1")
 BOOT_URL = f"http://127.0.0.1:{BOOT_PORT}/sse"
 

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import ApprovalPrompt from "./ApprovalPrompt";
 import { renderWithSettings } from "../../test/renderWithProviders";
+import { axe } from "vitest-axe";
 
 describe("ApprovalPrompt", () => {
   it("renders primary actions for approval prompt", () => {
@@ -21,7 +22,7 @@ describe("ApprovalPrompt", () => {
     renderWithSettings(<ApprovalPrompt stage="summary_confirming" />);
 
     expect(
-      screen.getByRole("heading", { name: /summary approval prompt/i }),
+      screen.getByRole("heading", { name: /does this capture your intent/i }),
     ).toBeInTheDocument();
   });
 
@@ -29,7 +30,7 @@ describe("ApprovalPrompt", () => {
     renderWithSettings(<ApprovalPrompt stage="pir_confirming" />);
 
     expect(
-      screen.getByRole("heading", { name: /pir approval prompt/i }),
+      screen.getByRole("heading", { name: /do these pirs look correct/i }),
     ).toBeInTheDocument();
   });
 
@@ -90,5 +91,30 @@ describe("ApprovalPrompt", () => {
     );
 
     expect(onRejectWithFeedback).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses default copy when stage is provided but has no specific copy (e.g. 'gathering')", () => {
+    renderWithSettings(<ApprovalPrompt stage="gathering" />);
+
+    // "gathering" has no entry in PROMPT_COPY_BY_STAGE → falls back to DEFAULT_PROMPT_COPY
+    // The default title is returned by t.approvalDefault — just check the buttons exist
+    expect(
+      screen.getByRole("button", { name: /approve & continue/i })
+    ).toBeInTheDocument();
+  });
+
+  it("renders plan-specific copy when stage is plan_confirming", () => {
+    renderWithSettings(<ApprovalPrompt stage="plan_confirming" />);
+
+    expect(
+      screen.getByRole("heading", { name: /ready to start collection/i }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("ApprovalPrompt — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in default state", async () => {
+    const { container } = renderWithSettings(<ApprovalPrompt />);
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

@@ -34,7 +34,12 @@ class DeliberationSummarizer:
         self.model = model
 
     async def generate_summary(
-        self, question: str, responses: List[RoundResponse], language: str = "en"
+        self,
+        question: str,
+        responses: List[RoundResponse],
+        language: str = "en",
+        working_directory: str | None = None,
+        reasoning_effort: str | None = None,
     ) -> Summary:
         """
         Generate summary from deliberation responses.
@@ -43,6 +48,8 @@ class DeliberationSummarizer:
             question: Original deliberation question
             responses: All responses from all rounds
             language: BCP-47 language code for the summary content
+            working_directory: Optional working directory for CLI adapters
+            reasoning_effort: Optional reasoning effort for adapters that support it
 
         Returns:
             Summary object with consensus, agreements, disagreements, and recommendation
@@ -53,9 +60,13 @@ class DeliberationSummarizer:
         # Create summarization prompt
         prompt = self._create_summary_prompt(debate_text, language)
 
-        # Let exceptions propagate for fallback chain in engine
+        # Let exceptions propagate so the engine can decide how to handle failures.
         summary_text = await self.adapter.invoke(
-            prompt=prompt, model=self.model, context=None
+            prompt=prompt,
+            model=self.model,
+            context=None,
+            working_directory=working_directory,
+            reasoning_effort=reasoning_effort,
         )
         return self._parse_summary(summary_text)
 

@@ -15,7 +15,7 @@ from src.services.confidence.assertion_enrichment import (
     validate_finding_ids,
 )
 from src.services.confidence.scoring import compute_confidence
-from src.services.ai.gemini_agent import GeminiAgent
+from src.services.ai.agent_factory import create_tool_agent
 
 logger = logging.getLogger("app")
 
@@ -71,7 +71,7 @@ class AnalysisService:
                         if not ref_docs
                         else f"{persona}\n\n{ref_docs}\n\n{task_prompt}"
                     )
-                    agent = GeminiAgent(self.mcp_client)
+                    agent = create_tool_agent(self.mcp_client)
                     raw = await agent.run(
                         system_prompt=system_prompt,
                         task=(

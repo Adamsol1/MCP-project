@@ -16,6 +16,7 @@ import { describe, it, expect, vi } from "vitest";
 import userEvent from "@testing-library/user-event";
 import CitationText from "./CitationText";
 import type { Claim } from "../../types/conversation";
+import { axe } from "vitest-axe";
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 
@@ -239,5 +240,31 @@ describe("CitationText — highlight state", () => {
     expect(
       screen.getByText("Energy infrastructure is vulnerable")
     ).not.toHaveClass("bg-primary-subtle");
+  });
+});
+
+describe("CitationText — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations with plain text", async () => {
+    const { container } = render(
+      <CitationText
+        text="No sources here, just analysis."
+        claims={[]}
+        highlightedRefs={[]}
+        onRefHover={vi.fn()}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with citation markers", async () => {
+    const { container } = render(
+      <CitationText
+        text="Norway faces elevated risk[1] based on intelligence."
+        claims={[claimNorway]}
+        highlightedRefs={[]}
+        onRefHover={vi.fn()}
+      />,
+    );
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

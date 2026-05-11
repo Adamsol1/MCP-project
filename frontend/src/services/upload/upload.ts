@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BACKEND_URL } from "../apiConfig";
 
+/** User-supplied bibliographic metadata attached to an uploaded file. */
 export interface CitationMetadata {
   author: string;
   year: string;
@@ -8,10 +9,12 @@ export interface CitationMetadata {
   publisher: string;
 }
 
+/** Full backend record for a file that has been uploaded to a session. */
 export interface UploadedFileRecord {
   file_upload_id: string;
   session_id: string;
   original_filename: string;
+  /** Sanitised filename stored on disk (may differ from `original_filename`). */
   filename: string;
   stored_filename: string;
   stored_path: string;
@@ -19,17 +22,22 @@ export interface UploadedFileRecord {
   mime_type?: string | null;
   size_bytes: number;
   uploaded_at: string;
+  /** Backend parse pipeline state: `ready` means text was extracted and is search-indexable. */
   parse_status: "pending" | "ready" | "failed" | "skipped";
   searchable: boolean;
+  /** Human-readable reason the file was excluded from search (e.g. unsupported format). */
   search_skip_reason?: string | null;
+  /** Path to the extracted Markdown representation of the file; null if parsing hasn't run. */
   parsed_markdown_path?: string | null;
   citation?: CitationMetadata;
 }
 
+/** Backend response for a successful single-file upload — extends the record with a status discriminant. */
 export interface UploadResponse extends UploadedFileRecord {
   status: "success";
 }
 
+/** Backend response shape for the list-files endpoint. */
 interface UploadListResponse {
   status: "success";
   session_id: string;
@@ -65,7 +73,12 @@ export async function uploadFile(
   return httpResponse.data;
 }
 
-/** Fetch all uploads stored for a session. */
+/**
+ * Fetches all files that have been uploaded under a given session.
+ *
+ * @param sessionId - Backend session ID whose uploaded files to list.
+ * @returns Array of file records (may be empty if no files have been uploaded yet).
+ */
 export async function listUploadedFiles(
   sessionId: string,
 ): Promise<UploadedFileRecord[]> {
@@ -76,7 +89,12 @@ export async function listUploadedFiles(
   return httpResponse.data.files;
 }
 
-/** Delete one uploaded file by upload id in a session. */
+/**
+ * Deletes a single uploaded file from the backend.
+ *
+ * @param sessionId    - Session the file belongs to.
+ * @param fileUploadId - The `file_upload_id` of the record to remove.
+ */
 export async function deleteUploadedFile(
   sessionId: string,
   fileUploadId: string,

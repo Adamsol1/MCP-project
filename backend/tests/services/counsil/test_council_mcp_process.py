@@ -31,9 +31,10 @@ async def test_maybe_start_council_mcp_uses_sync_popen(monkeypatch):
     launched = {}
     fake_process = FakeProcess()
 
-    def fake_popen(args, cwd):
+    def fake_popen(args, cwd, **kwargs):
         launched["args"] = args
         launched["cwd"] = cwd
+        launched["env"] = kwargs.get("env")
         return fake_process
 
     async def fake_wait_for_health(_server_url):

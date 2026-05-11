@@ -1,5 +1,7 @@
 import json
 import logging
+import re
+from contextlib import suppress
 from datetime import datetime
 from enum import Enum
 from typing import Any
@@ -245,6 +247,13 @@ class DirectionFlow(BasePhaseFlow):
                 f"[Session {self.session_id}] Source timeframes pre-populated from settings: {self.context.source_timeframes}"
             )
 
+        explicit_context = self._extract_explicit_context(user_message)
+        if explicit_context:
+            self._apply_context_update(explicit_context)
+            logger.info(
+                f"[Session {self.session_id}] Context extracted from explicit user text: {list(explicit_context.keys())}"
+            )
+
         # INITIAL PHASE
         if self.state == DirectionState.INITIAL:
             self.sub_state = None
@@ -297,10 +306,166 @@ class DirectionFlow(BasePhaseFlow):
             pf = extracted_context["priority_focus"]
             self.context.priority_focus = ", ".join(pf) if isinstance(pf, list) else pf
         if extracted_context.get("perspectives"):
-            try:
+            with suppress(ValueError, KeyError):
                 self.update_perspectives(extracted_context["perspectives"])
-            except (ValueError, KeyError):
-                pass
+
+    @staticmethod
+    def _clean_extracted_text(value: str) -> str:
+        return value.strip(" \t\r\n.:-")
+
+    @classmethod
+    def _extract_explicit_context(cls, text: str) -> dict[str, Any]:
+        """Extract obvious direction fields from explicit marker phrases."""
+        extracted: dict[str, Any] = {}
+        normalized = " ".join(text.strip().split())
+        if not normalized:
+            return extracted
+
+        scope_match = re.search(
+            r"\bscope\s+(?:being|is|:)\s+(.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if scope_match:
+            extracted["scope"] = cls._clean_extracted_text(scope_match.group(1))
+        else:
+            exposure_match = re.search(
+                r"\b(exposure to .+?)(?:\.|$)", normalized, flags=re.IGNORECASE
+            )
+            if exposure_match:
+                extracted["scope"] = cls._clean_extracted_text(
+                    exposure_match.group(1)
+                )
+
+        target_match = re.search(
+            r"\binvestigate\s+(.+?)(?:\s+scope\s+(?:being|is|:)|\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if target_match:
+            target = cls._clean_extracted_text(target_match.group(1))
+            if target:
+                extracted["target_entities"] = [target]
+
+        timeframe_match = re.search(
+            r"\b((?:last|past)\s+\d+\s+(?:days?|weeks?|months?|years?)"
+            r"(?:\s+and\s+(?:predictions?\s+for\s+)?(?:the\s+)?next\s+\d+\s+"
+            r"(?:days?|weeks?|months?|years?))?)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if timeframe_match:
+            extracted["timeframe"] = cls._clean_extracted_text(
+                timeframe_match.group(1)
+            )
+
+        actors_match = re.search(
+            r"\binclude\s+(.+?threat actors?.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if actors_match:
+            extracted["threat_actors"] = [
+                cls._clean_extracted_text(actors_match.group(1))
+            ]
+        elif re.search(r"\bstate-sponsored\b", normalized, flags=re.IGNORECASE):
+            extracted["threat_actors"] = ["state-sponsored groups"]
+
+        focus_match = re.search(
+            r"\bpriority focus\s+(?:is|:)\s+(.+?)(?:\.|$)",
+            normalized,
+            flags=re.IGNORECASE,
+        )
+        if focus_match:
+            extracted["priority_focus"] = cls._clean_extracted_text(
+                focus_match.group(1)
+            )
+
+        return extracted
+
+    @staticmethod
+    def _context_field_from_question_type(question_type: str | None) -> str | None:
+        if not question_type:
+            return None
+        aliases = {
+            "scope": "scope",
+            "timeframe": "timeframe",
+            "target_entities": "target_entities",
+            "targets": "target_entities",
+            "entities": "target_entities",
+            "actors": "threat_actors",
+            "threat_actors": "threat_actors",
+            "focus": "priority_focus",
+            "priority_focus": "priority_focus",
+        }
+        return aliases.get(str(question_type).strip().lower())
+
+    @staticmethod
+    def _context_field_from_question_text(question: str | None) -> str | None:
+        if not question:
+            return None
+        text = question.lower()
+        if "scope" in text:
+            return "scope"
+        if "time" in text or "period" in text or "timeframe" in text:
+            return "timeframe"
+        if any(
+            word in text
+            for word in (
+                "countries",
+                "organizations",
+                "systems",
+                "sectors",
+                "entities",
+            )
+        ):
+            return "target_entities"
+        if "threat actor" in text or "adversar" in text or "group" in text:
+            return "threat_actors"
+        if "priorit" in text or "focus" in text or "emphas" in text:
+            return "priority_focus"
+        return None
+
+    def _last_answered_field(self) -> str | None:
+        if not self.context.dialogue_turns:
+            return None
+        last_turn = self.context.dialogue_turns[-1]
+        return self._context_field_from_question_type(
+            last_turn.get("question_type")
+        ) or self._context_field_from_question_text(last_turn.get("question"))
+
+    @staticmethod
+    def _coerce_answer_for_context_field(field: str, answer: str):
+        cleaned = answer.strip()
+        if field in {"target_entities", "threat_actors"}:
+            return [cleaned] if cleaned else []
+        return cleaned
+
+    def _backfill_answered_field(
+        self,
+        extracted_context: dict,
+        user_message: str,
+    ) -> dict:
+        """Preserve the user's answer to the previous question if extraction missed it."""
+        field = self._last_answered_field()
+        if not field or extracted_context.get(field):
+            return extracted_context
+        answer_value = self._coerce_answer_for_context_field(field, user_message)
+        if answer_value:
+            extracted_context = {**extracted_context, field: answer_value}
+        return extracted_context
+
+    def _preapply_answered_field(self, user_message: str) -> None:
+        """Apply the answer to the last asked field before asking the model again."""
+        field = self._last_answered_field()
+        if not field:
+            return
+        current = getattr(self.context, field)
+        if current:
+            return
+        answer_value = self._coerce_answer_for_context_field(field, user_message)
+        if answer_value:
+            self._apply_context_update({field: answer_value})
 
     async def handle_initial_input(
         self, user_message, dialogue_service, language: str = "en"
@@ -359,6 +524,7 @@ class DirectionFlow(BasePhaseFlow):
         self.context.dialogue_turns.append(
             {
                 "question": result.question.question_text,
+                "question_type": result.question.question_type,
                 "answer": user_message,
             }
         )
@@ -396,6 +562,11 @@ class DirectionFlow(BasePhaseFlow):
             dialogue_response.content = self.context.model_dump_json()
             return dialogue_response
 
+        # Apply the answer to the previous question before generating the next one.
+        # This prevents local models from seeing stale context and repeating the
+        # same missing-field question.
+        self._preapply_answered_field(user_message)
+
         # Generate question and extract context from user message
         try:
             result = await dialogue_service.generate_clarifying_question(
@@ -410,11 +581,18 @@ class DirectionFlow(BasePhaseFlow):
                 action=DialogueAction.ERROR, content="Failed to generate question"
             )
 
-        # Update context
-        self._apply_context_update(result.extracted_context)
+        # Update context. Local models may ask the right question but omit the
+        # user's answer from the JSON context; preserve the answer based on the
+        # question the user was responding to.
+        extracted_context = self._backfill_answered_field(
+            result.extracted_context,
+            user_message,
+        )
+        self._apply_context_update(extracted_context)
         self.context.dialogue_turns.append(
             {
                 "question": result.question.question_text,
+                "question_type": result.question.question_type,
                 "answer": user_message,
             }
         )

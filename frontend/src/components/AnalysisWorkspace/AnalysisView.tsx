@@ -12,7 +12,6 @@ import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverage
 import AnalysisReportPDF from "./AnalysisReportPDF";
 import ReviewFeedbackPDF from "./ReviewFeedbackPDF";
 import type { PhaseReviewItem } from "../../types/conversation";
-import type { CouncilNote } from "../../types/analysis";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 
 // ---------------------------------------------------------------------------
@@ -247,7 +246,6 @@ interface AnalysisViewProps {
   onStartCouncil: () => void;
   timeframe?: string;
   reviewActivity?: PhaseReviewItem[];
-  councilNote?: CouncilNote | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -260,7 +258,6 @@ export default function AnalysisView({
   onStartCouncil,
   timeframe,
   reviewActivity = [],
-  councilNote = null,
 }: AnalysisViewProps) {
   const { processing_result: processingResult, analysis_draft: analysis } =
     data;
@@ -315,7 +312,6 @@ export default function AnalysisView({
         reviewActivity={reviewActivity}
         reportTitle={analysisHeading}
         analysisData={data}
-        councilNote={councilNote}
       />,
     ).toBlob();
     const url = URL.createObjectURL(blob);

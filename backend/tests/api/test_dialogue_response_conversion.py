@@ -34,6 +34,7 @@ def test_convert_to_message_response_keeps_canonical_action(action: DialogueActi
         "stage",
         "phase",
         "sub_state",
+        "review_activity",
     }
 
 

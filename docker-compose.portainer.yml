@@ -1,7 +1,7 @@
 services:
   frontend:
     build:
-      context: https://github.com/Adamsol1/MCP-project.git#dev
+      context: https://github.com/Adamsol1/MCP-project.git#feature_docker
       dockerfile: docker/frontend.Dockerfile
     ports:
       - "${APP_PORT:-8080}:80"
@@ -12,7 +12,7 @@ services:
 
   backend:
     build:
-      context: https://github.com/Adamsol1/MCP-project.git#dev
+      context: https://github.com/Adamsol1/MCP-project.git#feature_docker
       dockerfile: docker/backend.Dockerfile
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
@@ -21,6 +21,13 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8001/v1}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
+      LLM_MAX_COMPLETION_TOKENS: ${LLM_MAX_COMPLETION_TOKENS:-}
+      LLM_ENABLE_THINKING: ${LLM_ENABLE_THINKING:-}
       MCP_SERVER_URL: http://generation-mcp:8001/sse
       REVIEW_MCP_URL: http://review-mcp:8002/sse
       COUNCIL_MCP_URL: http://council-mcp:8003/sse
@@ -29,6 +36,8 @@ services:
       KNOWLEDGE_DB_PATH: /app/backend/data/knowledge.db
     volumes:
       - backend_data:/app/backend/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8000"
     depends_on:
@@ -48,7 +57,7 @@ services:
 
   generation-mcp:
     build:
-      context: https://github.com/Adamsol1/MCP-project.git#dev
+      context: https://github.com/Adamsol1/MCP-project.git#feature_docker
       dockerfile: docker/generation-mcp.Dockerfile
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
@@ -73,7 +82,7 @@ services:
 
   review-mcp:
     build:
-      context: https://github.com/Adamsol1/MCP-project.git#dev
+      context: https://github.com/Adamsol1/MCP-project.git#feature_docker
       dockerfile: docker/review-mcp.Dockerfile
     environment:
       REVIEW_MCP_HOST: 0.0.0.0
@@ -90,13 +99,20 @@ services:
 
   council-mcp:
     build:
-      context: https://github.com/Adamsol1/MCP-project.git#dev
+      context: https://github.com/Adamsol1/MCP-project.git#feature_docker
       dockerfile: docker/council-mcp.Dockerfile
     environment:
       GEMINI_API_KEY: ${GEMINI_API_KEY:?Set GEMINI_API_KEY in Portainer}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       NEBIUS_API_KEY: ${NEBIUS_API_KEY:-}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:8001/v1}
+      LLM_MODEL: ${LLM_MODEL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-}
+      LLM_MAX_COMPLETION_TOKENS: ${LLM_MAX_COMPLETION_TOKENS:-}
+      LLM_ENABLE_THINKING: ${LLM_ENABLE_THINKING:-}
       COUNCIL_MCP_HOST: 0.0.0.0
       COUNCIL_MCP_PORT: "8003"
       COUNCIL_TRANSCRIPTS_DIR: transcripts
@@ -104,6 +120,8 @@ services:
     volumes:
       - council_transcripts:/app/council_mcp_server/transcripts
       - council_decision_graph:/app/council_mcp_server/decision_graph_data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     expose:
       - "8003"
     healthcheck:

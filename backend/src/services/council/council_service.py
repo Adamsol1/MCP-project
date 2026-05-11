@@ -4,6 +4,7 @@ import json
 import logging
 import os
 from pathlib import Path  # used in __init__ for working_directory
+from urllib.parse import urlparse
 
 from src.mcp_client.client import MCPClient
 from src.models.analysis import (
@@ -16,21 +17,57 @@ from src.models.analysis import (
 )
 from src.models.dialogue import Perspective
 from src.services.ai.agent_builder import get_display_name
+from src.services.ai.llm_config import (
+    get_default_gemini_model,
+    get_default_llm_model,
+    get_llm_provider,
+)
 
 logger = logging.getLogger("app")
 
 _DEFAULT_COUNCIL_MCP_URL = "http://127.0.0.1:8003/sse"
+_LOCAL_NON_COUNCIL_PORTS = {8000, 8001, 8002, 8004, 8011}
 
 
 def get_council_mcp_url() -> str:
-    return os.getenv("COUNCIL_MCP_URL", _DEFAULT_COUNCIL_MCP_URL)
+    server_url = os.getenv("COUNCIL_MCP_URL")
+    if not server_url:
+        return _DEFAULT_COUNCIL_MCP_URL
+
+    parsed = urlparse(server_url)
+    path = parsed.path.rstrip("/")
+    points_at_llm_api = path == "/v1" or path.startswith("/v1/")
+    points_at_local_non_council = (
+        parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port in _LOCAL_NON_COUNCIL_PORTS
+    )
+    if points_at_llm_api or points_at_local_non_council:
+        logger.warning(
+            "[CouncilService] Ignoring COUNCIL_MCP_URL=%s because it points at "
+            "a local non-council service. Using %s.",
+            server_url,
+            _DEFAULT_COUNCIL_MCP_URL,
+        )
+        return _DEFAULT_COUNCIL_MCP_URL
+
+    return server_url
+
+
+def get_council_adapter() -> str:
+    return "gemini" if get_llm_provider() == "gemini" else "openai"
+
+
+def get_council_model() -> str:
+    if get_llm_provider() == "gemini":
+        return get_default_gemini_model()
+    return get_default_llm_model()
 
 
 class CouncilService:
     """Run a council deliberation with fixed app defaults."""
 
     DEFAULT_ADAPTER = "gemini"
-    DEFAULT_MODEL = "gemini-2.5-pro"
+    DEFAULT_MODEL = "gemini-2.5-flash"
     DEFAULT_MODE = "conference"
     DEFAULT_ROUNDS = 2
     DEFAULT_TIMEOUT_PER_ROUND = 180
@@ -53,14 +90,16 @@ class CouncilService:
         self.transcript_dir.mkdir(parents=True, exist_ok=True)
         self.mcp_client = mcp_client or MCPClient(server_url=get_council_mcp_url())
         self._perspective_docs: dict[str, str] = perspective_docs or {}
+        self.adapter = get_council_adapter()
+        self.model = get_council_model()
 
     def resolve_runtime_profile(
         self, council_settings: CouncilRunSettings | None = None
     ) -> CouncilRuntimeProfile:
         settings = council_settings or CouncilRunSettings()
         return CouncilRuntimeProfile(
-            adapter=self.DEFAULT_ADAPTER,
-            model=self.DEFAULT_MODEL,
+            adapter=self.adapter,
+            model=self.model,
             mode=settings.mode,
             rounds=settings.rounds,
             timeout_per_round_seconds=settings.timeout_seconds,
@@ -108,8 +147,8 @@ class CouncilService:
             )
             participants.append(
                 {
-                    "cli": self.DEFAULT_ADAPTER,
-                    "model": self.DEFAULT_MODEL,
+                    "cli": self.adapter,
+                    "model": self.model,
                     "display_name": get_display_name(perspective, language),
                     "persona_prompt": (
                         f"{persona}\n\n{self._perspective_docs[perspective.value]}\n\n{behavior}"
@@ -187,8 +226,8 @@ class CouncilService:
                 "summarize_entries",
                 {
                     "entries": payload,
-                    "adapter": self.DEFAULT_ADAPTER,
-                    "model": self.DEFAULT_MODEL,
+                    "adapter": self.adapter,
+                    "model": self.model,
                     "language": language,
                 },
             )
@@ -216,8 +255,12 @@ class CouncilService:
 
         first_error = debates[0].get("response", "").strip("[]")
         if "API key" in first_error or "api key" in first_error:
+            if self.adapter == "gemini":
+                raise RuntimeError(
+                    "Council runtime failed: Gemini API access is not configured correctly."
+                )
             raise RuntimeError(
-                "Council runtime failed: Gemini API access is not configured correctly."
+                "Council runtime failed: local OpenAI-compatible API access is not configured correctly for the backend process."
             )
         raise RuntimeError(f"Council runtime failed: {first_error}")
 

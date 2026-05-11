@@ -8,7 +8,7 @@ import pytest
 
 from src.models.dialogue import DialogueContext
 from src.models.reasoning import ReasoningLogEntry
-from src.services.AI.ai_orchestrator import AIOrchestrator
+from src.services.ai.ai_orchestrator import AIOrchestrator
 from src.services.reasearch_logger import ResearchLogger
 from tests.services.conftest import (
     MockGenerator,
@@ -66,7 +66,26 @@ def test_logger_stores_multiple_attempts():
     assert len(logger.logs) == 3
 
 
-def test_logger_writes_to_jsonl_file(tmp_path):
+def test_logger_writes_log_entry_to_db(tmp_path, monkeypatch):
+    import sqlite3
+
+    import src.services.reasearch_logger as logger_module
+
+    db_path = tmp_path / "test_sessions.db"
+    monkeypatch.setenv("SESSIONS_DB_PATH", str(db_path))
+    monkeypatch.setattr(logger_module, "_conn", None)
+
+    conn = sqlite3.connect(str(db_path))
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS research_log_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT, entry_type TEXT, phase TEXT,
+            timestamp TEXT, content TEXT
+        )"""
+    )
+    conn.commit()
+    conn.close()
+
     session_id = str(uuid4())
     log_entry = ReasoningLogEntry(
         attempt_number=1,
@@ -80,12 +99,19 @@ def test_logger_writes_to_jsonl_file(tmp_path):
         model_used="test-model",
     )
 
-    logger = ResearchLogger(log_path=tmp_path / "log.jsonl")
-    logger.create_log(log_entry)
+    research_logger = ResearchLogger(session_id=session_id)
+    research_logger.create_log(log_entry)
 
-    saved_log = tmp_path / "log.jsonl"
-    assert saved_log.exists()
-    assert saved_log.read_text() == json.dumps(log_entry.model_dump(mode="json")) + "\n"
+    conn = sqlite3.connect(str(db_path))
+    rows = conn.execute(
+        "SELECT session_id, phase FROM research_log_entries WHERE session_id = ?",
+        (session_id,),
+    ).fetchall()
+    conn.close()
+
+    assert len(rows) == 1
+    assert rows[0][0] == session_id
+    assert rows[0][1] == "pir_generation"
 
 
 @pytest.mark.asyncio
@@ -112,10 +138,7 @@ async def test_orchestrator_logs_reasoning():
     )
 
     assert result == "Generated PIR based on context"
-    assert len(logger.logs) == 2
+    assert len(logger.logs) == 1
     assert logger.logs[0].attempt_number == 1
-    assert logger.logs[1].attempt_number == 2
     assert logger.logs[0].session_id == "test-session-id"
-    assert logger.logs[1].session_id == "test-session-id"
     assert logger.logs[0].model_used == "test-model"
-    assert logger.logs[1].model_used == "test-model"

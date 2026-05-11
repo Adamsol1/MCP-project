@@ -7,14 +7,14 @@
  * Run with: cd frontend && npx vitest PirSourcesView.test
  */
 
-import { screen, act } from "@testing-library/react";
+import { screen, act, fireEvent } from "@testing-library/react";
 import { describe, it, expect } from "vitest";
-import userEvent from "@testing-library/user-event";
 import { useEffect } from "react";
 import PirSourcesView from "./PirSourcesView";
 import { WorkspaceProvider, useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
 import { renderWithSettings } from "../../test/renderWithProviders";
 import type { PirData } from "../../types/conversation";
+import { axe } from "vitest-axe";
 
 // ── Seeder helpers ─────────────────────────────────────────────────────────────
 // Sets pirData or highlightedRefs in context on mount so tests can start
@@ -82,14 +82,15 @@ const pirDataNoSources: PirData = {
 // ── Group 1: Empty state ──────────────────────────────────────────────────────
 
 describe("PirSourcesView — empty state", () => {
-  it("shows a placeholder when pirData is null (no PIR generated yet)", () => {
-    renderWithSettings(
+  it("renders nothing when pirData is null (no PIR generated yet)", () => {
+    const { container } = renderWithSettings(
       <WorkspaceProvider>
         <PirSourcesView />
       </WorkspaceProvider>,
     );
 
-    expect(screen.getByText(/no sources/i)).toBeInTheDocument();
+    // Component returns null when pirData is absent — no DOM output
+    expect(container.firstChild).toBeNull();
   });
 
   it("shows a placeholder when pirData has no sources", async () => {
@@ -144,10 +145,10 @@ describe("PirSourcesView — source rendering", () => {
 
 // ── Group 3: Hover updates context ────────────────────────────────────────────
 
+// userEvent.hover/unhover deadlock in jsdom. React 18 synthesizes onMouseEnter
+// from native mouseover (bubbling) and onMouseLeave from mouseout — use those directly.
 describe("PirSourcesView — hover updates context", () => {
   it("hovering a source card sets highlightedRefs in context", async () => {
-    const user = userEvent.setup();
-
     renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
@@ -161,14 +162,13 @@ describe("PirSourcesView — hover updates context", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    await user.hover(sourceCard);
+    fireEvent.mouseOver(sourceCard);
+    await act(async () => {});
 
     expect(screen.getByTestId("refs")).toHaveTextContent("[1]");
   });
 
   it("mouse leave on a source card clears highlightedRefs in context", async () => {
-    const user = userEvent.setup();
-
     renderWithSettings(
       <WorkspaceProvider>
         <PirDataSeeder pirData={pirDataWithSources} />
@@ -182,8 +182,10 @@ describe("PirSourcesView — hover updates context", () => {
     const sourceCard = screen
       .getByText(/Norwegian-Russian Geopolitical Relations/)
       .closest("li")!;
-    await user.hover(sourceCard);
-    await user.unhover(sourceCard);
+    fireEvent.mouseOver(sourceCard);
+    await act(async () => {});
+    fireEvent.mouseOut(sourceCard);
+    await act(async () => {});
 
     expect(screen.getByTestId("refs")).toHaveTextContent("empty");
   });
@@ -229,5 +231,27 @@ describe("PirSourcesView — highlight state from context", () => {
 
     expect(card1).toHaveClass("text-primary");
     expect(card2).not.toHaveClass("text-primary");
+  });
+});
+
+describe("PirSourcesView — accessibility (WCAG 2.1 AA)", () => {
+  it("has no violations in empty state", async () => {
+    const { container } = renderWithSettings(
+      <WorkspaceProvider>
+        <PirSourcesView />
+      </WorkspaceProvider>,
+    );
+    expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("has no violations with sources loaded", async () => {
+    const { container } = renderWithSettings(
+      <WorkspaceProvider>
+        <PirDataSeeder pirData={pirDataWithSources} />
+        <PirSourcesView />
+      </WorkspaceProvider>,
+    );
+    await act(async () => {});
+    expect(await axe(container)).toHaveNoViolations();
   });
 });

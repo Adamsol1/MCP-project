@@ -5,8 +5,45 @@ from fastapi.testclient import TestClient
 
 from src.api import analysis as analysis_api
 from src.api.main import app
-from src.models.analysis import AnalysisDraft, CouncilNote
+from src.models.analysis import AnalysisDraft, CouncilNote, FindingModel, ProcessingResult
 from src.services.analysis.analysis_session_store import AnalysisSessionStore
+
+_INTEGRATION_FINDINGS = [
+    FindingModel(
+        id="F-001",
+        title="Credential-access activity",
+        finding="Repeated authentication attempts targeted privileged accounts.",
+        evidence_summary="Login failures followed by successful access.",
+        source="network_telemetry",
+        confidence=82,
+        relevant_to=["PIR-1"],
+        supporting_data={"attack_ids": ["T1078"]},
+        why_it_matters="Suggests adversary access development.",
+        uncertainties=["Compromised account path unconfirmed."],
+    ),
+    FindingModel(
+        id="F-003",
+        title="Phishing staging",
+        finding="Lookalike domains appear staged for credential theft.",
+        evidence_summary="Passive DNS and hosting overlap support staging.",
+        source="osint",
+        confidence=76,
+        relevant_to=["PIR-2"],
+        supporting_data={"domains": ["example-phish.test"]},
+        why_it_matters="Supports a parallel intrusion path.",
+        uncertainties=["Delivery infrastructure incomplete."],
+    ),
+]
+
+_INTEGRATION_PROCESSING_RESULT = ProcessingResult(
+    findings=_INTEGRATION_FINDINGS,
+    gaps=["Attribution remains unresolved.", "Victimology requires confirmation."],
+)
+
+
+class _FakeProcessingResultStore:
+    async def get_processing_result(self, session_id: str):  # noqa: ARG002
+        return _INTEGRATION_PROCESSING_RESULT
 
 
 class _FakeAnalysisService:
@@ -39,6 +76,7 @@ class _FakeCouncilService:
         processing_result,
         analysis_draft,
         finding_ids=None,
+        **_kwargs,
     ):
         assert session_id == "integration-session"
         assert len(selected_perspectives) >= 2
@@ -81,7 +119,7 @@ class _FakeResearchLogger:
 def test_analysis_and_council_flow_persists_across_reload(monkeypatch, tmp_path):
     """Draft generation, council run, and later reload should reuse persisted state."""
     store = AnalysisSessionStore(sessions_dir=tmp_path / "sessions")
-    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda: store)
+    monkeypatch.setattr(analysis_api, "AnalysisSessionStore", lambda uow=None: store)
     monkeypatch.setattr(
         analysis_api,
         "AnalysisService",
@@ -92,6 +130,11 @@ def test_analysis_and_council_flow_persists_across_reload(monkeypatch, tmp_path)
         analysis_api,
         "ResearchLogger",
         lambda session_id=None: _FakeResearchLogger(session_id=session_id),
+    )
+    monkeypatch.setattr(
+        analysis_api,
+        "ProcessingResultStore",
+        lambda uow=None: _FakeProcessingResultStore(),
     )
 
     client = TestClient(app)

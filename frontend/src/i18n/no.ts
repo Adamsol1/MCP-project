@@ -17,6 +17,7 @@ export const no = {
   minimizeDevTools: "Minimer utviklerverkt\u00f8y",
   sendTestMessage: "Send testmelding",
   showCollectionApproval: "Vis innsamlingsgodkjenning",
+  openLlmChat: "\u00c5pne LLM-chat",
   previousRun: "Tidligere kjøring",
   refresh: "Oppdater",
   loading: "Laster...",
@@ -68,6 +69,10 @@ export const no = {
     "Uploaded Documents": "Opplastede dokumenter",
     "Web Search": "Nettsøk",
   } as Record<string, string>,
+  beta: "Beta",
+  webSearchBetaTitle:
+    "Nettsøk med lokal LLM er i beta — siden hentes via httpx på backend, " +
+    "så JavaScript-baserte sider og sider med bot-beskyttelse hoppes over.",
   sourceDescriptions: {
     "AlienVault OTX": "Åpne trusselinnmatinger",
     "Knowledge Bank": "Organisasjonens kuraterte intel",
@@ -149,6 +154,12 @@ export const no = {
   uiLanguageDesc: "Spr\u00e5ket som brukes i grensesnittet.",
   aiOutputLanguage: "AI-utdataspr\u00e5k",
   aiOutputLanguageDesc: "Spr\u00e5ket som AI vil bruke i sine svar.",
+  aiProviderLabel: "AI-leverand\u00f8r",
+  aiProviderDesc: "Velg om foresp\u00f8rsler bruker Gemini API eller lokal LLM.",
+  aiProviderLabels: {
+    local: "Lokal LLM",
+    gemini: "Gemini API",
+  } as Record<string, string>,
   langEnglish: "Engelsk",
   langNorwegian: "Norsk",
   themeLabel: "Tema",

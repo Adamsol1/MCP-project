@@ -70,52 +70,52 @@ def _make_note() -> CouncilNote:
 class TestAnalysisSessionStore:
     """Test persisted analysis draft and council state."""
 
-    def test_draft_persistence(self, monkeypatch, tmp_path):
+    async def test_draft_persistence(self, monkeypatch, tmp_path):
         """Saved drafts should be reloaded after a later read."""
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-draft")
         store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
-        processing_result = ProcessingResultStore().get_processing_result(
+        processing_result = await ProcessingResultStore().get_processing_result(
             "session-draft"
         )
         draft = _make_draft()
 
-        store.save_draft("session-draft", processing_result, draft)
-        reloaded = store.load("session-draft")
+        await store.save_draft("session-draft", processing_result, draft)
+        reloaded = await store.load("session-draft")
 
         assert reloaded is not None
         assert isinstance(reloaded.processing_result, ProcessingResult)
         assert reloaded.analysis_draft == draft
 
-    def test_council_note_persistence(self, tmp_path):
+    async def test_council_note_persistence(self, tmp_path):
         """Saved council notes should remain separate from the persisted draft."""
         store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
         note = _make_note()
 
-        store.save_council_note("session-council", note)
-        reloaded = store.load("session-council")
+        await store.save_council_note("session-council", note)
+        reloaded = await store.load("session-council")
 
         assert reloaded is not None
         assert reloaded.latest_council_note == note
         assert reloaded.analysis_draft is None
 
-    def test_reload_behavior_preserves_draft_and_latest_note(
+    async def test_reload_behavior_preserves_draft_and_latest_note(
         self, monkeypatch, tmp_path
     ):
         """Reloading should preserve both the draft and the latest council note."""
         monkeypatch.setattr(processing_service_module, "_SESSIONS_DATA_DIR", tmp_path)
         _write_processed_json(tmp_path, "session-reload")
         store = AnalysisSessionStore(sessions_dir=tmp_path / "analysis-sessions")
-        processing_result = ProcessingResultStore().get_processing_result(
+        processing_result = await ProcessingResultStore().get_processing_result(
             "session-reload"
         )
         draft = _make_draft()
         note = _make_note()
 
-        store.save_draft("session-reload", processing_result, draft)
-        store.save_council_note("session-reload", note)
+        await store.save_draft("session-reload", processing_result, draft)
+        await store.save_council_note("session-reload", note)
 
-        reloaded = AnalysisSessionStore(
+        reloaded = await AnalysisSessionStore(
             sessions_dir=tmp_path / "analysis-sessions"
         ).load("session-reload")
 

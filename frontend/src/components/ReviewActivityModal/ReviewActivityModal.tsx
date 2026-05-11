@@ -14,8 +14,26 @@ interface ReviewActivityModalProps {
 
 // ── Inline text formatter ──────────────────────────────────────────────────────
 
-function InlineFormatted({ text }: { text: string }) {
-  const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
+// LLM responses occasionally hand us non-string reasoning/summary fields
+// (e.g. Gemini emitting an object with step_1/step_2 keys, or an array of
+// bullet strings). Coerce defensively so a model quirk can't blank the UI.
+function toFormattableString(value: unknown): string {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  if (Array.isArray(value)) return value.map(toFormattableString).join("\n");
+  if (typeof value === "object") {
+    try {
+      return JSON.stringify(value, null, 2);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
+function InlineFormatted({ text }: { text: unknown }) {
+  const safe = toFormattableString(text);
+  const parts = safe.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return (
     <>
       {parts.map((part, i) => {
@@ -29,8 +47,9 @@ function InlineFormatted({ text }: { text: string }) {
   );
 }
 
-function FormattedReviewText({ text }: { text: string }) {
-  const lines = text.split("\n");
+function FormattedReviewText({ text }: { text: unknown }) {
+  const safe = toFormattableString(text);
+  const lines = safe.split("\n");
   const elements: React.ReactNode[] = [];
   lines.forEach((line, i) => {
     const trimmed = line.trim();
@@ -466,13 +485,14 @@ export default function ReviewActivityModal({
       <div
         role="dialog"
         aria-modal="true"
+        aria-labelledby="review-activity-modal-title"
         className="flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex shrink-0 items-center justify-between border-b border-border px-6 py-4">
           <div>
-            <h2 className="text-base font-semibold text-text-primary">Review Activity</h2>
+            <h2 id="review-activity-modal-title" className="text-base font-semibold text-text-primary">Review Activity</h2>
             <p className="mt-0.5 text-xs text-text-muted">
               {activity.length} attempt{activity.length !== 1 ? "s" : ""} — {phasesSummary}
             </p>

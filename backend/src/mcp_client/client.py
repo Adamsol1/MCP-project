@@ -1,7 +1,7 @@
 """MCP Client — connects to the standalone MCP server via SSE/HTTP.
 
 The MCP server runs as a separate process (started independently via
-`python mcp_server/src/server.py`). This client connects to it over HTTP
+`python generation_mcp_server/src/server.py`). This client connects to it over HTTP
 using Server-Sent Events (SSE) transport — no subprocess management needed.
 """
 
@@ -12,6 +12,7 @@ import time
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from typing import Any
+from urllib.parse import urlparse
 
 from mcp import ClientSession
 from mcp.client.sse import sse_client
@@ -20,7 +21,7 @@ from pydantic import AnyUrl
 
 logger = logging.getLogger("app")
 
-_DEFAULT_URL = "http://127.0.0.1:8001/sse"
+_DEFAULT_URL = "http://127.0.0.1:8011/sse"
 
 # Receives (message, options) from the MCP server and returns the chosen option.
 ElicitationCallback = Callable[[str, list[str]], Awaitable[str]]
@@ -28,6 +29,35 @@ ElicitationCallback = Callable[[str, list[str]], Awaitable[str]]
 _RESTRICTED_TLP = frozenset({"TLP:RED", "TLP:AMBER", "TLP:AMBER+STRICT"})
 _USE_LOCAL = "Bytt til lokal LLM"
 _USE_CLOUD = "Fortsett med Gemini"
+
+
+def get_mcp_server_url() -> str:
+    """Return the MCP tools SSE URL, ignoring obvious LLM/backend URLs."""
+
+    server_url = os.getenv("MCP_SERVER_URL")
+    if not server_url:
+        return _DEFAULT_URL
+
+    parsed = urlparse(server_url)
+    if parsed.scheme not in {"http", "https"}:
+        return server_url
+
+    path = parsed.path.rstrip("/")
+    is_local_llm_tunnel_sse = (
+        parsed.hostname in {"127.0.0.1", "localhost"}
+        and parsed.port in {8000, 8001}
+        and path == "/sse"
+    )
+    if path == "/v1" or path.startswith("/v1/") or is_local_llm_tunnel_sse:
+        logger.warning(
+            "[MCP] Ignoring MCP_SERVER_URL=%s because it points at the local "
+            "LLM/backend port, not the MCP tools server. Using %s.",
+            server_url,
+            _DEFAULT_URL,
+        )
+        return _DEFAULT_URL
+
+    return server_url
 
 
 def _get_tlp_level(content_header: str) -> str | None:
@@ -47,7 +77,7 @@ class MCPClient:
     Args:
         server_url:           SSE endpoint URL of the running MCP server.
                               Defaults to the MCP_SERVER_URL env var, or
-                              http://127.0.0.1:8001/sse if unset.
+                              http://127.0.0.1:8011/sse if unset.
         elicitation_callback: Optional async function invoked when the MCP server
                               sends an elicitation/create request mid-tool-call.
                               Receives (message, options) and must return the
@@ -60,7 +90,7 @@ class MCPClient:
         server_url: str | None = None,
         elicitation_callback: ElicitationCallback | None = None,
     ) -> None:
-        self.server_url = server_url or os.getenv("MCP_SERVER_URL", _DEFAULT_URL)
+        self.server_url = server_url or get_mcp_server_url()
         self.session: ClientSession | None = None
         self._elicitation_callback = elicitation_callback
         self._resource_tlp_warned: bool = False

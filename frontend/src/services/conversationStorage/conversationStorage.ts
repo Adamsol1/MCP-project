@@ -17,6 +17,13 @@ const DEFAULT_STORE: ConversationStore = {
   activeConversationId: null,
 };
 
+/**
+ * Validates `rawStage` against the known `DialogueStage` union.
+ *
+ * When the stored value is unrecognised (e.g. from an old schema), falls back
+ * to `"summary_confirming"` if the conversation was mid-confirmation, otherwise
+ * `"initial"`, to avoid placing the UI in an undefined state.
+ */
 function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
   if (
     rawStage === "initial" ||
@@ -38,6 +45,13 @@ function coerceStage(rawStage: unknown, isConfirming: boolean): DialogueStage {
   return isConfirming ? "summary_confirming" : "initial";
 }
 
+/**
+ * Infers the `DialoguePhase` from a conversation's stage and message history
+ * when no explicit phase value is stored (e.g. upgrading from an older schema).
+ *
+ * The `reviewing` stage is ambiguous: it can occur in both the collection and
+ * processing phases, so the function inspects message types to disambiguate.
+ */
 function inferPhaseFromConversation(raw: Conversation, stage: DialogueStage): DialoguePhase {
   switch (stage) {
     case "planning":
@@ -66,6 +80,10 @@ function inferPhaseFromConversation(raw: Conversation, stage: DialogueStage): Di
   }
 }
 
+/**
+ * Validates `rawPhase` against the known `DialoguePhase` union, falling back to
+ * `inferPhaseFromConversation` when the stored value is unrecognised.
+ */
 function coercePhase(
   rawPhase: unknown,
   rawConversation: Conversation,
@@ -83,6 +101,10 @@ function coercePhase(
   return inferPhaseFromConversation(rawConversation, stage);
 }
 
+/**
+ * Validates `rawSubState` against the known `DialogueSubState` union.
+ * Returns null for any unrecognised value (null is the valid "no sub-state" sentinel).
+ */
 function coerceSubState(rawSubState: unknown): DialogueSubState {
   if (
     rawSubState === "awaiting_decision" ||
@@ -94,6 +116,12 @@ function coerceSubState(rawSubState: unknown): DialogueSubState {
   return null;
 }
 
+/**
+ * Sanitises a raw `Conversation` loaded from localStorage by coercing all
+ * enum-like fields through their respective validators and recomputing
+ * `isConfirming` from the canonical stage + sub-state rather than trusting
+ * the stored boolean, which can be stale after a mid-session page reload.
+ */
 function normalizeConversation(raw: Conversation): Conversation {
   const stage = coerceStage(raw.stage, raw.isConfirming);
   const phase = coercePhase(raw.phase, raw, stage);

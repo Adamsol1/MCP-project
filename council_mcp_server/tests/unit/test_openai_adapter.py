@@ -85,6 +85,26 @@ class TestOpenAIAdapter:
         assert body["messages"] == [{"role": "user", "content": "What is 2+2?"}]
         assert body["stream"] is False
 
+    def test_build_request_chat_completions_with_vllm_options(self):
+        """Test vLLM-compatible request options are included when configured."""
+        adapter = OpenAIAdapter(
+            base_url="http://localhost:8000/v1",
+            api_key="test-key",
+            max_completion_tokens=512,
+            temperature=0.7,
+            enable_thinking=False,
+        )
+
+        endpoint, headers, body = adapter.build_request(
+            model="Qwen/Qwen3-8B", prompt="Say hello"
+        )
+
+        assert endpoint == "/chat/completions"
+        assert headers["Authorization"] == "Bearer test-key"
+        assert body["max_completion_tokens"] == 512
+        assert body["temperature"] == 0.7
+        assert body["chat_template_kwargs"] == {"enable_thinking": False}
+
     def test_build_request_responses_api(self):
         """Test build_request for o3 models uses Responses API."""
         adapter = OpenAIAdapter(
