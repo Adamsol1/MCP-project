@@ -22,7 +22,10 @@ from src.models.dialogue import (
     PhaseReviewItem,
 )
 from src.models.reasoning import ReasoningLog
-from src.services.processing.processing_result_store import normalize_raw_result
+from src.services.processing.processing_result_store import (
+    is_valid_processing_result,
+    normalize_raw_result,
+)
 from src.services.state_machines.base_phase_flow import BasePhaseFlow
 
 logger = logging.getLogger("app")
@@ -100,7 +103,6 @@ async def _write_processed(
         )
     await uow.processing_attempts.append(session_id, pir, raw_result)
     logger.info(f"[ProcessingFlow] Appended processing attempt to DB for {session_id}")
-    logger.info(f"[ProcessingFlow] Wrote processed.json for {session_id}")
 
 
 class ProcessingState(str, Enum):
@@ -240,6 +242,20 @@ class ProcessingFlow(BasePhaseFlow):
             )
 
         raw_result = normalize_raw_result(raw_result)
+        if not is_valid_processing_result(raw_result):
+            logger.error(
+                "[ProcessingFlow] Processing produced no valid structured result for %s",
+                self.session_id,
+            )
+            return DialogueResponse(
+                action=DialogueAction.ERROR,
+                content=(
+                    "Processing did not produce a valid structured result. "
+                    "Check that the selected model can follow the processing JSON schema "
+                    "and, for local LLMs, that MCP tool calling is enabled."
+                ),
+            )
+
         self.state = ProcessingState.REVIEWING
         logger.info(f"[Session {self.session_id}] State: PROCESSING -> REVIEWING")
         await _write_processed(self.session_id, self.pir, raw_result, uow=uow)

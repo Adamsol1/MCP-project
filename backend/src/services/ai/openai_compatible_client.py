@@ -38,9 +38,17 @@ class OpenAICompatibleClient:
         *,
         tools: list[dict[str, Any]] | None = None,
         response_format: dict[str, Any] | None = None,
+        require_tools: bool = False,
     ) -> dict[str, Any]:
         # Strip tools if the provider already told us it doesn't support them.
         if not OpenAICompatibleClient._tools_supported:
+            if require_tools and tools:
+                raise RuntimeError(
+                    "The configured local LLM endpoint does not support tool calling. "
+                    "Start vLLM with --enable-auto-tool-choice and the matching "
+                    "--tool-call-parser for the selected model, or choose a provider "
+                    "that supports tool calls."
+                )
             tools = None
         if not OpenAICompatibleClient._json_response_format_supported:
             response_format = None
@@ -79,6 +87,14 @@ class OpenAICompatibleClient:
                 except httpx.RemoteProtocolError:
                     if "tools" in body:
                         OpenAICompatibleClient._tools_supported = False
+                        if require_tools:
+                            raise RuntimeError(
+                                "The configured local LLM endpoint disconnected when "
+                                "tool-calling metadata was sent. Start vLLM with "
+                                "--enable-auto-tool-choice and the matching "
+                                "--tool-call-parser for the selected model, or choose "
+                                "a provider that supports tool calls."
+                            ) from None
                         logger.info(
                             "[OpenAICompatibleClient] Provider disconnected when "
                             "tool-calling metadata was sent; disabling tools for "
@@ -94,6 +110,13 @@ class OpenAICompatibleClient:
                 except httpx.HTTPStatusError as exc:
                     if "tools" in body and self._is_tool_support_error(exc.response):
                         OpenAICompatibleClient._tools_supported = False
+                        if require_tools:
+                            raise RuntimeError(
+                                "The configured local LLM endpoint rejected tool-calling "
+                                "metadata. Start vLLM with --enable-auto-tool-choice "
+                                "and the matching --tool-call-parser for the selected "
+                                "model, or choose a provider that supports tool calls."
+                            ) from exc
                         logger.info(
                             "[OpenAICompatibleClient] Provider rejected tool-calling "
                             "metadata; disabling tools for subsequent requests. To "

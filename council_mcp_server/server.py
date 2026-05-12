@@ -283,6 +283,31 @@ def _build_set_session_schema() -> dict:
     }
 
 
+def _limit_full_debate_rounds(result, max_rounds: int) -> dict:
+    """Return result dict with full_debate limited by round count, not entry count."""
+    result_dict = result.model_dump()
+    round_numbers = sorted({response.round for response in result.full_debate})
+
+    if len(round_numbers) > max_rounds:
+        total_rounds = len(round_numbers)
+        included_rounds = set(round_numbers[-max_rounds:])
+        result_dict["full_debate"] = [
+            r.model_dump() if hasattr(r, "model_dump") else r
+            for r in result.full_debate
+            if r.round in included_rounds
+        ]
+        result_dict["full_debate_truncated"] = True
+        result_dict["total_rounds"] = total_rounds
+        logger.info(
+            f"Truncated full_debate from {total_rounds} to last {max_rounds} rounds for MCP response"
+        )
+    else:
+        result_dict["full_debate_truncated"] = False
+        result_dict["total_rounds"] = len(round_numbers)
+
+    return result_dict
+
+
 @app.list_tools()
 async def list_tools() -> list[Tool]:
     """List available MCP tools."""
@@ -569,24 +594,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             f"Deliberation complete: {result.rounds_completed} rounds, status: {result.status}"
         )
 
-        # Truncate full_debate for MCP response if needed (to avoid token limit)
+        # Truncate full_debate for MCP response if needed (to avoid token limit).
+        # The setting is in rounds, not entries. A round contains one response per
+        # participant, so truncating by entry count can accidentally drop whole
+        # participants from otherwise small debates.
         max_rounds = getattr(config, "mcp", {}).get("max_rounds_in_response", 3)
-        result_dict = result.model_dump()
-
-        if len(result.full_debate) > max_rounds:
-            total_rounds = len(result.full_debate)
-            # Convert RoundResponse objects to dicts for the truncated slice
-            result_dict["full_debate"] = [
-                r.model_dump() if hasattr(r, "model_dump") else r
-                for r in result.full_debate[-max_rounds:]
-            ]
-            result_dict["full_debate_truncated"] = True
-            result_dict["total_rounds"] = total_rounds
-            logger.info(
-                f"Truncated full_debate from {total_rounds} to last {max_rounds} rounds for MCP response"
-            )
-        else:
-            result_dict["full_debate_truncated"] = False
+        result_dict = _limit_full_debate_rounds(result, max_rounds)
 
         # Summarize tool_executions for MCP response (full detail is in transcript)
         if result_dict.get("tool_executions"):

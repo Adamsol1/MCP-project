@@ -45,6 +45,38 @@ def _parse_tool_arguments(raw: Any) -> dict[str, Any]:
     return {}
 
 
+def _extract_json_object(text: str) -> dict[str, Any] | None:
+    candidate = _strip_json_fence(text)
+    try:
+        parsed = json.loads(candidate)
+        return parsed if isinstance(parsed, dict) else None
+    except json.JSONDecodeError:
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", candidate)
+    if not match:
+        return None
+    try:
+        parsed = json.loads(match.group(0))
+    except json.JSONDecodeError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _tool_specs_for_prompt(tools: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    specs = []
+    for tool in tools:
+        function = tool.get("function") or {}
+        specs.append(
+            {
+                "name": function.get("name"),
+                "description": function.get("description", ""),
+                "parameters": function.get("parameters", {}),
+            }
+        )
+    return specs
+
+
 def _extract_html_text(raw_html: str) -> tuple[str | None, str]:
     title_match = re.search(
         r"<title[^>]*>(.*?)</title>", raw_html, re.IGNORECASE | re.DOTALL
@@ -92,6 +124,7 @@ class ToolCallingAgent:
         response_format: dict[str, Any] | None = None,
     ) -> str:
         available_tools = await self._get_tool_declarations(allowed_tool_names)
+        tools_required = allowed_tool_names is not None and bool(available_tools)
         self.last_thought_text = ""
         logger.info(
             "[ToolCallingAgent] Starting run with %s tools available",
@@ -105,11 +138,25 @@ class ToolCallingAgent:
         last_text = ""
 
         for round_num in range(self.max_tool_rounds):
-            message = await self.client.chat(
-                messages,
-                tools=available_tools,
-                response_format=response_format,
-            )
+            try:
+                message = await self.client.chat(
+                    messages,
+                    tools=available_tools,
+                    response_format=response_format,
+                    require_tools=tools_required,
+                )
+            except RuntimeError as exc:
+                if tools_required and "tool" in str(exc).lower():
+                    logger.warning(
+                        "[ToolCallingAgent] Native tool calling unavailable; using text-based MCP tool loop."
+                    )
+                    return await self._run_text_tool_loop(
+                        system_prompt=system_prompt,
+                        task=task,
+                        available_tools=available_tools,
+                        status_tracker=status_tracker,
+                    )
+                raise
             tool_calls = message.get("tool_calls") or []
 
             if not tool_calls:
@@ -185,6 +232,130 @@ class ToolCallingAgent:
 
         logger.warning(
             "[ToolCallingAgent] Max tool rounds (%s) reached",
+            self.max_tool_rounds,
+        )
+        return last_text or "Agent reached maximum tool iterations without completing."
+
+    async def _run_text_tool_loop(
+        self,
+        *,
+        system_prompt: str,
+        task: str,
+        available_tools: list[dict[str, Any]],
+        status_tracker=None,
+    ) -> str:
+        """Fallback MCP loop for local endpoints without native tool calling."""
+        tool_specs = _tool_specs_for_prompt(available_tools)
+        messages: list[dict[str, Any]] = [
+            {
+                "role": "system",
+                "content": (
+                    f"{system_prompt}\n\n"
+                    "Native tool calling is unavailable. You can still request MCP tools "
+                    "by returning ONLY a JSON object in this shape:\n"
+                    '{"tool_calls":[{"name":"tool_name","arguments":{}}]}\n\n'
+                    "When you have enough tool results, return ONLY this JSON object:\n"
+                    '{"final":"your complete final answer"}\n\n'
+                    "Do not include prose outside those JSON objects while requesting tools."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"{task}\n\n"
+                    "Available MCP tools:\n"
+                    f"{json.dumps(tool_specs, ensure_ascii=False)}"
+                ),
+            },
+        ]
+        last_text = ""
+
+        for round_num in range(self.max_tool_rounds):
+            message = await self.client.chat(messages)
+            text = str(message.get("content") or "").strip()
+            last_text = text
+            payload = _extract_json_object(text)
+
+            if payload is None:
+                logger.info(
+                    "[ToolCallingAgent] Text tool loop completed in %s round(s)",
+                    round_num + 1,
+                )
+                return text
+
+            if "final" in payload:
+                final = payload["final"]
+                logger.info(
+                    "[ToolCallingAgent] Text tool loop completed in %s round(s)",
+                    round_num + 1,
+                )
+                return final if isinstance(final, str) else json.dumps(final)
+
+            raw_calls = payload.get("tool_calls") or payload.get("tools") or []
+            if not isinstance(raw_calls, list) or not raw_calls:
+                logger.info(
+                    "[ToolCallingAgent] Text tool loop completed in %s round(s)",
+                    round_num + 1,
+                )
+                return text
+
+            logger.info(
+                "[ToolCallingAgent] Text round %s: %s tool call(s)",
+                round_num + 1,
+                len(raw_calls),
+            )
+            messages.append({"role": "assistant", "content": text})
+
+            tool_results: list[dict[str, Any]] = []
+            for raw_call in raw_calls:
+                if not isinstance(raw_call, dict):
+                    continue
+                name = str(raw_call.get("name") or "").strip()
+                args = _parse_tool_arguments(raw_call.get("arguments"))
+                if not name:
+                    continue
+
+                _args_safe = (
+                    repr(args)
+                    .encode("ascii", errors="backslashreplace")
+                    .decode("ascii")
+                )
+                logger.info("[ToolCallingAgent] Calling tool: %s(%s)", name, _args_safe)
+                if status_tracker is not None:
+                    status_tracker.record_tool_call(name, args)
+
+                try:
+                    result = await self.mcp_client.call_tool(name, args)
+                    result_text = (
+                        result if isinstance(result, str) else json.dumps(result)
+                    )
+                except Exception as exc:
+                    result_text = f"Tool error: {type(exc).__name__}: {exc}"
+                    logger.error("[ToolCallingAgent] Tool %s failed: %s", name, exc)
+
+                tool_results.append(
+                    {
+                        "name": name,
+                        "arguments": args,
+                        "result": result_text,
+                    }
+                )
+
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "MCP tool results:\n"
+                        f"{json.dumps(tool_results, ensure_ascii=False)}\n\n"
+                        "Use these results. If more MCP data is needed, return another "
+                        '{"tool_calls":[...]} JSON object. Otherwise return '
+                        '{"final":"..."} with the complete final answer.'
+                    ),
+                }
+            )
+
+        logger.warning(
+            "[ToolCallingAgent] Text tool loop max rounds (%s) reached",
             self.max_tool_rounds,
         )
         return last_text or "Agent reached maximum tool iterations without completing."

@@ -5,6 +5,8 @@ import type {
 } from "../../types/analysis";
 import { API_BACKEND_URL } from "../apiConfig";
 
+const ANALYSIS_COUNCIL_TIMEOUT_MS = 15 * 60 * 1000;
+
 /**
  * Submits a council analysis request to the backend and returns the resulting note.
  *
@@ -18,6 +20,7 @@ export async function runAnalysisCouncil(request: RunAnalysisCouncilRequest) {
   const httpResponse = await axios.post<CouncilNote>(
     `${API_BACKEND_URL}/api/analysis/council`,
     request,
+    { timeout: ANALYSIS_COUNCIL_TIMEOUT_MS },
   );
 
   return httpResponse.data;

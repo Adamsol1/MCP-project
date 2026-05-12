@@ -1,3 +1,5 @@
+import json
+
 import pytest
 
 from src.models.dialogue import DialogueAction
@@ -8,10 +10,21 @@ _MOCK_COLLECTED = {
     "pir": "Test PIR",
     "attempts": ["raw collected data"],
 }
+_VALID_PROCESSING_RESULT = (
+    '{"findings":[{"id":"F-01","title":"Finding","finding":"A finding.",'
+    '"evidence_summary":"Evidence summary.","source":"test","confidence":80,'
+    '"why_it_matters":"It matters."}],"gaps":[]}'
+)
+_MODIFIED_PROCESSING_RESULT = (
+    '{"findings":[{"id":"F-02","title":"Modified finding",'
+    '"finding":"A modified finding.","evidence_summary":"Modified evidence.",'
+    '"source":"test","confidence":75,"why_it_matters":"It still matters."}],'
+    '"gaps":[]}'
+)
 _MOCK_PROCESSED = {
     "session_id": "s1",
     "pir": "Test PIR",
-    "attempts": ["raw processed result"],
+    "attempts": [_VALID_PROCESSING_RESULT],
 }
 
 
@@ -37,7 +50,7 @@ class MockProcessingService:
         self.process_calls.append(
             {"collected_data": collected_data, "pir": pir, "language": language}
         )
-        return "raw processed result"
+        return _VALID_PROCESSING_RESULT
 
     async def modify_processing(
         self, last_result, user_message, language="en"
@@ -51,7 +64,7 @@ class MockProcessingService:
                 "language": language,
             }
         )
-        return "modified processed result"
+        return _MODIFIED_PROCESSING_RESULT
 
 
 class MockOrchestrator:
@@ -67,7 +80,7 @@ class MockOrchestrator:
     async def process_and_review(self, **kwargs):  # noqa: ARG002
         if self.raise_on_process:
             raise RuntimeError("Orchestrator unavailable")
-        return "orchestrated processed result"
+        return _VALID_PROCESSING_RESULT
 
 
 class MockReviewer:
@@ -129,6 +142,39 @@ async def test_initialize_with_orchestrator_sets_pending_reasoning_log(monkeypat
     assert flow.pending_reasoning_log is not None
     assert flow.pending_reasoning_log.phase == "processing"
     assert flow.pending_reasoning_log.model_used == "mock-model"
+
+
+@pytest.mark.asyncio
+async def test_initialize_rejects_invalid_processing_result(monkeypatch):
+    flow = ProcessingFlow(session_id="s1", pir="Test PIR")
+    service = MockProcessingService()
+
+    async def invalid_process(*_, **__):
+        return "not valid structured processing JSON"
+
+    service.process = invalid_process
+    write_calls = []
+
+    async def write_processed(*args, **kwargs):
+        write_calls.append((args, kwargs))
+
+    monkeypatch.setattr(
+        "src.services.state_machines.processing_flow._read_collected",
+        async_return(_MOCK_COLLECTED),
+    )
+    monkeypatch.setattr(
+        "src.services.state_machines.processing_flow._read_processed", async_return(None)
+    )
+    monkeypatch.setattr(
+        "src.services.state_machines.processing_flow._write_processed", write_processed
+    )
+
+    response = await flow.initialize(service)
+
+    assert response.action == DialogueAction.ERROR
+    assert "valid structured result" in response.content
+    assert flow.state == ProcessingState.PROCESSING
+    assert write_calls == []
 
 
 @pytest.mark.asyncio
@@ -438,7 +484,7 @@ async def test_initialize_response_content_is_raw_result(monkeypatch):
     response = await flow.initialize(service)
 
     # Assert
-    assert response.content == "raw processed result"
+    assert json.loads(response.content)["findings"][0]["id"] == "F-01"
 
 
 @pytest.mark.asyncio
@@ -482,7 +528,7 @@ async def test_initialize_passes_previous_result_to_orchestrator(monkeypatch):
     class CapturingOrchestrator(MockOrchestrator):
         async def process_and_review(self, **kwargs):
             captured_kwargs.update(kwargs)
-            return "result"
+            return _VALID_PROCESSING_RESULT
 
     orchestrator = CapturingOrchestrator()
     reviewer = MockReviewer()
@@ -621,7 +667,7 @@ async def test_handle_reviewing_modify_response_content_is_modified_result(monke
     response = await flow.process_user_message("adjust", service, approved=False)
 
     # Assert — content is what modify_processing returned, not the original
-    assert response.content == "modified processed result"
+    assert response.content == _MODIFIED_PROCESSING_RESULT
 
 
 # ── process_user_message — PROCESSING state ───────────────────────────────────

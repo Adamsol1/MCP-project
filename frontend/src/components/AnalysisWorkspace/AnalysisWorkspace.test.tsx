@@ -486,14 +486,12 @@ describe("AnalysisWorkspace", () => {
     ).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText(/Key Agreements/i)).toBeInTheDocument();
 
-    // "Neutral Evidence Analyst" is abbreviated to "EU Analyst" by shortenParticipantName
-    // because "neutral" contains the substring "eu" which maps to the EU perspective key.
     await user.click(
-      screen.getByRole("button", { name: "EU Analyst" }),
+      screen.getByRole("button", { name: "Neutral Evidence Analyst" }),
     );
 
     expect(
-      screen.getByRole("button", { name: "EU Analyst" }),
+      screen.getByRole("button", { name: "Neutral Evidence Analyst" }),
     ).toHaveAttribute("aria-pressed", "true");
     // Participant view shows the parsed response sections
     expect(screen.getByText(/Uncertainties/i)).toBeInTheDocument();

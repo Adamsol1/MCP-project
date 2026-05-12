@@ -41,6 +41,7 @@ describe("runAnalysisCouncil", () => {
     expect(axios.post).toHaveBeenCalledWith(
       `${BASE}/api/analysis/council`,
       request,
+      { timeout: 900000 },
     );
     expect(result).toEqual(mockNote);
   });

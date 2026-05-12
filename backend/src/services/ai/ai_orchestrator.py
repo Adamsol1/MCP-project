@@ -28,7 +28,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_attempts = 1  # initial attempt + 1 retry on major review rejection
+        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -188,9 +188,14 @@ class AIOrchestrator:
 
             feedback = result.suggestions
             self.retry_explanations.append(result.suggestions or "")
-            logger.warning(
-                f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback..."
-            )
+            if attempt < self.max_attempts:
+                logger.warning(
+                    f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback..."
+                )
+            else:
+                logger.warning(
+                    f"[Orchestrator] Rejected (major) on final attempt {attempt}; no retry remains."
+                )
 
         logger.warning(
             f"[Orchestrator] All {self.max_attempts} attempts exhausted. Returning last result."

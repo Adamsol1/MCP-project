@@ -66,7 +66,11 @@ function formatPerspectiveLabel(key: string) {
 }
 
 function stripMarkdown(value: string) {
-  return value.replace(/\*\*(.*?)\*\*/g, "$1").trim();
+  return value
+    .replace(/^#{1,6}\s+/, "")
+    .replace(/\s+#{1,6}$/, "")
+    .replace(/\*\*(.*?)\*\*/g, "$1")
+    .trim();
 }
 
 function normalizeSectionTitle(value: string) {
@@ -134,6 +138,13 @@ function buildCouncilSections(body: string) {
     if (numberedHeadingMatch) {
       flushSection();
       currentSection = { title: normalizeSectionTitle(numberedHeadingMatch[1]), items: [] };
+      continue;
+    }
+
+    const markdownHeadingMatch = line.match(/^#{1,6}\s+(.+?)\s*#*$/);
+    if (markdownHeadingMatch) {
+      flushSection();
+      currentSection = { title: normalizeSectionTitle(markdownHeadingMatch[1]), items: [] };
       continue;
     }
 
@@ -346,7 +357,7 @@ function CouncilParticipantPanel({
       {participantView.sections.map((section, si) => (
         <div key={si}>
           {section.title ? (
-            <p className="mb-2 text-sm font-semibold text-text-primary">{section.title}</p>
+            <h3 className="mb-2 text-base font-semibold text-text-primary">{section.title}</h3>
           ) : null}
           <div className="space-y-3">
             {section.items.map(renderCouncilSectionItem)}
@@ -446,7 +457,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
                   {sections.map((section, si) => (
                     <div key={si}>
                       {section.title ? (
-                        <p className="mb-2 text-sm font-semibold text-text-primary">{section.title}</p>
+                        <h4 className="mb-2 text-base font-semibold text-text-primary">{section.title}</h4>
                       ) : null}
                       <div className="space-y-3">
                         {section.items.map(renderCouncilSectionItem)}

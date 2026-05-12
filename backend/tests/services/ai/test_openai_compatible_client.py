@@ -124,6 +124,85 @@ async def test_chat_retries_without_tools_when_provider_disconnects_on_tools():
 
 @pytest.mark.asyncio
 @respx.mock
+async def test_chat_raises_when_required_tools_are_rejected():
+    OpenAICompatibleClient._tools_supported = True
+    client = OpenAICompatibleClient(
+        config=LLMConfig(
+            base_url="http://llm.test/v1",
+            api_key="test-key",
+            model="test-model",
+            timeout_seconds=5,
+            temperature=None,
+            max_completion_tokens=None,
+            enable_thinking=None,
+        )
+    )
+    route = respx.post("http://llm.test/v1/chat/completions").mock(
+        return_value=httpx.Response(
+            400,
+            json={
+                "error": {
+                    "message": '"auto" tool choice requires --enable-auto-tool-choice and --tool-call-parser to be set',
+                }
+            },
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="rejected tool-calling metadata"):
+        await client.chat(
+            [{"role": "user", "content": "hello"}],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "noop",
+                        "description": "No-op",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                }
+            ],
+            require_tools=True,
+        )
+
+    assert route.call_count == 1
+    OpenAICompatibleClient._tools_supported = True
+
+
+@pytest.mark.asyncio
+async def test_chat_raises_when_required_tools_are_already_known_unsupported():
+    OpenAICompatibleClient._tools_supported = False
+    client = OpenAICompatibleClient(
+        config=LLMConfig(
+            base_url="http://llm.test/v1",
+            api_key="test-key",
+            model="test-model",
+            timeout_seconds=5,
+            temperature=None,
+            max_completion_tokens=None,
+            enable_thinking=None,
+        )
+    )
+
+    with pytest.raises(RuntimeError, match="does not support tool calling"):
+        await client.chat(
+            [{"role": "user", "content": "hello"}],
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "noop",
+                        "description": "No-op",
+                        "parameters": {"type": "object", "properties": {}},
+                    },
+                }
+            ],
+            require_tools=True,
+        )
+    OpenAICompatibleClient._tools_supported = True
+
+
+@pytest.mark.asyncio
+@respx.mock
 async def test_chat_normalizes_local_model_decoding_artifacts():
     client = OpenAICompatibleClient(
         config=LLMConfig(

@@ -95,6 +95,11 @@ def normalize_raw_result(raw: str) -> str:
     return json.dumps(result.model_dump(mode="json"), ensure_ascii=False)
 
 
+def is_valid_processing_result(raw: str) -> bool:
+    """Return True when raw text can be loaded as a ProcessingResult."""
+    return _try_parse_processing_result(raw) is not None
+
+
 def _convert_legacy_processing_result(
     legacy_result: LegacyProcessingResult,
 ) -> ProcessingResult:

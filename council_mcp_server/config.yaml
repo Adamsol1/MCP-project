@@ -542,7 +542,7 @@ storage:
 mcp:
   # Maximum rounds to include in MCP response (to avoid token limit)
   # Full transcript is always saved to file - this only affects MCP response size
-  max_rounds_in_response: 3
+  max_rounds_in_response: 5
 
 deliberation:
   # Convergence detection settings

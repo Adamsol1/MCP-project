@@ -71,7 +71,7 @@ const demoCouncilNote: CouncilNote = {
       round: 1,
       participant: "US Strategic Analyst",
       response:
-        'This is clearly state-sponsored.\n\nVOTE: {"option":"State-sponsored access development","confidence":0.88,"rationale":"Infrastructure overlap is consistent with state actor TTPs."}',
+        '## Assessment\n\nThis is clearly state-sponsored.\n\nVOTE: {"option":"State-sponsored access development","confidence":0.88,"rationale":"Infrastructure overlap is consistent with state actor TTPs."}',
       timestamp: "2026-02-01T10:00:00Z",
     },
     {
@@ -472,6 +472,8 @@ describe("CouncilView — council note rendering", () => {
     await user.click(usTab);
 
     expect(usTab).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Assessment")).toBeInTheDocument();
+    expect(screen.queryByText(/## Assessment/i)).not.toBeInTheDocument();
     expect(
       screen.getByText(/State-sponsored access development/i),
     ).toBeInTheDocument();
