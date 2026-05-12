@@ -247,7 +247,8 @@ function renderCouncilSectionItem(item: CouncilSectionItem, index: number) {
 function shortenParticipantName(name: string, t: Translations): string {
   const lower = name.toLowerCase();
   for (const [perspective, analystName] of Object.entries(t.perspectiveAnalystNames)) {
-    if (lower.startsWith(perspective) || lower.includes(perspective)) {
+    const perspectivePattern = new RegExp(`(^|\\b)${perspective}(\\b|$)`, "i");
+    if (perspectivePattern.test(lower)) {
       return analystName;
     }
   }
@@ -374,7 +375,7 @@ function CouncilParticipantPanel({
 }
 
 function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entries: CouncilTranscriptEntry[] }) {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const t = useT();
 
   return (
@@ -401,30 +402,31 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
         </svg>
       </button>
 
-      {/* Participant summaries — shown in the collapsed header area */}
-      <div className="border-t border-border-muted divide-y divide-border-muted/60">
-        {entries.map((entry, i) => {
-          const { body, vote } = splitVoteFromResponse(entry.response);
-          const summary = entry.summary ?? extractSummary(body);
-          const shortName = shortenParticipantName(entry.participant, t);
-          return (
-            <div key={i} className="px-4 py-3 space-y-1">
-              <p className="text-xs font-semibold text-text-primary">{shortName}</p>
-              <p className="text-sm leading-6 text-text-secondary">{summary}</p>
-              {vote ? (
-                <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                  <span className="text-xs font-medium text-text-primary">{vote.option}</span>
-                  {vote.confidence !== null ? (
-                    <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-primary">
-                      {Math.round(vote.confidence * 100)}%
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
+      {!isOpen ? (
+        <div className="border-t border-border-muted divide-y divide-border-muted/60">
+          {entries.map((entry, i) => {
+            const { body, vote } = splitVoteFromResponse(entry.response);
+            const summary = entry.summary ?? extractSummary(body);
+            const shortName = shortenParticipantName(entry.participant, t);
+            return (
+              <div key={i} className="px-4 py-3 space-y-1">
+                <p className="text-xs font-semibold text-text-primary">{shortName}</p>
+                <p className="text-sm leading-6 text-text-secondary">{summary}</p>
+                {vote ? (
+                  <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                    <span className="text-xs font-medium text-text-primary">{vote.option}</span>
+                    {vote.confidence !== null ? (
+                      <span className="rounded-full border border-border bg-surface px-2.5 py-0.5 text-xs font-medium text-text-primary">
+                        {Math.round(vote.confidence * 100)}%
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
 
       {/* Full responses — shown only when expanded */}
       {isOpen ? (
@@ -436,7 +438,7 @@ function CollapsibleRound({ roundNumber, entries }: { roundNumber: number; entri
               <div key={`${entry.round}-${entry.participant}-${index}`}>
                 <div className="mb-4 flex items-baseline justify-between gap-3 border-b border-border-muted pb-2">
                   <p className="text-sm font-semibold text-text-primary">
-                    {entry.participant}
+                    {shortenParticipantName(entry.participant, t)}
                   </p>
                   <span className="text-xs text-text-muted">{entry.timestamp}</span>
                 </div>
