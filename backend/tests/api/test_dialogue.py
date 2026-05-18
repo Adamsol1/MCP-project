@@ -4,6 +4,8 @@ from datetime import UTC, datetime
 
 import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.integration
 from sqlmodel import SQLModel
 
 from src.api import dialogue as dialogue_api

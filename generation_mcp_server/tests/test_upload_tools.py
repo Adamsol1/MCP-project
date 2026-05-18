@@ -1,10 +1,9 @@
-"""TDD tests for upload MCP tools.
-
-Run with:
-    cd mcp_server && pytest tests/test_upload_tools.py -v
-"""
+"""Tests for upload MCP tools."""
 
 import json
+from unittest.mock import MagicMock
+
+import pytest
 
 from src.server import mcp
 from src.tools import upload_tools
@@ -25,10 +24,13 @@ class TestToolRegistration:
 
 
 class TestDefaultUploadsDir:
-    def test_default_dir_resolves_under_mcp_server(self):
+    def test_default_dir_resolves_under_src(self):
+        # arrange / act
         default = upload_tools._default_uploads_dir()
-        assert default.parts[-2] == "mcp_server"
+
+        # assert
         assert default.parts[-1] == "uploads"
+        assert default.parts[-2] == "resources"
 
 
 class TestUploadFile:
@@ -56,74 +58,111 @@ class TestUploadFile:
 
 class TestListUploads:
     def test_list_uploads_returns_empty_for_unknown_session(self, tmp_path, monkeypatch):
+        # arrange — bypass DB, use filesystem only
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
-        result = upload_tools.list_uploads("unknown-session")
-        assert json.loads(result) == []
+        monkeypatch.setattr(upload_tools, "_db_list", lambda _: None)
+
+        # act / assert
+        assert json.loads(upload_tools.list_uploads("unknown-session")) == []
 
     def test_list_uploads_returns_files_after_staging(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_list", lambda _: None)
         session_dir = tmp_path / "session-1"
         session_dir.mkdir()
         (session_dir / "file-abc.md").write_text("content", encoding="utf-8")
 
+        # act
         result = json.loads(upload_tools.list_uploads("session-1"))
 
+        # assert
         assert len(result) == 1
         assert result[0]["file_id"] == "file-abc"
 
     def test_list_uploads_returns_size_bytes(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_list", lambda _: None)
         session_dir = tmp_path / "session-1"
         session_dir.mkdir()
         text = "hello world"
         (session_dir / "file-abc.md").write_text(text, encoding="utf-8")
 
+        # act / assert
         result = json.loads(upload_tools.list_uploads("session-1"))
         assert result[0]["size_bytes"] == len(text.encode("utf-8"))
 
     def test_list_uploads_is_session_isolated(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_list", lambda _: None)
         (tmp_path / "session-1").mkdir()
         (tmp_path / "session-2").mkdir()
         (tmp_path / "session-1" / "file-a.md").write_text("a", encoding="utf-8")
         (tmp_path / "session-2" / "file-b.md").write_text("b", encoding="utf-8")
 
+        # act
         result_1 = json.loads(upload_tools.list_uploads("session-1"))
         result_2 = json.loads(upload_tools.list_uploads("session-2"))
 
+        # assert
         assert len(result_1) == 1 and result_1[0]["file_id"] == "file-a"
         assert len(result_2) == 1 and result_2[0]["file_id"] == "file-b"
 
     def test_list_uploads_ignores_non_md_files(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_list", lambda _: None)
         session_dir = tmp_path / "session-1"
         session_dir.mkdir()
         (session_dir / "file-abc.md").write_text("content", encoding="utf-8")
         (session_dir / "other.txt").write_text("ignored", encoding="utf-8")
 
+        # act / assert
         result = json.loads(upload_tools.list_uploads("session-1"))
         assert len(result) == 1
 
 
 class TestReadUpload:
-    def test_read_upload_returns_content(self, tmp_path, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_read_upload_returns_content(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_read", lambda _s, _f: None)
         session_dir = tmp_path / "session-1"
         session_dir.mkdir()
         (session_dir / "file-abc.md").write_text("# Report\nContent.", encoding="utf-8")
 
-        result = upload_tools.read_upload("session-1", "file-abc")
+        # act
+        result = await upload_tools.read_upload(MagicMock(), "session-1", "file-abc")
+
+        # assert
         assert result == "# Report\nContent."
 
-    def test_read_upload_returns_error_for_missing_file(self, tmp_path, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_read_upload_returns_error_for_missing_file(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
+        monkeypatch.setattr(upload_tools, "_db_read", lambda _s, _f: None)
         (tmp_path / "session-1").mkdir()
-        result = upload_tools.read_upload("session-1", "nonexistent")
+
+        # act
+        result = await upload_tools.read_upload(MagicMock(), "session-1", "nonexistent")
+
+        # assert
         assert "error" in result.lower() or "not found" in result.lower()
 
-    def test_read_upload_returns_error_for_unknown_session(self, tmp_path, monkeypatch):
+    @pytest.mark.asyncio
+    async def test_read_upload_returns_error_for_unknown_session(self, tmp_path, monkeypatch):
+        # arrange
         monkeypatch.setattr(upload_tools, "UPLOADS_DIR", tmp_path)
-        result = upload_tools.read_upload("unknown-session", "file-abc")
+        monkeypatch.setattr(upload_tools, "_db_read", lambda _s, _f: None)
+
+        # act
+        result = await upload_tools.read_upload(MagicMock(), "unknown-session", "file-abc")
+
+        # assert
         assert "error" in result.lower() or "not found" in result.lower()
 
 

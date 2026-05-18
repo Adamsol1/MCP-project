@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { pdf } from "@react-pdf/renderer";
 import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import { useChat } from "../../hooks/useChat/useChat";
 import { useSettings } from "../../contexts/SettingsContext/SettingsContext";
@@ -10,7 +9,6 @@ import type {
   CouncilTranscriptEntry,
   ProcessingFinding,
 } from "../../types/analysis";
-import CouncilReportPDF from "./CouncilReportPDF";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -593,6 +591,10 @@ export default function CouncilView({
 
   async function handleDownloadPDF() {
     if (!councilNote) return;
+    const [{ pdf }, { default: CouncilReportPDF }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("./CouncilReportPDF"),
+    ]);
     const blob = await pdf(<CouncilReportPDF councilNote={councilNote} />).toBlob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

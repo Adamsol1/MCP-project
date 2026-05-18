@@ -7,6 +7,8 @@ Run with: python -m pytest tests/test_parsing.py -v
 """
 
 import json
+from unittest.mock import patch
+
 import pytest
 
 from models import PIRResponse
@@ -36,12 +38,18 @@ def _make_raw(
 # ── Group 1: Happy path ───────────────────────────────────────────────────────
 
 def test_enrich_attaches_citation_from_registry():
+    # arrange
     raw = _make_raw(
         pir_text="Norway faces elevated risk[1]",
         claims=[{"id": "claim_1", "text": "Norway faces elevated risk", "source_ref": "[1]", "source_id": "geopolitical/norway_russia"}],
         sources=[{"id": "geopolitical/norway_russia", "ref": "[1]", "source_type": "kb"}],
     )
-    result = enrich_pir_response(raw)
+
+    # act
+    with patch("resources._get_citation_from_db", return_value=None):
+        result = enrich_pir_response(raw)
+
+    # assert
     assert isinstance(result, PIRResponse)
     assert result.sources[0].citation.author == "Threat Intelligence System"
     assert result.sources[0].citation.title == "Norwegian-Russian Geopolitical Relations"

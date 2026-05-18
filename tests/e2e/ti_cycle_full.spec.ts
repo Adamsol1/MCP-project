@@ -1,0 +1,36 @@
+import { test, expect } from '@playwright/test';
+
+test('test', async ({ page }) => {
+  await page.goto('http://localhost:5173/');
+  await page.getByRole('textbox', { name: 'Type anything...' }).click();
+  await page.getByRole('textbox', { name: 'Type anything...' }).fill('Focus on');
+  await page.getByRole('textbox', { name: 'Type anything...' }).press('ControlOrMeta+a');
+  await page.getByRole('textbox', { name: 'Type anything...' }).fill('will china invade taiwan? focus on state sponsoresd cyber groups and attacks against electrical infrastructure. use next 6 months as timeline. include pacific states reactions');
+  await page.getByRole('button', { name: '🇨🇳 China' }).click();
+  await page.getByRole('button', { name: '🌐 Global' }).click();
+  await page.getByRole('button', { name: 'Send message' }).click();
+  await page.getByRole('button', { name: 'Approve & Continue' }).click();
+  await page.getByRole('button', { name: 'Fortsett med Gemini' }).click();
+  await page.getByText('Show reasoning').click();
+  await page.getByRole('button', { name: 'Approve & Continue' }).click();
+  await page.getByRole('button', { name: 'Upload Files' }).click();
+  await page.waitForTimeout(5000);
+  await page.getByRole('button', { name: 'close' }).click();
+  await page.getByRole('button', { name: 'Approve & Continue' }).click();
+  await page.getByRole('button', { name: 'Start Collecting' }).click();
+  await page.getByRole('button', { name: 'View Raw Data →' }).click({ timeout: 600_000 });
+  await page.getByText('Knowledge Bank3 items').click();
+  await page.getByRole('button', { name: 'close' }).click();
+  await page.getByRole('button', { name: 'Accept' }).click();
+  await page.getByRole('cell', { name: 'F-01' }).click();
+  await page.getByRole('button', { name: 'close' }).click();
+  await page.getByRole('button', { name: 'Accept' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download PDF' }).click();
+  const download = await downloadPromise;
+  await page.getByRole('heading', { name: 'Framing by Perspective' }).click();
+  await page.getByRole('button', { name: 'Go to Council' }).click();
+  await page.getByRole('button', { name: 'Select all' }).click();
+  await page.getByRole('button', { name: 'Run council' }).click();
+  await page.getByRole('heading', { name: 'Advisory note' }).click();
+});

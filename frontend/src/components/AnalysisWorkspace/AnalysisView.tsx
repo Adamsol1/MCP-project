@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import { pdf } from "@react-pdf/renderer";
 import { HelpModal, HelpButton } from "../HelpModal/HelpModal";
 import type {
   AnalysisResponse,
@@ -9,8 +8,6 @@ import type {
   ProcessingFinding,
 } from "../../types/analysis";
 import CollectionCoverageView from "../CollectionCoverageView/CollectionCoverageView";
-import AnalysisReportPDF from "./AnalysisReportPDF";
-import ReviewFeedbackPDF from "./ReviewFeedbackPDF";
 import type { PhaseReviewItem } from "../../types/conversation";
 import type { CouncilNote } from "../../types/analysis";
 import { useWorkspace } from "../../contexts/WorkspaceContext/WorkspaceContext";
@@ -293,6 +290,10 @@ export default function AnalysisView({
     .map((key) => [key, analysis.per_perspective_implications[key]] as const);
 
   async function handleDownloadPDF() {
+    const [{ pdf }, { default: AnalysisReportPDF }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("./AnalysisReportPDF"),
+    ]);
     const blob = await pdf(
       <AnalysisReportPDF data={data} title={analysisHeading} />,
     ).toBlob();
@@ -309,10 +310,15 @@ export default function AnalysisView({
   }
 
   async function handleDownloadFeedbackPDF() {
+    const [{ pdf }, { default: ReviewFeedbackPDF }] = await Promise.all([
+      import("@react-pdf/renderer"),
+      import("./ReviewFeedbackPDF"),
+    ]);
     const blob = await pdf(
       <ReviewFeedbackPDF
         reviewActivity={reviewActivity}
         reportTitle={analysisHeading}
+        analysisData={data}
       />,
     ).toBlob();
     const url = URL.createObjectURL(blob);

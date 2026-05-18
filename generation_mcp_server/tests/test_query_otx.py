@@ -6,8 +6,8 @@ import httpx
 import pytest
 import respx
 
-from src import server
-from src.server import query_otx
+from src.server import mcp
+from src.tools.otx_tools import query_otx
 
 OTX_BASE = "https://otx.alienvault.com/api/v1"
 
@@ -25,8 +25,8 @@ def _set_otx_key(monkeypatch):
 
 class TestRegistration:
     def test_query_otx_tool_registered(self):
-        tools = server.mcp._tool_manager._tools
-        assert "query_otx" in tools
+        # arrange / act / assert
+        assert "query_otx" in mcp._tool_manager._tools
 
 
 # ------------------------------------------------------------------
@@ -37,11 +37,11 @@ class TestRegistration:
 class TestValidation:
     def test_raises_on_empty_search_term(self):
         with pytest.raises(ValueError, match="search_term"):
-            query_otx.fn("", "")
+            query_otx("", "")
 
     def test_raises_on_whitespace_search_term(self):
         with pytest.raises(ValueError, match="search_term"):
-            query_otx.fn("   ", "")
+            query_otx("   ", "")
 
 
 # ------------------------------------------------------------------
@@ -71,7 +71,7 @@ class TestIndicatorSearch:
             )
         )
 
-        raw = query_otx.fn("1.2.3.4", "ipv4")
+        raw = query_otx("1.2.3.4", "ipv4")
         data = json.loads(raw)
 
         assert data["total_results"] == 1
@@ -101,7 +101,7 @@ class TestIndicatorSearch:
             )
         )
 
-        raw = query_otx.fn("evil.com", "domain")
+        raw = query_otx("evil.com", "domain")
         data = json.loads(raw)
 
         assert data["total_results"] == 1
@@ -113,7 +113,7 @@ class TestIndicatorSearch:
             return_value=httpx.Response(404)
         )
 
-        raw = query_otx.fn("9.9.9.9", "ipv4")
+        raw = query_otx("9.9.9.9", "ipv4")
         data = json.loads(raw)
 
         assert data["total_results"] == 0
@@ -127,13 +127,13 @@ class TestIndicatorSearch:
             )
         )
 
-        raw = query_otx.fn("8.8.8.8", "ipv4")
+        raw = query_otx("8.8.8.8", "ipv4")
         data = json.loads(raw)
 
         assert data["total_results"] == 0
 
     def test_unsupported_indicator_type_returns_empty(self):
-        raw = query_otx.fn("something", "unsupported_type")
+        raw = query_otx("something", "unsupported_type")
         data = json.loads(raw)
 
         assert data["total_results"] == 0
@@ -144,7 +144,7 @@ class TestIndicatorSearch:
             side_effect=httpx.ReadTimeout("timeout")
         )
 
-        raw = query_otx.fn("1.2.3.4", "ipv4")
+        raw = query_otx("1.2.3.4", "ipv4")
         data = json.loads(raw)
 
         assert data["total_results"] == 0
@@ -170,16 +170,22 @@ SAMPLE_PULSE = {
 class TestPulseSearch:
     @respx.mock
     def test_returns_pulse_results(self):
+        # arrange — mock pulse search and detail fetch (top 3 are enriched)
         respx.get(f"{OTX_BASE}/search/pulses").mock(
             return_value=httpx.Response(200, json={"results": [SAMPLE_PULSE]})
         )
+        respx.get(f"{OTX_BASE}/pulses/abc-123").mock(
+            return_value=httpx.Response(200, json={**SAMPLE_PULSE, "indicators": [], "description": "", "references": []})
+        )
 
-        raw = query_otx.fn("APT29")
+        # act
+        raw = query_otx("APT29")
         data = json.loads(raw)
 
+        # assert
         assert data["total_results"] == 1
         assert data["indicator_type"] == "keyword"
-        r = data["results"][0]
+        r = data["enriched_pulses"][0]
         assert r["pulse_name"] == "APT29 Campaign"
         assert r["adversary"] == "APT29"
         assert "apt29" in r["tags"]
@@ -188,43 +194,49 @@ class TestPulseSearch:
 
     @respx.mock
     def test_returns_empty_on_no_results(self):
+        # arrange
         respx.get(f"{OTX_BASE}/search/pulses").mock(
             return_value=httpx.Response(200, json={"results": []})
         )
 
-        raw = query_otx.fn("nonexistent-malware-xyz")
+        # act
+        raw = query_otx("nonexistent-malware-xyz")
         data = json.loads(raw)
 
+        # assert
         assert data["total_results"] == 0
-        assert data["results"] == []
+        assert data["enriched_pulses"] == []
 
     @respx.mock
-    def test_handles_pagination(self):
-        page1 = [
-            {**SAMPLE_PULSE, "id": f"p-{i}", "name": f"Pulse {i}"} for i in range(50)
-        ]
-        page2 = [{**SAMPLE_PULSE, "id": "p-50", "name": "Pulse 50"}]
-
+    def test_fetches_single_page_of_results(self):
+        # arrange — new implementation fetches a single page (max 10)
+        page = [{**SAMPLE_PULSE, "id": f"p-{i}", "name": f"Pulse {i}"} for i in range(5)]
         route = respx.get(f"{OTX_BASE}/search/pulses").mock(
-            side_effect=[
-                httpx.Response(200, json={"results": page1}),
-                httpx.Response(200, json={"results": page2}),
-            ]
+            return_value=httpx.Response(200, json={"results": page})
         )
+        for i in range(3):  # top 3 are enriched with detail fetches
+            respx.get(f"{OTX_BASE}/pulses/p-{i}").mock(
+                return_value=httpx.Response(200, json={**SAMPLE_PULSE, "indicators": [], "description": "", "references": []})
+            )
 
-        raw = query_otx.fn("APT29")
+        # act
+        raw = query_otx("APT29")
         data = json.loads(raw)
 
-        assert data["total_results"] == 51
-        assert route.call_count == 2
+        # assert
+        assert data["total_results"] == 5
+        assert route.call_count == 1  # single page fetch
 
     @respx.mock
     def test_returns_empty_on_api_error(self):
+        # arrange
         respx.get(f"{OTX_BASE}/search/pulses").mock(return_value=httpx.Response(403))
 
-        raw = query_otx.fn("APT29")
+        # act
+        raw = query_otx("APT29")
         data = json.loads(raw)
 
+        # assert
         assert data["total_results"] == 0
 
 
@@ -235,10 +247,13 @@ class TestPulseSearch:
 
 class TestMissingApiKey:
     def test_returns_empty_without_api_key(self, monkeypatch):
+        # arrange
         monkeypatch.delenv("OTX_API_KEY", raising=False)
 
-        raw = query_otx.fn("APT29")
+        # act
+        raw = query_otx("APT29")
         data = json.loads(raw)
 
+        # assert
         assert data["total_results"] == 0
-        assert data["results"] == []
+        assert data["enriched_pulses"] == []

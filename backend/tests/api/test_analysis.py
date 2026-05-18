@@ -2,7 +2,10 @@
 
 import json
 
+import pytest
 from fastapi.testclient import TestClient
+
+pytestmark = pytest.mark.integration
 
 from src.api import analysis as analysis_api
 from src.api.main import app
