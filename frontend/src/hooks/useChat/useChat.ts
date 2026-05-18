@@ -37,6 +37,7 @@ import { useT, type Translations } from "../../i18n/useT";
 
 let didRequestInitialDevSnapshots = false;
 
+/** Stages that require an explicit user decision (approve or reject) before the workflow advances. */
 const DECISION_STAGES: DialogueStage[] = [
   "summary_confirming",
   "pir_confirming",
@@ -45,6 +46,7 @@ const DECISION_STAGES: DialogueStage[] = [
   "processing",
 ];
 
+/** Maps each backend action to the message type used for rendering in ChatWindow. */
 const ACTION_TO_MESSAGE_TYPE: Record<
   DialogueAction,
   NonNullable<Message["type"]>
@@ -64,14 +66,30 @@ const ACTION_TO_MESSAGE_TYPE: Record<
   complete: "complete",
 };
 
+/**
+ * Returns true if the given stage requires an explicit user decision before the workflow advances.
+ * @param stage - The current dialogue stage.
+ * @returns True if the stage is a decision stage.
+ */
 function isDecisionStage(stage: DialogueStage): boolean {
   return DECISION_STAGES.includes(stage);
 }
 
+/**
+ * Returns the default subState for a given dialogue stage.
+ * Decision stages default to "awaiting_decision"; all others default to null.
+ * @param stage - The dialogue stage to evaluate.
+ * @returns The default subState value for the given stage.
+ */
 function defaultSubStateForStage(stage: DialogueStage): DialogueSubState {
   return isDecisionStage(stage) ? "awaiting_decision" : null;
 }
 
+/**
+ * Attempts to parse a raw string as JSON of type T.
+ * @param raw - The string to parse.
+ * @returns The parsed value, or null if parsing fails.
+ */
 function tryParseJson<T>(raw: string): T | null {
   try {
     return JSON.parse(raw) as T;
@@ -80,6 +98,12 @@ function tryParseJson<T>(raw: string): T | null {
   }
 }
 
+/**
+ * Extracts a JSON object from a raw string using three fallback strategies:
+ * direct parse, markdown code-block extraction, then brace-boundary slicing.
+ * @param raw - The raw string to extract from.
+ * @returns A plain object if a valid JSON object is found, otherwise null.
+ */
 function extractJsonObject(raw: string): Record<string, unknown> | null {
   const direct = tryParseJson<unknown>(raw);
   if (direct && typeof direct === "object" && !Array.isArray(direct)) {
@@ -111,6 +135,12 @@ function extractJsonObject(raw: string): Record<string, unknown> | null {
   return null;
 }
 
+/**
+ * Normalises a raw source label string to a canonical display name.
+ * Handles known aliases such as "alienvault" and variants of "knowledge bank".
+ * @param raw - The raw label string received from the backend.
+ * @returns The canonical display name for the source.
+ */
 function normalizeSourceLabel(raw: string): string {
   const value = raw.trim();
   const lower = value.toLowerCase();
@@ -126,6 +156,12 @@ function normalizeSourceLabel(raw: string): string {
   return value;
 }
 
+/**
+ * Parses a raw unknown value into a deduplicated list of normalised source names.
+ * Non-string and duplicate array elements are silently dropped.
+ * @param raw - The value to parse, expected to be a string array from the backend.
+ * @returns A deduplicated array of normalised source display names.
+ */
 function parseSourcesFromUnknown(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   const deduped: string[] = [];
@@ -139,6 +175,12 @@ function parseSourcesFromUnknown(raw: unknown): string[] {
   return deduped;
 }
 
+/**
+ * Parses a markdown-formatted plan text into structured collection steps.
+ * Supports both bold ("**Title:**") and plain ("Title:") numbered list formats.
+ * @param plan - The raw markdown plan text from the backend.
+ * @returns An array of CollectionPlanStep objects, or undefined if fewer than two items are found.
+ */
 function parseStepsFromPlanText(plan: string): CollectionPlanStep[] | undefined {
   // Split on numbered list boundaries: "N." at the start of a line
   const chunks = plan.split(/(?=^\d+\.[ \t])/m).map((s) => s.trim()).filter(Boolean);
@@ -169,6 +211,13 @@ function parseStepsFromPlanText(plan: string): CollectionPlanStep[] | undefined 
   return steps.length > 0 ? steps : undefined;
 }
 
+/**
+ * Parses a raw backend payload into a CollectionPlanData object.
+ * Accepts either direct JSON or plain markdown plan text.
+ * Source aggregation prefers per-step sources over the top-level field to handle legacy payloads.
+ * @param raw - The raw string from the backend response.
+ * @returns A structured CollectionPlanData object.
+ */
 function parsePlanData(raw: string): CollectionPlanData {
   const parsed = extractJsonObject(raw);
   if (!parsed) {
@@ -212,6 +261,12 @@ function parsePlanData(raw: string): CollectionPlanData {
   };
 }
 
+/**
+ * Extracts a flat list of suggested source names from a raw backend string.
+ * Tries a JSON array first, then falls back to parsing it as a plan payload.
+ * @param raw - The raw string from the backend response.
+ * @returns A deduplicated array of source display names.
+ */
 function parseSuggestedSources(raw: string): string[] {
   const parsed = tryParseJson<unknown>(raw);
   if (
@@ -227,12 +282,26 @@ function parseSuggestedSources(raw: string): string[] {
   return [];
 }
 
+/**
+ * Resolves a backend action string to the corresponding chat message type.
+ * @param response - The backend dialogue response.
+ * @returns The message type for rendering, or undefined if the action has no mapping.
+ */
 function resolveMessageType(
   response: DialogueApiResponse,
 ): Message["type"] | undefined {
   return (ACTION_TO_MESSAGE_TYPE as Record<string, NonNullable<Message["type"]>>)[response.action];
 }
 
+/**
+ * Infers the conversation stage and subState from a backend response.
+ * Uses action-based heuristics when the response does not carry an explicit stage field,
+ * which handles older backend versions that omitted that field.
+ * @param response - The backend dialogue response.
+ * @param fallbackStage - The stage to use if no inference rule matches.
+ * @param fallbackSubState - The subState to use if no inference rule matches.
+ * @returns An object containing the resolved stage and subState.
+ */
 function inferStageFromResponse(
   response: DialogueApiResponse,
   fallbackStage: DialogueStage,
@@ -287,6 +356,14 @@ function inferStageFromResponse(
   return { stage: fallbackStage, subState: fallbackSubState };
 }
 
+/**
+ * Infers the current TI phase from the resolved stage and backend response.
+ * Falls back to the provided phase when the response does not include a phase field.
+ * @param response - The backend dialogue response.
+ * @param stage - The already-resolved dialogue stage.
+ * @param fallbackPhase - The phase to use if no inference rule matches.
+ * @returns The inferred DialoguePhase.
+ */
 function inferPhaseFromResponse(
   response: DialogueApiResponse,
   stage: DialogueStage,
@@ -318,6 +395,13 @@ function inferPhaseFromResponse(
   }
 }
 
+/**
+ * Translates known backend error strings into localised UI messages.
+ * Unmapped errors are passed through unchanged.
+ * @param raw - The raw error string from the backend.
+ * @param t - The current translations object.
+ * @returns The localised error string.
+ */
 function translateBackendError(raw: string, t: Translations): string {
   const mapping: Record<string, string> = {
     "Collection failed": t.collectionFailed,
@@ -325,6 +409,15 @@ function translateBackendError(raw: string, t: Translations): string {
   return mapping[raw.trim()] ?? raw;
 }
 
+/**
+ * Constructs a system Message from a backend DialogueApiResponse.
+ * Parses structured data payloads (PIR, plan, collection, processing, analysis, council)
+ * and attaches them to message.data for type-specific rendering in ChatWindow.
+ * @param response - The backend response to convert.
+ * @param t - The current translations object.
+ * @param isGatherMore - Whether this message belongs to a gather-more collection flow.
+ * @returns A Message object ready to be added to the conversation.
+ */
 function buildSystemMessage(
   response: DialogueApiResponse,
   t: Translations,
@@ -439,6 +532,12 @@ function buildSystemMessage(
   return message;
 }
 
+/**
+ * Returns the localised feedback prompt shown to the user after they reject a decision-stage response.
+ * @param stage - The current dialogue stage.
+ * @param t - The current translations object.
+ * @returns The prompt string asking the user to provide revision feedback.
+ */
 function getFeedbackPrompt(stage: DialogueStage, t: Translations): string {
   if (stage === "summary_confirming") {
     return t.feedbackSummary;
@@ -452,6 +551,17 @@ function getFeedbackPrompt(stage: DialogueStage, t: Translations): string {
   return t.feedbackCollection;
 }
 
+/**
+ * Core chat hook that drives the TI workflow dialogue.
+ *
+ * Manages message history, stage/phase/subState transitions, approval flows,
+ * source selection, gather-more cycles, and dev tools (snapshots, stage jumping).
+ * State is persisted in ConversationContext; this hook owns only transient UI state
+ * such as loading flags, source lists, and dev prefill values.
+ *
+ * @param initialPerspectives - Default perspective codes applied when a new conversation is created.
+ * @returns An object containing message state, action handlers, and dev utilities.
+ */
 export function useChat(initialPerspectives?: string[]) {
   const {
     activeConversation,
@@ -553,6 +663,16 @@ export function useChat(initialPerspectives?: string[]) {
     setPendingGatherMoreText(null);
   }, [activeConversation?.id]);
 
+  /**
+   * Applies a backend response to the active conversation.
+   * Adds the system message, advances stage/phase, and updates review activity in WorkspaceContext.
+   * @param response - The backend response to apply.
+   * @param conversationId - The ID of the conversation to update.
+   * @param fallbackStage - The stage to use if the response carries none.
+   * @param fallbackSubState - The subState to use if the response carries none.
+   * @param fallbackPhase - The phase to use if the response carries none.
+   * @param isGatherMore - Whether this response belongs to a gather-more flow.
+   */
   const applyResponse = (
     response: DialogueApiResponse,
     conversationId: string,
@@ -578,6 +698,20 @@ export function useChat(initialPerspectives?: string[]) {
     setStage(conversationId, next.stage, next.subState, nextPhase);
   };
 
+  /**
+   * Sends a message to the backend and handles the two-step collection flow.
+   * When the backend responds with start_collecting, a second "collect" call is issued
+   * automatically to retrieve collection results, hiding this handshake from callers.
+   * @param conversationId - The conversation to update with the response.
+   * @param sessionId - The backend session ID for this conversation.
+   * @param message - The text message to send.
+   * @param approved - Whether the user approved the current stage, or undefined if not applicable.
+   * @param options - Additional send options (source selection, timeframes, council params).
+   * @param fallbackStage - The stage to fall back to if the response carries none.
+   * @param fallbackSubState - The subState to fall back to if the response carries none.
+   * @param fallbackPhase - The phase to fall back to if the response carries none.
+   * @param perspectives - The active perspective codes for this conversation.
+   */
   const sendAndHandle = async (
     conversationId: string,
     sessionId: string,

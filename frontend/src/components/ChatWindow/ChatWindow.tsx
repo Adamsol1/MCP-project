@@ -45,7 +45,12 @@ function Chevron() {
   );
 }
 
-/** Renders reasoning markdown into structured sections and bullet lists. */
+/**
+ * Renders AI reasoning markdown into structured sections and bullet lists.
+ * Normalises inconsistent whitespace and inline bullet separators from the model output.
+ * @param text - The raw reasoning markdown string from the backend.
+ * @returns A formatted React element with headings, bullets, and prose blocks.
+ */
 function ReasoningMarkdown({ text }: { text: string }) {
   // Normalise: replace inline " * " separators (model sometimes omits newlines)
   // with a real newline so each bullet lands on its own line.
@@ -116,7 +121,12 @@ function ReasoningMarkdown({ text }: { text: string }) {
   return <div className="space-y-1 text-sm text-text-secondary">{rendered}</div>;
 }
 
-/** Renders inline markdown: **bold** and plain text segments. */
+/**
+ * Renders inline markdown tokens, converting **bold** markers to strong elements
+ * and stripping stray leading/trailing asterisks.
+ * @param text - A single line of inline markdown text.
+ * @returns A React node with bold segments and plain text spans.
+ */
 function renderInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) => {
@@ -128,6 +138,12 @@ function renderInline(text: string): React.ReactNode {
   });
 }
 
+/**
+ * Renders Priority Intelligence Requirements generated in the Direction phase.
+ * Sorts PIRs by priority and syncs pirData into WorkspaceContext for citation cross-referencing.
+ * @param pirData - The structured PIR payload from the backend.
+ * @returns A React element showing PIR cards, source list, and optional reasoning.
+ */
 function PirMessage({ pirData }: { pirData: PirData }) {
   const { highlightedRefs, setHighlightedRefs, setPirData } = useWorkspace();
   const t = useT();
@@ -243,6 +259,12 @@ function PirMessage({ pirData }: { pirData: PirData }) {
   );
 }
 
+/**
+ * Renders the AI-generated collection plan.
+ * Shows structured step cards when step data is available; falls back to plain text.
+ * @param planData - The parsed collection plan data.
+ * @returns A React element showing numbered step cards or raw plan text.
+ */
 function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
   const t = useT();
   const reasoningText = (planData.reasoning ?? "").trim();
@@ -322,6 +344,11 @@ function CollectionPlanMessage({ planData }: { planData: CollectionPlanData }) {
   );
 }
 
+/**
+ * Renders the list of sources suggested by the AI for the upcoming collection.
+ * @param sources - The array of source display names to show.
+ * @returns A React element with the suggested source list, or a placeholder when empty.
+ */
 function SuggestedSourcesMessage({
   sources,
 }: {
@@ -344,6 +371,11 @@ function SuggestedSourcesMessage({
   );
 }
 
+/**
+ * Renders a text summary of the completed collection, including sources used and identified gaps.
+ * @param data - The collection summary payload from the backend.
+ * @returns A React element with the summary text, sources list, and gap description.
+ */
 function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
   const t = useT();
   return (
@@ -376,6 +408,11 @@ function CollectionSummaryMessage({ data }: { data: CollectionSummaryData }) {
 
 type ConfidenceTier = "low" | "moderate" | "high" | "assessed";
 
+/**
+ * Converts a 0-100 confidence integer into a four-level tier label.
+ * @param score - The confidence score in the range 0 to 100.
+ * @returns The tier: "assessed" (80+), "high" (60-79), "moderate" (40-59), or "low" (below 40).
+ */
 function confidenceTierFromInt(score: number): ConfidenceTier {
   if (score >= 80) return "assessed";
   if (score >= 60) return "high";
@@ -383,6 +420,7 @@ function confidenceTierFromInt(score: number): ConfidenceTier {
   return "low";
 }
 
+/** Tailwind class strings for each confidence tier badge. */
 const FINDING_TIER_STYLES: Record<ConfidenceTier, string> = {
   assessed: "bg-purple-600 text-white",
   high: "bg-emerald-600 text-white",
@@ -390,6 +428,7 @@ const FINDING_TIER_STYLES: Record<ConfidenceTier, string> = {
   low: "bg-red-600 text-white",
 };
 
+/** Maps backend source identifiers to user-facing display names shown in findings. */
 const SOURCE_DISPLAY_NAMES: Record<string, string> = {
   knowledge_bank: "Knowledge Bank",
   otx: "AlienVault OTX",
@@ -406,7 +445,14 @@ function formatRelevantTo(values: string[]): string {
   return values.join(", ");
 }
 
-/** Renders an APA citation string, turning the trailing URL (if any) into a clickable link. */
+/**
+ * Renders an APA 7th edition citation string with the trailing URL as a clickable link.
+ * If the citation already contains an https:// URL, it is linkified in place;
+ * otherwise the url param is appended as a separate anchor.
+ * @param citation - The full APA citation string.
+ * @param url - The canonical URL for the source.
+ * @returns A React fragment with the formatted citation and an anchor element.
+ */
 function ApaWithLink({ citation, url }: { citation: string; url: string }) {
   const urlIdx = citation.lastIndexOf("https://");
   if (urlIdx === -1) {
@@ -431,6 +477,15 @@ function ApaWithLink({ citation, url }: { citation: string; url: string }) {
   );
 }
 
+/**
+ * Full-detail modal for a single processing finding.
+ * Resolves source references against collected items from WorkspaceContext
+ * to render APA citations, URLs, Knowledge Base refs, and OTX indicators.
+ * @param finding - The finding to display, or null when the modal is closed.
+ * @param displayId - The display-friendly ID shown in the header (e.g. "F-01").
+ * @param onClose - Callback invoked when the modal is dismissed.
+ * @returns A modal overlay element, or null when no finding is selected.
+ */
 function FindingDetailModal({
   finding,
   displayId,
@@ -752,6 +807,14 @@ function FindingDetailModal({
   );
 }
 
+/**
+ * Renders the processing results table with findings sorted by confidence score.
+ * Supports gap collection: individual gaps can be selected for targeted re-collection.
+ * @param data - The structured processing output from the backend.
+ * @param onGapCollect - Optional callback invoked with a pre-filled prompt for gap collection.
+ * @param onCollectMore - Optional callback for the Collect More action from the approval bar.
+ * @returns A React element with a sortable findings table and an optional gap collection UI.
+ */
 function ProcessingMessage({
   data,
   onGapCollect,
@@ -1013,6 +1076,11 @@ interface ChatWindowProps {
   onGapCollect?: (gap: string) => void;
 }
 
+/**
+ * Renders a compact table showing item counts per source from a collection run.
+ * @param summaries - The list of source summary entries to display.
+ * @returns A table element, or null if the summaries list is empty.
+ */
 function SourceSummaryTable({
   summaries,
 }: {
@@ -1050,6 +1118,13 @@ function SourceSummaryTable({
   );
 }
 
+/**
+ * Renders the collection run summary card and pushes data into WorkspaceContext.
+ * When data.replace is true the workspace collection is replaced; otherwise it is merged.
+ * @param data - The collection display payload from the backend.
+ * @param runNumber - The sequential run number shown in the card header.
+ * @returns A React element showing the run header and a source summary table.
+ */
 function CollectionDisplayMessage({
   data,
   runNumber,
@@ -1105,6 +1180,39 @@ function CollectionDisplayMessage({
   );
 }
 
+/**
+ * Main conversation panel for the TI workflow.
+ *
+ * Renders all message types (summary, PIR, plan, collection, processing, analysis, council)
+ * via an internal dispatch switch. The bottom panel adapts based on state: source selection,
+ * active collection progress, approval prompts, or the text input form.
+ * AnalysisWorkspace is mounted inline below the message list once an analysis message arrives.
+ *
+ * @param messages - The list of messages to display.
+ * @param onSendMessage - Callback invoked when the user submits a text message.
+ * @param isConfirming - Whether the workflow is waiting for an approve/reject decision.
+ * @param isLoading - Whether a backend call is in progress.
+ * @param stage - The current dialogue stage.
+ * @param phase - The current TI phase.
+ * @param subState - The current dialogue sub-state.
+ * @param onApprove - Callback invoked when the user approves the current stage.
+ * @param onReject - Callback invoked when the user rejects the current stage.
+ * @param onGatherMore - Callback to enter the gather-more flow from the collection review.
+ * @param onGatherMoreFromProcessing - Callback to trigger re-collection from the processing review.
+ * @param isSourceSelecting - Whether the source selection panel is active.
+ * @param isCollecting - Whether collection is actively running.
+ * @param collectionStatus - Live status polled from the backend during collection.
+ * @param availableSources - The list of sources the user can select.
+ * @param selectedSources - The currently selected sources.
+ * @param onToggleSourceSelection - Callback to toggle a source in the selection.
+ * @param onSubmitSourceSelection - Callback invoked when the user confirms the source selection.
+ * @param devPrefill - A dev-mode message to auto-send after a short delay.
+ * @param onDevPrefillConsumed - Callback to clear the devPrefill value after use.
+ * @param inputPrefill - A string to pre-fill into the text input field.
+ * @param onInputPrefillConsumed - Callback to clear the inputPrefill value after use.
+ * @param onGapCollect - Callback invoked with a pre-filled gap collection prompt.
+ * @returns The chat panel React element.
+ */
 export default function ChatWindow({
   onSendMessage,
   messages = [],

@@ -14,12 +14,26 @@ const PHASE_ORDER: DialoguePhase[] = [
   "analysis",
 ];
 
+/**
+ * Returns the index of the given phase in the phase order array.
+ * @param phase The dialogue phase for which to find the index.
+ * @returns The index of the phase in the PHASE_ORDER array, or -1 if not found.
+ * Note: The "council" phase is treated as a sub-mode of "analysis" and will return the same index as "analysis".
+ */
 function phaseIndex(phase: DialoguePhase): number {
   // Council is a sub-mode of analysis — show Analysis as active
   const normalized = phase === "council" ? "analysis" : phase;
   return PHASE_ORDER.indexOf(normalized);
 }
 
+/**
+ * Renders a stage tracker component that visually represents the current phase of a dialogue process.
+ * Each stage is represented by a circle with a label, and the active stage is highlighted.
+ * Completed stages are marked with a check icon, while upcoming stages are shown with a numbered circle.
+ *
+ * @param activePhase The current active dialogue phase to determine which stage is active in the tracker.
+ * @returns A React component that displays the stage tracker with appropriate styling for completed, active, and upcoming stages.
+ */
 function CheckIcon() {
   return (
     <svg
@@ -38,6 +52,10 @@ function CheckIcon() {
   );
 }
 
+/**
+ * Renders a right-pointing chevron icon used as a separator between stages in the stage tracker.
+ * @returns  A React component that displays a chevron icon with appropriate styling.
+ */
 function ChevronRight() {
   return (
     <svg
@@ -57,6 +75,11 @@ function ChevronRight() {
   );
 }
 
+/**
+ *  StageTracker component visually represents the current phase of a dialogue process, showing completed, active, and upcoming stages with appropriate styling.
+ * @param Object containing the activePhase prop, which indicates the current dialogue phase to determine the active stage in the tracker.
+ * @returns A React component that displays the stage tracker with circles and labels for each stage, using icons and styling to differentiate between completed, active, and upcoming stages.
+ */
 export default function StageTracker({
   activePhase,
 }: {

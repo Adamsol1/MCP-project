@@ -26,6 +26,23 @@ interface IntelligencePanelProps {
   collectionStatus?: CollectionStatus | null;
 }
 
+/**
+ * Right-side panel that adapts its content to the current TI phase.
+ *
+ * Direction: shows the perspective selector and PIR sources when available.
+ * Collection, Processing, Analysis: shows the uploaded file list.
+ * All phases: shows review activity and collection stats when data is present.
+ *
+ * @param phase - The current TI phase driving the panel content.
+ * @param selectedPerspectives - The currently selected analyst perspective codes.
+ * @param onPerspectiveChange - Callback invoked when the user changes perspective selection.
+ * @param onOpenFileUpload - Callback to open the file upload modal.
+ * @param uploadedFiles - The list of files uploaded to the current session.
+ * @param onFileRemove - Callback invoked when the user removes an uploaded file.
+ * @param isCollecting - Whether collection is actively running.
+ * @param collectionStatus - Live status object polled from the backend during collection.
+ * @returns The intelligence panel React element.
+ */
 export default function IntelligencePanel({
   phase,
   selectedPerspectives = ["NEUTRAL"],
@@ -195,6 +212,14 @@ export default function IntelligencePanel({
   );
 }
 
+/**
+ * Labelled section with an optional dividing rule above and an optional right-aligned header element.
+ * @param label - The section label displayed as a small uppercase heading.
+ * @param children - The section body content.
+ * @param first - When true, suppresses the top divider (used for the first section in the panel).
+ * @param headerRight - Optional element rendered on the right side of the section header.
+ * @returns A section element with a labelled header and body content.
+ */
 function PanelSection({ label, children, first = false, headerRight }: { label: string; children: ReactNode; first?: boolean; headerRight?: ReactNode }) {
   return (
     <>
@@ -212,6 +237,12 @@ function PanelSection({ label, children, first = false, headerRight }: { label: 
   );
 }
 
+/**
+ * Shows a live per-source progress list during active collection.
+ * Highlights the currently active source and marks completed sources with a checkmark.
+ * @param status - The live collection status object from the backend polling endpoint.
+ * @returns A list element showing each source and its collection progress.
+ */
 function CollectionStatusDisplay({ status }: { status: CollectionStatus }) {
   const t = useT();
   const entries = Object.entries(status.sources);
@@ -287,6 +318,11 @@ interface ReviewActivitySectionProps {
   onOpenReviewModal: (attempt: number) => void;
 }
 
+/**
+ * Attempts to parse a JSON string as ProcessingData.
+ * @param content - The raw JSON string to parse, or null.
+ * @returns A ProcessingData object if parsing succeeds and the shape matches, otherwise null.
+ */
 function tryParseProcessingData(content: string | null): ProcessingData | null {
   if (!content) return null;
   try {
@@ -298,6 +334,13 @@ function tryParseProcessingData(content: string | null): ProcessingData | null {
   return null;
 }
 
+/**
+ * Lists AI review attempts for the current session.
+ * Processing-phase attempts can be expanded inline to preview their findings and gaps.
+ * @param activity - The list of review items produced by the AI reviewer between phases.
+ * @param onOpenReviewModal - Callback invoked with the attempt number to open the full review modal.
+ * @returns A list of collapsible review attempt cards.
+ */
 function ReviewActivitySection({ activity, onOpenReviewModal }: ReviewActivitySectionProps) {
   const [expandedAttempts, setExpandedAttempts] = useState<Set<number>>(new Set());
 
@@ -425,6 +468,18 @@ interface FileUploadSectionProps {
   onFileRemove?: (file: UploadedFileRecord) => void;
 }
 
+/**
+ * Upload button and file list for the Intelligence Panel.
+ * Shows up to VISIBLE_FILE_COUNT files; additional files are revealed with a toggle.
+ * @param uploadedFiles - The full list of uploaded files for the current session.
+ * @param visibleFiles - The slice of files currently shown (respects the showAllFiles toggle).
+ * @param hiddenCount - The number of files hidden by the VISIBLE_FILE_COUNT limit.
+ * @param showAllFiles - Whether all files are currently expanded.
+ * @param onToggleShowAll - Callback to toggle between the collapsed and expanded file list.
+ * @param onOpenFileUpload - Callback to open the file upload modal.
+ * @param onFileRemove - Optional callback invoked when the user clicks a file remove button.
+ * @returns A React element with the upload button and file list.
+ */
 function FileUploadSection({
   uploadedFiles,
   visibleFiles,

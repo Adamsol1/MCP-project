@@ -97,6 +97,11 @@ function getConfidenceTierLabel(confidence: number): string {
   return "Low";
 }
 
+/**
+ *  StageTracker component visually represents the current phase of a dialogue process, showing completed, active, and upcoming stages with appropriate styling.
+ * @param summary The AI-generated summary of the analysis, used as a fallback to derive the report title if an explicit title is not provided. The first sentence or first 8 words of the summary will be used as the title if the main title is missing.
+ * @returns The derived title for the analysis report.
+ */
 function deriveTitleFromSummary(summary: string): string {
   // Take the first sentence of the AI-generated summary as a title fallback
   const firstSentence = summary.split(/[.!?]/)[0]?.trim() ?? "";
@@ -105,6 +110,14 @@ function deriveTitleFromSummary(summary: string): string {
   return firstSentence.split(/\s+/).slice(0, 8).join(" ");
 }
 
+/**
+ *  Formats a perspective key into a more human-readable label for display in the PDF report.
+ * @param analysisTitle The explicit title provided in the analysis draft, which takes highest precedence if available and non-empty.
+ * @param summary The AI-generated summary of the analysis, used as a fallback to derive the report title if an explicit title is not provided. The first sentence or first 8 words of the summary will be used as the title if the main title is missing.
+ * @param conversationTitle The title of the conversation from which the analysis was generated, used as a secondary fallback if both the explicit title and summary are unavailable or uninformative. The conversation title will be used unless it is the default "New conversation".
+ * @param findings The list of findings included in the analysis, used as a last-resort fallback to derive the title from the first finding's title if all other sources are unavailable or uninformative.
+ * @returns The derived title for the analysis report, based on the provided parameters in order of precedence: explicit title, summary-derived title, conversation title, and first finding title.
+ */
 function getAnalysisHeading(
   analysisTitle: string,
   summary: string,
@@ -132,12 +145,22 @@ function getSupportingDataSummary(data: Record<string, string[]>) {
 // Helpers — stat computation
 // ---------------------------------------------------------------------------
 
+/**
+ *  Calculates the average confidence score across all findings in the analysis report.
+ * @param findings The list of findings included in the analysis, each containing a confidence score. The function computes the average confidence by summing the confidence scores of all findings and dividing by the total number of findings. If there are no findings, it returns 0 to indicate no confidence.
+ * @returns The average confidence score as a percentage (0-100) across all findings, rounded to the nearest whole number. If there are no findings, returns 0.
+ */
 function getAverageConfidence(findings: ProcessingFinding[]) {
   if (findings.length === 0) return 0;
   const total = findings.reduce((sum, f) => sum + f.confidence, 0);
   return Math.round(total / findings.length);
 }
 
+/**
+ *  Computes the overall timespan covered by the findings in the analysis report, based on the timestamps included in the supporting data of each finding. The function extracts all timestamps from the findings, determines the earliest and latest timestamps, and calculates the difference to provide a human-readable timespan (e.g., "3 days", "2 months", "1 year"). If there are fewer than 2 valid timestamps, it returns null to indicate that a timespan cannot be computed.
+ * @param findings The list of findings included in the analysis, each potentially containing timestamps in their supporting data. The function processes these timestamps to determine the overall timespan covered by the findings. If there are fewer than 2 valid timestamps, it returns null to indicate that a timespan cannot be computed.
+ * @returns A human-readable string representing the timespan covered by the findings (e.g., "3 days", "2 months", "1 year"), or null if there are fewer than 2 valid timestamps to compute a timespan.
+ */
 function getTimelineSpan(findings: ProcessingFinding[]) {
   const allTimestamps = findings
     .flatMap((f) => f.supporting_data["timestamps"] ?? [])
@@ -154,6 +177,11 @@ function getTimelineSpan(findings: ProcessingFinding[]) {
   return `${diffDays} days`;
 }
 
+/**
+ *  Retrieves all unique source types from the findings in the analysis report.
+ * @param findings The list of findings included in the analysis, each potentially containing source information. The function processes these sources to determine all unique types.
+ * @returns An array of unique source types as strings.
+ */
 function getAllSourceTypes(findings: ProcessingFinding[]): string[] {
   const types = new Set<string>();
   for (const finding of findings) {
