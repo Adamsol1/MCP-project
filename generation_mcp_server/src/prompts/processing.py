@@ -12,6 +12,11 @@ def build_processing_prompt(
     previous_result: str | None = None,
     language: str = "en",
 ) -> str:
+    """Build the processing prompt (PMESII extraction) for the generator LLM.
+
+    Optional sections are appended only when set: reviewer feedback for a
+    retry, and the previous run's result so the LLM can flag assessment changes.
+    """
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
     lang_note = _language_instruction(language, "all output fields")
 
@@ -152,6 +157,7 @@ def build_processing_modify_prompt(
     modifications: str,
     language: str = "en",
 ) -> str:
+    """Build the processing-modify prompt. Applies analyst edits without re-running tools."""
     lang_note = _language_instruction(language, "the modified output")
 
     return f"""{lang_note}You are a professional threat intelligence analyst. Apply the requested modification to an existing processing result.

@@ -24,6 +24,7 @@ _OTX_INDICATOR_SECTIONS: dict[str, str] = {
 
 
 def _otx_request(path: str, params: dict | None = None) -> dict:
+    """GET an OTX endpoint. Returns {} on missing key or non-403 errors; raises on 403."""
     api_key = os.getenv("OTX_API_KEY")
     if not api_key:
         logger.error("[query_otx] OTX_API_KEY environment variable is not set")
@@ -50,6 +51,7 @@ def _otx_request(path: str, params: dict | None = None) -> dict:
 
 
 def _search_otx_indicator(indicator_type: str, value: str) -> list[dict]:
+    """Look up an exact IoC in OTX. Returns one row per pulse the indicator appears in."""
     section = _OTX_INDICATOR_SECTIONS.get(indicator_type.lower())
     if not section:
         return []
@@ -76,6 +78,7 @@ def _search_otx_indicator(indicator_type: str, value: str) -> list[dict]:
 
 
 def _search_otx_pulses(query: str, since_date: str = "") -> list[dict]:
+    """Keyword search across OTX pulses. Caps at 10 results for one round-trip."""
     all_results: list[dict] = []
     limit = 10
 
@@ -111,6 +114,7 @@ def _search_otx_pulses(query: str, since_date: str = "") -> list[dict]:
 
 
 def _fetch_pulse_details(pulse_id: str) -> dict:
+    """Pull the full pulse (description, IoCs, refs) by id. Caps indicators at 50."""
     data = _otx_request(f"pulses/{pulse_id.strip()}")
     if not data:
         return {"pulse_id": pulse_id, "error": "No data returned"}
@@ -195,4 +199,5 @@ def query_otx(search_term: str, indicator_type: str = "", since_date: str = "") 
 
 
 def register_otx_tools(mcp) -> None:
+    """Register query_otx on the MCP server."""
     mcp.tool(query_otx)

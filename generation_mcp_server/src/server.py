@@ -9,6 +9,7 @@ from urllib.request import urlopen
 
 
 def _health_ok(port: int) -> bool:
+    """True if /health on this port returns 2xx within 300ms."""
     try:
         with urlopen(f"http://127.0.0.1:{port}/health", timeout=0.3) as response:
             return 200 <= response.status < 300
@@ -17,19 +18,24 @@ def _health_ok(port: int) -> bool:
 
 
 def _port_in_use(port: int) -> bool:
+    """True if something is listening on this port. Doesn't say what."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         sock.settimeout(0.3)
         return sock.connect_ex(("127.0.0.1", port)) == 0
 
 
+# Defaults to 8001. The review MCP claims 8002.
 BOOT_PORT = int(os.getenv("MCP_SERVER_PORT", "8001"))
 BOOT_URL = f"http://127.0.0.1:{BOOT_PORT}/sse"
 
+# ── Preflight ────────────────────────────────────────────────────────────────
+# Runs before heavy imports so a duplicate launch exits fast.
 if __name__ == "__main__":
     if _health_ok(BOOT_PORT):
         print(f"Generation MCP already running on {BOOT_URL}", flush=True)
         raise SystemExit(0)
     if _port_in_use(BOOT_PORT):
+        # Port taken but /health didn't answer, so it's not us.
         print(
             f"Generation MCP port {BOOT_PORT} is already in use. Stop the other process or set MCP_SERVER_PORT.",
             file=sys.stderr,
@@ -37,6 +43,8 @@ if __name__ == "__main__":
         )
         raise SystemExit(1)
 
+# ── Dependencies ─────────────────────────────────────────────────────────────
+# Guarded so a missing package points at the right poetry project to fix.
 try:
     from dotenv import load_dotenv
     from fastmcp import FastMCP
@@ -63,6 +71,8 @@ from tools.upload_tools import register_upload_tools
 
 load_dotenv()
 
+# ── MCP server setup ─────────────────────────────────────────────────────────
+# `instructions` is what clients see during MCP discovery.
 mcp = FastMCP(
     name="ThreatIntelligence",
     instructions=(
@@ -86,6 +96,7 @@ register_prompts(mcp)
 # Health check
 @mcp.custom_route("/health", methods=["GET"])
 async def health(request):
+    """Liveness probe. Used by the preflight check above."""
     return JSONResponse({"status": "ok"})
 
 
@@ -97,6 +108,8 @@ def greet() -> str:
     return "MCP Threat Intelligence Server is running."
 
 
+# ── Entrypoint ───────────────────────────────────────────────────────────────
+# Quiet by default so the backend's logs stay readable when this runs as a child.
 if __name__ == "__main__":
     print(f"Starting Generation MCP on {BOOT_URL}", flush=True)
     mcp.run(

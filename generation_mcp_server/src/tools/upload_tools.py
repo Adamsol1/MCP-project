@@ -16,6 +16,7 @@ logger = logging.getLogger("mcp_server")
 
 
 def _default_uploads_dir() -> Path:
+    """Default uploads location: src/resources/uploads. Overridden by MCP_UPLOADS_DIR."""
     return Path(__file__).resolve().parents[1] / "resources" / "uploads"
 
 
@@ -137,6 +138,7 @@ def delete_upload(session_id: str, file_upload_id: str) -> str:
 
 
 def register_upload_tools(mcp):
+    """Register the upload staging tools (upload, list, read, delete) on the MCP server."""
     mcp.tool(upload_file)
     mcp.tool(list_uploads)
     mcp.tool(read_upload)

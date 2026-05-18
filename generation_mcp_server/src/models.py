@@ -1,3 +1,5 @@
+"""Pydantic models for PIR responses (sources, claims, citations, PIRs)."""
+
 from pydantic import BaseModel, field_validator
 from typing import Literal
 
@@ -12,6 +14,7 @@ class Citation(BaseModel):
   publisher: str
 
 class Source(BaseModel):
+  """A cited source. `ref` is the inline marker (e.g. [1]); `id` links to KB content."""
   id: str # e.g., "geopolitical/norway_russia" — unique identifier for the source
   ref: str # e.g., "[1]" — this is what gets cited in the claim text and links to the Citation
   source_type: Literal["kb", "doc", "data"] # e.g., "kb", "doc", "data" — this drives the UI badge and is a Literal with limited valid values
@@ -19,6 +22,7 @@ class Source(BaseModel):
 
 
 class Claim(BaseModel):
+  """A source-backed statement in pir_text. `source_ref` matches a Source.ref."""
   id: str # e.g., "claim_001" — unique identifier for the claim
   text: str # The prose text of the claim, e.g., "Norway and Russia have a complex geopolitical relationship."
   source_ref: str  # e.g., "[1]" — this should match the Source.ref of the Source that supports this claim, creating a link between the Claim and its Source
@@ -35,6 +39,7 @@ class Claim(BaseModel):
 
 
 class PIRItem(BaseModel):
+  """One PIR: a prioritised intelligence question with its rationale and source links."""
   question: str       # the PIR formulated as an intelligence question
   priority: Literal["high", "medium", "low"]
   rationale: str      # why this PIR matters given the context
@@ -42,6 +47,7 @@ class PIRItem(BaseModel):
 
 
 class PIRResponse(BaseModel):
+  """Full PIR generation output: summary, sources, claims, and the PIR list."""
   pir_text: str          # annotated summary paragraph — may contain [N] citation markers
   claims: list[Claim]    # opt-in: only source-backed statements become Claim entries
   sources: list[Source]  # all sources referenced by pir_text claims

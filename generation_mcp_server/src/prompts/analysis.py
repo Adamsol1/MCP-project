@@ -46,6 +46,11 @@ def build_analysis_generate_prompt(
     perspectives: str = "us, norway, china, eu, russia, neutral",
     language: str = "en",
 ) -> str:
+    """Build the analysis-draft prompt for the generator LLM.
+
+    Injects today's date so temporal claims have a fixed reference, and
+    builds a per-perspective implications block from _PERSPECTIVE_LENS.
+    """
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
     lang_note = _language_instruction(language, "all output fields")
 

@@ -14,6 +14,7 @@ _DEFAULT_DATA_DIR = _PROJECT_ROOT / "backend" / "data"
 
 
 def _resolve_db(env_var: str, filename: str) -> str:
+    """Return path to the db file. Env var wins, otherwise backend/data/<filename>."""
     override = os.getenv(env_var)
     if override:
         return override

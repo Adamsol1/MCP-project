@@ -12,6 +12,7 @@ from .processing import processing_modify, processing_process
 
 
 def register_prompts(mcp) -> None:
+    """Register every phase prompt on the MCP server, in cycle order."""
     mcp.prompt(direction_gathering)
     mcp.prompt(direction_summary)
     mcp.prompt(direction_pir)

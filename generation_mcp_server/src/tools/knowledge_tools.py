@@ -106,11 +106,13 @@ async def read_knowledge_base(ctx: Context, resource_id: str, session_id: str) -
 
 
 def register_knowledge_tools(mcp) -> None:
+    """Register the knowledge bank tools (list, read) on the MCP server."""
     mcp.tool(list_knowledge_base)
     mcp.tool(read_knowledge_base)
 
 
 def register_knowledge_resources(mcp) -> None:
+    """Register the knowledge:// resources (index + per-item reader) on the MCP server."""
     @mcp.resource("knowledge://index", mime_type="application/json")
     def knowledge_index() -> str:
         """Index of all knowledge bank resources with their keywords and URIs."""

@@ -42,6 +42,7 @@ def _read_processed(session_id: str) -> str | None:
 
 
 def register_session_resources(mcp) -> None:
+    """Register the per-session processed-findings resource on the MCP server."""
     @mcp.resource("session://{session_id}/processed", mime_type="application/json")
     def get_processed_findings(session_id: str) -> str:
         """Latest processed findings for a session.

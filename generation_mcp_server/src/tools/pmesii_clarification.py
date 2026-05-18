@@ -36,4 +36,5 @@ async def request_pmesii_clarification(
 
 
 def register_processing_tools(mcp) -> None:
+    """Register the PMESII clarification tool on the MCP server."""
     mcp.tool(request_pmesii_clarification)

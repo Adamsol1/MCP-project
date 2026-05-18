@@ -60,6 +60,7 @@ def build_collection_plan_prompt(
     current_plan: str | None = None,
     language: str = "en",
 ) -> str:
+    """Build the collection-plan prompt. Existing-plan and modification sections are optional."""
     available_sources = list(SOURCE_TOOL_MAP.keys())
     available_sources_str = ", ".join(f'"{s}"' for s in available_sources)
     lang_note = _language_instruction(language, "the 'plan' field")
@@ -127,6 +128,12 @@ def build_collection_collect_prompt(
     source_timeframes: dict[str, str] | None = None,
     language: str = "en",  # noqa: ARG001 - raw source content must remain verbatim.
 ) -> str:
+    """Build the collection-collect prompt for the data-gathering agent.
+
+    Restricts the agent to tools mapped from selected_sources, threads
+    per-tier date windows and per-perspective region/language hints into
+    the web-search guidance, and adapts to future-oriented PIRs.
+    """
     approved_tools = [
         tool
         for s in selected_sources if s in SOURCE_TOOL_MAP
@@ -348,6 +355,7 @@ def build_collection_summarize_prompt(
     collected_data: str,
     language: str = "en",
 ) -> str:
+    """Build the collection-summarize prompt. Factual narrative only, no interpretation."""
     lang_note = _language_instruction(language)
 
     return f"""{lang_note}You are a professional threat intelligence analyst. Your task is to produce a factual summary of collected intelligence data. You have no tools — work only from the data provided.
@@ -378,6 +386,7 @@ def build_collection_modify_prompt(
     modifications: str,
     language: str = "en",
 ) -> str:
+    """Build the collection-modify prompt. Applies analyst edits, no re-collection."""
     lang_note = _language_instruction(language, "the 'summary' and 'gaps' fields")
 
     return f"""{lang_note}You are a professional threat intelligence analyst. Apply the requested modification to an existing intelligence summary.

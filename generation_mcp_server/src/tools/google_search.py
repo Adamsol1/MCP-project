@@ -66,6 +66,7 @@ def _build_serper_payload(
     region: str | None,
     language: str | None,
 ) -> dict:
+    """Assemble the JSON body for a Serper request. Noise sites are excluded via -site:."""
     payload: dict = {
         "q": f"{query} {_SITE_EXCLUSION}",
         "num": min(max(1, num_results), 10),
@@ -83,6 +84,7 @@ def _build_serper_payload(
 
 
 def _serper_headers() -> dict:
+    """HTTP headers for Serper. Key comes from SERPER_API_KEY at call time."""
     return {
         "X-API-KEY": os.getenv("SERPER_API_KEY", ""),
         "Content-Type": "application/json",
@@ -90,6 +92,7 @@ def _serper_headers() -> dict:
 
 
 def _handle_serper_error(e: Exception) -> str | None:
+    """Map common Serper failures (403/429/timeout) to short user-facing strings."""
     if isinstance(e, httpx.HTTPStatusError):
         status = e.response.status_code
         if status == 403:
@@ -230,4 +233,5 @@ def google_news_search(
 
 
 def register_google_search_tools(mcp) -> None:
+    """Register google_search on the MCP server. google_news_search is not exposed yet."""
     mcp.tool(google_search)

@@ -17,15 +17,18 @@ UPLOADS_ROOT = Path(
 
 
 def _split_query_terms(query: str) -> list[str]:
+    """Lowercase the query and split on whitespace. Empty tokens dropped."""
     return [token for token in re.split(r"\s+", query.strip().lower()) if token]
 
 
 def _score_text(text: str, terms: list[str]) -> int:
+    """Score a document by total occurrences of each term. Case-insensitive."""
     lowered = text.lower()
     return sum(lowered.count(term) for term in terms)
 
 
 def _make_snippet(text: str, terms: list[str], width: int = 180) -> str:
+    """Return a ~180-char window centred on the first matching term."""
     lowered = text.lower()
     indices = [lowered.find(term) for term in terms if term in lowered]
     if not indices:
@@ -36,6 +39,7 @@ def _make_snippet(text: str, terms: list[str], width: int = 180) -> str:
 
 
 def _default_citation(filename: str) -> dict[str, str]:
+    """Placeholder citation used when a file has no front-matter or DB metadata."""
     return {
         "author": "Unknown",
         "year": "Unknown",
@@ -45,6 +49,7 @@ def _default_citation(filename: str) -> dict[str, str]:
 
 
 def _format_apa_citation(citation: dict[str, str]) -> str:
+    """Render a citation dict as a single APA-style line."""
     return (
         f"{citation.get('author', 'Unknown')}. "
         f"({citation.get('year', 'Unknown')}). "
@@ -54,6 +59,7 @@ def _format_apa_citation(citation: dict[str, str]) -> str:
 
 
 def _parse_markdown_front_matter(markdown_text: str) -> tuple[dict[str, str], str]:
+    """Split YAML-ish front matter from the body. Returns (metadata_dict, body)."""
     if not markdown_text.startswith("---\n"):
         return {}, markdown_text
 
@@ -80,6 +86,7 @@ def _parse_markdown_front_matter(markdown_text: str) -> tuple[dict[str, str], st
 
 
 def _extract_page_sections(markdown_body: str) -> list[tuple[int, str]]:
+    """Split a parsed PDF markdown body into (page_number, text) sections."""
     sections: list[tuple[int, str]] = []
     current_page: int | None = None
     buffer: list[str] = []
@@ -102,6 +109,7 @@ def _extract_page_sections(markdown_body: str) -> list[tuple[int, str]]:
 
 
 def _read_text_by_extension(path: Path, extension: str) -> str:
+    """Read a non-PDF upload as plain text. Unsupported extensions return ''."""
     if extension == ".txt":
         return path.read_text(encoding="utf-8", errors="ignore")
     if extension == ".json":
@@ -118,6 +126,7 @@ def _read_text_by_extension(path: Path, extension: str) -> str:
 
 
 def _search_record(entry: dict, terms: list[str], max_results: int) -> list[dict]:
+    """Search one manifest entry. PDFs score per page; other files score whole-file."""
     extension = str(entry.get("extension", "")).lower()
     filename = str(entry.get("filename") or entry.get("original_filename") or "unknown")
     file_upload_id = str(entry.get("file_upload_id", ""))
@@ -374,4 +383,5 @@ async def search_local_data(ctx: Context, session_id: str, query: str, max_resul
 
 
 def register_local_search_tools(mcp) -> None:
+    """Register search_local_data on the MCP server."""
     mcp.tool(search_local_data)
