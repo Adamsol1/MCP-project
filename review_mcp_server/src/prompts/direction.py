@@ -4,6 +4,18 @@ from datetime import UTC, datetime
 
 
 def build_direction_review_prompt(content: str, context: str) -> str:
+    """Build the system prompt the reviewer LLM receives for PIR evaluation.
+
+    The MCP-facing adapter (direction_review) delegates here. Splitting the
+    template build into its own function keeps the prompt text testable
+    without spinning up the FastMCP runtime.
+
+    Args:
+        content: PIRs to review, serialized as JSON.
+        context: Dialogue context used during PIR generation, serialized as JSON.
+    """
+    # UTC so timeliness assessments are deterministic regardless of where the
+    # server is deployed. The reviewer is told this date is authoritative.
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
     return f"""You are a strict quality reviewer for Priority Intelligence Requirements (PIRs)

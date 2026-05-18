@@ -1,7 +1,19 @@
+"""Analysis phase review prompt builder and MCP adapter function."""
+
 from datetime import UTC, datetime
 
 
 def build_analysis_review_prompt(content: str, context: str) -> str:
+    """Build the system prompt the reviewer LLM receives for analysis-draft review.
+
+    The Analysis phase is the last LLM-generated step before the analyst sees
+    output, so the review focuses on evidence traceability of key judgments
+    and per-perspective implications back to processing-result findings.
+
+    Args:
+        content: Analysis draft (summary, judgments, implications, gaps) as JSON.
+        context: PIR set and processing result, as JSON.
+    """
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
     return f"""You are a strict quality reviewer for analysis drafts produced in the Analysis
@@ -77,5 +89,14 @@ Set overall_approved to true only if ALL individual PIRs are approved.
 }}"""
 
 
+# ── MCP adapter function ──────────────────────────────────────────────────────
+
+
 def analysis_review(content: str, context: str) -> str:
+    """Review prompt for the analysis draft produced in the Analysis phase.
+
+    Args:
+        content: The analysis draft to review (JSON string).
+        context: The PIRs and processing result used as basis (JSON string).
+    """
     return build_analysis_review_prompt(content, context)

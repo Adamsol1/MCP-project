@@ -5,14 +5,31 @@ from datetime import UTC, datetime
 
 
 def build_processing_review_prompt(content: str, context: str) -> str:
+    """Build the system prompt the reviewer LLM receives for processing-result review.
+
+    The prompt adapts to two modes:
+      - First-pass processing: full review of PMESII entities and gaps.
+      - Re-processing (is_revision): a softer review that allows previously
+        documented unresolvable gaps to persist and focuses on what the new
+        pass changed relative to the prior result.
+
+    Args:
+        content: Processing result (entities, gaps, summary) as JSON.
+        context: Source PIRs and collected data, as JSON.
+    """
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
+    # Context parsing is defensive: any malformed payload falls back to
+    # first-pass mode so the stricter review path is never silently skipped.
     try:
         _ctx = _json.loads(context)
         _is_revision = bool(_ctx.get("is_revision", False))
     except Exception:
         _is_revision = False
 
+    # FIRST-PASS VS RE-PROCESSING
+    # Keep the mode-specific header and the gap rule side by side so a future
+    # editor can update both halves of the contract together.
     if _is_revision:
         _mode_header = """
 ## RE-PROCESSING MODE

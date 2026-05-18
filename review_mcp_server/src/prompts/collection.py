@@ -5,14 +5,37 @@ from datetime import UTC, datetime
 
 
 def build_collection_review_prompt(content: str, context: str) -> str:
+    """Build the system prompt the reviewer LLM receives for collected-data review.
+
+    The prompt adapts to two call sites:
+      - Full collection: review every PIR against the gathered evidence.
+      - Supplemental ("gather more"): review only whether the new data
+        addresses the specific gap the user flagged.
+
+    Mode is inferred from the presence of `gather_more_feedback` in the
+    context payload, so callers do not need to set a separate flag.
+
+    Args:
+        content: Collected data summary, serialized as JSON.
+        context: Collection plan and PIR set, serialized as JSON.
+    """
+    # UTC for the same reason as direction.py: temporal claims need a stable
+    # reference even when a collection run straddles midnight in the
+    # analyst's local timezone.
     _today = datetime.now(UTC).strftime('%Y-%m-%d')
 
+    # Context arrives as JSON over MCP. A malformed payload should not crash
+    # the prompt build, so fall back to full-collection mode if parsing fails.
     try:
         _ctx = _json.loads(context)
         _gather_more_feedback = (_ctx.get("gather_more_feedback") or "").strip()
     except Exception:
         _gather_more_feedback = ""
 
+    # SUPPLEMENTAL VS FULL MODE
+    # Header and coverage rule both shift when the user explicitly asked for
+    # a top-up. Composing them in a single branch keeps the two prompt
+    # variants visually adjacent and easy to compare during review.
     if _gather_more_feedback:
         _mode_header = f"""
 ## SUPPLEMENTAL COLLECTION MODE
