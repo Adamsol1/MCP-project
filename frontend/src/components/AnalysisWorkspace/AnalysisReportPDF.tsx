@@ -101,6 +101,14 @@ const styles = StyleSheet.create({
   },
 });
 
+/**
+ *  Formats a perspective key into a more human-readable label for display in the PDF report.
+ *  - "neutral" is labeled as "Global"
+ *  - "us" and "eu" are converted to uppercase
+ *  - Other keys are capitalized
+ * @param key The perspective key to format, such as "neutral", "us", "eu", or other custom keys.
+ * @returns A formatted label string for the given perspective key, suitable for display in the PDF report.
+ */
 function formatPerspectiveLabel(key: string): string {
   if (key === "neutral") return "Global";
   if (key === "us" || key === "eu") return key.toUpperCase();
@@ -112,6 +120,11 @@ interface Props {
   title: string;
 }
 
+/**
+ * Renders an analysis report as a PDF document using @react-pdf/renderer, based on the provided analysis response data.
+ * @param data The analysis response data containing the analysis draft and processing results, which includes findings, key judgments, recommended actions, information gaps, and perspective implications.
+ * @returns A PDF document component that can be rendered or downloaded, presenting the analysis report in a structured and visually organized format. The report includes sections for the summary, key judgments, recommended actions, information gaps, perspective implications, and an evidence docket with detailed findings.
+ */
 export default function AnalysisReportPDF({ data, title }: Props) {
   const { analysis_draft: analysis, processing_result: processingResult } = data;
   const findings = processingResult.findings;

@@ -283,7 +283,8 @@ def build_collection_collect_prompt(
 
     step_guidance_section = f"\n{step_source_guidance}\n" if step_source_guidance else ""
 
-    return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources. Do not summarize, interpret, or draw conclusions.
+    return f"""You are a threat intelligence data collector. Your only task is to retrieve raw data from approved sources.
+     Do not summarize, interpret, or draw conclusions.
 
 ## Approved PIRs
 {pir}

@@ -3,6 +3,7 @@ import { createContext, useCallback, useState } from "react";
 import type { CollectedItem, CollectionDisplayData, CollectionSourceSummary, PhaseReviewItem, PirData } from "../../types/conversation";
 import React from "react";
 
+/** Maps internal MCP tool names to user-facing source display names. */
 const TOOL_DISPLAY_NAMES: Record<string, string> = {
   knowledge_base: "Knowledge Bank",
   list_knowledge_base: "Knowledge Bank",
@@ -16,10 +17,18 @@ const TOOL_DISPLAY_NAMES: Record<string, string> = {
   fetch_page: "Web Fetch",
 };
 
+
+/** Sources that require title-based deduplication in addition to URL-based deduplication. */
 const WEB_SOURCES = new Set(["fetch_page", "google_news_search", "google_search"]);
 
+/**
+ * Deduplicates collected items based on their source and resource ID.
+ * @param items List of collected items to deduplicate.
+ * @returns Deduplicated list of collected items.
+ */
+
 function deduplicateItems(items: CollectedItem[]): CollectedItem[] {
-  // Pass 1: deduplicate by (canonical-source, resource_id) — keep richer content
+  // Pass 1: deduplicate by (canonical-source, resource_id)
   const byUrl = new Map<string, CollectedItem>();
   for (const item of items) {
     const canonical = TOOL_DISPLAY_NAMES[item.source] ?? item.source;
@@ -30,7 +39,7 @@ function deduplicateItems(items: CollectedItem[]): CollectedItem[] {
     }
   }
 
-  // Pass 2: deduplicate web items by (source, title) — same article at different URLs
+  // Pass 2: deduplicate web items by (source, title), keeping the one with the longest content
   const seenTitles = new Map<string, number>();
   const result: CollectedItem[] = [];
   for (const item of byUrl.values()) {
@@ -52,6 +61,11 @@ function deduplicateItems(items: CollectedItem[]): CollectedItem[] {
   return result;
 }
 
+/**
+ *  Builds a summary of collection sources from the list of collected items.
+ * @param items List of collected items to summarize.
+ * @returns List of collection source summaries, sorted by display name.
+ */
 function buildSourceSummary(items: CollectedItem[]): CollectionSourceSummary[] {
   const statsMap = new Map<string, CollectionSourceSummary>();
   for (const item of items) {
@@ -68,7 +82,10 @@ function buildSourceSummary(items: CollectedItem[]): CollectionSourceSummary[] {
   }
   return Array.from(statsMap.values()).sort((a, b) => a.display_name.localeCompare(b.display_name));
 }
-
+/**
+ * Defines the shape of the workspace context value, including state and updater functions for highlighted references, PIR data, collection data, and review activity.
+ * This context is used to manage and share workspace-related state across the application.
+ */
 export interface WorkspaceContextValue {
   highlightedRef: string | null;
   setHighlightedRef: (ref: string | null) => void;
@@ -89,6 +106,13 @@ export const WorkspaceContext = createContext<WorkspaceContextValue | null>(
   null,
 );
 
+/**
+ * Provides shared workspace state to the component tree.
+ * Holds PIR data, collection results, highlighted source references,
+ * and review activity produced by the AI reviewer between phases.
+ * @param children - The child component tree that will consume the workspace context.
+ * @returns A context provider wrapping the provided children.
+ */
 export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const [highlightedRefs, setHighlightedRefs] = useState<string[]>([]);
   const [pirData, setPirData] = useState<PirData | null>(null);
@@ -99,6 +123,11 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   const setHighlightedRef = useCallback((ref: string | null) => {
     setHighlightedRefs(ref ? [ref] : []);
   }, []);
+  /**
+   * Merges incoming collection data with existing state, deduplicating items
+   * and rebuilding the source summary in a single pass.
+   * @param incoming - The new collection display data to merge in.
+   */
   const mergeCollectionData = useCallback((incoming: CollectionDisplayData) => {
     setCollectionData((prev) => {
       const combined = prev

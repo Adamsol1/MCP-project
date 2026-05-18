@@ -114,6 +114,10 @@ export const ConversationContext =
  *    as the new active item when the deleted one was currently active.
  *  - ADD_MESSAGE automatically sets the conversation title from the first user
  *    message (truncated to 50 characters), replacing the "New conversation" default.
+ *
+ * @param state The current conversation store state.
+ * @param action The mutation to apply, represented as a discriminated union.
+ * @returns The new conversation store state after applying the mutation.
  */
 function conversationReducer(
   state: ConversationStore,
@@ -275,6 +279,8 @@ function conversationReducer(
  *
  * All callback functions are wrapped in useCallback so their references stay
  * stable across re-renders — safe to pass as props to child components.
+ * @param children The React node(s) that should have access to this context.
+ * @returns A ConversationContext.Provider wrapping the children with the context value.
  */
 export function ConversationProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(

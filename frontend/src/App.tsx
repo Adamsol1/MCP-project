@@ -33,6 +33,14 @@ import { HelpButton, HelpModal } from "./components/HelpModal/HelpModal";
 
 const SIDEBAR_CONTENT_REVEAL_DELAY_MS = 180;
 
+/**
+ * Invisible component that resets workspace state when the active conversation changes
+ * or when the stage reverts to "gathering" after a rejected PIR.
+ * Rendered inside AppShell so it has access to WorkspaceContext.
+ * @param conversationId - The active conversation ID; a change triggers a full workspace reset.
+ * @param stage - The current dialogue stage; "gathering" triggers a PIR data clear.
+ * @returns null (renders no UI).
+ */
 function WorkspaceResetWatcher({
   conversationId,
   stage,
@@ -60,7 +68,12 @@ function WorkspaceResetWatcher({
 
   return null;
 }
-
+/**
+ * Root layout and orchestrator for the application.
+ * Owns the three-column structure (sidebar, chat, intelligence panel), all modal state,
+ * file upload handling, collection status polling, and elicitation polling.
+ * @returns The full application shell React element.
+ */
 function AppShell() {
   const t = useT();
   const { success, error } = useToast();
@@ -157,6 +170,7 @@ function AppShell() {
     return activeConversation ?? createNewConversation(pendingPerspectives);
   };
 
+  // Load uploaded files whenever the active session changes.
   useEffect(() => {
     if (!activeConversation?.sessionId) return;
 
@@ -183,6 +197,7 @@ function AppShell() {
     };
   }, [activeConversation?.sessionId, error]);
 
+  // Poll collection status every 1.5 s while the backend is actively collecting.
   useEffect(() => {
     if (!isCollecting || !activeConversation?.sessionId) return;
 
@@ -203,6 +218,7 @@ function AppShell() {
     };
   }, [isCollecting, activeConversation?.sessionId]);
 
+  // Poll for pending elicitation prompts every 1.5 s while a backend call is in progress.
   useEffect(() => {
     if (!isLoading || !activeConversation?.sessionId) return;
 
