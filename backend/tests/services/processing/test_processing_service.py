@@ -87,6 +87,23 @@ class TestProcess:
         parsed = json.loads(result)
         assert parsed["reasoning"] == "existing reasoning"
 
+    @pytest.mark.asyncio
+    async def test_process_passes_pmesii_tool_to_agent(self, mock_mcp_client):
+        # arrange
+        with patch("src.services.processing.processing_service.GeminiAgent") as MockAgent:
+            mock_agent = MagicMock()
+            mock_agent.run = AsyncMock(return_value='{"findings": [], "reasoning": "r"}')
+            mock_agent.last_thought_text = ""
+            MockAgent.return_value = mock_agent
+            service = ProcessingService(mcp_client=mock_mcp_client)
+
+            # act
+            await service.process(collected_data="data", pir="pir")
+
+        # assert
+        _, run_kwargs = mock_agent.run.call_args
+        assert "request_pmesii_clarification" in run_kwargs["allowed_tool_names"]
+
 
 class TestModifyProcessing:
     @pytest.mark.asyncio

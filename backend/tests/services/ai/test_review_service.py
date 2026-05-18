@@ -45,14 +45,22 @@ class MockBrokenReviewMCPClient:
         return False
 
 
+_APPROVED_RETURN = {
+    "overall_approved": True,
+    "pir_reviews": [],
+    "severity": "none",
+    "suggestions": None,
+}
+
+
 @pytest.mark.asyncio
 async def test_review_pir_is_approved():
+    # arrange
     context = DialogueContext()
     context.scope = "identify attack patterns"
     context.timeframe = "last 6 months"
     context.target_entities = ["Norway"]
     fake_pir_report = "Identify attack patterns in Norway over the last 6 months"
-
     llm = MockLLMService(
         return_value={
             "overall_approved": True,
@@ -64,13 +72,63 @@ async def test_review_pir_is_approved():
     review_mcp = MockReviewMCPClient()
     review_service = ReviewService(llm, review_mcp)
 
+    # act
     result = await review_service.review_pir(fake_pir_report, context, "direction")
 
+    # assert
     assert isinstance(result, ReviewResult)
     assert result.overall_approved is True
     assert result.severity == "none"
     assert review_mcp.calls[0]["name"] == "direction_review"
     assert llm.prompts[0] == "mock review prompt"
+
+
+@pytest.mark.asyncio
+async def test_review_collection_uses_collection_review_prompt():
+    # arrange
+    context = DialogueContext()
+    context.scope = "identify attack patterns"
+    llm = MockLLMService(return_value=_APPROVED_RETURN)
+    review_mcp = MockReviewMCPClient()
+    service = ReviewService(llm, review_mcp)
+
+    # act
+    await service.review_pir("collected data summary", context, "collection")
+
+    # assert
+    assert review_mcp.calls[0]["name"] == "collection_review"
+
+
+@pytest.mark.asyncio
+async def test_review_processing_uses_processing_review_prompt():
+    # arrange
+    context = DialogueContext()
+    context.scope = "identify attack patterns"
+    llm = MockLLMService(return_value=_APPROVED_RETURN)
+    review_mcp = MockReviewMCPClient()
+    service = ReviewService(llm, review_mcp)
+
+    # act
+    await service.review_pir("processed findings", context, "processing")
+
+    # assert
+    assert review_mcp.calls[0]["name"] == "processing_review"
+
+
+@pytest.mark.asyncio
+async def test_review_analysis_uses_analysis_review_prompt():
+    # arrange
+    context = DialogueContext()
+    context.scope = "identify attack patterns"
+    llm = MockLLMService(return_value=_APPROVED_RETURN)
+    review_mcp = MockReviewMCPClient()
+    service = ReviewService(llm, review_mcp)
+
+    # act
+    await service.review_pir("analysis draft", context, "analysis")
+
+    # assert
+    assert review_mcp.calls[0]["name"] == "analysis_review"
 
 
 @pytest.mark.asyncio

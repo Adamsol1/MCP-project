@@ -1,7 +1,10 @@
 import json
 from pathlib import Path
+from unittest.mock import MagicMock
 
-from src import server
+import pytest
+
+from src.tools import local_search
 
 
 def _write_session_manifest(root: Path, session_id: str, files: list[dict]) -> None:
@@ -16,8 +19,11 @@ def _write_session_manifest(root: Path, session_id: str, files: list[dict]) -> N
     (session_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
-def test_search_local_data_finds_text_file(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "UPLOADS_ROOT", tmp_path)
+@pytest.mark.asyncio
+async def test_search_local_data_finds_text_file(tmp_path, monkeypatch):
+    # arrange
+    monkeypatch.setattr(local_search, "UPLOADS_ROOT", tmp_path)
+    monkeypatch.setattr(local_search, "_db_search_uploads", lambda *_: None)
 
     text_path = tmp_path / "s1" / "files" / "file1__intel.txt"
     text_path.parent.mkdir(parents=True, exist_ok=True)
@@ -37,16 +43,21 @@ def test_search_local_data_finds_text_file(tmp_path, monkeypatch):
         ],
     )
 
-    raw = server.search_local_data.fn("s1", "apt29 norwegian")
+    # act
+    raw = await local_search.search_local_data(MagicMock(), "s1", "apt29 norwegian")
     data = json.loads(raw)
 
+    # assert
     assert data["total_results"] == 1
     assert data["results"][0]["file_upload_id"] == "file1"
     assert "apt29" in data["results"][0]["snippet"].lower()
 
 
-def test_search_local_data_finds_pdf_markdown_with_page_reference(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "UPLOADS_ROOT", tmp_path)
+@pytest.mark.asyncio
+async def test_search_local_data_finds_pdf_markdown_with_page_reference(tmp_path, monkeypatch):
+    # arrange
+    monkeypatch.setattr(local_search, "UPLOADS_ROOT", tmp_path)
+    monkeypatch.setattr(local_search, "_db_search_uploads", lambda *_: None)
 
     parsed_path = tmp_path / "s1" / "parsed" / "pdf1.md"
     parsed_path.parent.mkdir(parents=True, exist_ok=True)
@@ -90,9 +101,11 @@ def test_search_local_data_finds_pdf_markdown_with_page_reference(tmp_path, monk
         ],
     )
 
-    raw = server.search_local_data.fn("s1", "norwegian")
+    # act
+    raw = await local_search.search_local_data(MagicMock(), "s1", "norwegian")
     data = json.loads(raw)
 
+    # assert
     assert data["total_results"] == 1
     result = data["results"][0]
     assert result["page_reference"] == "Page 2"
@@ -100,8 +113,11 @@ def test_search_local_data_finds_pdf_markdown_with_page_reference(tmp_path, monk
     assert result["apa_citation"] == "Jane Analyst. (2026). Threat Report. Security Org."
 
 
-def test_search_local_data_is_session_isolated(tmp_path, monkeypatch):
-    monkeypatch.setattr(server, "UPLOADS_ROOT", tmp_path)
+@pytest.mark.asyncio
+async def test_search_local_data_is_session_isolated(tmp_path, monkeypatch):
+    # arrange
+    monkeypatch.setattr(local_search, "UPLOADS_ROOT", tmp_path)
+    monkeypatch.setattr(local_search, "_db_search_uploads", lambda *_: None)
 
     file_a = tmp_path / "s1" / "files" / "a.txt"
     file_a.parent.mkdir(parents=True, exist_ok=True)
@@ -109,15 +125,7 @@ def test_search_local_data_is_session_isolated(tmp_path, monkeypatch):
     _write_session_manifest(
         tmp_path,
         "s1",
-        [
-            {
-                "file_upload_id": "a",
-                "filename": "a.txt",
-                "stored_path": file_a.as_posix(),
-                "extension": ".txt",
-                "searchable": True,
-            }
-        ],
+        [{"file_upload_id": "a", "filename": "a.txt", "stored_path": file_a.as_posix(), "extension": ".txt", "searchable": True}],
     )
 
     file_b = tmp_path / "s2" / "files" / "b.txt"
@@ -126,19 +134,13 @@ def test_search_local_data_is_session_isolated(tmp_path, monkeypatch):
     _write_session_manifest(
         tmp_path,
         "s2",
-        [
-            {
-                "file_upload_id": "b",
-                "filename": "b.txt",
-                "stored_path": file_b.as_posix(),
-                "extension": ".txt",
-                "searchable": True,
-            }
-        ],
+        [{"file_upload_id": "b", "filename": "b.txt", "stored_path": file_b.as_posix(), "extension": ".txt", "searchable": True}],
     )
 
-    data_s1 = json.loads(server.search_local_data.fn("s1", "beta"))
-    data_s2 = json.loads(server.search_local_data.fn("s2", "beta"))
+    # act
+    data_s1 = json.loads(await local_search.search_local_data(MagicMock(), "s1", "beta"))
+    data_s2 = json.loads(await local_search.search_local_data(MagicMock(), "s2", "beta"))
 
+    # assert
     assert data_s1["total_results"] == 0
     assert data_s2["total_results"] == 1

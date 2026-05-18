@@ -116,6 +116,13 @@ KNOWLEDGE_REGISTRY: dict[str, dict] = {
             "publisher": "Internal Knowledge Bank",
         },
     },
+    # ── Analytical personas ──────────────────────────────────────────────────
+    "personas/us": {"keywords": [], "priority": 4, "citation": None},
+    "personas/norway": {"keywords": [], "priority": 4, "citation": None},
+    "personas/china": {"keywords": [], "priority": 4, "citation": None},
+    "personas/eu": {"keywords": [], "priority": 4, "citation": None},
+    "personas/russia": {"keywords": [], "priority": 4, "citation": None},
+    "personas/neutral": {"keywords": [], "priority": 4, "citation": None},
     # ── Threat actors ────────────────────────────────────────────────────────
     "threat_actors/russian_state": {
         "keywords": ["apt28", "sandworm", "cozy bear", "fsb", "gru", "svr", "russia", "russian"],
