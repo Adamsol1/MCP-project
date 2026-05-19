@@ -29,7 +29,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
+        self.max_attempts = 1  # initial attempt + 1 retry on major review rejection for not only 1
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
