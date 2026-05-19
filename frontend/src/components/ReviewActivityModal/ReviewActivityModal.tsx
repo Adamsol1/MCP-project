@@ -15,6 +15,7 @@ interface ReviewActivityModalProps {
 // ── Inline text formatter ──────────────────────────────────────────────────────
 
 function InlineFormatted({ text }: { text: string }) {
+  if (typeof text !== "string") return null;
   const parts = text.split(/(\*\*[^*]+\*\*|\*[^*]+\*)/g);
   return (
     <>
@@ -30,6 +31,7 @@ function InlineFormatted({ text }: { text: string }) {
 }
 
 function FormattedReviewText({ text }: { text: string }) {
+  if (typeof text !== "string") return null;
   const lines = text.split("\n");
   const elements: React.ReactNode[] = [];
   lines.forEach((line, i) => {

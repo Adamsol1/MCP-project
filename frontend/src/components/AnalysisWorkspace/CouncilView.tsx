@@ -855,11 +855,6 @@ export default function CouncilView({
                   </svg>
                   {isTranscriptExpanded ? t.councilHideDebate : t.councilShowDebate}
                 </button>
-                {councilNote.transcript_path ? (
-                  <p className="text-[11px] text-text-muted">
-                    {t.councilTranscriptPath(councilNote.transcript_path)}
-                  </p>
-                ) : null}
               </div>
 
               {isTranscriptExpanded ? (
