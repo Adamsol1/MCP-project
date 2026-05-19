@@ -279,6 +279,7 @@ site/
 /backend/data/web_search
 /backend/data
 !/backend/data/
+!/backend/data/.gitkeep
 !/backend/data/outputs/
 !/backend/data/outputs/demo_processing_result.json
 

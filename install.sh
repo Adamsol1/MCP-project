@@ -26,6 +26,7 @@ for dir in backend council_mcp_server generation_mcp_server review_mcp_server; d
     echo "==> Running poetry install in $dir..."
     poetry install
     if [ "$dir" = "backend" ]; then
+      mkdir -p "$ROOT/backend/data/logs"
       echo "==> Running database migrations in $dir..."
       poetry run alembic -c alembic_sessions.ini upgrade head
       poetry run alembic -c alembic_knowledge.ini upgrade head

@@ -42,6 +42,7 @@ foreach ($dir in @("backend", "council_mcp_server", "generation_mcp_server", "re
     Invoke-Step "Running poetry install in $dir..." { poetry install }
 
     if ($dir -eq "backend") {
+        New-Item -ItemType Directory -Force -Path "$Root\backend\data\logs" | Out-Null
         Invoke-Step "Running sessions migration..." { poetry run alembic -c alembic_sessions.ini upgrade head }
         Invoke-Step "Running knowledge migration..." { poetry run alembic -c alembic_knowledge.ini upgrade head }
         Invoke-Step "Seeding knowledge database..." { poetry run python scripts/seed_knowledge.py }
