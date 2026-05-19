@@ -5,7 +5,8 @@ from collections.abc import Callable
 from datetime import datetime
 from typing import Any
 
-from src.models.dialogue import CollectionContext
+from src.models.analysis import AnalysisDraft, ProcessingResult
+from src.models.dialogue import AnalysisContext, CollectionContext, ProcessingContext
 from src.models.reasoning import ReasoningLogEntry
 
 logger = logging.getLogger("app")
@@ -28,7 +29,7 @@ class AIOrchestrator:
         generator_model: str = "unknown",
         reviewer_model: str = "unknown",
     ):
-        self.max_attempts = 1  # initial attempt + 1 retry on major review rejection
+        self.max_attempts = 2  # initial attempt + 1 retry on major review rejection
         self.research_logger = research_logger
         self.generator_model = generator_model
         self.reviewer_model = reviewer_model
@@ -42,7 +43,7 @@ class AIOrchestrator:
         """Generate content and review it, retrying once if the reviewer flags a major issue.
 
         Flow per attempt:
-            1. Call generate_fn(feedback) — feedback is None on the first attempt,
+            1. Call generate_fn(feedback),
                then the reviewer's suggestions on any retry.
             2. Call reviewer.review_pir(content, context, phase).
             3. If severity != "major", return the content.
@@ -50,14 +51,14 @@ class AIOrchestrator:
 
         Args:
             generate_fn: Async callable that accepts optional feedback (str | None).
-                         Caller binds all phase-specific args via lambda before passing in.
-            reviewer:    Service with a review_pir(content, context, phase) method.
+                         Caller binds all phase specific arguments via lambda before passing in.
+            reviewer:    Service with a review_pir method.
             context:     Pydantic BaseModel passed through to reviewer unchanged.
-            phase:       Intelligence cycle phase (e.g. "direction", "collection").
+            phase:       Intelligence cycle phase.
             session_id:  Used for logging.
 
         Returns:
-            The generated content (str or dict) from the last attempt.
+            The generated content from the last attempt.
 
         Raises:
             Any exception from generate_fn or review_pir.
@@ -68,6 +69,8 @@ class AIOrchestrator:
         feedback: str | None = None
         generated = None
 
+
+        #For each attempt log generated content, review and issues.
         for attempt in range(1, self.max_attempts + 1):
             attempt_timestamp = datetime.now()
             error_type: str | None = None
@@ -83,7 +86,7 @@ class AIOrchestrator:
             try:
                 generated = await generate_fn(feedback)
             except BaseException as e:
-                # Unwrap nested ExceptionGroups to find the root cause
+                #Find root cause if exception is raised
                 original = e
                 while isinstance(e, ExceptionGroup) and e.exceptions:
                     e = e.exceptions[0]
@@ -97,6 +100,7 @@ class AIOrchestrator:
                     f"[Orchestrator] Generation failed on attempt {attempt}: {error_type}: {e}",
                     exc_info=True,
                 )
+                #Log the failed attempt
                 self._log_attempt(
                     ReasoningLogEntry(
                         attempt_number=attempt,
@@ -153,7 +157,7 @@ class AIOrchestrator:
                 }
             )
             logger.info(
-                f"[Orchestrator] Review done in {review_duration:.2f}s — "
+                f"[Orchestrator] Review done in {review_duration:.2f}s"
                 f"approved={result.overall_approved}, severity={result.severity}"
             )
             if result.suggestions:
@@ -184,11 +188,11 @@ class AIOrchestrator:
             feedback = result.suggestions
             self.retry_explanations.append(result.suggestions or "")
             logger.warning(
-                f"[Orchestrator] Rejected (major) on attempt {attempt} — retrying with feedback..."
+                f"[Orchestrator] Rejected (major) on attempt {attempt} retring with feedvack"
             )
 
         logger.warning(
-            f"[Orchestrator] All {self.max_attempts} attempts exhausted. Returning last result."
+            f"[Orchestrator] All {self.max_attempts} Too many attempts used. Returning the last result."
         )
         return generated
 
@@ -203,8 +207,8 @@ class AIOrchestrator:
 
         Args:
             context:    DialogueContext with the gathered intelligence requirements.
-            generator:  Service with a generate_pir(context) method.
-            reviewer:   Service with a review_pir(content, context, phase) method.
+            generator:  Service with a generate_pir method.
+            reviewer:   Service with a review_pir method.
             phase:      Intelligence phase (e.g. "direction"), passed to the reviewer.
             session_id: Used for logging.
 
@@ -239,22 +243,20 @@ class AIOrchestrator:
     ) -> str:
         """Collect intelligence data and review it, with automatic retry on major issues.
 
-        Each retry accumulates data from previous attempts — the agent sees what was
-        already collected and only adds new data. The reviewer always sees the full
-        accumulated dataset.
+        Each retry uses data from the previus attempt meaning that the agent adds to already collected data. All data is given to the reviewer
 
         Args:
-            sources:            List of selected source names.
+            sources:            List of selected sources.
             pir:                PIR string from the direction phase.
             plan:               Collection plan string.
-            collection_service: Service with a collect(sources, pir, plan) method.
-            reviewer:           Service with a review_pir(content, context, phase) method.
+            collection_service: Service with a collect method.
+            reviewer:           Service with a review_pir method.
             session_id:         Used for logging.
-            direction_context:  DialogueContext from the direction phase (optional, enriches review).
-            timeframe:          PIR timeframe string used to filter OTX results by date.
+            direction_context:  DialogueContext from the direction phase.
+            timeframe:          PIR timeframe. Used to filter results.
 
         Returns:
-            Accumulated raw data string from all collection attempts.
+            All raw data from collection.
 
         Raises:
             Any exception from collect or review_pir
@@ -280,8 +282,8 @@ class AIOrchestrator:
                 )
             else:
                 accumulated["raw_data"] = new_data
-            # Summarize before passing to reviewer so it receives {summary, sources_used, gaps}
-            # instead of the raw {"collected_data": [...]} blob.
+            # Summarize before passing to reviewer
+            # instead of the raw collection data
             return await collection_service.summarize(pir, accumulated["raw_data"], language)
 
         await self._run_with_review(
@@ -296,7 +298,7 @@ class AIOrchestrator:
             phase="collection",
             session_id=session_id,
         )
-        # Always return raw data — the summary was only for the reviewer.
+        # Always return raw data
         return accumulated["raw_data"]
 
     async def analyse_and_review(
@@ -309,9 +311,20 @@ class AIOrchestrator:
         selected_perspectives: list[str] | None = None,
         language: str = "en",
     ) -> tuple:
-        from src.models.analysis import AnalysisDraft, ProcessingResult
-        from src.models.dialogue import AnalysisContext
+        """
+        Generate analysis and review it. If the reviewer finds errors, regenerate
 
+        Args:
+            processing_result : ProcessingResult
+            analysis_service : Service
+            reviewer : Service with a review_pir method
+            session_id : Used for logging.
+            pir : PIR string from direction phase.
+            selected_perspectives : Perspectives to include in the analysis.
+
+        Returns:
+            Tuple of (AnalysisDraft, enriched ProcessingResult)
+        """
         async def analyse_fn(_=None):
             draft, enriched = await analysis_service.generate_draft(
                 processing_result,
@@ -349,6 +362,20 @@ class AIOrchestrator:
         previous_result: str | None = None,
         language: str = "en",
     ) -> str:
+        """
+        Process collected data and review it. If the reviewer rejects, regenerate.
+
+        Args:
+            collected_data : Raw collected data
+            pir : PIR string
+            processing_service : Service with a process method.
+            reviewer : Service with a review_pir method.
+            session_id : Used for logging.
+            previous_result : Previous processing result if this is a revision.
+
+        Returns:
+            Processed result string.
+        """
         async def process_fn(feedback=None):
             return await processing_service.process(
                 collected_data=collected_data,
@@ -357,8 +384,6 @@ class AIOrchestrator:
                 previous_result=previous_result,
                 language=language,
             )
-
-        from src.models.dialogue import ProcessingContext
 
         return await self._run_with_review(  # type: ignore[no-any-return]
             generate_fn=process_fn,

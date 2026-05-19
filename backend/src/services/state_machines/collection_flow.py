@@ -47,8 +47,6 @@ async def _read_collected(session_id: str, uow=None) -> dict | None:
 async def _write_collected(session_id: str, pir: str, raw_data: str, uow=None) -> None:
     """Append a raw agent response to the collection_attempts table.
 
-    Does NOT commit — the caller (dialogue endpoint) is responsible for committing
-    the full transaction after saving session state.
     """
     if uow is None:
         raise RuntimeError(
@@ -80,17 +78,14 @@ class CollectionFlow(BasePhaseFlow):
         self.state = CollectionState.PLANNING
         self.collection_plan: str | None = None
         self.selected_sources: list[str] = []
-        # TODO: DB migration — pending_reasoning_log written to disk on approval.
-        # Replace with a ReasoningLog table insert when DB is in place.
         self.pending_reasoning_log: ReasoningLog | None = None
         self.gather_more_feedback: str | None = None
 
-    # TODO: DB migration — to_dict and from_dict replace with SQLAlchemy model read/write.
-    # CollectionFlow state (pir, plan, state, sources) becomes columns in a sessions table.
     def to_dict(self) -> dict:
         """Serialize session state to a plain dict for JSON persistence.
         Note: research_logger is excluded — it is reconstructed on load.
-        Collected data lives in data/sessions/{session_id}/collected.json — not here."""
+        Collected data lives in data/sessions/{session_id}/collected.json — not here.
+        """
         return {
             "session_id": self.session_id,
             "state": self.state.value,
@@ -209,7 +204,7 @@ class CollectionFlow(BasePhaseFlow):
         """
         State handler for plan confirming phase.
         Frontend should send boolean with user input, which decides next action.
-        On approve, selected_sources must be provided — source selection happens locally on the frontend.
+        On approve, selected_sources must be provided. This happends in frontend by user.
         Possible outcomes:
             - Approve (approved=True) -> State change: PLAN_CONFIRMING -> COLLECTING
             - Reject (approved=False) -> Regenerate plan with user message. Self loop (stay in PLAN_CONFIRMING)

@@ -1,12 +1,11 @@
-"""GeminiAgent — AI agent with MCP tool-loop for Collection and Processing phases.
+"""GeminiAgent.  AI agent with MCP tool loop for Collection and Processing phases.
 
 This is the core of the "true MCP" architecture. GeminiAgent sends Gemini a
 system prompt + task, then autonomously calls MCP tools (OSINT sources,
 knowledge bank, data processing) until it has enough information to return
 a final answer.
 
-The backend only manages human approval checkpoints — all AI decisions about
-which tools to call and when are made by the agent itself.
+The backend only manages human approval checkpoints
 """
 
 import json
@@ -26,10 +25,8 @@ _SERVER_PATH = str(
 
 
 def _json_schema_to_gemini(schema: dict) -> types.Schema:
-    """Convert a JSON Schema dict to a Gemini types.Schema object.
-
-    Used to pass MCP tool inputSchemas to Gemini so it knows what
-    arguments each tool accepts. Called recursively for nested objects.
+    """
+    Convert a JSON Schema dict into a Geminy specific schema objet.
     """
     type_map = {
         "string": types.Type.STRING,
@@ -39,10 +36,12 @@ def _json_schema_to_gemini(schema: dict) -> types.Schema:
         "array": types.Type.ARRAY,
         "object": types.Type.OBJECT,
     }
+    #Default to string
     schema_type = type_map.get(schema.get("type", "string"), types.Type.STRING)
     properties = {
         k: _json_schema_to_gemini(v) for k, v in schema.get("properties", {}).items()
     }
+    #Array
     items = (
         _json_schema_to_gemini(schema["items"])
         if schema.get("type") == "array" and "items" in schema
@@ -58,19 +57,19 @@ def _json_schema_to_gemini(schema: dict) -> types.Schema:
 
 
 class GeminiAgent:
-    """Gemini AI agent that autonomously calls MCP tools to complete tasks.
+    """Gemini AI agent that autonomously calls MCP tools to complete tasks by itself.
 
-    The agent runs a tool-use loop:
-      1. Send system prompt + task to Gemini with available MCP tools
-      2. Gemini decides which tools to call
+    The agent runs a tool use loop that functions as follows:
+      1. Send system prompt + task to Gemini with available MCP tools to give it the task
+      2. Gemini decides which tools to call by itself, is agent driven
       3. Execute tool calls via MCPClient
       4. Feed results back to Gemini
-      5. Repeat until Gemini returns a final text response (no more tool calls)
+      5. Repeat until Gemini returns a final text response
 
     Args:
-        model:           Gemini model ID to use.
-        mcp_client:      Connected MCPClient instance for tool execution.
-        max_tool_rounds: Safety limit on tool-call iterations (prevents infinite loops).
+        model:           Gemini model ID that is used.
+        mcp_client:      Connected MCPClient.
+        max_tool_rounds: Built in safety limit to limit tool calls. It is made to prevent eternal AI loops
     """
 
     def __init__(
@@ -98,9 +97,7 @@ class GeminiAgent:
         Args:
             system_prompt:      Instructions that define the agent's role and behaviour.
             task:               The specific task to complete.
-            allowed_tool_names: When provided, only tools in this set are exposed to
-                                the model. Enforces source selection at the API level
-                                rather than relying on prompt instructions alone.
+            allowed_tool_names: The tools the AI can use. If empty, all tools are legai
 
         Returns:
             The agent's final text response after all tool calls are complete.
@@ -110,6 +107,7 @@ class GeminiAgent:
             f"[GeminiAgent] Starting run with {len(available_tools)} tools available"
         )
 
+        #User task
         contents = [
             types.Content(
                 role="user",
@@ -117,6 +115,7 @@ class GeminiAgent:
             )
         ]
 
+        #Tool use loop
         self.last_thought_text = ""
         config = types.GenerateContentConfig(
             system_instruction=system_prompt,
@@ -124,6 +123,7 @@ class GeminiAgent:
             thinking_config=types.ThinkingConfig(include_thoughts=True),
         )
 
+        #Check if max tool rounds is not reached
         for round_num in range(self.max_tool_rounds):
             try:
                 response = await self.client.aio.models.generate_content(
@@ -140,14 +140,16 @@ class GeminiAgent:
                 raise
 
             candidate = response.candidates[0] if response.candidates else None
+            #Candidate is empty on error. Use safety checks to prevent crash
             if candidate is None or candidate.content is None or candidate.content.parts is None:
                 finish_reason = getattr(candidate, "finish_reason", "N/A") if candidate else "NO_CANDIDATES"
                 logger.warning(
-                    "[GeminiAgent] Empty or blocked response (finish_reason=%s) — returning empty string",
+                    "[GeminiAgent] Empty or blocked response (finish_reason=%s). returning empty string",
                     finish_reason,
                 )
                 return ""
 
+            #Retrieve tool calls
             tool_calls = [
                 part
                 for part in candidate.content.parts
@@ -183,6 +185,7 @@ class GeminiAgent:
             )
             contents.append(candidate.content)
 
+            #Perform tool calls and collect
             tool_results = []
             for part in tool_calls:
                 fc = part.function_call
@@ -222,7 +225,7 @@ class GeminiAgent:
         )
         return last_text or "Agent reached maximum tool iterations without completing."
 
-    # Phrases that indicate Gemini could not access the page.
+    # Phrases that indicate Gemini could not access the page. Necessary due to error phrase being not consistent
     _INACCESSIBLE_PHRASES: tuple[str, ...] = (
         "not accessible",
         "unable to access",
@@ -252,11 +255,10 @@ class GeminiAgent:
         perspectives: list[str],
         batch_size: int = 15,
     ) -> list[dict]:
-        """Second-pass: fetch and summarise web pages using Gemini url_context.
+        """Second-pass fetch and summarise web pages using Gemini url_context.
 
-        Makes a separate Gemini call with the url_context built-in tool — no MCP
-        tools, no scraping. Gemini fetches each URL server-side through Google's
-        infrastructure.
+        Makes a separate Gemini call with the url_context built-in tool.
+        Gemini fetches each URL server side through Google infrastructure.
 
         Pages that are inaccessible (paywalled, 403/404, blocked) are silently
         skipped so they don't pollute the collected data or the source count.
@@ -273,6 +275,7 @@ class GeminiAgent:
             batch = urls[i : i + batch_size]
             url_list = "\n".join(f"- {url}" for url in batch)
 
+            #Prompt for Gemini to fetch and summarise results
             prompt = (
                 f"PIR (Priority Intelligence Requirement): {pir}\n"
                 f"Analysis perspectives: {perspectives_str}\n\n"
@@ -302,6 +305,7 @@ class GeminiAgent:
                 f"]}}"
             )
 
+            #Attempt the AI call and log error
             try:
                 try:
                     response = await self.client.aio.models.generate_content(
@@ -318,11 +322,9 @@ class GeminiAgent:
                         )
                         raise e.exceptions[0] from e
                     raise
-                # Gemini can return a response with no candidates or with a candidate
-                # whose content is None — this happens when the response is blocked by
-                # safety filters, hits a rate limit, or the model declines to answer.
-                # Accessing .content.parts on a None candidate raises AttributeError,
-                # so we guard here and skip the batch rather than crashing the whole pass.
+
+                #Gemini may return a empty list when there is an error. The check is to prevent cracsh if empty.
+
                 candidate = response.candidates[0] if response.candidates else None
                 if candidate is None or candidate.content is None:
                     logger.warning(

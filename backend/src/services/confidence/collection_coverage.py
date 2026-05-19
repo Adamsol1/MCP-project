@@ -16,9 +16,6 @@ from src.models.confidence import (
     PirCoverageScore,
 )
 
-# ---------------------------------------------------------------------------
-# Source type normalisation
-# ---------------------------------------------------------------------------
 
 SOURCE_TYPE_MAP: dict[str, str] = {
     "osint": "otx",
@@ -37,10 +34,6 @@ SOURCE_TYPE_MAP: dict[str, str] = {
 def _normalise_source(source: str) -> str:
     return SOURCE_TYPE_MAP.get(source.lower().strip(), "other")
 
-
-# ---------------------------------------------------------------------------
-# Scoring helpers
-# ---------------------------------------------------------------------------
 
 _PRIORITY_WEIGHTS: dict[str, int] = {"high": 3, "medium": 2, "low": 1}
 
@@ -125,11 +118,6 @@ def _build_rationale(
     return " ".join(parts)
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
-
-
 def compute_collection_coverage(
     findings: list[FindingModel],
     gaps: list[str],
@@ -144,7 +132,7 @@ def compute_collection_coverage(
               'question' (str), 'priority' (str), 'rationale' (str).
 
     Returns:
-        CollectionCoverageResult with per-PIR scores and an aggregate.
+        CollectionCoverageResult with per PIR scores and an aggregate.
     """
     if not pirs:
         return CollectionCoverageResult(

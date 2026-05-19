@@ -5,22 +5,11 @@ from enum import Enum
 
 from pydantic import BaseModel, Field
 
-# ---------------------------------------------------------------------------
-# Shared tier enum
-# ---------------------------------------------------------------------------
-
-
 class ConfidenceTier(str, Enum):
     LOW = "low"
     MODERATE = "moderate"
     HIGH = "high"
     ASSESSED = "assessed"
-
-
-# ---------------------------------------------------------------------------
-# Collection Coverage (Layer 0 — existing)
-# ---------------------------------------------------------------------------
-
 
 class CoverageFindingRef(BaseModel):
     """Lightweight reference to a finding that contributed to a PIR's coverage score."""
@@ -31,7 +20,7 @@ class CoverageFindingRef(BaseModel):
 
 
 class PirCoverageScore(BaseModel):
-    pir_index: int = Field(..., description="Zero-based PIR index")
+    pir_index: int = Field(..., description="PIR index")
     pir_question: str = Field(..., description="The PIR question text")
     priority: str = Field(..., description="high / medium / low")
     tier: ConfidenceTier = Field(..., description="Coverage confidence tier")
@@ -47,7 +36,6 @@ class PirCoverageScore(BaseModel):
         description="The actual findings that mapped to this PIR",
     )
 
-
 class CollectionCoverageResult(BaseModel):
     per_pir: list[PirCoverageScore] = Field(default_factory=list)
     aggregate_tier: ConfidenceTier = Field(
@@ -55,12 +43,6 @@ class CollectionCoverageResult(BaseModel):
     )
     aggregate_score: float = Field(..., ge=0.0, le=1.0)
     summary: str = Field(..., description="One-sentence summary for the analyst")
-
-
-# ---------------------------------------------------------------------------
-# Confidence Algorithm (Layer 1) — dataclass for internal use
-# ---------------------------------------------------------------------------
-
 
 @dataclass
 class ConfidenceBreakdown:
@@ -74,12 +56,6 @@ class ConfidenceBreakdown:
     source_types: list[str] = field(default_factory=list)
     circular_flag: bool = False
 
-
-# ---------------------------------------------------------------------------
-# Finding-Level Confidence (Layer 2)
-# ---------------------------------------------------------------------------
-
-
 class FindingConfidence(BaseModel):
     """Algorithm-computed confidence for a single finding."""
 
@@ -90,12 +66,6 @@ class FindingConfidence(BaseModel):
     independence: float = Field(..., ge=0.0, le=1.0)
     circular_flag: bool = False
     source_types: list[str] = Field(default_factory=list)
-
-
-# ---------------------------------------------------------------------------
-# Assertion-Level Confidence (Layer 3)
-# ---------------------------------------------------------------------------
-
 
 class AssertionConfidence(BaseModel):
     """Computed confidence for a single per-perspective assertion."""

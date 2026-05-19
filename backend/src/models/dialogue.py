@@ -77,7 +77,7 @@ class ProcessingContext(BaseModel):
     pir: str
     collected_data: str
     is_revision: bool = False
-    """True when this is a re-processing run refining an earlier result."""
+    """True when this is a reprocessing run refining an earlier result."""
 
 
 class AnalysisContext(BaseModel):

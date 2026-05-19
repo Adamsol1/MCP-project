@@ -232,6 +232,10 @@ class CouncilService:
         council_settings: CouncilRunSettings | None = None,
         language: str = "en",
     ) -> CouncilNote:
+        """Run a council deliberation and return the result as a CouncilNote.
+        Builds participants, sends a deliberate request to the council MCP server,
+        and parses the response into structured output.
+        """
         del session_id
         selected_findings = (
             [f for f in processing_result.findings if f.id in finding_ids]

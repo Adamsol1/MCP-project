@@ -61,12 +61,12 @@ export interface Settings {
 
 /**
  * Fallback values used on first launch or when localStorage is missing/corrupt.
- * English language, dark theme, and no pre-filled parameters.
+ * English language, light theme, and no pre-filled parameters.
  */
 export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   aiLanguage: "en",
-  theme: "dark",
+  theme: "light",
   inputParameters: {
     timeframe: "",
     sourceTimeframes: {

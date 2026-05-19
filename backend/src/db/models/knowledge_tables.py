@@ -6,7 +6,7 @@ from sqlmodel import Field, SQLModel
 
 
 class KnowledgeResourceTable(SQLModel, table=True):
-    """One row per knowledge resource — replaces .md files on disk."""
+    """One row per knowledge resource. Replaces .md files on disk."""
 
     __tablename__ = "knowledge_resources"
 

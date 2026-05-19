@@ -14,11 +14,11 @@ class RawIOC(BaseModel):
     before validation and normalization.
     """
 
-    raw_value: str = Field(..., description="Raw IOC value as extracted")
+    raw_value: str = Field(..., description="Raw IOC value")
 
-    suspected_type: IOCType = Field(..., description="Suspected IOC type")
+    suspected_type: IOCType = Field(..., description="IOC type")
 
-    context: str | None = Field(
+    context: str | None = Field( 
         default=None, max_length=500, description="Context where IOC was found"
     )
 

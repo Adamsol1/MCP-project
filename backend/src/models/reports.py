@@ -10,7 +10,7 @@ from src.models.indicators import NormalizedIndicator
 
 
 class ThreatReport(BaseModel):
-    """A threat intelligence report aggregating multiple indicators."""
+    """A threat intelligence report."""
 
     id: str = Field(..., description="Unique identifier")
 
@@ -20,7 +20,7 @@ class ThreatReport(BaseModel):
         default=None, max_length=2000, description="Report description"
     )
 
-    source: DataSource = Field(..., description="Where report came from")
+    source: DataSource = Field(..., description="Where the report came from")
 
     source_id: str | None = Field(default=None, description="ID from original source")
 
@@ -31,7 +31,7 @@ class ThreatReport(BaseModel):
     tlp: TLPLevel = Field(..., description="Sharing restrictions")
 
     tags: list[str] = Field(
-        default_factory=list, description="Tags (deduplicated, lowercase)"
+        default_factory=list, description="Tags"
     )
 
     mitre_attack_ids: list[str] = Field(

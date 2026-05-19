@@ -4,37 +4,6 @@ This module contains the NormalizedIndicator model which represents a validated,
 normalized Indicator of Compromise (IOC). The model validates that IOC values
 match their declared types using regex patterns and the ipaddress library.
 
-Components Summary:
-|------------------------|-----------|---------------------------------------------|
-| Component              | Type      | Purpose                                     |
-|------------------------|-----------|---------------------------------------------|
-| NormalizedIndicator    | Class     | Main model for validated IOCs               |
-| id                     | Field     | Unique identifier for the indicator         |
-| type                   | Field     | IOC type (determines which validator runs)  |
-| value                  | Field     | The actual IOC (IP, hash, domain, etc.)     |
-| confidence             | Field     | 0-100 score of how reliable this IOC is     |
-| threat_level           | Field     | Severity (critical/high/medium/low/unknown) |
-| source                 | Field     | Where data came from (OTX, MISP, manual)    |
-| @model_validator       | Decorator | Runs after fields are set, triggers valid.  |
-| _validate_ipv4         | Method    | Uses ipaddress library to validate IPv4     |
-| _validate_ipv6         | Method    | Uses ipaddress library to validate IPv6     |
-| _validate_md5          | Method    | Regex: 32 hex characters                    |
-| _validate_sha1         | Method    | Regex: 40 hex characters                    |
-| _validate_sha256       | Method    | Regex: 64 hex characters                    |
-| _validate_domain       | Method    | Regex: valid domain format                  |
-| _validate_url          | Method    | Must start with http:// or https://         |
-| _validate_email        | Method    | Regex: basic email format                   |
-| _validate_cve          | Method    | Regex: CVE-YYYY-NNNN+ format                |
-|------------------------|-----------|---------------------------------------------|
-
-Validation Patterns:
---------------------
-- MD5:    ^[a-f0-9]{32}$
-- SHA1:   ^[a-f0-9]{40}$
-- SHA256: ^[a-f0-9]{64}$
-- Domain: ^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,}$
-- CVE:    ^cve-\\d{4}-\\d{4,}$
-- Email:  ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$
 """
 
 import ipaddress

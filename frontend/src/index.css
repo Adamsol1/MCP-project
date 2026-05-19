@@ -1,5 +1,6 @@
 @import "./styles/theme.css";
 @import "tailwindcss";
+@import "flag-icons/css/flag-icons.min.css";
 
 body {
   font-family: var(--font-sans);

@@ -1,7 +1,7 @@
-"""ReviewService - AI review for generated content via Review MCP Server.
+"""ReviewService. AI review for generated content via Review MCP Server.
 
 Prompts are fetched from the dedicated review MCP server (port 8002).
-The AI call is made via LLMService - no tool loop needed, review is pure synthesis.
+The AI call is made via LLMService
 """
 
 import json
@@ -19,15 +19,13 @@ logger = logging.getLogger("app")
 
 class ReviewService:
     """AI review wrapper using the Review MCP Server for prompts and LLMService for generation.
-
-    Fetches review prompt templates from the dedicated review MCP server (port 8002),
-    then calls LLMService (Gemini) to perform the actual review.
+    AI review for generated content. Uses the Review MCP server to retrieve prompts that is given to the Agent.
     """
 
     def __init__(self, llm_service: LLMService, review_mcp_client: MCPClient):
         self.llm_service = llm_service
         self.review_mcp_client = review_mcp_client
-        # Fail-open by default so review MCP outages do not break the main flow.
+
         self.fail_open = os.getenv("REVIEW_FAIL_OPEN", "true").lower() == "true"
 
     def _fallback_result(self, phase: str, exc: Exception) -> ReviewResult:
@@ -44,7 +42,8 @@ class ReviewService:
         )
 
     async def review_pir(self, content, context: BaseModel, phase: str) -> ReviewResult:
-        """Review generated content against the dialogue context.
+        """
+        Review generated content against dialogue context.
 
         Args:
             content: The content to review (str or dict).
@@ -65,6 +64,7 @@ class ReviewService:
 
         logger.info("[ReviewService] Fetching review prompt for phase=%s", phase)
 
+        #Attempt to review the PIR
         try:
             async with self.review_mcp_client.connect():
                 prompt = await self.review_mcp_client.get_prompt(

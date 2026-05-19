@@ -61,7 +61,7 @@ _DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS = 3600.0
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")
 
-# Legacy filesystem paths — kept for dev-tool snapshot/restore endpoints only.
+# Legacy filesystem paths. Kept for devtool snapshot/restore endpoints only.
 # The main session save/load path uses sessions.db via UnitOfWork (see _save_session/_load_session).
 _SESSIONS_DIR = Path(__file__).parent.parent.parent / "sessions"
 _BACKEND_DIR = Path(__file__).resolve().parents[2]
@@ -73,6 +73,7 @@ _SESSION_ID_RE = re.compile(r"^[A-Za-z0-9_-]+$")
 
 
 def _dialogue_request_timeout_seconds(request: Any) -> float:
+    """Get request timeout in seconds. If request has council settings, timeout is extended."""
     raw_timeout = os.getenv("DIALOGUE_REQUEST_TIMEOUT_SECONDS")
     try:
         timeout = (
@@ -106,8 +107,6 @@ class IntelligenceSession:
     Args:
         Session_id : Identifer of the session
         research_logger: Logger for this session
-
-
     """
 
     def __init__(self, session_id: str, research_logger: ResearchLogger):
@@ -123,11 +122,6 @@ class IntelligenceSession:
 
 
 _sessions: dict[str, IntelligenceSession] = {}
-
-# Tombstone of session ids that were explicitly deleted.  Blocks in-flight
-# requests (e.g. a long-running /api/dialogue/message handler) from
-# re-inserting the row via _save_session after the user has already
-# deleted the session on the frontend.
 _deleted_sessions: set[str] = set()
 
 
@@ -213,6 +207,7 @@ class DialogueMessageResponse(BaseModel):
     review_activity: list[dict] | None = None
 
 
+# Dev tool. not production
 class DialogueDevStateResponse(BaseModel):
     session_id: str
     stage: str
@@ -226,6 +221,7 @@ class DialogueDevStateResponse(BaseModel):
     has_modifications: bool
 
 
+# Dev tool. not production
 class DialogueDevStateRequest(BaseModel):
     session_id: str
     stage: str
@@ -234,6 +230,7 @@ class DialogueDevStateRequest(BaseModel):
     current_pir: str | None = None
 
 
+# Dev tool. not production
 class DialogueDevSnapshot(BaseModel):
     session_id: str
     title: str
@@ -243,6 +240,7 @@ class DialogueDevSnapshot(BaseModel):
     artifacts: dict[str, bool]
 
 
+# Dev tool. not production
 class DialogueDevRestoreRequest(BaseModel):
     source_session_id: str
     target_session_id: str
@@ -250,6 +248,7 @@ class DialogueDevRestoreRequest(BaseModel):
     target_phase: str | None = None
 
 
+# Dev tool. not production
 class DialogueDevRestoreResponse(DialogueDevStateResponse):
     source_session_id: str
     messages: list[dict[str, Any]]
@@ -348,7 +347,7 @@ def _convert_to_message_response(
     return result
 
 
-# Temp
+# Dev tool. not production
 def _ensure_dev_tools_enabled():
     if not DEV_TOOLS_ENABLED:
         raise HTTPException(status_code=404, detail="Not found")
@@ -411,6 +410,7 @@ async def _get_or_create_session(
 
 
 def _get_active_stage_and_phase(session: IntelligenceSession) -> tuple[str, Phase]:
+    """Return current stage and phase by checking which flow is active."""
     if session.analysis_flow:
         return session.analysis_flow.state.value, Phase.ANALYSIS
     if session.processing_flow:
@@ -420,6 +420,7 @@ def _get_active_stage_and_phase(session: IntelligenceSession) -> tuple[str, Phas
     return session.direction_flow.state.value, Phase.DIRECTION
 
 
+# Dev tool. not production
 def _build_dev_state_response(
     session_id: str, session: IntelligenceSession
 ) -> DialogueDevStateResponse:
@@ -444,6 +445,7 @@ def _build_dev_state_response(
     )
 
 
+# Dev tool. not production
 def _default_dev_sub_state(stage: str) -> str | None:
     if stage in {
         DirectionState.SUMMARY_CONFIRMING.value,
@@ -457,12 +459,14 @@ def _default_dev_sub_state(stage: str) -> str | None:
     return None
 
 
+# Dev tool. not production
 def _validate_dev_session_id(session_id: str) -> str:
     if not _SESSION_ID_RE.fullmatch(session_id):
         raise HTTPException(status_code=400, detail="Invalid session_id")
     return session_id
 
 
+# Dev tool. not production
 def _safe_child(root: Path, *parts: str) -> Path:
     root_resolved = root.resolve()
     path = root_resolved.joinpath(*parts).resolve()
@@ -471,6 +475,7 @@ def _safe_child(root: Path, *parts: str) -> Path:
     return path
 
 
+# Dev tool. not production
 def _read_json_file(path: Path) -> dict[str, Any] | None:
     if not path.exists():
         return None
@@ -481,6 +486,7 @@ def _read_json_file(path: Path) -> dict[str, Any] | None:
     return data if isinstance(data, dict) else None
 
 
+# Dev tool. not production
 def _latest_mtime(paths: list[Path]) -> str | None:
     existing = [path for path in paths if path.exists()]
     if not existing:
@@ -490,6 +496,7 @@ def _latest_mtime(paths: list[Path]) -> str | None:
     ).isoformat()
 
 
+# Dev tool. not production
 def _session_artifact_paths(session_id: str) -> dict[str, Path]:
     return {
         "session": _safe_child(_SESSIONS_DIR, f"{session_id}.json"),
@@ -501,6 +508,7 @@ def _session_artifact_paths(session_id: str) -> dict[str, Path]:
     }
 
 
+# Dev tool. not production
 def _snapshot_title(session_id: str, session_data: dict[str, Any] | None) -> str:
     context = (session_data or {}).get("direction_flow", {}).get("context", {})
     initial_query = context.get("initial_query")
@@ -509,6 +517,7 @@ def _snapshot_title(session_id: str, session_data: dict[str, Any] | None) -> str
     return session_id
 
 
+# Dev tool. not production
 def _stage_phase_from_session_data(
     session_data: dict[str, Any] | None,
 ) -> tuple[str, str]:
@@ -529,6 +538,7 @@ def _stage_phase_from_session_data(
     return DirectionState.INITIAL.value, Phase.DIRECTION.value
 
 
+# Dev tool. not production
 def _build_dev_snapshot(session_id: str) -> DialogueDevSnapshot:
     paths = _session_artifact_paths(session_id)
     session_data = _read_json_file(paths["session"])
@@ -569,6 +579,7 @@ def _build_dev_snapshot(session_id: str) -> DialogueDevSnapshot:
     )
 
 
+# Dev tool. not production
 async def _build_dev_snapshot_db(
     session_id: str, uow: UnitOfWork
 ) -> DialogueDevSnapshot:
@@ -603,7 +614,7 @@ async def _build_dev_snapshot_db(
             except (json.JSONDecodeError, AttributeError):
                 pass
 
-    # Merge with filesystem artifacts for legacy sessions
+    #Legacy sessions
     processed_path = paths["data"] / "processed.json"
     collected_path = paths["data"] / "collected.json"
     artifacts = {
@@ -616,7 +627,7 @@ async def _build_dev_snapshot_db(
         "reasoning_log": paths["reasoning_log"].exists(),
     }
 
-    # Pick the most recent timestamp across DB and filesystem
+    #Find newest timestamp
     updated_at = _latest_mtime([
         paths["session"], paths["analysis"], collected_path,
         processed_path, paths["collection_status"],
@@ -637,11 +648,13 @@ async def _build_dev_snapshot_db(
     )
 
 
+# Dev tool. not production
 def _replace_session_id_in_text(path: Path, source_id: str, target_id: str) -> None:
     text = path.read_text(encoding="utf-8")
     path.write_text(text.replace(source_id, target_id), encoding="utf-8")
 
 
+# Dev tool. not production
 def _copy_text_artifact(
     source_path: Path, target_path: Path, source_id: str, target_id: str
 ) -> None:
@@ -652,6 +665,7 @@ def _copy_text_artifact(
     _replace_session_id_in_text(target_path, source_id, target_id)
 
 
+# Dev tool. not production
 def _copy_directory_artifact(
     source_path: Path, target_path: Path, source_id: str, target_id: str
 ) -> None:
@@ -671,6 +685,7 @@ def _copy_directory_artifact(
             _replace_session_id_in_text(child, source_id, target_id)
 
 
+# Dev tool. not production
 async def _clone_dev_artifacts(
     source_id: str, target_id: str, uow: UnitOfWork
 ) -> None:
@@ -685,9 +700,8 @@ async def _clone_dev_artifacts(
     if not source_exists_in_db and not source_paths["session"].exists():
         raise HTTPException(status_code=404, detail="Source session not found")
 
-    # --- DB copy (primary path for all current sessions) ---
     if source_exists_in_db:
-        # Ensure target session row exists before inserting child rows
+        # Ensure target session row exists
         target_row = await uow.sessions.get(source_id)
         if target_row:
             from src.db.models.session_tables import SessionTable
@@ -697,21 +711,21 @@ async def _clone_dev_artifacts(
             new_row.id = target_id
             await uow.sessions.upsert(new_row)
 
-        # Copy collection attempts
+        # Copy collection
         collection_attempts = await uow.collection_attempts.get_all(source_id)
         for attempt in collection_attempts:
             await uow.collection_attempts.append(
                 target_id, attempt.pir, attempt.raw_response
             )
 
-        # Copy processing attempts
+        # Copy processing
         processing_attempts = await uow.processing_attempts.get_all(source_id)
         for attempt in processing_attempts:
             await uow.processing_attempts.append(
                 target_id, attempt.pir, attempt.raw_result
             )
 
-        # Copy analysis session
+        # Copy analysis
         analysis_row = await uow.analysis_sessions.get_by_session(source_id)
         if analysis_row:
             await uow.analysis_sessions.get_or_create(target_id)
@@ -729,7 +743,7 @@ async def _clone_dev_artifacts(
         await uow.commit()
         logger.info("[DevTools] Cloned DB data from %s to %s", source_id, target_id)
 
-    # --- Legacy filesystem copy (fallback for old sessions) ---
+    #Legacyfallback
     target_paths = _session_artifact_paths(target_id)
     _copy_text_artifact(
         source_paths["session"], target_paths["session"], source_id, target_id
@@ -755,6 +769,7 @@ async def _clone_dev_artifacts(
 
 
 def _ensure_collection_flow(session: IntelligenceSession) -> CollectionFlow:
+    """Create collection flow for session if it does not exist yet. Marks direction as complete."""
     if session.collection_flow is None:
         session.collection_flow = CollectionFlow(
             session_id=session.session_id,
@@ -767,6 +782,7 @@ def _ensure_collection_flow(session: IntelligenceSession) -> CollectionFlow:
 
 
 def _ensure_processing_flow(session: IntelligenceSession) -> ProcessingFlow:
+    """Create processing flow for session if it does not exist yet. Marks collection as complete."""
     collection_flow = _ensure_collection_flow(session)
     collection_flow.state = CollectionState.COMPLETE
     if session.processing_flow is None:
@@ -780,6 +796,7 @@ def _ensure_processing_flow(session: IntelligenceSession) -> ProcessingFlow:
 
 
 def _ensure_analysis_flow(session: IntelligenceSession) -> AnalysisFlow:
+    """Create analysis flow for session if it does not exist yet. Marks processing as complete."""
     processing_flow = _ensure_processing_flow(session)
     processing_flow.state = ProcessingState.COMPLETE
     if session.analysis_flow is None:
@@ -794,6 +811,7 @@ def _ensure_analysis_flow(session: IntelligenceSession) -> AnalysisFlow:
 async def _hydrate_analysis_flow_from_store(
     session: IntelligenceSession, uow: UnitOfWork | None = None
 ) -> None:
+    """Load analysis result from DB into the analysis flow if not already set."""
     analysis_flow = _ensure_analysis_flow(session)
     if analysis_flow.analysis_result:
         return
@@ -816,6 +834,7 @@ async def _hydrate_analysis_flow_from_store(
     }
 
 
+# Dev tool. not production
 async def _apply_dev_restore_stage(
     session: IntelligenceSession,
     target_stage: str | None,
@@ -849,6 +868,7 @@ async def _apply_dev_restore_stage(
         )
         return
 
+    #Check if phase is collection
     if phase == Phase.COLLECTION.value:
         try:
             collection_state = CollectionState(target_stage)
@@ -863,6 +883,7 @@ async def _apply_dev_restore_stage(
         collection_flow.state = collection_state
         return
 
+    #Check if phase is processing
     if phase == Phase.PROCESSING.value:
         processing_flow = _ensure_processing_flow(session)
         session.analysis_flow = None
@@ -878,6 +899,7 @@ async def _apply_dev_restore_stage(
             ) from exc
         return
 
+    #Check if phase is analysis
     if phase == Phase.ANALYSIS.value:
         analysis_flow = _ensure_analysis_flow(session)
         if target_stage == AnalysisState.COMPLETE.value:
@@ -918,7 +940,7 @@ def _try_parse_json(raw: str | None) -> Any:
                     return None
     return None
 
-
+#Retrieve latest attempt
 def _latest_attempt(path: Path) -> str | None:
     data = _read_json_file(path)
     attempts = data.get("attempts") if data else None
@@ -1095,7 +1117,7 @@ async def _build_dev_hydrated_messages(
         if processing_data:
             messages.append(
                 {
-                    "text": "Processing complete - results are ready for review.",
+                    "text": "Processing complete results are ready for review.",
                     "sender": "system",
                     "type": "processing",
                     "data": processing_data,
@@ -1118,6 +1140,7 @@ async def _build_dev_hydrated_messages(
 
 
 def _get_mcp_client(session_id: str | None = None) -> MCPClient:
+    """Create MCPClient with elicitation callback wired up if session_id is given."""
     if not session_id:
         return MCPClient()
     store = get_elicitation_store()
@@ -1401,6 +1424,7 @@ async def _handle_analysis_phase(
     session: IntelligenceSession,
     _request: DialogueMessageRequest,
 ) -> DialogueMessageResponse:
+    """Handles incoming messages during the analysis phase. Returns stored analysis result."""
     assert session.analysis_flow is not None
     response = await session.analysis_flow.process_user_message()
     return _convert_to_message_response(
@@ -1415,6 +1439,7 @@ async def _handle_council_phase(
     request: DialogueMessageRequest,
     uow: UnitOfWork,
 ) -> DialogueMessageResponse:
+    """Handles incoming messages during the council phase. Runs council deliberation."""
     if session.council_flow is None:
         from src.models.dialogue import DialogueAction, DialogueResponse
 
@@ -1453,6 +1478,7 @@ async def _dispatch_message(
     review_service: ReviewService,
     uow: UnitOfWork,
 ) -> DialogueMessageResponse:
+    """Route incoming message to the correct phase handler based on active session state."""
     session = await _get_or_create_session(request.session_id, uow)
     orchestrator = _build_orchestrator(session)
     if session.analysis_flow:

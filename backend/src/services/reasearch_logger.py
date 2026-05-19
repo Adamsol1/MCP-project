@@ -1,4 +1,4 @@
-"""ResearchLogger — writes research/reasoning log entries to sessions.db.
+"""ResearchLogger  writes research/reasoning log entries to sessions.db.
 
 Uses the sync sqlite3 module because the logger is invoked from many sync
 contexts (state machines, agent callbacks). The `research_log_entries` table
@@ -45,7 +45,7 @@ def _get_connection() -> sqlite3.Connection:
 
 
 class ResearchLogger:
-    """Persists per-session research and reasoning logs to sessions.db.
+    """Persists per session research and reasoning logs to sessions.db.
 
     Two entry types land in the `research_log_entries` table:
       - "ai_generation" / "user_action" — appended via create_log()

@@ -33,12 +33,12 @@ export default function PerspectiveSelector({
   const t = useT();
 
   const perspectives = [
-    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL", icon: "🌐" },
-    { label: t.perspectiveLabels["CHINA"], value: "CHINA", icon: "🇨🇳" },
-    { label: t.perspectiveLabels["EU"], value: "EU", icon: "🇪🇺" },
-    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY", icon: "🇳🇴" },
-    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA", icon: "🇷🇺" },
-    { label: t.perspectiveLabels["US"], value: "US", icon: "🇺🇸" },
+    { label: t.perspectiveLabels["NEUTRAL"], value: "NEUTRAL", flagClass: null },
+    { label: t.perspectiveLabels["CHINA"], value: "CHINA", flagClass: "fi fi-cn" },
+    { label: t.perspectiveLabels["EU"], value: "EU", flagClass: "fi fi-eu" },
+    { label: t.perspectiveLabels["NORWAY"], value: "NORWAY", flagClass: "fi fi-no" },
+    { label: t.perspectiveLabels["RUSSIA"], value: "RUSSIA", flagClass: "fi fi-ru" },
+    { label: t.perspectiveLabels["US"], value: "US", flagClass: "fi fi-us" },
   ];
 
   /**
@@ -84,7 +84,11 @@ export default function PerspectiveSelector({
                   : "bg-surface border-border text-text-secondary hover:bg-primary-subtle hover:border-primary hover:text-primary"
               }`}
             >
-              <span className="text-base leading-none">{perspective.icon}</span>
+              {perspective.flagClass ? (
+                <span className={`${perspective.flagClass} text-base leading-none`} aria-hidden="true" />
+              ) : (
+                <span className="text-base leading-none" aria-hidden="true">🌐</span>
+              )}
               <span>{perspective.label}</span>
             </button>
           );

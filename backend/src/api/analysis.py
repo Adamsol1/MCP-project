@@ -52,7 +52,7 @@ async def _load_pirs_for_session(
 ) -> list[dict]:
     """Load the approved PIR list from sessions.db or legacy JSON.
 
-    Returns an empty list if the session is missing or malformed — coverage
+    Returns an empty list if the session is missing or malformed. coverage
     will still compute (all PIRs will be LOW), so callers never crash.
     """
     # Try DB first
@@ -106,11 +106,13 @@ class AnalysisCouncilRequest(BaseModel):
     @field_validator("debate_point")
     @classmethod
     def _strip_debate_point(cls, value: str) -> str:
+        """Strip whitespace from debate point."""
         return value.strip()
 
     @field_validator("finding_ids")
     @classmethod
     def _normalize_finding_ids(cls, value: list[str]) -> list[str]:
+        """Strip whitespace and remove duplicates from finding IDs."""
         normalized: list[str] = []
         seen: set[str] = set()
         for item in value:
@@ -124,6 +126,7 @@ class AnalysisCouncilRequest(BaseModel):
     @field_validator("selected_perspectives")
     @classmethod
     def _normalize_perspectives(cls, value: list[str]) -> list[str]:
+        """Lowercase and deduplicate perspectives to match Perspective enum values."""
         normalized: list[str] = []
         seen: set[str] = set()
         for item in value:
@@ -136,6 +139,7 @@ class AnalysisCouncilRequest(BaseModel):
 
     @model_validator(mode="after")
     def _validate_inputs(self) -> "AnalysisCouncilRequest":
+        """Require at least 2 perspectives and either a debate point or finding IDs."""
         if len(self.selected_perspectives) < 2:
             raise ValueError("selected_perspectives must contain at least 2 items")
         if not self.debate_point and not self.finding_ids:
@@ -171,6 +175,10 @@ async def _build_draft(
     analysis_service: AnalysisService | None = None,
     mcp_client: MCPClient | None = None,
 ) -> AnalysisDraftResponse:
+    """
+    Build and return an analysis draft response for the given session.
+    Returns cached draft if processing result is unchanged, otherwise regenerates.
+    """
     processing_service = processing_service or ProcessingResultStore(uow=uow)
     analysis_service = analysis_service or AnalysisService(mcp_client or MCPClient())
 
@@ -178,6 +186,7 @@ async def _build_draft(
     processing_result = await processing_service.get_processing_result(session_id)
     processing_changed = state.processing_result != processing_result
 
+    # Regenerate draft if forced, missing, or if the underlying processing result has changed
     if (
         force_refresh
         or state.processing_result is None
@@ -189,11 +198,14 @@ async def _build_draft(
             processing_result,
             selected_perspectives=selected_perspectives,
         )
+        # generate_draft may return (draft, enriched_processing_result) or just draft
         if isinstance(draft_result, tuple):
             analysis_draft, enriched_processing_result = draft_result
         else:
             analysis_draft = draft_result
             enriched_processing_result = processing_result
+
+        # Full save (clears council note) if processing changed, otherwise just update draft
         if force_refresh or processing_changed:
             state.session_id = session_id
             state.processing_result = enriched_processing_result

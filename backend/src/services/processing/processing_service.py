@@ -1,3 +1,5 @@
+"""Service for processing collected intelligence data into structured findings."""
+
 import json
 import logging
 
@@ -15,6 +17,8 @@ _PROCESSING_TOOLS = [
 
 
 class ProcessingService:
+    """Runs collected data through the processing phase using a Gemini agent."""
+
     def __init__(self, mcp_client: MCPClient):
         self.mcp_client = mcp_client
 
@@ -26,6 +30,7 @@ class ProcessingService:
         previous_result: str | None = None,
         language: str = "en",
     ) -> str:
+        """Process collected data into structured findings. Returns raw JSON string."""
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
                 "processing_process",
@@ -61,6 +66,7 @@ class ProcessingService:
         modifications: str,
         language: str = "en",
     ) -> str:
+        """Apply user modifications to an existing processing result."""
         async with self.mcp_client.connect():
             system_prompt = await self.mcp_client.get_prompt(
                 "processing_modify",

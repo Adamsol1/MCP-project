@@ -1,4 +1,4 @@
-"""OTXCollector — queries AlienVault OTX for threat intelligence.
+"""OTXCollector queries AlienVault OTX for threat intelligence.
 
 This service handles all communication with the OTX REST API v1,
 including indicator lookups, pulse retrieval, and keyword searches.
@@ -68,10 +68,6 @@ class OTXCollector:
             raise ValueError("OTX_API_KEY environment variable is not set")
         self._request_timestamps: list[float] = []
 
-    # ------------------------------------------------------------------
-    # Public methods
-    # ------------------------------------------------------------------
-
     async def get_indicator(
         self, ioc_type: IOCType, value: str
     ) -> list[NormalizedIndicator]:
@@ -136,10 +132,6 @@ class OTXCollector:
         """
         results_data = await self._paginate("search/pulses", params={"q": query})
         return [self._parse_pulse(d) for d in results_data]
-
-    # ------------------------------------------------------------------
-    # HTTP infrastructure
-    # ------------------------------------------------------------------
 
     async def _request(
         self, method: str, path: str, params: dict | None = None
@@ -261,9 +253,6 @@ class OTXCollector:
         response.raise_for_status()
         return response  # pragma: no cover
 
-    # ------------------------------------------------------------------
-    # Response parsing
-    # ------------------------------------------------------------------
 
     def _parse_pulse(self, data: dict) -> OTXPulse:
         """Parse raw OTX JSON into an OTXPulse model.

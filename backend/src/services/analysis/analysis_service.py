@@ -1,3 +1,5 @@
+"""Service for generating analysis drafts from processed findings."""
+
 import json
 import logging
 import re
@@ -23,13 +25,17 @@ _DEFAULT_PERSPECTIVES = tuple(p.value for p in Perspective)
 
 
 class AnalysisService:
+    """
+    Service for generating analysis from processing result
+    Will make on Agent per perspective, run them, and then combine all result into same analysis.
+    """
+
     def __init__(
         self,
         mcp_client: MCPClient,
         perspective_docs: dict[str, str] | None = None,
     ):
         self.mcp_client = mcp_client
-        # Maps perspective name → formatted reference document markdown (may be empty)
         self._perspective_docs: dict[str, str] = perspective_docs or {}
 
     async def generate_draft(
@@ -39,6 +45,19 @@ class AnalysisService:
         pir: str = "",
         language: str = "en",
     ) -> tuple[AnalysisDraft, ProcessingResult]:
+        """
+
+        Generate analysis by making one agent per perspective, run them, and then combine all result into same analysis.
+        Each agent will analyse from their given perspective.
+
+        Args:
+            processing_result : ProcessingResult from the processing.
+            selected_perspectives : Perspectives to include. Defaults to all if not set.
+            pir : PIR string from the direction phase.
+
+        Returns:
+            Tuple of (AnalysisDraft, enriched ProcessingResult)
+        """
         normalized = self._normalize_perspectives(selected_perspectives)
         enriched_result = self._enrich_findings(processing_result)
         fallback_draft = self._build_fallback_draft(
@@ -50,6 +69,7 @@ class AnalysisService:
         base_payload: dict | None = None
         merged_implications: dict = {}
 
+        #Attempt to generate analysis. Log any errors
         try:
             async with self.mcp_client.connect():
                 for perspective in normalized:
@@ -72,6 +92,7 @@ class AnalysisService:
                         else f"{persona}\n\n{ref_docs}\n\n{task_prompt}"
                     )
                     agent = GeminiAgent(self.mcp_client)
+                    #system promt
                     raw = await agent.run(
                         system_prompt=system_prompt,
                         task=(
@@ -100,7 +121,7 @@ class AnalysisService:
                         )
                         continue
 
-                    # First agent provides shared fields (title, summary, key_judgments, etc.)
+                    # First agent provides shared fields like summary. The other agents will fill out their perspectives.
                     if base_payload is None:
                         base_payload = payload
 
@@ -121,7 +142,7 @@ class AnalysisService:
 
         except Exception:
             logger.warning(
-                "[AnalysisService] MCP generation failed — using fallback draft.",
+                "[AnalysisService] MCP generation failed using fallback draft.",
                 exc_info=True,
             )
             return self._enrich_draft_assertions(
@@ -130,7 +151,7 @@ class AnalysisService:
 
         if base_payload is None:
             logger.warning(
-                "[AnalysisService] No agents produced output — using fallback draft."
+                "[AnalysisService] No agents produced output using fallback draft."
             )
             return self._enrich_draft_assertions(
                 fallback_draft, enriched_result
@@ -142,7 +163,7 @@ class AnalysisService:
             llm_draft = AnalysisDraft.model_validate(base_payload)
         except Exception:
             logger.warning(
-                "[AnalysisService] Invalid draft payload — using fallback draft."
+                "[AnalysisService] Invalid draft payload using fallback draft."
             )
             llm_draft = fallback_draft
 
@@ -158,6 +179,8 @@ class AnalysisService:
         return self._enrich_draft_assertions(merged, enriched_result), enriched_result
 
     def _enrich_findings(self, processing_result: ProcessingResult) -> ProcessingResult:
+        """
+        Compute and attach confidence score to findings based on processing result"""
         enriched: list[FindingModel] = []
         for finding in processing_result.findings:
             source_urls = list(finding.supporting_data.get("source_refs", []))
@@ -182,6 +205,7 @@ class AnalysisService:
         draft: AnalysisDraft,
         processing_result: ProcessingResult,
     ) -> AnalysisDraft:
+        """Attach confidence scores to each perspective"""
         enriched_implications: dict[str, list[PerspectiveAssertion]] = {}
         for perspective, assertions in draft.per_perspective_implications.items():
             enriched_implications[perspective] = enrich_assertions(
@@ -192,6 +216,9 @@ class AnalysisService:
         )
 
     def _normalize_perspectives(self, selected: list[str] | None) -> list[str]:
+        """Normalize and validate perspective values against the Perspective enum.
+        Returns all perspectives if selected is empty or all values are invalid.
+        """
         if not selected:
             return list(_DEFAULT_PERSPECTIVES)
         normalized = [
@@ -207,6 +234,10 @@ class AnalysisService:
         selected_perspectives: list[str],
         language: str = "en",
     ) -> AnalysisDraft:
+        """
+        TEMP ONLY. WIll be removed
+        Build a hardcoded fallback draft when MCP generation fails.
+        Routes to Norwegian version if language is 'no', otherwise uses English."""
         if language == "no":
             return self._build_norwegian_fallback_draft(
                 processing_result, selected_perspectives
@@ -227,6 +258,7 @@ class AnalysisService:
         )
         first_gap = gaps[0] if gaps else "Attribution remains unresolved."
 
+        #Assumptiion of each perspective
         all_implications: dict[str, list[PerspectiveAssertion]] = {
             "us": [
                 _a(
@@ -305,6 +337,9 @@ class AnalysisService:
         processing_result: ProcessingResult,
         selected_perspectives: list[str],
     ) -> AnalysisDraft:
+        """
+        TEMP ONLY
+        Norwegian version of _build_fallback_draft. Same structure, translated text."""
         findings = processing_result.findings
         gaps = list(processing_result.gaps)
         first_id = findings[0].id if findings else None
@@ -396,6 +431,8 @@ class AnalysisService:
     def _merge_with_fallback(
         self, llm_draft: AnalysisDraft, fallback: AnalysisDraft
     ) -> AnalysisDraft:
+        """Merge LLM generated draft with fallback. Uses fallback values where LLM output is empty.
+        """
         merged_implications: dict[str, list[PerspectiveAssertion]] = {}
         for key in llm_draft.per_perspective_implications:
             llm_values = llm_draft.per_perspective_implications.get(key, [])

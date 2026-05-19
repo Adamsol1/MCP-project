@@ -112,6 +112,8 @@ def _write_manifest(manifest_path: Path, manifest: dict[str, Any]) -> None:
 
 
 def _stream_to_disk(file_obj, destination: Path) -> tuple[str, int]:
+    """Stream file to disk in 1MB chunks while computing SHA256 hash.
+    Returns (sha256_hex, total_bytes_written)."""
     digest = hashlib.sha256()
     total_size = 0
     with destination.open("wb") as out_file:
@@ -126,6 +128,7 @@ def _stream_to_disk(file_obj, destination: Path) -> tuple[str, int]:
 
 
 def _extract_year(value: Any) -> str:
+    """Try to extract a 4 digit year from value. Returns "Unknown" if not found."""
     if value is None:
         return "Unknown"
     if isinstance(value, datetime):
@@ -151,6 +154,8 @@ def _compose_pdf_markdown(
     page_count: int,
     page_texts: list[str],
 ) -> str:
+    """Build a markdown string with YAML front matter and page sections for a parsed PDF.
+    Each page gets its own heading. Returns the complete markdown as a string."""
     lines: list[str] = [
         "---",
         f"file_upload_id: {_yaml_quote(file_upload_id)}",
@@ -197,11 +202,10 @@ def _convert_to_markdown(
     stored_path: Path,
     parsed_path: Path,
 ) -> str:
-    """Wrap non-PDF file content in a minimal markdown artifact.
+    """Wrap a non pdfF file content to a md.
 
     Returns parse_status: "ready" on success, "failed" on read error.
-    The raw file content is preserved unchanged — only front matter and a
-    heading are added so the AI has context about the source.
+    The raw file content is preserved unchanged
     """
     try:
         content = stored_path.read_text(encoding="utf-8", errors="replace")
@@ -247,7 +251,7 @@ def _parse_pdf_to_markdown(
     """
     try:
         from pypdf import (
-            PdfReader,  # Imported lazily to avoid hard runtime import failures
+            PdfReader,  # Imported lazily
         )
     except Exception:
         citation = {
@@ -287,6 +291,7 @@ def _parse_pdf_to_markdown(
         or _UNKNOWN,
     }
 
+    #If data is missing, add flags
     metadata_flags: list[str] = []
     if citation["author"] == _UNKNOWN:
         metadata_flags.append("missing_author")

@@ -1,4 +1,4 @@
-"""Assertion-level confidence enrichment (Layer 3).
+"""Assertion level confidence enrichment (Layer 3).
 
 Pure functions that take a list of PerspectiveAssertion objects and the available
 FindingModel list and return enriched assertions with AssertionConfidence attached.
@@ -38,15 +38,14 @@ def validate_finding_ids(
     assertions: list[dict],
     valid_finding_ids: set[str],
 ) -> list[dict]:
-    """Strip invalid finding IDs from raw assertion dicts and log warnings.
+    """Strip invalid finding IDs from assertion dicts and log warnings.
 
     Args:
-        assertions: List of raw assertion dicts (from AI output or fallback).
-                    Each dict may have a 'supporting_finding_ids' key.
-        valid_finding_ids: Set of finding IDs that exist in the ProcessingResult.
+        assertions : List of raw assertion dicts from AI output or fallback.
+        valid_finding_ids : Set of finding IDs that exist in the ProcessingResult.
 
     Returns:
-        Same list with invalid IDs stripped from 'supporting_finding_ids'.
+        Same list with invalid IDs removed from supporting_finding_ids.
     """
     for assertion in assertions:
         original = assertion.get("supporting_finding_ids") or []
@@ -66,14 +65,14 @@ def enrich_assertions(
     assertions: list[PerspectiveAssertion],
     findings: list[FindingModel],
 ) -> list[PerspectiveAssertion]:
-    """Compute and attach AssertionConfidence for each PerspectiveAssertion.
+    """Compute and attach AssertionConfidence to each PerspectiveAssertion.
 
     Args:
-        assertions: List of assertions (may have empty/None confidence).
-        findings: All available findings from ProcessingResult.
+        assertions : List of assertions, may have empty confidence.
+        findings : All available findings from ProcessingResult.
 
     Returns:
-        New list of PerspectiveAssertion objects with confidence populated.
+        New list of PerspectiveAssertion with confidence populated.
     """
     finding_by_id: dict[str, FindingModel] = {f.id: f for f in findings}
     enriched: list[PerspectiveAssertion] = []
@@ -87,7 +86,7 @@ def enrich_assertions(
         ]
 
         if not supporting:
-            # No evidence base → pretrained/uncited authority, LOW tier
+            # No evidence base, use pretrained authority fallback with LOW tier
             confidence = _ZERO_FINDING_CONFIDENCE
             source_types: list[str] = []
         else:
@@ -101,7 +100,7 @@ def enrich_assertions(
             )
             # Override circular flag if cross-finding refs share URLs
             if circular and not breakdown.circular_flag:
-                # Re-compute with circular penalty applied manually
+                # Recompute with circular penalty applied manually
                 from src.services.confidence.scoring import (
                     _CIRCULAR_MULTIPLIER,
                     _W_AUTHORITY,
@@ -147,12 +146,6 @@ def enrich_assertions(
         )
 
     return enriched
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _collect_source_types(findings: list[FindingModel]) -> list[str]:
     """Unique source type strings from a set of findings."""
