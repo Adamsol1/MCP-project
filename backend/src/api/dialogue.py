@@ -56,7 +56,7 @@ _GATHER_MORE_CONTENT = (
 )
 _SUB_STATE_GATHER_MORE = "awaiting_gather_more"
 _SUB_STATE_AWAITING_DECISION = "awaiting_decision"
-_DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS = 600.0
+_DEFAULT_DIALOGUE_REQUEST_TIMEOUT_SECONDS = 3600.0
 
 router = APIRouter(prefix="/api/dialogue")
 logger = logging.getLogger("app")

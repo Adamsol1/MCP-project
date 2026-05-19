@@ -140,7 +140,7 @@ class GeminiAgent:
                 raise
 
             candidate = response.candidates[0] if response.candidates else None
-            if candidate is None or candidate.content is None:
+            if candidate is None or candidate.content is None or candidate.content.parts is None:
                 finish_reason = getattr(candidate, "finish_reason", "N/A") if candidate else "NO_CANDIDATES"
                 logger.warning(
                     "[GeminiAgent] Empty or blocked response (finish_reason=%s) — returning empty string",

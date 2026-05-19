@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -e
 
+# IDE Python extensions (VS Code, etc.) can set VIRTUAL_ENV to point at the
+# selected interpreter — even when it's a system Python, not a real venv.
+# Poetry honors VIRTUAL_ENV and skips venv creation, installing every project
+# into the same site-packages where they overwrite each other's deps.
+unset VIRTUAL_ENV
+
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 echo "==> Installing root npm dependencies..."
@@ -13,7 +19,7 @@ for dir in backend council_mcp_server generation_mcp_server review_mcp_server; d
   if [ -f "$ROOT/$dir/pyproject.toml" ]; then
     echo "==> Checking poetry lock in $dir..."
     cd "$ROOT/$dir"
-    if [ ! -f "poetry.lock" ] || ! poetry lock --check 2>/dev/null; then
+    if [ ! -f "poetry.lock" ] || ! poetry check --lock 2>/dev/null; then
       echo "    Lock file missing or stale — running poetry lock..."
       poetry lock
     fi
