@@ -27,7 +27,7 @@ _TOOL_TO_SOURCE: dict[str, str] = {
     "google_news_search": "Web Search",
 }
 
-# Tools that represent a page fetch — shown as current_activity and increment the current source count.
+# Tools that represent a page fetch shown as current_activity and increment the current source count.
 _FETCH_TOOLS: set[str] = {"fetch_page"}
 
 # Tools that are lookup/search operations and should not increment the result count.
@@ -45,7 +45,7 @@ _repo = CollectionStatusRepository()
 
 
 class CollectionStatusTracker:
-    """Writes live per-source tool-call counts to collection_status table for frontend polling.
+    """Writes live per-source tool call counts to collection_status table for frontend polling.
 
     Usage in collection_service.py::
 
@@ -106,7 +106,7 @@ class CollectionStatusTracker:
         self._flush()
 
     def set_source_count(self, source: str, count: int) -> None:
-        """Overwrite the result count for a source (used after post-processing passes)."""
+        """Overwrite the result count for a source."""
         if source in self._data["sources"]:
             self._data["sources"][source]["call_count"] = count
             self._flush()

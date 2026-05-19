@@ -17,26 +17,26 @@ class ReasoningLogEntry(BaseModel):
         ..., description="Dialogue phase, e.g. 'pir_generation', 'collection_planning'"
     )
     attempt_number: int = Field(
-        ..., ge=1, description="Attempt counter for current session. Starts at one"
+        ..., ge=1, description="Attempt counter for session"
     )
-    timestamp: datetime = Field(..., description="Timestamp for attempt")
-    generated_content: str = Field(..., description="Generated content for this phase")
+    timestamp: datetime = Field(..., description="Timestamp for the generation")
+    generated_content: str = Field(..., description="Generated content for current phase")
     generation_duration: float = Field(
-        ..., ge=0, description="Time spent generating content. Uses seconds"
+        ..., ge=0, description="Time spent generating content"
     )
     review_result: ReviewResult | None = Field(
         default=None,
-        description="A review result with review information. None if review failed.",
+        description="A review result with review information",
     )
     review_duration: float = Field(
-        ..., ge=0, description="Time spent reviewing content. Uses seconds"
+        ..., ge=0, description="Time spent reviewing content"
     )
     model_used: str = Field(
-        ..., description="Model used for AI generation. e.g Gemini 2.5"
+        ..., description="Model used for AI generation"
     )
     error_type: str | None = Field(
         default=None,
-        description="Exception type if generation or review failed, e.g. 'TimeoutError'",
+        description="Exception type if generation or review failed",
     )
 
 
@@ -56,13 +56,13 @@ class UserActionLogEntry(BaseModel):
 
 class ReasoningLog(BaseModel):
     """
-    Full AI reasoning trace for a session phase. Written to disk as a single
+    Full AI reasoning trace for a session phase. Written to disk/db as a single
     JSON file when content is approved by the user.
     """
 
     session_id: str | None
     phase: str = Field(
-        ..., description="Dialogue phase, e.g. 'direction', 'collection'"
+        ..., description="Dialogue phase"
     )
     model_used: str
     dialogue_turns: list[dict]

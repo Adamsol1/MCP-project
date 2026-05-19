@@ -1,4 +1,4 @@
-"""Analysis Confidence Score — deterministic algorithm.
+"""Analysis Confidence Score. being deterministic algorithm.
 
 No AI calls. Pure functions that compute confidence from source metadata.
 
@@ -9,7 +9,7 @@ Theoretical grounding:
   separate dimensions. Authority weights implement the reliability dimension.
 - JDP 2-00 p. 32: Assessments must be bounded by uncertainty — corroboration
   is capped at 0.90.
-- JDP 2-00 p. 59 §3.39: Circular reporting warning — independence component
+- JDP 2-00 p. 59 §3.39: Circular reporting warning independence component
   with 0.6 multiplier implements this.
 """
 
@@ -28,9 +28,6 @@ from src.services.confidence.source_authority_config import (
     THINK_TANK_DOMAINS,
 )
 
-# ---------------------------------------------------------------------------
-# Component weights
-# ---------------------------------------------------------------------------
 
 _W_AUTHORITY = 0.40
 _W_CORROBORATION = 0.35
@@ -38,11 +35,6 @@ _W_INDEPENDENCE = 0.25
 
 # Circular-reporting penalty multiplier (JDP 2-00 §3.39)
 _CIRCULAR_MULTIPLIER = 0.6
-
-
-# ---------------------------------------------------------------------------
-# Tier mapping (shared with collection_coverage.py)
-# ---------------------------------------------------------------------------
 
 
 def _score_to_tier(score: float) -> ConfidenceTier:
@@ -53,11 +45,6 @@ def _score_to_tier(score: float) -> ConfidenceTier:
     if score >= 0.40:
         return ConfidenceTier.MODERATE
     return ConfidenceTier.LOW
-
-
-# ---------------------------------------------------------------------------
-# URL / domain helpers
-# ---------------------------------------------------------------------------
 
 
 def _extract_domain(url: str) -> str:
@@ -87,19 +74,19 @@ def classify_web_source(url: str | None, publisher: str | None) -> str:  # noqa:
     if not domain:
         return "web_other"
 
-    # 1. State media → treat as government authority
+    # 1. State media treat as government authority
     if any(sm in domain for sm in STATE_MEDIA_DOMAINS):
         return "web_gov"
 
-    # 2. Government — pattern-based (.gov., .mil., etc.)
+    # 2. Government pattern-based (.gov., .mil., etc.)
     if any(pattern in domain for pattern in GOV_PATTERNS):
         return "web_gov"
 
-    # 3. Government — suffix patterns (.gov, .mil at end of domain)
+    # 3. Government suffix patterns (.gov, .mil at end of domain)
     if any(domain.endswith(suffix) for suffix in GOV_SUFFIX_PATTERNS):
         return "web_gov"
 
-    # 4. Government — exact domain match
+    # 4. Government exact domain match
     if any(domain == g or domain.endswith("." + g) for g in GOV_EXACT_DOMAINS):
         return "web_gov"
 
@@ -112,11 +99,6 @@ def classify_web_source(url: str | None, publisher: str | None) -> str:  # noqa:
         return "web_news"
 
     return "web_other"
-
-
-# ---------------------------------------------------------------------------
-# Authority component
-# ---------------------------------------------------------------------------
 
 
 def _compute_authority(
@@ -147,13 +129,11 @@ def _compute_authority(
     return max(authority_values) if authority_values else 0.10
 
 
-# ---------------------------------------------------------------------------
 # Corroboration component
-# ---------------------------------------------------------------------------
 
 
 def _count_independent_clusters(source_urls: list[str] | None) -> int:
-    """Count distinct URL clusters. Sources sharing the same URL → 1 cluster."""
+    """Count distinct URL clusters. Sources sharing the same URL 1 cluster."""
     if not source_urls:
         return 1  # assume at least one source cluster
 
@@ -165,9 +145,7 @@ def _compute_corroboration(cluster_count: int) -> float:
     return CORROBORATION_SCALE.get(cluster_count, CORROBORATION_CAP)
 
 
-# ---------------------------------------------------------------------------
 # Circular reporting detection
-# ---------------------------------------------------------------------------
 
 
 def detect_circular_reporting(
@@ -178,11 +156,6 @@ def detect_circular_reporting(
         return False
     normalized = [u.strip().lower() for u in source_urls if u.strip()]
     return len(normalized) != len(set(normalized))
-
-
-# ---------------------------------------------------------------------------
-# Main public API
-# ---------------------------------------------------------------------------
 
 
 def compute_confidence(

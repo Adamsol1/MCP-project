@@ -1,4 +1,4 @@
-"""Models for analysis-phase processing results, drafts, and council output."""
+"""Models for analysis phase processing results, drafts, and council output."""
 
 from typing import Any
 
@@ -8,32 +8,34 @@ from src.models.confidence import FindingConfidence, PerspectiveAssertion
 
 
 class FindingModel(BaseModel):
-    """A structured finding extracted during the processing phase."""
+    """
+    Finding model used in processing phase.
+    """
 
-    id: str = Field(..., description="Unique finding identifier")
-    title: str = Field(..., description="Short finding title")
-    finding: str = Field(..., description="Detailed finding statement")
-    evidence_summary: str = Field(..., description="Concise evidence summary")
+    id: str = Field(..., description="Unique id")
+    title: str = Field(..., description="Short title")
+    finding: str = Field(..., description="Detailed finding")
+    evidence_summary: str = Field(..., description="Summary")
     source: str = Field(..., description="Source category for the finding")
     confidence: int = Field(
         ..., ge=0, le=100, description="AI-generated confidence (legacy, 0–100)"
     )
     categories: list[str] = Field(
-        default_factory=list, description="PMESII categories assigned to this finding"
+        default_factory=list, description="PMESII categories given to this finding"
     )
     relevant_to: list[str] = Field(
-        default_factory=list, description="Related PIR identifiers"
+        default_factory=list, description="Related PIR"
     )
     supporting_data: dict[str, list[str]] = Field(
-        default_factory=dict, description="Structured support data for downstream use"
+        default_factory=dict, description="Structured support data"
     )
     why_it_matters: str = Field(..., description="Analytical significance of finding")
     uncertainties: list[str] = Field(
-        default_factory=list, description="Known uncertainties or unresolved questions"
+        default_factory=list, description="Known uncertainties"
     )
     computed_confidence: FindingConfidence | None = Field(
         default=None,
-        description="Algorithm-computed confidence breakdown (None until enrichment pass)",
+        description="Computed confidence breakdown (None until enrichment pass)",
     )
 
 
@@ -57,14 +59,14 @@ class AnalysisDraft(BaseModel):
     )
     summary: str = Field(..., description="Short analytical summary")
     key_judgments: list[str] = Field(
-        default_factory=list, description="Primary analytical judgments"
+        default_factory=list, description="Primary judgments"
     )
     per_perspective_implications: dict[str, list[PerspectiveAssertion]] = Field(
         default_factory=dict,
         description="Implications grouped by analytical perspective, with evidence trace",
     )
     recommended_actions: list[str] = Field(
-        default_factory=list, description="Recommended follow-up actions"
+        default_factory=list, description="Recommended follow up actions"
     )
     information_gaps: list[str] = Field(
         default_factory=list, description="Remaining information gaps"
@@ -123,7 +125,7 @@ class CouncilRuntimeProfile(BaseModel):
 
 
 class CouncilRunSettings(BaseModel):
-    """User-configurable runtime overrides for analysis-stage council runs."""
+    """User configurable runtime overrides for analysis-stage council runs."""
 
     mode: str = Field(default="conference", pattern="^(conference|quick)$")
     rounds: int = Field(default=2, ge=1, le=5)
@@ -138,7 +140,7 @@ class CouncilNote(BaseModel):
     status: str = Field(..., description="Council run status")
     question: str = Field(..., description="Debate question posed to the council")
     participants: list[str] = Field(
-        default_factory=list, description="User-visible participant labels"
+        default_factory=list, description="User visible participant labels"
     )
     rounds_completed: int = Field(..., description="Number of rounds completed")
     summary: str = Field(..., description="Council summary / consensus text")

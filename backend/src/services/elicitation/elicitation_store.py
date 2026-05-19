@@ -1,7 +1,7 @@
-"""ElicitationStore — in-memory store for MCP elicitation requests.
+"""ElicitationStore.
 
 When an MCP tool calls ctx.elicit(), the elicitation_callback parks a question
-here and blocks on an asyncio.Event. The frontend polls collection-status, sees
+here and blocks on an asyncio.Event. The frontend polls collection status, sees
 the pending elicitation, shows a modal, and POSTs the user's choice back.
 Responding resolves the Event and unblocks the agent.
 """
@@ -34,10 +34,10 @@ class PendingElicitation:
 
 
 class ElicitationStore:
-    """Singleton store — one pending elicitation per session at a time.
+    """Singleton store.
 
-    Also tracks which sessions have already received a provider-switch warning
-    so the classified-content elicitation fires at most once per session.
+    Also tracks which sessions have already received a provider switch warning
+    so the classified content elicitation fires at most once per session.
     """
 
     def __init__(self) -> None:

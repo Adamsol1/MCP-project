@@ -1,13 +1,9 @@
 """Configurable domain lists for web source authority classification.
 
-All lists are constants — extend these during testing without touching logic code.
+All lists are constants, extend these during testing without touching logic code.
 State media is classified as web_gov (not web_news) because it reflects official
 state positions rather than independent reporting. See thesis design note.
 """
-
-# ---------------------------------------------------------------------------
-# Source authority weights
-# ---------------------------------------------------------------------------
 
 SOURCE_AUTHORITY_WEIGHTS: dict[str, float] = {
     # Internal curated sources
@@ -36,10 +32,6 @@ SOURCE_AUTHORITY_WEIGHTS: dict[str, float] = {
     "uncited": 0.10,
 }
 
-# ---------------------------------------------------------------------------
-# Corroboration scale (independent source clusters → score)
-# ---------------------------------------------------------------------------
-
 CORROBORATION_SCALE: dict[int, float] = {
     1: 0.25,
     2: 0.55,
@@ -47,9 +39,6 @@ CORROBORATION_SCALE: dict[int, float] = {
 }
 CORROBORATION_CAP = 0.90  # 4+ clusters — JDP 2-00 p. 32 irreducible uncertainty
 
-# ---------------------------------------------------------------------------
-# Government: pattern-based detection
-# ---------------------------------------------------------------------------
 
 GOV_PATTERNS: list[str] = [".gov.", ".mil.", ".gob.", ".govt."]
 
@@ -95,11 +84,6 @@ GOV_EXACT_DOMAINS: set[str] = {
     "fsb.ru",
 }
 
-# ---------------------------------------------------------------------------
-# State media — classified as web_gov (not web_news)
-# These outlets reflect official state positions and are not editorially
-# independent. Design decision documented for thesis.
-# ---------------------------------------------------------------------------
 
 STATE_MEDIA_DOMAINS: set[str] = {
     # China
@@ -115,9 +99,6 @@ STATE_MEDIA_DOMAINS: set[str] = {
     "sputniknews.com",
 }
 
-# ---------------------------------------------------------------------------
-# Think tanks & research institutions
-# ---------------------------------------------------------------------------
 
 THINK_TANK_DOMAINS: set[str] = {
     # US / International
@@ -152,9 +133,6 @@ THINK_TANK_DOMAINS: set[str] = {
     "isw",
 }
 
-# ---------------------------------------------------------------------------
-# News outlets (editorially independent)
-# ---------------------------------------------------------------------------
 
 NEWS_DOMAINS: set[str] = {
     # Wire services

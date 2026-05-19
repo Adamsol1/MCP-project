@@ -1,4 +1,4 @@
-"""LLMService — direct Gemini API calls for the Direction phase.
+"""LLMService direct Gemini API calls for the Direction phase.
 
 This service is used by DialogueService and ReviewService for all
 Direction phase AI generation. No MCP is involved.
@@ -18,18 +18,14 @@ logger = logging.getLogger("app")
 
 
 def _repair_json(text: str) -> str:
-    """Apply a sequence of increasingly aggressive repairs to LLM-generated JSON.
+    """Apply a sequence of increasingly aggressive repairs to LLM generated JSON.
 
-    Repair 1 — smart/curly quotes: replace typographic " " ' ' with ASCII equivalents.
-    Repair 2 — bad escape sequences: remove backslashes before characters that are not
-               valid JSON escape targets (e.g. \' produced by some models).
-    Repair 3 — trailing commas: strip commas immediately before ] or }.
-    Repair 4 — unescaped inner quotes: scan character-by-character; when inside a JSON
-               string, any " not immediately followed by a JSON structural character
-               (, } ] : or end-of-input) is treated as an unescaped quote and gets
-               escaped to \".
+    Repair 1: Replace typographic quotes with ASCII equivalents.
+    Repair 2: Remove backslashes before characters that are not valid JSON escape targets.
+    Repair 3: Strip trailing commas before ] or }.
+    Repair 4: Escape unescaped inner quotes inside string values.
     """
-    # Repair 1: typographic quotes → ASCII
+    # Repair 1
     text = (
         text.replace("\u201c", '"')
         .replace("\u201d", '"')
@@ -37,16 +33,13 @@ def _repair_json(text: str) -> str:
         .replace("\u2019", "'")
     )
 
-    # Repair 2: invalid escape sequences (e.g. \' → ')
+    # Repair 2
     text = re.sub(r"\\([^\"\\\/bfnrtu])", r"\1", text)
 
-    # Repair 3: trailing commas before } or ]
+    # Repair 3
     text = re.sub(r",\s*([}\]])", r"\1", text)
 
-    # Repair 4: unescaped double quotes inside string values.
-    # Heuristic: when inside a string, a " is the closing quote only when
-    # the next non-whitespace char is a JSON structural character (, } ] :)
-    # or the text ends.  Otherwise it is escaped.
+    # Repair 4
     result: list[str] = []
     i = 0
     n = len(text)
@@ -57,7 +50,7 @@ def _repair_json(text: str) -> str:
             i += 1
             continue
 
-        # Opening quote of a string — copy it and scan the contents.
+        # Opening quote of a string  copy it and scan the contents.
         result.append('"')
         i += 1
         while i < n:
@@ -92,9 +85,8 @@ def _repair_json(text: str) -> str:
 class LLMService:
     """Direct Gemini API wrapper for backend AI calls.
 
-    Used exclusively in the Direction phase where no external tool
-    integration is needed. Wraps google-genai with async support
-    and JSON parsing convenience.
+    Used in the direction phase to call Gemini directly. This is used when MCP is not needed.
+
     """
 
     def __init__(self, model: str = "gemini-2.5-flash"):
@@ -124,7 +116,7 @@ class LLMService:
         return response.text
 
     async def generate_json(self, prompt: str) -> dict:
-        """Send a prompt to Gemini and return the parsed JSON response.
+        """Send a prompt to Gemini and return the JSON response.
 
         Args:
             prompt: The prompt string to send to the model.
@@ -145,7 +137,7 @@ class LLMService:
         except json.JSONDecodeError:
             pass
 
-        # First parse failed — apply repairs and retry.
+        # First parse failed. Attempt to repair and try again
         repaired = _repair_json(text)
         try:
             result = json.loads(repaired)
@@ -161,7 +153,7 @@ class LLMService:
 
     @staticmethod
     def _strip_fences(text: str) -> str:
-        """Strip markdown code fences and trailing non-JSON content from a response string."""
+        """Strip markdown code fences and trailing content from a response string."""
         text = text.strip()
         if text.startswith("```"):
             lines = text.splitlines()

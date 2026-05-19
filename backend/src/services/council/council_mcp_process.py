@@ -83,7 +83,7 @@ async def maybe_start_council_mcp(server_url: str) -> subprocess.Popen[bytes] | 
     """Start the local council MCP server for development if needed.
 
     Production or externally hosted MCP setups should set COUNCIL_MCP_URL to a
-    non-local URL, or set COUNCIL_MCP_AUTOSTART=0.
+    non local URL, or set COUNCIL_MCP_AUTOSTART=0.
     """
     if not _autostart_enabled():
         logger.info("[Council MCP] Autostart disabled")

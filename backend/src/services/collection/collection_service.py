@@ -5,6 +5,8 @@ For each collection phase we:
 2. Gemini agent executes prompts and uses allowed tools.
 3. Agent returns collected/derived content.
 4. Backend returns structured content to CollectionFlow for frontend review.
+
+Same pattern
 """
 
 import json
@@ -35,7 +37,7 @@ _SOURCE_TO_TOOLS: dict[str, list[str]] = {
 }
 
 
-# Substring rules for noisy model outputs: all tokens in a tuple must appear
+# Substring rules for noisy model outputs. all tokens in a tuple must appear
 # in the lowercased source string for the rule to fire (AND within a tuple,
 # first match wins across the list).
 _SUBSTRING_RULES: list[tuple[tuple[str, ...], str]] = [
@@ -88,9 +90,9 @@ def _extract_search_urls(raw_data: str) -> list[str]:
     Both are searched so the second-pass fetch runs regardless of which format
     the model used.
     """
-    # Format 1 — legacy text: "URL: https://..."
+    # Format 1: legacy text: "URL: https://..."
     text_urls = re.findall(r"URL:\s*(https?://\S+)", raw_data)
-    # Format 2 — JSON resource_id field containing an HTTP URL
+    # Format 2: JSON resource_id field containing an HTTP URL
     resource_ids = re.findall(r'"resource_id"\s*:\s*"(https?://[^"]+)"', raw_data)
 
     seen: set[str] = set()
@@ -107,7 +109,7 @@ def _extract_search_urls(raw_data: str) -> list[str]:
 # when merging collected_data lists in parse_collected_data.
 _COLLECTION_SEPARATOR = "--- NEW COLLECTION ATTEMPT ---"
 
-# Web-fetch source tool names — used for title-based secondary deduplication.
+# Web-fetch source tool names, used for title-based secondary deduplication.
 _WEB_FETCH_SOURCES = {"fetch_page", "google_news_search", "google_search"}
 
 
@@ -321,7 +323,7 @@ class CollectionService:
             if not isinstance(items, list):
                 raise ValueError("collected_data is not a list")
 
-            # Deduplicate items by (source, resource_id) — the agent may call
+            # Deduplicate items by (source, resource_id)the agent may call
             # search_local_data or read_upload multiple times across PIRs/attempts,
             # returning the same document each time. Keep the last occurrence so
             # later calls (with potentially fuller content) win.
@@ -427,7 +429,7 @@ class CollectionService:
         if parsed:
             raw_steps = parsed.get("steps")
             if isinstance(raw_steps, list) and raw_steps:
-                # New per-step format — normalise each step and aggregate sources.
+                # New per-step format: normalise each step and aggregate sources.
                 steps: list[dict[str, Any]] = []
                 seen_sources: list[str] = []
                 for step in raw_steps:
@@ -574,7 +576,7 @@ class CollectionService:
         perspectives: list[str] | None = None,
         source_timeframes: dict[str, str] | None = None,
     ) -> str:
-        """Collect raw data only — no summarization.
+        """Collect raw data onlyno summarization.
 
         existing_raw_data: data already gathered in previous attempts (passed for context).
         """
@@ -596,13 +598,13 @@ class CollectionService:
                 if unavailable:
                     alt = [s for s in selected_sources if s not in intended]
                     line += (
-                        f" — {', '.join(unavailable)} not selected by user."
+                        f"{', '.join(unavailable)} not selected by user."
                         f" Use {', '.join(available) or 'other approved sources'}"
                         f"{' + ' + ', '.join(alt) if alt else ''} to cover this step instead."
                     )
                 else:
                     line += (
-                        f" — all intended sources available: {', '.join(available)}."
+                        f"all intended sources available: {', '.join(available)}."
                     )
                 lines.append(line)
             step_source_guidance = "\n".join(lines)
@@ -648,7 +650,7 @@ class CollectionService:
             )
 
         # Second pass: summarize full page content via Gemini url_context (no scraping).
-        # Runs outside the MCP context — url_context is a Gemini built-in, not an MCP tool.
+        # Runs outside the MCP contexturl_context is a Gemini built-in, not an MCP tool.
         # We pass up to 25 URLs (buffer) because some pages will be inaccessible and get
         # filtered out inside fetch_url_summaries, so we need extras to hit the ~15 target.
         if "Web Search" in selected_sources:

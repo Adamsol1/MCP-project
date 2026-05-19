@@ -4,10 +4,10 @@ Reads raw collected data from collection_attempts table, runs the processing age
 (normalize → enrich → correlate → synthesize), writes the result to
 processing_attempts table, and presents it for analyst review.
 
-States:
-    PROCESSING  — agent has not yet run (waiting for initialize)
-    REVIEWING   — analyst is reviewing the processed result
-    COMPLETE    — analyst approved, phase done
+Possible States:
+    PROCESSING: agent has not yet run (waiting for initialize)
+    REVIEWING: analyst is reviewing the processed result
+    COMPLETE: analyst approved, phase done
 """
 
 import json
@@ -104,9 +104,9 @@ async def _write_processed(
 
 
 class ProcessingState(str, Enum):
-    PROCESSING = "processing"
-    REVIEWING = "reviewing"
-    COMPLETE = "complete"
+    PROCESSING = "processing"  # Agent is running, processing collected data
+    REVIEWING = "reviewing"    # Analyst is reviewing the processed result
+    COMPLETE = "complete"      # Processing phase complete, analyst approved
 
 
 class ProcessingFlow(BasePhaseFlow):
@@ -128,8 +128,6 @@ class ProcessingFlow(BasePhaseFlow):
         self.pir = pir
         self.direction_context = direction_context
         self.state = ProcessingState.PROCESSING
-        # TODO: DB migration — pending_reasoning_log written to DB on approval.
-        # Replace with a ReasoningLog table insert when DB is in place.
         self.pending_reasoning_log: ReasoningLog | None = None
 
     # TODO: DB migration — to_dict and from_dict replace with SQLAlchemy model read/write.
@@ -300,8 +298,8 @@ class ProcessingFlow(BasePhaseFlow):
         """
         State handler for reviewing phase.
         Possible outcomes:
-          - Approve (approved=True)  → COMPLETE, write reasoning log
-          - Modify (approved=False)  → Re-run with analyst feedback, self-loop
+          - Approve (approved=True): REVIEWING -> COMPLETE, write reasoning log
+          - Modify (approved=False): Re-run processing with analyst feedback, self-loop (stay in REVIEWING)
         """
         assert self.session_id, "session_id must be set before reviewing"
         if approved:

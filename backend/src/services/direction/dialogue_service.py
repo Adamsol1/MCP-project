@@ -38,7 +38,6 @@ class DialogueService:
         Args:
             user_message: The user's latest message.
             context: Current dialogue context.
-            language: BCP-47 language code for the response language.
 
         Returns:
             QuestionResult with question and extracted context fields.
@@ -80,13 +79,11 @@ class DialogueService:
     ) -> Any:
         """Generate PIRs from gathered dialogue context.
 
-        Uses the MCP Resources primitive to pre-fetch relevant knowledge before
-        generation (host-driven), in addition to the AI's autonomous tool calls
-        (model-driven). This demonstrates both access patterns for RQ1.1.
+        Uses the MCP Resources primitive to prefetch relevant knowledge before
+        generation, in addition to the AI's autonomous tool calls.
 
         Args:
             context: The dialogue context with scope, timeframe, target_entities, perspectives.
-            language: BCP-47 language code. Falls back to self.language when not passed directly.
             current_pir: Existing PIR string for modification requests.
 
         Returns:
@@ -96,7 +93,7 @@ class DialogueService:
         perspectives = [p.value for p in context.perspectives]
 
         async with self.mcp_client.connect():
-            # MCP Resources primitive: backend pre-fetches relevant knowledge
+            # MCP Resources primitive: backend pre fetches relevant knowledge
             # based on context (host-driven), before the AI starts generating.
             background_knowledge = await self._fetch_relevant_resources(context)
 
@@ -154,14 +151,10 @@ class DialogueService:
     async def _fetch_relevant_resources(self, context: DialogueContext) -> str:
         """Pre-fetch relevant knowledge using the MCP Resources primitive.
 
-        This is the host-driven counterpart to AI-driven tool calls. The backend
+        This is the host driven counterpart to AI-driven tool calls. The backend
         reads the knowledge index resource, matches resources against the current
         investigation context, and fetches the top matches to inject into the
         PIR generation prompt as grounding knowledge.
-
-        This demonstrates the Resources primitive (RQ1.1): the host decides what
-        knowledge is relevant and fetches it proactively, rather than leaving it
-        entirely to the AI to discover via tools.
 
         Args:
             context: Current dialogue context to match knowledge against.
@@ -222,7 +215,7 @@ class DialogueService:
     async def generate_summary(
         self, context: DialogueContext, modifications=None, language: str = "en"
     ) -> dict:
-        """Generate a human-readable summary of the gathered context.
+        """Generate a human readable summary of the gathered context.
 
         Args:
             context: The dialogue context gathered so far.

@@ -1,3 +1,5 @@
+"""State machine for the Analysis phase. States: PENDING -> COMPLETE"""
+
 import json
 import logging
 from enum import Enum
@@ -10,11 +12,16 @@ logger = logging.getLogger("app")
 
 
 class AnalysisState(str, Enum):
-    PENDING = "pending"
-    COMPLETE = "complete"
+    PENDING = "pending"   # Waiting for analysis generation
+    COMPLETE = "complete"  # Analysis approved by user
 
 
 class AnalysisFlow(BasePhaseFlow):
+    """
+    State machine for the analysis phase. Generates analysis draft from processing result.
+    States: PENDING -> COMPLETE
+    """
+
     def __init__(
         self,
         session_id: str | None = None,
@@ -27,6 +34,7 @@ class AnalysisFlow(BasePhaseFlow):
         self.analysis_result: dict | None = None
 
     def to_dict(self) -> dict:
+        """Serialize analysis state to dict for JSON persistence."""
         return {
             "session_id": self.session_id,
             "state": self.state.value,
@@ -36,6 +44,7 @@ class AnalysisFlow(BasePhaseFlow):
 
     @classmethod
     def from_dict(cls, data: dict, research_logger=None) -> "AnalysisFlow":
+        """Load AnalysisFlow from a saved dict. Called on server restart."""
         flow = cls(
             session_id=data["session_id"],
             pir=data.get("pir", ""),
@@ -46,6 +55,7 @@ class AnalysisFlow(BasePhaseFlow):
         return flow
 
     def _extract_pirs(self) -> list[dict]:
+        """Parse and return the list of PIR dicts from the stored PIR JSON string."""
         if not self.pir:
             return []
         try:
@@ -68,6 +78,12 @@ class AnalysisFlow(BasePhaseFlow):
         selected_perspectives: list[str] | None = None,
         language: str = "en",
     ) -> DialogueResponse:
+        """
+        Generate analssis draft from processing result. Change to COMPLETE
+        Use the DUAL ai pattern if possible.
+        Generate analysis draft from processing result and move to COMPLETE.
+        Possible state transitions: PENDING -> COMPLETE
+        """
         if not self.session_id:
             return DialogueResponse(
                 action=DialogueAction.ERROR, content="No session ID set."
@@ -85,6 +101,7 @@ class AnalysisFlow(BasePhaseFlow):
             )
             return DialogueResponse(action=DialogueAction.ERROR, content=str(exc))
 
+        #Use dual ai pattern
         try:
             if orchestrator and reviewer:
                 analysis_draft, enriched_result = await orchestrator.analyse_and_review(
@@ -96,6 +113,7 @@ class AnalysisFlow(BasePhaseFlow):
                     selected_perspectives=selected_perspectives,
                     language=language,
                 )
+                #Else no review
             else:
                 analysis_draft, enriched_result = await analysis_service.generate_draft(
                     processing_result,
@@ -154,6 +172,7 @@ class AnalysisFlow(BasePhaseFlow):
         return response
 
     async def process_user_message(self, **_kwargs) -> DialogueResponse:
+        """Return the stored analysis result if complete, otherwise return error."""
         if self.state == AnalysisState.COMPLETE and self.analysis_result:
             return DialogueResponse(
                 action=DialogueAction.SHOW_ANALYSIS,

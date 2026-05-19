@@ -26,8 +26,6 @@ PROCESSING_RESULT_UNAVAILABLE_MESSAGE = (
 def _repair_array_with_gaps(candidate: str) -> dict | None:
     """Repair the case where the model returned a bare findings array with gaps appended.
 
-    Handles: [...findings...],\n  "gaps": [...]\n}
-    instead of: {"findings": [...], "gaps": [...]}
     """
     m = re.match(
         r"\s*(\[[\s\S]*\])\s*,\s*\"gaps\"\s*:\s*(\[[\s\S]*?\])\s*\}?\s*$",
@@ -84,7 +82,7 @@ def _try_parse_processing_result(raw: str) -> ProcessingResult | None:
 
 
 def normalize_raw_result(raw: str) -> str:
-    """Re-serialize malformed LLM output as canonical JSON if possible.
+    """Re serialize malformed LLM output as canonical JSON if possible.
 
     Returns the original string unchanged when parsing fails so callers always
     get a usable value.
@@ -248,7 +246,7 @@ class ProcessingResultStore:
         if not attempts:
             return None
 
-        # Walk attempts newest-first to find the most recent valid result
+        # Walk attempts newest first to find the most recent valid result
         for attempt in reversed(attempts):
             result = _try_parse_processing_result(attempt.raw_result)
             if result is not None:

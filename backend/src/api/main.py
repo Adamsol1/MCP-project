@@ -222,12 +222,8 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
     - All uploaded files and parsed artifacts (data/imports/{session_id}/)
     - Research and reasoning logs (data/outputs/research_log_* and reasoning_log_*)
     - Legacy: analysis state file and session JSON if they exist
-
-    The DB delete is attempted first and committed independently of the file
-    cleanups.  If file cleanup later fails we still return 204 — the
-    authoritative DB row is already gone and stale files can be pruned later.
     """
-    # --- DB delete (authoritative) ---
+    # DB delete
     try:
         existed = await evict_session(session_id, uow)
     except Exception as e:
@@ -239,7 +235,7 @@ async def delete_session(session_id: str, uow: UnitOfWork = Depends(get_uow)):
             status_code=500, detail="Failed to delete session from DB"
         ) from e
 
-    # --- Filesystem cleanups (best-effort) ---
+    # Filesystem clean
     try:
         delete_session_uploads(session_id=session_id, uploads_root=UPLOADS_ROOT)
 
